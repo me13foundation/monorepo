@@ -23,13 +23,14 @@ This document outlines the infrastructure setup for the MED13 Resource Library (
 - Familiar YAML-based configuration
 - Automatic testing and deployment on main branch pushes
 
-### Database: SQLite (Development) / Cloud SQL PostgreSQL (Production)
-**Decision**: SQLite for local development, Cloud SQL PostgreSQL for production
+### Database: SQLite (Development & Production)
+**Decision**: SQLite for all environments - simple, reliable, and sufficient for MED13 data volumes
 **Rationale**:
-- Cost-efficient and fully compatible with Python ecosystem
-- Managed service reduces operational overhead
-- Automatic backups, scaling, and security patches
-- JSONB support for flexible metadata storage as specified in requirements
+- Zero-configuration file-based database
+- Perfect for MED13 data volumes (genes, variants, phenotypes, publications, evidence)
+- No operational overhead - database travels with application
+- ACID-compliant with excellent reliability
+- JSON support for flexible metadata storage
 - Private IP connectivity with Cloud Run for security
 
 ### Secrets Management: Google Cloud Secret Manager
@@ -47,7 +48,7 @@ This document outlines the infrastructure setup for the MED13 Resource Library (
 - **Runtime**: Python 3.11
 - **Framework**: FastAPI (REST/GraphQL API)
 - **UI**: Plotly Dash for curation interface
-- **Database**: SQLite (development) / PostgreSQL 15+ with JSONB (production)
+- **Database**: SQLite (development & production)
 - **Deployment**: Cloud Run (serverless with source deployments)
 - **Containerization**: Dockerfile for local development
 
@@ -416,35 +417,23 @@ python-multipart==0.0.6
 
 ## Database Configuration
 
-### Local Development (SQLite)
-- **Database**: SQLite file-based database (`med13.db`)
+### SQLite Database (All Environments)
+- **Database**: SQLite file-based database (`med13.db` for dev, `med13_prod.db` for production)
 - **Setup**: Automatic file creation, zero configuration
 - **Migration**: Alembic handles schema changes
-- **Data**: Persisted locally, easy to reset for development
-
-### Production (Cloud SQL)
-- **Instance Type**: PostgreSQL 15
-- **Machine Type**: db-f1-micro (for development) or db-g1-small (for production)
-- **Storage**: 10GB SSD (autoscale enabled)
-- **Backup**: Daily backups with 7-day retention
-- **High Availability**: Single zone (upgrade to regional for production)
-
-### Connection Security
-- **Private IP**: Enabled for Cloud Run connectivity
-- **IAM Authentication**: Service account-based access
-- **SSL**: Required for all connections
-- **VPC Network**: Default network with private services access
+- **Storage**: File included in Cloud Run deployment
+- **Backup**: Simple file copy operations
+- **Data Volume**: Perfect for MED13 resource library size
+- **Concurrency**: ACID-compliant with WAL mode for concurrent reads/writes
 
 ## Secrets Management
 
 ### Required Secrets
-- `med13-db-password`: Database password
-- `med13-db-user`: Database username
 - `clinvar-api-key`: ClinVar API access token
 - `pubmed-api-key`: PubMed API key
 - `crossref-api-key`: Crossref API token
 - `omim-api-key`: OMIM API key
-- `oauth-client-secret`: OAuth2 client secret
+- `oauth-client-secret`: OAuth2 client secret (for curator authentication)
 - `jwt-secret-key`: JWT signing secret
 
 ### Service Account Setup (Per Environment)
@@ -465,15 +454,10 @@ gcloud iam service-accounts create med13-prod \
 for env in dev staging prod; do
   SA="med13-${env}@YOUR_PROJECT.iam.gserviceaccount.com"
 
-  # Secret Manager access
+  # Secret Manager access for API keys and authentication secrets
   gcloud projects add-iam-policy-binding YOUR_PROJECT \
     --member="serviceAccount:$SA" \
     --role="roles/secretmanager.secretAccessor"
-
-  # Cloud SQL client access
-  gcloud projects add-iam-policy-binding YOUR_PROJECT \
-    --member="serviceAccount:$SA" \
-    --role="roles/cloudsql.client"
 
   # Cloud Run invoker (for production service account)
   if [ "$env" = "prod" ]; then
@@ -497,7 +481,7 @@ Each GitHub environment stores its own `GCP_SA_KEY` secret for secure authentica
 
 ### Network Security
 - **HTTPS Only**: Cloud Run enforces SSL
-- **Private Database**: Cloud SQL accessible only via private IP
+- **Database Security**: SQLite file included in deployment (no external access)
 - **VPC Service Controls**: (Optional) For additional isolation
 - **Firewall Rules**: Restrictive ingress rules
 
@@ -505,14 +489,14 @@ Each GitHub environment stores its own `GCP_SA_KEY` secret for secure authentica
 
 ### Estimated Monthly Costs
 - **Cloud Run**: $0.0001/request (2M requests free)
-- **Cloud SQL**: $15-30/month (basic instance)
+- **Database**: $0 (SQLite file included in deployment)
 - **Secret Manager**: $0.06/secret/month (~$2-3/month)
 - **Cloud Storage**: $0.02/GB/month (minimal for logs)
-- **Total**: $20-40/month for development/production
+- **Total**: $5-15/month for development/production
 
 ### Scaling Strategy
 - **Cloud Run**: Automatic scaling (0-1000 instances)
-- **Database**: Vertical scaling or read replicas as needed
+- **Database**: SQLite handles MED13 data volumes efficiently
 - **Storage**: Archive old data to Cloud Storage
 
 ## Monitoring & Observability
@@ -543,22 +527,10 @@ Each GitHub environment stores its own `GCP_SA_KEY` secret for secure authentica
 ```bash
 # Enable required APIs
 gcloud services enable run.googleapis.com
-gcloud services enable sqladmin.googleapis.com
 gcloud services enable secretmanager.googleapis.com
 gcloud services enable storage.googleapis.com
 
-# Create Cloud SQL instance
-gcloud sql instances create med13-db \
-  --database-version=POSTGRES_15 \
-  --cpu=1 \
-  --memory=3840MB \
-  --region=us-central1 \
-  --root-password=[SECURE_PASSWORD]
-
-# Create database
-gcloud sql databases create med13_library --instance=med13-db
-
-# Create data retention buckets
+# Create data retention buckets (optional - for data exports)
 gsutil mb -p YOUR_PROJECT -c standard gs://med13-data-sources
 gsutil lifecycle set retention-policy-90-days gs://med13-data-sources
 gsutil mb -p YOUR_PROJECT -c coldline gs://med13-data-archive
@@ -582,7 +554,7 @@ gsutil mb -p YOUR_PROJECT -c coldline gs://med13-data-archive
 ## Maintenance & Operations
 
 ### Backup Strategy
-- **Database**: Daily automated backups via Cloud SQL
+- **Database**: SQLite file backups via `make backup-db`
 - **Application**: Infrastructure as code in GitHub
 - **Secrets**: Versioned in Secret Manager
 
@@ -625,7 +597,7 @@ While not currently required, prepare for future healthcare compliance:
 
 ### Retention Guidelines
 - **Raw source files**: Store in Cloud Storage bucket with 90-day retention
-- **Processed data**: Retain indefinitely in Cloud SQL for research integrity
+- **Processed data**: Retain indefinitely in SQLite for research integrity
 - **Audit logs**: 7-year retention for compliance and provenance tracking
 - **Backups**: 30-day retention with weekly long-term archives
 - **Temporary files**: Immediate deletion after processing
@@ -641,9 +613,9 @@ gsutil mb -p YOUR_PROJECT -c coldline gs://med13-data-archive
 ```
 
 ### Database Backup Strategy
-- **Automated backups**: Daily via Cloud SQL
-- **Point-in-time recovery**: 7-day window available
-- **Cross-region replication**: For disaster recovery (future enhancement)
+- **Manual backups**: Via `make backup-db` command
+- **File-based recovery**: Restore from SQLite backup files
+- **Version control**: Database schema tracked in code migrations
 
 ## Infrastructure-as-Code Foundation
 
@@ -652,17 +624,7 @@ Document all manual setup commands for future Infrastructure-as-Code conversion:
 
 ```bash
 # Enable required APIs
-gcloud services enable run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com
-
-# Create Cloud SQL instance
-gcloud sql instances create med13-db \
-  --database-version=POSTGRES_15 \
-  --tier=db-g1-small \
-  --region=us-central1 \
-  --backup-start-time=02:00
-
-# Create database
-gcloud sql databases create med13_library --instance=med13-db
+gcloud services enable run.googleapis.com secretmanager.googleapis.com
 
 # Deploy Cloud Run services
 gcloud run deploy med13-resource-library \

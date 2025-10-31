@@ -1,7 +1,7 @@
 # MED13 Resource Library - Development Makefile
 # Automates common development, testing, and deployment tasks
 
-.PHONY: help install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-db-connect cloud-secrets-list ci check-env docs-serve backup-db restore-db
+.PHONY: help install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list ci check-env docs-serve backup-db restore-db
 
 # Default target
 help: ## Show this help message
@@ -142,9 +142,6 @@ deploy-prod: ## Deploy to production environment
 cloud-logs: ## View Cloud Run logs
 	gcloud logs read "resource.type=cloud_run_revision AND resource.labels.service_name=med13-resource-library" --limit=50
 
-cloud-db-connect: ## Connect to Cloud SQL database
-	gcloud sql connect med13-db --user=med13_user
-
 cloud-secrets-list: ## List all secrets
 	gcloud secrets list
 
@@ -186,20 +183,10 @@ docs-serve: ## Serve documentation locally
 	cd docs && python3 -m http.server 8000
 
 # Backup and Recovery
-backup-db: ## Create database backup (local SQLite)
+backup-db: ## Create database backup (SQLite)
 	@echo "Creating SQLite database backup..."
 	cp med13.db backup_$(shell date +%Y%m%d_%H%M%S).db
 
-backup-db-cloud: ## Create Cloud SQL database backup
-	@echo "Creating Cloud SQL database backup..."
-	gcloud sql export sql med13-db gs://med13-data-archive/backup-$(shell date +%Y%m%d-%H%M%S).sql \
-		--database=med13_library
-
-restore-db: ## Restore database from backup (specify FILE variable, local SQLite)
+restore-db: ## Restore database from backup (specify FILE variable)
 	@echo "Restoring SQLite database from $(FILE)..."
 	cp $(FILE) med13.db
-
-restore-db-cloud: ## Restore Cloud SQL database from backup (specify FILE variable)
-	@echo "Restoring Cloud SQL database from $(FILE)..."
-	gcloud sql import sql med13-db gs://med13-data-archive/$(FILE) \
-		--database=med13_library
