@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+psycopg2://postgres:postgres@localhost:5432/med13",
+    "sqlite:///med13.db",
 )
 
 engine = create_engine(DATABASE_URL, future=True, pool_pre_ping=True)

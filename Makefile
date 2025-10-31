@@ -186,12 +186,20 @@ docs-serve: ## Serve documentation locally
 	cd docs && python3 -m http.server 8000
 
 # Backup and Recovery
-backup-db: ## Create database backup
-	@echo "Creating database backup..."
+backup-db: ## Create database backup (local SQLite)
+	@echo "Creating SQLite database backup..."
+	cp med13.db backup_$(shell date +%Y%m%d_%H%M%S).db
+
+backup-db-cloud: ## Create Cloud SQL database backup
+	@echo "Creating Cloud SQL database backup..."
 	gcloud sql export sql med13-db gs://med13-data-archive/backup-$(shell date +%Y%m%d-%H%M%S).sql \
 		--database=med13_library
 
-restore-db: ## Restore database from backup (specify FILE variable)
-	@echo "Restoring database from $(FILE)..."
+restore-db: ## Restore database from backup (specify FILE variable, local SQLite)
+	@echo "Restoring SQLite database from $(FILE)..."
+	cp $(FILE) med13.db
+
+restore-db-cloud: ## Restore Cloud SQL database from backup (specify FILE variable)
+	@echo "Restoring Cloud SQL database from $(FILE)..."
 	gcloud sql import sql med13-db gs://med13-data-archive/$(FILE) \
 		--database=med13_library

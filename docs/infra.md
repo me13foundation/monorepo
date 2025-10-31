@@ -23,8 +23,8 @@ This document outlines the infrastructure setup for the MED13 Resource Library (
 - Familiar YAML-based configuration
 - Automatic testing and deployment on main branch pushes
 
-### Database: Cloud SQL (PostgreSQL)
-**Decision**: Managed PostgreSQL service
+### Database: SQLite (Development) / Cloud SQL PostgreSQL (Production)
+**Decision**: SQLite for local development, Cloud SQL PostgreSQL for production
 **Rationale**:
 - Cost-efficient and fully compatible with Python ecosystem
 - Managed service reduces operational overhead
@@ -47,7 +47,7 @@ This document outlines the infrastructure setup for the MED13 Resource Library (
 - **Runtime**: Python 3.11
 - **Framework**: FastAPI (REST/GraphQL API)
 - **UI**: Plotly Dash for curation interface
-- **Database**: PostgreSQL 15+ with JSONB support
+- **Database**: SQLite (development) / PostgreSQL 15+ with JSONB (production)
 - **Deployment**: Cloud Run (serverless with source deployments)
 - **Containerization**: Dockerfile for local development
 
@@ -416,7 +416,13 @@ python-multipart==0.0.6
 
 ## Database Configuration
 
-### Cloud SQL Setup
+### Local Development (SQLite)
+- **Database**: SQLite file-based database (`med13.db`)
+- **Setup**: Automatic file creation, zero configuration
+- **Migration**: Alembic handles schema changes
+- **Data**: Persisted locally, easy to reset for development
+
+### Production (Cloud SQL)
 - **Instance Type**: PostgreSQL 15
 - **Machine Type**: db-f1-micro (for development) or db-g1-small (for production)
 - **Storage**: 10GB SSD (autoscale enabled)
