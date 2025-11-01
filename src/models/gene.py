@@ -4,7 +4,7 @@ Strongly typed Pydantic models with comprehensive validation.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ConfigDict, ValidationInfo
 from enum import Enum
 
@@ -161,10 +161,10 @@ class GeneResponse(Gene):
     )
 
     # Optional relationships (can be included based on query parameters)
-    variants: Optional[List[dict]] = Field(
+    variants: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Associated variants (optional)"
     )
-    phenotypes: Optional[List[dict]] = Field(
+    phenotypes: Optional[List[Dict[str, Any]]] = Field(
         default=None, description="Associated phenotypes (optional)"
     )
 
