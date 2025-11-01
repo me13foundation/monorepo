@@ -7,7 +7,7 @@ from .identifiers import (
     PhenotypeIdentifier,
     PublicationIdentifier,
 )
-from .provenance import Provenance
+from .provenance import Provenance, DataSource
 from .confidence import ConfidenceScore
 
 __all__ = [
@@ -16,5 +16,6 @@ __all__ = [
     "PhenotypeIdentifier",
     "PublicationIdentifier",
     "Provenance",
+    "DataSource",
     "ConfidenceScore",
 ]

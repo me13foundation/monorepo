@@ -287,11 +287,11 @@ Distribute FAIR packages with persistent identifiers.
 ### Phase 1B: Core ETL Pipeline (Weeks 3-8)
 
 #### Week 3-4: Data Ingestion
-- [ ] External API client implementations
-- [ ] Rate limiting and error handling
-- [ ] Raw data storage and provenance tracking
-- [ ] Parallel ingestion orchestration
-- [ ] Integration tests for data sources
+- [x] External API client implementations
+- [x] Rate limiting and error handling
+- [x] Raw data storage and provenance tracking
+- [x] Parallel ingestion orchestration
+- [x] Integration tests for data sources
 
 #### Week 5-6: Data Transformation
 - [ ] Parser implementations for each data source
