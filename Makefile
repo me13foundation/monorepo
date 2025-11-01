@@ -161,7 +161,7 @@ run-local: ## Run the application locally
 
 run-dash: ## Run the Dash curation interface locally
 	$(call check_venv)
-	$(USE_PYTHON) -c "from src.dash_app import app; app.run_server(host='0.0.0.0', port=8050, debug=True)"
+	$(USE_PYTHON) -c "from src.dash_app import app; app.run(host='0.0.0.0', port=8050, debug=True)"
 
 run-docker: docker-build ## Build and run with Docker
 	docker run -p 8080:8080 med13-resource-library
