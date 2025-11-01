@@ -203,9 +203,11 @@ class ETLTransformer:
         # Record results
         result = TransformationResult(
             stage=TransformationStage.PARSING,
-            status=TransformationStatus.COMPLETED
-            if not errors
-            else TransformationStatus.PARTIAL,
+            status=(
+                TransformationStatus.COMPLETED
+                if not errors
+                else TransformationStatus.PARTIAL
+            ),
             records_processed=sum(len(records) for records in parsed_data.values()),
             records_failed=len(errors),
             data=parsed_data,
@@ -275,9 +277,11 @@ class ETLTransformer:
         # Record results
         result = TransformationResult(
             stage=TransformationStage.NORMALIZATION,
-            status=TransformationStatus.COMPLETED
-            if not errors
-            else TransformationStatus.PARTIAL,
+            status=(
+                TransformationStatus.COMPLETED
+                if not errors
+                else TransformationStatus.PARTIAL
+            ),
             records_processed=sum(len(records) for records in normalized_data.values()),
             records_failed=len(errors),
             data=normalized_data,
@@ -326,9 +330,9 @@ class ETLTransformer:
                         "clinvar_id": record.clinvar_id,
                         "variant_id": record.variant_id,
                         "variation_name": record.variation_name,
-                        "variant_type": record.variant_type.value
-                        if record.variant_type
-                        else None,
+                        "variant_type": (
+                            record.variant_type.value if record.variant_type else None
+                        ),
                         "clinical_significance": record.clinical_significance,
                         "chromosome": record.chromosome,
                         "start_position": record.start_position,
@@ -371,9 +375,11 @@ class ETLTransformer:
                             if author.last_name
                         ],
                         "journal": record.journal.title if record.journal else None,
-                        "publication_date": record.publication_date.isoformat()
-                        if record.publication_date
-                        else None,
+                        "publication_date": (
+                            record.publication_date.isoformat()
+                            if record.publication_date
+                            else None
+                        ),
                         "doi": record.doi,
                         "source": "pubmed",
                     }
@@ -433,9 +439,11 @@ class ETLTransformer:
                         "Variant",
                         (),
                         {
-                            "primary_id": variant["clinvar_id"]
-                            if "clinvar_id" in variant
-                            else variant.get("variant_id", ""),
+                            "primary_id": (
+                                variant["clinvar_id"]
+                                if "clinvar_id" in variant
+                                else variant.get("variant_id", "")
+                            ),
                             "clinical_significance": variant.get(
                                 "clinical_significance"
                             ),
@@ -468,9 +476,11 @@ class ETLTransformer:
         # Record results
         result = TransformationResult(
             stage=TransformationStage.MAPPING,
-            status=TransformationStatus.COMPLETED
-            if not errors
-            else TransformationStatus.PARTIAL,
+            status=(
+                TransformationStatus.COMPLETED
+                if not errors
+                else TransformationStatus.PARTIAL
+            ),
             records_processed=len(mapped_data.get("gene_variant_links", []))
             + len(mapped_data.get("variant_phenotype_links", [])),
             records_failed=len(errors),
@@ -585,9 +595,11 @@ class ETLTransformer:
         # Record results
         result = TransformationResult(
             stage=TransformationStage.EXPORT,
-            status=TransformationStatus.COMPLETED
-            if not export_results["errors"]
-            else TransformationStatus.FAILED,
+            status=(
+                TransformationStatus.COMPLETED
+                if not export_results["errors"]
+                else TransformationStatus.FAILED
+            ),
             records_processed=len(export_results["files_created"]),
             records_failed=len(export_results["errors"]),
             data=export_results,

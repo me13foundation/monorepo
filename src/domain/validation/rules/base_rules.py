@@ -10,6 +10,8 @@ from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
 
+# Import validation rule classes (to avoid circular imports, these are imported in methods)
+
 
 class ValidationLevel(Enum):
     """Levels of validation strictness."""
@@ -25,6 +27,17 @@ class ValidationSeverity(Enum):
     ERROR = "error"  # Critical issues that should prevent processing
     WARNING = "warning"  # Issues that should be flagged but allow processing
     INFO = "info"  # Informational notes about data quality
+
+
+@dataclass
+class ValidationRule:
+    """A validation rule with configuration."""
+
+    field: str
+    rule: str
+    validator: callable
+    severity: ValidationSeverity
+    level: ValidationLevel
 
 
 @dataclass
@@ -637,3 +650,330 @@ def validate_publication_data(
     """Validate a list of publication entities."""
     validator = DataQualityValidator(level)
     return validator.validate_batch("publication", publications)
+
+
+class ValidationRuleEngine:
+    """
+    Dynamic validation rule engine.
+
+    Applies validation rules dynamically based on configuration,
+    supporting rule selection, prioritization, and result aggregation.
+    """
+
+    def __init__(self, level: ValidationLevel = ValidationLevel.STANDARD):
+        self.level = level
+        self.rule_registry: Dict[str, Dict[str, ValidationRule]] = {}
+        self._load_rule_registry()
+
+    def _load_rule_registry(self):
+        """Load all available validation rules into the registry."""
+        # Import here to avoid circular imports
+        from .gene_rules import GeneValidationRules
+        from .variant_rules import VariantValidationRules
+        from .phenotype_rules import PhenotypeValidationRules
+        from .publication_rules import PublicationValidationRules
+        from .relationship_rules import RelationshipValidationRules
+
+        # Gene rules
+        gene_rules = GeneValidationRules.get_all_rules()
+        self.rule_registry["gene"] = {rule.rule: rule for rule in gene_rules}
+
+        # Variant rules
+        variant_rules = VariantValidationRules.get_all_rules()
+        self.rule_registry["variant"] = {rule.rule: rule for rule in variant_rules}
+
+        # Phenotype rules
+        phenotype_rules = PhenotypeValidationRules.get_all_rules()
+        self.rule_registry["phenotype"] = {rule.rule: rule for rule in phenotype_rules}
+
+        # Publication rules
+        publication_rules = PublicationValidationRules.get_all_rules()
+        self.rule_registry["publication"] = {
+            rule.rule: rule for rule in publication_rules
+        }
+
+        # Relationship rules
+        relationship_rules = RelationshipValidationRules.get_all_rules()
+        self.rule_registry["relationship"] = {
+            rule.rule: rule for rule in relationship_rules
+        }
+
+    def validate_entity(
+        self,
+        entity_type: str,
+        entity_data: Dict[str, Any],
+        rule_selection: Optional[List[str]] = None,
+    ) -> ValidationResult:
+        """
+        Validate an entity using the rule engine.
+
+        Args:
+            entity_type: Type of entity ('gene', 'variant', etc.)
+            entity_data: Entity data to validate
+            rule_selection: Optional list of specific rules to apply
+
+        Returns:
+            ValidationResult with issues and quality score
+        """
+        if entity_type not in self.rule_registry:
+            return ValidationResult(
+                is_valid=True,
+                issues=[
+                    ValidationIssue(
+                        field="entity_type",
+                        value=entity_type,
+                        rule="entity_type_check",
+                        message=f"Unknown entity type: {entity_type}",
+                        severity=ValidationSeverity.ERROR,
+                    )
+                ],
+                score=0.0,
+            )
+
+        rules_to_apply = self._select_rules(entity_type, rule_selection)
+        issues = []
+
+        for rule in rules_to_apply:
+            # Apply rule-specific validation logic
+            # Import here to avoid circular imports
+            from .gene_rules import GeneValidationRules
+            from .variant_rules import VariantValidationRules
+            from .phenotype_rules import PhenotypeValidationRules
+            from .publication_rules import PublicationValidationRules
+            from .relationship_rules import RelationshipValidationRules
+
+            if entity_type == "gene":
+                validation_issues = GeneValidationRules.validate_gene_comprehensively(
+                    entity_data
+                )
+                issues.extend(validation_issues)
+            elif entity_type == "variant":
+                validation_issues = (
+                    VariantValidationRules.validate_variant_comprehensively(entity_data)
+                )
+                issues.extend(validation_issues)
+            elif entity_type == "phenotype":
+                validation_issues = (
+                    PhenotypeValidationRules.validate_phenotype_comprehensively(
+                        entity_data
+                    )
+                )
+                issues.extend(validation_issues)
+            elif entity_type == "publication":
+                validation_issues = (
+                    PublicationValidationRules.validate_publication_comprehensively(
+                        entity_data
+                    )
+                )
+                issues.extend(validation_issues)
+            elif entity_type == "relationship":
+                validation_issues = (
+                    RelationshipValidationRules.validate_relationship_comprehensively(
+                        entity_data
+                    )
+                )
+                issues.extend(validation_issues)
+
+        # Calculate quality score
+        score = self._calculate_quality_score(issues)
+
+        return ValidationResult(
+            is_valid=len([i for i in issues if i.get("severity") == "error"]) == 0,
+            issues=issues,
+            score=score,
+        )
+
+    def validate_batch(
+        self,
+        entity_type: str,
+        entities: List[Dict[str, Any]],
+        rule_selection: Optional[List[str]] = None,
+    ) -> List[ValidationResult]:
+        """
+        Validate a batch of entities.
+
+        Args:
+            entity_type: Type of entities
+            entities: List of entity data dictionaries
+            rule_selection: Optional list of specific rules to apply
+
+        Returns:
+            List of ValidationResult objects
+        """
+        return [
+            self.validate_entity(entity_type, entity, rule_selection)
+            for entity in entities
+        ]
+
+    def _select_rules(
+        self, entity_type: str, rule_selection: Optional[List[str]]
+    ) -> List[ValidationRule]:
+        """Select which rules to apply based on configuration."""
+        available_rules = list(self.rule_registry.get(entity_type, {}).values())
+
+        if not rule_selection:
+            # Apply all rules that meet the validation level
+            return [
+                rule for rule in available_rules if self._rule_applies_at_level(rule)
+            ]
+
+        # Apply only selected rules
+        selected_rules = []
+        for rule_name in rule_selection:
+            rule = self.rule_registry.get(entity_type, {}).get(rule_name)
+            if rule and self._rule_applies_at_level(rule):
+                selected_rules.append(rule)
+
+        return selected_rules
+
+    def _rule_applies_at_level(self, rule: ValidationRule) -> bool:
+        """Check if a validation rule applies at the current validation level."""
+        rule_level = getattr(rule, "level", ValidationLevel.STANDARD)
+
+        if self.level == ValidationLevel.LAX:
+            return rule_level in [ValidationLevel.LAX]
+        elif self.level == ValidationLevel.STANDARD:
+            return rule_level in [ValidationLevel.LAX, ValidationLevel.STANDARD]
+        else:  # STRICT
+            return True  # All rules apply in strict mode
+
+    def _calculate_quality_score(self, issues: List[Dict[str, Any]]) -> float:
+        """Calculate quality score based on validation issues."""
+        if not issues:
+            return 1.0
+
+        # Weight issues by severity
+        error_weight = 0.5
+        warning_weight = 0.25
+        info_weight = 0.1
+
+        total_penalty = 0.0
+
+        for issue in issues:
+            severity = issue.get("severity", "info")
+            if severity == "error":
+                total_penalty += error_weight
+            elif severity == "warning":
+                total_penalty += warning_weight
+            else:  # info
+                total_penalty += info_weight
+
+        # Cap penalty at 1.0
+        return max(0.0, 1.0 - min(1.0, total_penalty))
+
+    def get_available_rules(
+        self, entity_type: Optional[str] = None
+    ) -> Dict[str, List[str]]:
+        """
+        Get available validation rules.
+
+        Args:
+            entity_type: Optional entity type to filter rules
+
+        Returns:
+            Dictionary mapping entity types to lists of rule names
+        """
+        if entity_type:
+            rules = list(self.rule_registry.get(entity_type, {}).keys())
+            return {entity_type: rules}
+
+        return {et: list(rules.keys()) for et, rules in self.rule_registry.items()}
+
+    def create_validation_profile(
+        self, profile_config: Dict[str, Any]
+    ) -> "ValidationProfile":
+        """
+        Create a validation profile with custom rule configurations.
+
+        Args:
+            profile_config: Configuration for the validation profile
+
+        Returns:
+            ValidationProfile object
+        """
+        return ValidationProfile(self, profile_config)
+
+
+class ValidationProfile:
+    """
+    Custom validation profile with specific rule configurations.
+
+    Allows users to create tailored validation workflows with
+    specific rules, severity levels, and reporting preferences.
+    """
+
+    def __init__(self, engine: ValidationRuleEngine, config: Dict[str, Any]):
+        self.engine = engine
+        self.config = config
+        self.name = config.get("name", "custom_profile")
+        self.description = config.get("description", "")
+        self.level = config.get("level", ValidationLevel.STANDARD)
+        self.rule_selections = config.get(
+            "rule_selections", {}
+        )  # entity_type -> list of rule names
+        self.severity_overrides = config.get(
+            "severity_overrides", {}
+        )  # rule_name -> new_severity
+
+    def validate_entity(
+        self, entity_type: str, entity_data: Dict[str, Any]
+    ) -> ValidationResult:
+        """
+        Validate an entity using this profile's configuration.
+
+        Args:
+            entity_type: Type of entity
+            entity_data: Entity data
+
+        Returns:
+            ValidationResult with profile-specific validation
+        """
+        # Get rule selection for this entity type
+        rule_selection = self.rule_selections.get(entity_type)
+
+        # Validate using the engine
+        result = self.engine.validate_entity(entity_type, entity_data, rule_selection)
+
+        # Apply severity overrides
+        for issue in result.issues:
+            rule_name = issue.get("rule")
+            if rule_name in self.severity_overrides:
+                issue["severity"] = self.severity_overrides[rule_name].value
+
+        # Recalculate quality score with new severities
+        result.score = self.engine._calculate_quality_score(result.issues)
+
+        return result
+
+    def validate_batch(
+        self, entity_type: str, entities: List[Dict[str, Any]]
+    ) -> List[ValidationResult]:
+        """
+        Validate a batch of entities using this profile.
+
+        Args:
+            entity_type: Type of entities
+            entities: List of entity data
+
+        Returns:
+            List of ValidationResult objects
+        """
+        return [self.validate_entity(entity_type, entity) for entity in entities]
+
+    def get_profile_summary(self) -> Dict[str, Any]:
+        """
+        Get a summary of this validation profile.
+
+        Returns:
+            Dictionary with profile information
+        """
+        return {
+            "name": self.name,
+            "description": self.description,
+            "level": self.level.value,
+            "rule_selections": self.rule_selections,
+            "severity_overrides": {
+                k: v.value for k, v in self.severity_overrides.items()
+            },
+            "available_rules": self.engine.get_available_rules(),
+        }
