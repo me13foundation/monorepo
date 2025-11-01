@@ -310,11 +310,11 @@ Distribute FAIR packages with persistent identifiers.
 ### Phase 1C: User Interface (Weeks 9-10)
 
 #### Week 9: API Layer
-- [ ] RESTful endpoint implementations
-- [ ] Request/response schemas
-- [ ] Authentication and authorization
-- [ ] API documentation generation
-- [ ] Rate limiting and security middleware
+- [x] RESTful endpoint implementations
+- [x] Request/response schemas
+- [x] Authentication and authorization
+- [x] API documentation generation
+- [x] Rate limiting and security middleware
 
 #### Week 10: Curation Dashboard
 - [ ] Dash application setup
