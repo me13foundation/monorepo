@@ -7,7 +7,19 @@ from src.routes.resources import router as resources_router
 
 def create_app() -> FastAPI:
     """Instantiate the FastAPI application with middleware and routes."""
-    app = FastAPI(title="MED13 Resource Library", version="0.1.0")
+    app = FastAPI(
+        title="MED13 Resource Library",
+        version="0.1.0",
+        description="A curated resource library for MED13 variants, phenotypes, and supporting evidence.",
+        contact={
+            "name": "MED13 Foundation",
+            "url": "https://med13foundation.org",
+        },
+        license_info={
+            "name": "Open Access Biomedical Data",
+            "url": "https://creativecommons.org/licenses/by/4.0/",
+        },
+    )
 
     app.add_middleware(
         CORSMiddleware,
@@ -21,6 +33,21 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         allow_credentials=True,
     )
+
+    # Root endpoint
+    @app.get("/", summary="Welcome to MED13 Resource Library", tags=["info"])
+    async def root():
+        """Welcome endpoint with API information."""
+        return {
+            "message": "Welcome to the MED13 Resource Library API",
+            "description": "A curated resource library for MED13 variants, phenotypes, and supporting evidence",
+            "version": "0.1.0",
+            "documentation": "/docs",
+            "health_check": "/health/",
+            "resources": "/resources/",
+            "contact": "https://med13foundation.org",
+            "license": "CC-BY 4.0 - Open Access Biomedical Data",
+        }
 
     app.include_router(health_router)
     app.include_router(resources_router)
