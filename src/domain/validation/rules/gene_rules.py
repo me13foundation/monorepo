@@ -72,7 +72,8 @@ class GeneValidationRules:
                 return (
                     False,
                     f"Invalid gene symbol format: {symbol_str}",
-                    "Gene symbols should start with a letter and contain only letters, numbers, underscores, and hyphens",
+                    "Gene symbols should start with a letter and contain only "
+                    "letters, numbers, underscores, and hyphens",
                 )
 
             # Check length
@@ -167,13 +168,15 @@ class GeneValidationRules:
 
             if hgnc_symbols and hgnc_ids:
                 # If we have both symbols and IDs, they should be consistent
-                # This is a simplified check - in practice would need HGNC database lookup
+                # This is a simplified check - in practice would need
+                # HGNC database lookup
                 symbol_count = len(hgnc_symbols)
                 id_count = len(hgnc_ids)
 
                 if symbol_count != id_count and symbol_count != 1 and id_count != 1:
                     issues.append(
-                        f"Mismatch between HGNC symbols ({symbol_count}) and IDs ({id_count})"
+                        f"Mismatch between HGNC symbols ({symbol_count}) "
+                        f"and IDs ({id_count})"
                     )
 
             # Check for empty cross-references
@@ -220,7 +223,8 @@ class GeneValidationRules:
                 return (
                     False,
                     f"Invalid chromosome: {chrom}",
-                    f"Valid chromosomes: {', '.join(sorted(GeneValidationRules.VALID_CHROMOSOMES))}",
+                    f"Valid chromosomes: "
+                    f"{', '.join(sorted(GeneValidationRules.VALID_CHROMOSOMES))}",
                 )
 
             # Validate positions if provided
@@ -235,14 +239,16 @@ class GeneValidationRules:
                 if start < 0 or end < 0:
                     return (
                         False,
-                        f"Negative genomic positions not allowed: start={start}, end={end}",
+                        f"Negative genomic positions not allowed: "
+                        f"start={start}, end={end}",
                         "Genomic positions must be positive",
                     )
 
                 if start >= end:
                     return (
                         False,
-                        f"Start position ({start}) must be less than end position ({end})",
+                        f"Start position ({start}) must be less than "
+                        f"end position ({end})",
                         "Ensure start < end",
                     )
 
@@ -274,7 +280,8 @@ class GeneValidationRules:
                 if gene_size > max_size:
                     return (
                         False,
-                        f"Gene size ({gene_size:,} bp) exceeds chromosome {chrom} maximum ({max_size:,} bp)",
+                        f"Gene size ({gene_size:,} bp) exceeds chromosome "
+                        f"{chrom} maximum ({max_size:,} bp)",
                         "Check coordinates",
                     )
 

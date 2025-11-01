@@ -418,7 +418,7 @@ class ETLTransformer:
                         self.mappers["gene_variant"].add_gene_coordinates(
                             gene.primary_id,
                             variant["chromosome"],
-                            gene.primary_id,  # Simplified - would need actual coordinates
+                            gene.primary_id,  # Simplified - would need actual coords
                             gene.primary_id + 1000,
                         )
 

@@ -194,7 +194,8 @@ class PublicationValidationRules:
                 if journal_start_year and parsed_date.year < journal_start_year:
                     return (
                         False,
-                        f"Publication date ({parsed_date.year}) before journal start year ({journal_start_year})",
+                        f"Publication date ({parsed_date.year}) before "
+                        f"journal start year ({journal_start_year})",
                         "Check publication or journal information",
                     )
 
@@ -246,7 +247,8 @@ class PublicationValidationRules:
 
                 author_name = (
                     author.get("name")
-                    or f"{author.get('first_name', '')} {author.get('last_name', '')}".strip()
+                    or f"{author.get('first_name', '')} "
+                    f"{author.get('last_name', '')}".strip()
                 )
 
                 if not author_name:

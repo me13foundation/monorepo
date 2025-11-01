@@ -150,7 +150,8 @@ class RelationshipValidationRules:
 
             if confidence_diff > 0.3:  # Significant discrepancy
                 issues.append(
-                    f"Confidence score ({confidence}) doesn't match evidence level '{level}' (expected ~{expected_confidence})"
+                    f"Confidence score ({confidence}) doesn't match "
+                    f"evidence level '{level}' (expected ~{expected_confidence})"
                 )
 
             # Check for high-quality evidence sources
@@ -222,7 +223,8 @@ class RelationshipValidationRules:
                 earliest_evidence = min(evidence_dates)
                 if rel_date < earliest_evidence:
                     issues.append(
-                        f"Relationship date ({rel_date}) before earliest evidence ({earliest_evidence})"
+                        f"Relationship date ({rel_date}) before "
+                        f"earliest evidence ({earliest_evidence})"
                     )
 
             # Check publication timeline consistency
@@ -275,7 +277,8 @@ class RelationshipValidationRules:
             if "pathogenic" in clinical_sig and af > 0.01:  # 1%
                 if pop_size > 1000:  # Only flag for larger populations
                     issues.append(
-                        f"Pathogenic variant with high frequency ({af:.4f}) in population of {pop_size}"
+                        f"Pathogenic variant with high frequency ({af:.4f}) "
+                        f"in population of {pop_size}"
                     )
 
             # Very rare variants (<0.001) with benign classification
@@ -288,7 +291,8 @@ class RelationshipValidationRules:
                 # This is a simplified check
                 if af > 0.49:  # Very common variants
                     issues.append(
-                        f"Extremely common variant ({af:.4f}) - verify population genetics"
+                        f"Extremely common variant ({af:.4f}) - "
+                        f"verify population genetics"
                     )
 
             if issues:
@@ -331,7 +335,8 @@ class RelationshipValidationRules:
                 for conflict_type, conflict_details in conflicts.items():
                     if conflict_type == "clinical_significance":
                         issues.append(
-                            f"Conflicting clinical significance across databases: {conflict_details}"
+                            f"Conflicting clinical significance across "
+                            f"databases: {conflict_details}"
                         )
                     elif conflict_type == "allele_frequency":
                         issues.append(
@@ -419,7 +424,8 @@ class RelationshipValidationRules:
                     )
                 if effect is not None and (effect < ci_lower or effect > ci_upper):
                     issues.append(
-                        f"Effect size {effect} outside confidence interval [{ci_lower}, {ci_upper}]"
+                        f"Effect size {effect} outside confidence "
+                        f"interval [{ci_lower}, {ci_upper}]"
                     )
 
             if issues:

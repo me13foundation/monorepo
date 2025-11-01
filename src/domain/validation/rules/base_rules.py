@@ -10,7 +10,8 @@ from typing import Dict, List, Any, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
 
-# Import validation rule classes (to avoid circular imports, these are imported in methods)
+# Import validation rule classes (to avoid circular imports,
+# these are imported in methods)
 
 
 class ValidationLevel(Enum):
@@ -325,7 +326,8 @@ class DataQualityValidator:
             return (
                 False,
                 f"Invalid gene symbol format: {symbol}",
-                "Gene symbols should start with a letter and contain only letters, numbers, underscores, and hyphens",
+                "Gene symbols should start with a letter and contain only "
+                "letters, numbers, underscores, and hyphens",
             )
 
         # Length check

@@ -293,7 +293,8 @@ class ValidationPipeline:
         self, stage: PipelineStage, raw_data: Dict[str, List[Dict[str, Any]]]
     ) -> Dict[str, List[Dict[str, Any]]]:
         """Simulate data at different pipeline stages."""
-        # This is a simplified simulation - in practice, data would come from ETL pipeline
+        # This is a simplified simulation - in practice, data would
+        # come from ETL pipeline
         if stage == PipelineStage.PARSING:
             # Raw parsed data
             return {

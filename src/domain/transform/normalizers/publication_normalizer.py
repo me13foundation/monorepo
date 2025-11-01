@@ -333,7 +333,7 @@ class PublicationNormalizer:
         Merge multiple publication records for the same publication.
 
         Args:
-            publications: List of normalized publication records for the same publication
+            publications: List of normalized publication records for same publication
 
         Returns:
             Single merged publication record

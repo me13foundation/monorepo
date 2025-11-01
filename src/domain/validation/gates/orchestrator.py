@@ -294,7 +294,10 @@ class QualityGateOrchestrator:
                 {
                     "type": "critical_quality_drop",
                     "pipeline": pipeline_name,
-                    "message": f"Critical quality threshold not met: {result.summary['overall_quality_score']:.3f}",
+                    "message": (
+                        f"Critical quality threshold not met: "
+                        f"{result.summary['overall_quality_score']:.3f}"
+                    ),
                     "severity": "critical",
                 }
             )
@@ -519,7 +522,7 @@ class QualityGateOrchestrator:
 
         if quarantine_rate > 0.1:
             recommendations.append(
-                "High quarantine rate suggests quality gate thresholds may be too strict"
+                "High quarantine rate suggests quality gate thresholds too strict"
             )
         elif quarantine_rate < 0.01:
             recommendations.append(

@@ -365,9 +365,13 @@ class ValidationDashboard:
             <title>Validation Dashboard</title>
             <style>
                 body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                .header {{ background: #f8f9fa; padding: 20px; border-radius: 5px; margin-bottom: 20px; }}
-                .metric {{ background: white; border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }}
-                .health-indicator {{ display: inline-block; width: 20px; height: 20px; border-radius: 50%; background: {health_color}; margin-left: 10px; }}
+                .header {{ background: #f8f9fa; padding: 20px; border-radius: 5px;
+                           margin-bottom: 20px; }}
+                .metric {{ background: white; border: 1px solid #ddd; padding: 15px;
+                           margin: 10px 0; border-radius: 5px; }}
+                .health-indicator {{ display: inline-block; width: 20px; height: 20px;
+                                     border-radius: 50%; background: {health_color};
+                                     margin-left: 10px; }}
                 .status-healthy {{ color: #28a745; }}
                 .status-warning {{ color: #ffc107; }}
                 .status-critical {{ color: #dc3545; }}
@@ -389,7 +393,8 @@ class ValidationDashboard:
 
             <div class="metric">
                 <h2>Quality Metrics</h2>
-                <p>Overall Quality Score: {data.quality_metrics.get('overall_quality', {}).get('current', 0):.1%}</p>
+                <p>Overall Quality Score: {data.quality_metrics.get('overall_quality',
+                                                {}).get('current', 0):.1%}</p>
                 <p>Error Rate: {data.quality_metrics.get('error_rate', {}).get('current', 0):.1%}
                    ({data.quality_metrics.get('error_rate', {}).get('status', 'unknown')})</p>
                 <p>Pipeline Success Rate: {data.quality_metrics.get('pipeline_success', {}).get('rate', 0):.1%}</p>

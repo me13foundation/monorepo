@@ -138,7 +138,8 @@ class CrossReferenceMapper:
         variant_phenotype_links: List[VariantPhenotypeLink],
     ) -> List[Dict[str, Any]]:
         """
-        Infer gene-phenotype relationships from gene-variant and variant-phenotype links.
+        Infer gene-phenotype relationships from gene-variant and
+        variant-phenotype links.
 
         Args:
             gene_variant_links: Direct gene-variant relationships
@@ -370,7 +371,8 @@ class CrossReferenceMapper:
                 )
             if link.phenotype_id not in network.phenotypes:
                 errors.append(
-                    f"Phenotype {link.phenotype_id} referenced in link but not in network"
+                    f"Phenotype {link.phenotype_id} referenced in link "
+                    f"but not in network"
                 )
 
         return errors

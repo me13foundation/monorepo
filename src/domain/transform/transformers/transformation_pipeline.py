@@ -109,7 +109,8 @@ class TransformationPipeline:
             )
 
             self.logger.info(
-                f"Pipeline completed in {execution_time:.2f}s with {len(pipeline_result.errors)} errors"
+                f"Pipeline completed in {execution_time:.2f}s "
+                f"with {len(pipeline_result.errors)} errors"
             )
             return pipeline_result
 
