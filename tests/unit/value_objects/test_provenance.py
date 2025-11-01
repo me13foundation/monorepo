@@ -1,0 +1,154 @@
+"""
+Unit tests for provenance value object.
+"""
+
+import pytest
+from datetime import datetime, UTC
+from src.models.value_objects.provenance import Provenance, DataSource
+
+
+class TestProvenance:
+    """Test Provenance value object."""
+
+    def test_create_provenance(self):
+        """Test creating a valid Provenance."""
+        acquired_at = datetime.now(UTC)
+        provenance = Provenance(
+            source=DataSource.CLINVAR,
+            source_version="2023.01",
+            source_url="https://www.ncbi.nlm.nih.gov/clinvar/",
+            acquired_by="test_system",
+            acquired_at=acquired_at,
+            processing_steps=["normalized", "validated"],
+            quality_score=0.95,
+            validation_status="validated",
+            metadata={"key": "value"},
+        )
+
+        assert provenance.source == DataSource.CLINVAR
+        assert provenance.source_version == "2023.01"
+        assert provenance.source_url == "https://www.ncbi.nlm.nih.gov/clinvar/"
+        assert provenance.acquired_by == "test_system"
+        assert provenance.acquired_at == acquired_at
+        assert provenance.processing_steps == ["normalized", "validated"]
+        assert provenance.quality_score == 0.95
+        assert provenance.validation_status == "validated"
+        assert provenance.metadata == {"key": "value"}
+
+    def test_default_values(self):
+        """Test default values for Provenance."""
+        provenance = Provenance(source=DataSource.PUBMED, acquired_by="test_system")
+
+        assert provenance.processing_steps == []
+        assert provenance.validation_status == "pending"
+        assert provenance.metadata == {}
+        assert provenance.quality_score is None
+        assert isinstance(provenance.acquired_at, datetime)
+
+    def test_add_processing_step(self):
+        """Test adding a processing step."""
+        provenance = Provenance(source=DataSource.CLINVAR, acquired_by="test_system")
+
+        new_provenance = provenance.add_processing_step("normalized")
+
+        assert new_provenance.processing_steps == ["normalized"]
+        assert provenance.processing_steps == []  # Original unchanged
+
+    def test_update_quality_score(self):
+        """Test updating quality score."""
+        provenance = Provenance(source=DataSource.CLINVAR, acquired_by="test_system")
+
+        new_provenance = provenance.update_quality_score(0.85)
+
+        assert new_provenance.quality_score == 0.85
+        assert provenance.quality_score is None  # Original unchanged
+
+    def test_mark_validated(self):
+        """Test marking as validated."""
+        provenance = Provenance(
+            source=DataSource.CLINVAR,
+            acquired_by="test_system",
+            validation_status="pending",
+        )
+
+        new_provenance = provenance.mark_validated("approved")
+
+        assert new_provenance.validation_status == "approved"
+        assert provenance.validation_status == "pending"  # Original unchanged
+
+    def test_is_validated(self):
+        """Test validation status checking."""
+        valid_provenance = Provenance(
+            source=DataSource.CLINVAR,
+            acquired_by="test_system",
+            validation_status="validated",
+        )
+
+        approved_provenance = Provenance(
+            source=DataSource.CLINVAR,
+            acquired_by="test_system",
+            validation_status="approved",
+        )
+
+        pending_provenance = Provenance(
+            source=DataSource.CLINVAR,
+            acquired_by="test_system",
+            validation_status="pending",
+        )
+
+        assert valid_provenance.is_validated is True
+        assert approved_provenance.is_validated is True
+        assert pending_provenance.is_validated is False
+
+    def test_processing_summary(self):
+        """Test processing summary generation."""
+        provenance = Provenance(
+            source=DataSource.CLINVAR,
+            acquired_by="test_system",
+            processing_steps=["ingested", "normalized", "validated"],
+        )
+
+        assert provenance.processing_summary == "ingested → normalized → validated"
+
+    def test_processing_summary_empty(self):
+        """Test processing summary with no steps."""
+        provenance = Provenance(source=DataSource.CLINVAR, acquired_by="test_system")
+
+        assert provenance.processing_summary == "No processing steps recorded"
+
+    def test_string_representation(self):
+        """Test string representation."""
+        acquired_at = datetime(2023, 1, 1, 12, 0, 0, tzinfo=UTC)
+        provenance = Provenance(
+            source=DataSource.CLINVAR,
+            acquired_by="test_system",
+            acquired_at=acquired_at,
+            validation_status="validated",
+        )
+
+        assert str(provenance) == "clinvar (2023-01-01) - validated"
+
+    def test_immutable(self):
+        """Test that Provenance is immutable."""
+        provenance = Provenance(source=DataSource.CLINVAR, acquired_by="test_system")
+
+        with pytest.raises(
+            Exception
+        ):  # Pydantic raises ValidationError for frozen instances
+            provenance.source = DataSource.PUBMED
+
+    def test_invalid_quality_score(self):
+        """Test invalid quality score."""
+        with pytest.raises(ValueError):
+            Provenance(
+                source=DataSource.CLINVAR,
+                acquired_by="test_system",
+                quality_score=1.5,  # Invalid: > 1.0
+            )
+
+        with pytest.raises(ValueError):
+            Provenance(
+                source=DataSource.CLINVAR,
+                acquired_by="test_system",
+                quality_score=-0.5,  # Invalid: < 0.0
+            )
