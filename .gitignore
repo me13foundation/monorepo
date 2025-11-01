@@ -163,3 +163,6 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+
+# Raw API data (generated during testing)
+data/raw/
