@@ -31,34 +31,41 @@ Layer
 Tool
 Rationale
 ETL & validation
-Python 3.11, Pydantic models, pytest
-Strong typing and testable transformations.
+Python 3.12+, Pydantic v2 models, comprehensive quality assurance
+Strong typing, strict validation, and automated testing with MyPy, Black, Ruff, Bandit.
 Metadata store
-PostgreSQL with JSONB or Google Cloud Storage (CSV/JSON)
-Simple and scalable for storing cleaned data.
+SQLite (all environments) with SQLAlchemy 2.0
+Zero-configuration file-based database, ACID-compliant, perfect for MED13 data volumes, travels with Cloud Run deployment.
 Packaging & publishing
-RO‑Crate (JSON‑LD), Zenodo DOIs
+RO‑Crate (JSON‑LD), Zenodo DOIs (future)
 Ensures FAIR compliance and persistent identifiers.
 API layer
-FastAPI with OpenAPI/GraphQL schema
-Exposes read‑only endpoints for public access; supports ?include_text parameter to respect licenses.
+FastAPI with OpenAPI docs, CORS enabled
+REST API with automatic documentation, type-safe endpoints, deployed on Google Cloud Run.
 Internal curation UI
-Plotly Dash (Python)
-Provides interactive dashboards and tables for SMEs. Streamlit is another data‑app option but is less customizable than Dash (evidence.dev).
+Plotly Dash with Bootstrap components (Python)
+Interactive dashboards for SME curation, integrated with the same codebase for simplicity.
 Public portal
-Next.js (React)
-Used to build a polished, SEO‑friendly website that consumes the API. This framework allows full customization and user‑experience control (tianye.org).
-Model demo widgets (future)
-Gradio
-Optional for Phase 1 demos of AI‑powered extraction; Gradio excels at wrapping ML models but is not suitable as the main dashboard (evidence.dev).
+FastAPI-generated OpenAPI docs + custom frontend (future)
+Current: Auto-generated docs; Future: Next.js/React for polished UX.
+Quality Assurance
+MyPy, Black, Ruff, Flake8, Bandit, Pytest, Coverage, Pre-commit
+Enterprise-grade code quality with automated linting, type checking, security scanning, and testing.
 
 
 
-Deployment Model – Two Services
-To make the architecture explicit, Phase 0 is delivered as two separate services:
-Python back‑end / API service (api.med13foundation.org): Implements ETL jobs, validation, packaging, and provides REST/GraphQL endpoints. Deployed on Cloud Run or a similar platform. All authentication and RBAC live here.
-Next.js front‑end service (med13foundation.org): Serves the public and curation web pages. Fetches data from the API using HTTPS. Handles site branding, SEO, multi‑language support and navigation. A dedicated subpath or subdomain can host the knowledge‑base pages (e.g., med13foundation.org/knowledge-base).
-This separation improves security and scalability: the front‑end never touches the database directly and can be redeployed independently of the ETL and API layer.
+Deployment Model – Single Service Architecture
+Phase 0 uses a simplified, single-service architecture optimized for rapid development and cost efficiency:
+
+**FastAPI Backend Service**: Implements ETL jobs, validation, packaging, and provides REST endpoints. Deployed on Google Cloud Run with SQLite database included in the deployment. All authentication and RBAC live here.
+
+**Key Architectural Decisions**:
+- **SQLite Database**: File-based database travels with the Cloud Run deployment, eliminating database management overhead
+- **Source Deployments**: Direct GitHub-to-Cloud Run deployment without Docker complexity
+- **Quality Gates**: Comprehensive pre-commit and CI/CD quality assurance
+- **Cost Optimization**: Serverless scaling with minimal infrastructure costs
+
+**Future Frontend**: Next.js/React portal will consume the API via HTTPS, providing polished UX and SEO optimization when needed.
 ETL Pipeline
 The extraction–transformation–loading process comprises several stages:
 Ingest: Download or query data from each source (ClinVar, HPO, PubMed, OMIM, etc.) and save raw files with timestamps.
@@ -84,10 +91,11 @@ Each validated record is exported as structured JSON or CSV aligned with a draft
 A type_map.yaml defines how Phase 0 fields map to TypeDB entities, attributes and relations.
 The Phase 1 ETL reads RO‑Crates, applies the mapping and loads data into TypeDB. There is no expectation of reusing Phase 0 SQL queries or repository classes.
 This decoupling eliminates the conceptual mismatch between relational and graph models.
-Strategic Options
-To guide stakeholders, we acknowledge two paths:
-Graph‑Native (Recommended): Use TypeDB from the start for both Phase 0 and Phase 1. This eliminates migration overhead and ensures that the schema evolves organically. However, it requires the team to learn TypeDB early.
-Relational Prototype (High‑Risk): Use PostgreSQL for Phase 0 because of team familiarity. Accept that the Phase 0 data tier will be discarded after the resource library is created. Plan and budget a full rewrite for Phase 1.
-Phase 0 has been reframed as a resource library that prepares the data for either path.
+Strategic Implementation
+**Chosen Path**: SQLite-based resource library with schema migration ready for Phase 1 knowledge graph.
+
+**Rationale**: SQLite provides zero-configuration deployment, ACID compliance, and perfect fit for MED13 data volumes while maintaining schema compatibility for future graph database migration. The file-based approach eliminates operational complexity and enables seamless Cloud Run deployments.
+
+**Phase 1 Migration**: RO-Crate exports will facilitate smooth transition to TypeDB or other graph databases when advanced reasoning capabilities are needed.
 Summary
 The MED13 Resource Library (Phase 0) consolidates high‑quality information about MED13 into a FAIR package. It provides curated data to clinicians and researchers, records provenance and licensing, and prepares exports for the future graph‑based discovery system. This foundation ensures that subsequent phases can focus on causal reasoning and AI‑driven insights rather than basic data collection and cleaning.

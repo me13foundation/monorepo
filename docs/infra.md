@@ -45,8 +45,8 @@ This document outlines the infrastructure setup for the MED13 Resource Library (
 ## Infrastructure Components
 
 ### Application Stack
-- **Runtime**: Python 3.11
-- **Framework**: FastAPI (REST/GraphQL API)
+- **Runtime**: Python 3.12+
+- **Framework**: FastAPI (REST API with OpenAPI docs)
 - **UI**: Plotly Dash for curation interface
 - **Database**: SQLite (development & production)
 - **Deployment**: Cloud Run (serverless with source deployments)
@@ -54,10 +54,9 @@ This document outlines the infrastructure setup for the MED13 Resource Library (
 
 ### Google Cloud Services
 - **Cloud Run**: Serverless application hosting
-- **Cloud SQL**: Managed PostgreSQL database
 - **Secret Manager**: Secure secrets storage
+- **Cloud Storage**: Data exports, backups, and archives
 - **Cloud Build**: (Optional) For complex build processes
-- **Cloud Storage**: (Future) For data exports and backups
 
 ## Repository Structure
 
@@ -295,7 +294,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
@@ -401,18 +400,39 @@ web: uvicorn main:app --host 0.0.0.0 --port $PORT
 
 #### requirements.txt
 ```
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-sqlalchemy==2.0.23
-psycopg2-binary==2.9.9
-alembic==1.13.0
-pytest==7.4.3
-google-cloud-secretmanager==2.16.3
-plotly==5.17.0
-dash==2.14.0
-httpx==0.25.2
-python-multipart==0.0.6
+# MED13 Resource Library - Production Dependencies
+# Compatible with Python 3.12+
+
+# Core web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Data validation and typing
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+
+# HTTP client
+httpx>=0.25.0
+
+# Data processing
+pandas>=2.1.0
+numpy>=1.24.0
+
+# UI and visualization
+plotly>=5.17.0
+dash>=2.14.0
+dash-bootstrap-components>=1.5.0
+
+# Utilities
+python-multipart>=0.0.6
+
+# Google Cloud (uncomment when gcloud SDK is set up)
+# google-cloud-secretmanager>=2.16.0
+# google-cloud-storage>=2.10.0
 ```
 
 ## Database Configuration
@@ -521,7 +541,7 @@ Each GitHub environment stores its own `GCP_SA_KEY` secret for secure authentica
 ### Prerequisites
 1. Google Cloud Project with billing enabled
 2. GitHub repository with Actions enabled
-3. Python 3.11 development environment
+3. Python 3.12+ development environment
 
 ### Initial Setup
 ```bash
@@ -626,14 +646,17 @@ Document all manual setup commands for future Infrastructure-as-Code conversion:
 # Enable required APIs
 gcloud services enable run.googleapis.com secretmanager.googleapis.com
 
-# Deploy Cloud Run services
-gcloud run deploy med13-resource-library \
-  --source . \
-  --region=us-central1 \
-  --allow-unauthenticated=false \
-  --service-account med13-prod@YOUR_PROJECT.iam.gserviceaccount.com
+# Create service accounts (optional - for enhanced security)
+gcloud iam service-accounts create med13-prod \
+  --description="MED13 Production service account"
 
-gcloud run deploy med13-curation \
+# Grant Secret Manager access (if using secrets)
+gcloud projects add-iam-policy-binding YOUR_PROJECT \
+  --member="serviceAccount:med13-prod@YOUR_PROJECT.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor"
+
+# Deploy Cloud Run service (SQLite database included in deployment)
+gcloud run deploy med13-resource-library \
   --source . \
   --region=us-central1 \
   --allow-unauthenticated=false \
