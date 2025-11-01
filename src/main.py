@@ -4,6 +4,9 @@ from typing import Dict, Any
 
 from src.routes.health import router as health_router
 from src.routes.resources import router as resources_router
+from src.routes.genes import router as genes_router
+from src.middleware.auth import AuthMiddleware
+from src.middleware.rate_limit import EndpointRateLimitMiddleware
 
 
 def create_app() -> FastAPI:
@@ -36,6 +39,12 @@ def create_app() -> FastAPI:
         allow_credentials=True,
     )
 
+    # Add authentication middleware
+    app.add_middleware(AuthMiddleware)
+
+    # Add rate limiting middleware
+    app.add_middleware(EndpointRateLimitMiddleware)
+
     # Root endpoint
     @app.get("/", summary="Welcome to MED13 Resource Library", tags=["info"])
     async def root() -> Dict[str, Any]:
@@ -48,12 +57,27 @@ def create_app() -> FastAPI:
             "documentation": "/docs",
             "health_check": "/health/",
             "resources": "/resources/",
+            "genes": "/genes/",
+            "authentication": {
+                "type": "API Key",
+                "header": "X-API-Key",
+                "description": "Include API key in request headers for authentication",
+            },
+            "rate_limiting": {
+                "description": "Rate limiting applied based on client IP",
+                "headers": [
+                    "X-RateLimit-Remaining",
+                    "X-RateLimit-Limit",
+                    "X-RateLimit-Reset",
+                ],
+            },
             "contact": "https://med13foundation.org",
             "license": "CC-BY 4.0",
         }
 
     app.include_router(health_router)
     app.include_router(resources_router)
+    app.include_router(genes_router)
 
     return app
 
