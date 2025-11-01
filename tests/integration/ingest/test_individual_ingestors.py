@@ -148,7 +148,9 @@ class TestPubMedIngestor:
                         <PMID>34567890</PMID>
                         <Article>
                             <ArticleTitle>Test MED13 Publication</ArticleTitle>
-                            <Abstract><AbstractText>MED13 gene analysis</AbstractText></Abstract>
+                            <Abstract>
+                                <AbstractText>MED13 gene analysis</AbstractText>
+                            </Abstract>
                         </Article>
                         <AuthorList>
                             <Author><LastName>Smith</LastName><ForeName>John</ForeName></Author>
@@ -372,7 +374,10 @@ class TestUniProtIngestor:
                         "proteinDescription": {
                             "recommendedName": {
                                 "fullName": {
-                                    "value": "Mediator of RNA polymerase II transcription subunit 13"
+                                    "value": (
+                                        "Mediator of RNA polymerase II transcription "
+                                        "subunit 13"
+                                    )
                                 }
                             }
                         },
@@ -422,7 +427,8 @@ class TestUniProtIngestor:
         """Test fetching protein sequence."""
         mock_fasta_response = Response(
             200,
-            text=""">sp|P61968|MED13_HUMAN Mediator of RNA polymerase II transcription subunit 13 OS=Homo sapiens OX=9606 GN=MED13 PE=1 SV=2
+            text=""">sp|P61968|MED13_HUMAN Mediator of RNA polymerase II transcription
+subunit 13 OS=Homo sapiens OX=9606 GN=MED13 PE=1 SV=2
 MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAP
 RVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCP
 VQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCRAFYQLLKELADLEKKDKKDVQKAGDWSKG
@@ -436,10 +442,11 @@ KRRRGRRSKRRSYKRGRSK""",
             assert sequence is not None
             assert isinstance(sequence, str)
             assert len(sequence) > 0
-            assert (
-                "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAP"
-                in sequence
+            expected_sequence = (
+                "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAP"
+                "RMPEAAP"
             )
+            assert expected_sequence in sequence
 
     @pytest.mark.asyncio
     async def test_med13_relevance_analysis(self, ingestor):

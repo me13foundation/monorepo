@@ -237,7 +237,7 @@ class IngestionCoordinator:
             from src.models.value_objects import Provenance, DataSource
 
             failed_provenance = Provenance(
-                data_source=DataSource(source_name=task.source),
+                source=DataSource(task.source),
                 acquired_at=datetime.utcnow(),
                 acquired_by="MED13-Resource-Library-Coordinator",
                 processing_steps=[f"Failed ingestion: {str(e)}"],

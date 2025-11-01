@@ -160,8 +160,11 @@ class BaseIngestor(ABC):
             IngestionResult with all operation details
         """
         start_time = datetime.utcnow()
+        # Map source name to DataSource enum
+        data_source_enum = DataSource(self.source_name)
+
         provenance = Provenance(
-            data_source=DataSource(source_name=self.source_name),
+            source=data_source_enum,
             acquired_at=start_time,
             acquired_by="MED13-Resource-Library",
             processing_steps=[f"Ingested from {self.source_name}"],

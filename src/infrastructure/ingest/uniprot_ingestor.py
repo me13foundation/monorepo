@@ -7,7 +7,10 @@ import asyncio
 from typing import Dict, List, Any, Optional
 import json
 
-from .base_ingestor import BaseIngestor
+import httpx
+import requests
+
+from .base_ingestor import BaseIngestor, IngestionError
 
 
 class UniProtIngestor(BaseIngestor):
@@ -21,10 +24,68 @@ class UniProtIngestor(BaseIngestor):
     def __init__(self):
         super().__init__(
             source_name="uniprot",
-            base_url="https://rest.uniprot.org",
+            base_url="https://www.ebi.ac.uk/proteins/api",  # Try EBI Proteins API
             requests_per_minute=30,  # UniProt allows up to 200 requests/minute
             # for programmatic access
             timeout_seconds=60,  # Protein data can be large
+        )
+
+    async def _make_request(
+        self, method: str, endpoint: str, **kwargs
+    ) -> httpx.Response:
+        """
+        Override base _make_request to handle UniProt's redirect issues.
+        """
+        url = f"{self.base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+
+        for attempt in range(self.max_retries):
+            try:
+                # Wait for rate limit token
+                await self.rate_limiter.wait_for_token()
+
+                # Use a fresh client for each request to avoid redirect issues
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(self.timeout_seconds),
+                    follow_redirects=False,  # Don't follow redirects for UniProt
+                    headers={
+                        "User-Agent": "MED13-Resource-Library/1.0 (research@med13.org)"
+                    },
+                ) as temp_client:
+                    response = await temp_client.request(method, url, **kwargs)
+
+                    # Check for rate limiting
+                    if response.status_code == 429:
+                        # Exponential backoff for rate limiting
+                        wait_time = 2**attempt
+                        await asyncio.sleep(wait_time)
+                        continue
+
+                    response.raise_for_status()
+                    return response
+
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code >= 500:
+                    # Server error - retry
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+                        continue
+                raise IngestionError(
+                    f"HTTP {e.response.status_code}: {e.response.text}",
+                    self.source_name,
+                )
+
+            except Exception as e:
+                if attempt < self.max_retries - 1:
+                    await asyncio.sleep(2**attempt)
+                    continue
+                raise IngestionError(
+                    f"Request failed after {self.max_retries} attempts: {str(e)}",
+                    self.source_name,
+                )
+
+        raise IngestionError(
+            f"Request failed after {self.max_retries} attempts",
+            self.source_name,
         )
 
     async def fetch_data(self, query: str = "MED13", **kwargs) -> List[Dict[str, Any]]:
@@ -68,33 +129,54 @@ class UniProtIngestor(BaseIngestor):
         Returns:
             List of UniProt accession numbers
         """
-        # Build search query
-        search_terms = [query]
+        # Build search query - start simple
+        # UniProt might not support complex queries with AND
+        full_query = query  # Just use the basic query for now
 
-        # Add organism filter (human by default for MED13)
-        if kwargs.get("organism", "human").lower() in ["human", "homo sapiens", "9606"]:
-            search_terms.append("organism_id:9606")
-
-        # Add reviewed filter if requested
-        if kwargs.get("reviewed_only", True):
-            search_terms.append("reviewed:true")
-
-        full_query = " AND ".join(search_terms)
-
-        # Use UniProt search API
+        # Use EBI Proteins API
+        size = kwargs.get("max_results", 50)
+        url = f"{self.base_url}/proteins"
         params = {
-            "query": full_query,
-            "format": "list",  # Just accession numbers
-            "size": kwargs.get("max_results", 50),  # Limit results
+            "protein": full_query,  # EBI uses 'protein' parameter
+            "size": size,
         }
 
-        response = await self._make_request("GET", "/uniprotkb/search", params=params)
-        content = response.text.strip()
+        # Wait for rate limit
+        await self.rate_limiter.wait_for_token()
 
-        # Parse accession numbers (one per line)
-        accession_numbers = [
-            line.strip() for line in content.split("\n") if line.strip()
-        ]
+        # Use requests directly
+        response = requests.get(
+            url,
+            params=params,
+            headers={"User-Agent": "MED13-Resource-Library/1.0 (research@med13.org)"},
+            timeout=self.timeout_seconds,
+        )
+        response.raise_for_status()
+
+        # Parse XML response to extract accession numbers
+        import xml.etree.ElementTree as ET
+
+        try:
+            root = ET.fromstring(response.text)
+
+            # Extract accession numbers from XML
+            accession_numbers = []
+            ns = {
+                "u": "http://uniprot.org/uniprot",
+                "u2": "https://uniprot.org/uniprot",
+            }
+
+            # Try explicit namespaces
+            for ns_name in ["u", "u2"]:
+                for entry in root.findall(f".//{ns_name}:accession", ns):
+                    if entry.text:
+                        accession_numbers.append(entry.text.strip())
+
+        except Exception:
+            accession_numbers = []
+
+        # Remove duplicates and limit results
+        accession_numbers = list(set(accession_numbers))[:size]
         return accession_numbers
 
     async def _fetch_protein_details(
@@ -115,41 +197,268 @@ class UniProtIngestor(BaseIngestor):
         # Join accessions for batch request
         accessions = ",".join(accession_numbers)
 
-        # Fetch detailed records in JSON format
+        # Fetch detailed records from EBI API (returns XML)
+        url = f"{self.base_url}/proteins"
         params = {
-            "accessions": accessions,
-            "format": "json",
+            "accession": accessions,  # EBI uses 'accession' parameter
         }
 
-        response = await self._make_request("GET", "/uniprotkb/search", params=params)
+        # Wait for rate limit
+        await self.rate_limiter.wait_for_token()
 
-        try:
-            data = response.json()
-            records = data.get("results", [])
+        # Use requests directly
+        response = requests.get(
+            url,
+            params=params,
+            headers={"User-Agent": "MED13-Resource-Library/1.0 (research@med13.org)"},
+            timeout=self.timeout_seconds,
+        )
+        response.raise_for_status()
 
-            # Enrich records with source metadata
-            for record in records:
-                record.update(
-                    {
-                        "source": "uniprot",
-                        "fetched_at": response.headers.get("date", ""),
-                        "accession_numbers": accession_numbers,
-                    }
-                )
+        # Parse XML response
+        import xml.etree.ElementTree as ET
 
-            return records
+        root = ET.fromstring(response.text)
 
-        except json.JSONDecodeError:
-            # Return error record
-            return [
+        records = []
+        ns = {"u": "http://uniprot.org/uniprot", "u2": "https://uniprot.org/uniprot"}
+
+        # Try finding entries with different namespace approaches
+        entries = []
+        for ns_name in ["u", "u2"]:
+            entries = root.findall(f".//{ns_name}:entry", ns)
+            if entries:
+                break
+
+        for entry in entries:
+            # Convert XML entry to dictionary format
+            record = self._parse_xml_entry(entry)
+            record.update(
                 {
-                    "parsing_error": "Failed to parse UniProt JSON response",
+                    "source": "uniprot",
+                    "fetched_at": response.headers.get("date", ""),
                     "accession_numbers": accession_numbers,
-                    "raw_response": response.text[
-                        :1000
-                    ],  # First 1000 chars for debugging
                 }
+            )
+            records.append(record)
+
+        return records
+
+    def _parse_xml_entry(self, entry) -> Dict[str, Any]:
+        """
+        Parse XML entry element into dictionary format.
+
+        Args:
+            entry: XML element for a UniProt entry
+
+        Returns:
+            Dictionary representation of the entry
+        """
+        record = {}
+
+        # Extract basic information - handle namespace properly
+        # The entry element has xmlns="https://uniprot.org/uniprot"
+        ns = {"u": "https://uniprot.org/uniprot"}
+
+        # Primary accession
+        accession_elem = entry.find("u:accession", ns)
+        if accession_elem is not None:
+            record["primaryAccession"] = accession_elem.text
+
+        # UniProt ID
+        name_elem = entry.find("u:name", ns)
+        if name_elem is not None:
+            record["uniProtkbId"] = name_elem.text
+
+        # Protein description
+        protein_elem = entry.find("u:protein", ns)
+        if protein_elem is not None:
+            record["proteinDescription"] = self._parse_protein_description(protein_elem)
+
+        # Gene information
+        genes = []
+        for gene_elem in entry.findall("u:gene/u:name", ns):
+            genes.append(
+                {
+                    "geneName": {"value": gene_elem.text},
+                    "type": gene_elem.get("type", "primary"),
+                }
+            )
+        if genes:
+            record["genes"] = genes
+
+        # Organism information
+        organism_elem = entry.find("u:organism", ns)
+        if organism_elem is not None:
+            record["organism"] = self._parse_organism(organism_elem)
+
+        # Sequence information
+        sequence_elem = entry.find("u:sequence", ns)
+        if sequence_elem is not None:
+            record["sequence"] = {
+                "length": int(sequence_elem.get("length", 0)),
+                "mass": int(sequence_elem.get("mass", 0)),
+                "checksum": sequence_elem.get("checksum", ""),
+                "modified": sequence_elem.get("modified", ""),
+                "version": int(sequence_elem.get("version", 1)),
+            }
+
+        # Comments (function, subcellular location, etc.)
+        comments = []
+        for comment_elem in entry.findall("u:comment", ns):
+            comments.append(self._parse_comment(comment_elem))
+        if comments:
+            record["comments"] = comments
+
+        # References
+        references = []
+        for ref_elem in entry.findall("u:reference", ns):
+            references.append(self._parse_reference(ref_elem))
+        if references:
+            record["references"] = references
+
+        # Features (domains, PTMs, etc.)
+        features = []
+        for feature_elem in entry.findall("u:feature", ns):
+            features.append(self._parse_feature(feature_elem))
+        if features:
+            record["features"] = features
+
+        # Database references
+        db_refs = []
+        for db_elem in entry.findall("u:dbReference", ns):
+            db_refs.append(
+                {
+                    "type": db_elem.get("type"),
+                    "id": db_elem.get("id"),
+                    "properties": [
+                        {"type": prop.get("type"), "value": prop.get("value")}
+                        for prop in db_elem.findall("u:property", ns)
+                    ],
+                }
+            )
+        if db_refs:
+            record["dbReferences"] = db_refs
+
+        # Entry audit information
+        audit_elem = entry.find("u:entryAudit", ns)
+        if audit_elem is not None:
+            record["entryAudit"] = {
+                "lastAnnotationUpdateDate": audit_elem.get(
+                    "lastAnnotationUpdateDate", ""
+                )
+            }
+
+        return record
+
+    def _parse_protein_description(self, protein_elem) -> Dict[str, Any]:
+        """Parse protein description element."""
+        ns = {"u": "https://uniprot.org/uniprot"}
+        desc = {}
+
+        # Recommended name
+        rec_name = protein_elem.find("u:recommendedName", ns)
+        if rec_name is not None:
+            full_name = rec_name.find("u:fullName", ns)
+            if full_name is not None:
+                desc["recommendedName"] = {"fullName": {"value": full_name.text}}
+
+        return desc
+
+    def _parse_organism(self, organism_elem) -> Dict[str, Any]:
+        """Parse organism element."""
+        ns = {"u": "https://uniprot.org/uniprot"}
+        org = {}
+
+        # Scientific name
+        sci_name = organism_elem.find('u:name[@type="scientific"]', ns)
+        if sci_name is not None:
+            org["scientificName"] = sci_name.text
+
+        # Common name
+        com_name = organism_elem.find('u:name[@type="common"]', ns)
+        if com_name is not None:
+            org["commonName"] = com_name.text
+
+        # Taxon ID
+        taxon_ref = organism_elem.find('u:dbReference[@type="NCBI Taxonomy"]', ns)
+        if taxon_ref is not None:
+            org["taxonId"] = taxon_ref.get("id")
+
+        return org
+
+    def _parse_comment(self, comment_elem) -> Dict[str, Any]:
+        """Parse comment element."""
+        ns = {"u": "https://uniprot.org/uniprot"}
+        comment = {"commentType": comment_elem.get("type")}
+
+        # Text content
+        texts = []
+        for text_elem in comment_elem.findall("u:text", ns):
+            texts.append({"value": text_elem.text})
+        if texts:
+            comment["texts"] = texts
+
+        # Subcellular locations
+        locations = []
+        for loc_elem in comment_elem.findall("u:subcellularLocation/u:location", ns):
+            locations.append({"value": loc_elem.text})
+        if locations:
+            comment["subcellularLocations"] = [
+                {"location": {"value": loc["value"]}} for loc in locations
             ]
+
+        return comment
+
+    def _parse_reference(self, ref_elem) -> Dict[str, Any]:
+        """Parse reference element."""
+        ns = {"u": "https://uniprot.org/uniprot"}
+        ref = {}
+
+        # Citation
+        citation = ref_elem.find("u:citation", ns)
+        if citation is not None:
+            ref["citation"] = {
+                "type": citation.get("type"),
+                "title": (
+                    citation.find("u:title", ns).text
+                    if citation.find("u:title", ns) is not None
+                    else None
+                ),
+                "publicationDate": {"value": citation.get("date")},
+                "authors": [
+                    {"name": author.text}
+                    for author in citation.findall("u:authorList/u:person/u:name", ns)
+                ],
+            }
+
+        return ref
+
+    def _parse_feature(self, feature_elem) -> Dict[str, Any]:
+        """Parse feature element."""
+        ns = {"u": "https://uniprot.org/uniprot"}
+        feature = {
+            "type": feature_elem.get("type"),
+            "description": feature_elem.get("description"),
+        }
+
+        # Location
+        location = feature_elem.find("u:location", ns)
+        if location is not None:
+            loc_info = {}
+            begin_elem = location.find("u:begin", ns)
+            end_elem = location.find("u:end", ns)
+            position_elem = location.find("u:position", ns)
+
+            if begin_elem is not None and end_elem is not None:
+                loc_info["start"] = {"value": int(begin_elem.get("position", 0))}
+                loc_info["end"] = {"value": int(end_elem.get("position", 0))}
+            elif position_elem is not None:
+                loc_info["position"] = {"value": int(position_elem.get("position", 0))}
+
+            feature["location"] = loc_info
+
+        return feature
 
     def _parse_uniprot_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """

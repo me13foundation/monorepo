@@ -70,11 +70,17 @@ class ClinVarIngestor(BaseIngestor):
         Returns:
             List of ClinVar variant IDs
         """
-        # Build search query
-        query_terms = [
-            f"{gene_symbol}[gene]",
-            "homo sapiens[organism]",
-        ]
+        # Build search query - try multiple approaches for MED13
+        # First try the standard gene search
+        query_terms = [f"{gene_symbol}[gene]"]
+
+        # Add organism filter
+        query_terms.append("homo sapiens[organism]")
+
+        # For MED13, also try searching by gene ID or symbol variations
+        if gene_symbol.upper() == "MED13":
+            # MED13 might be indexed differently - try broader search
+            query_terms = [f"({gene_symbol}[gene] OR MED13[gene] OR mediator[gene])"]
 
         # Add additional filters if provided
         if kwargs.get("variant_type"):
