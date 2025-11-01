@@ -6,6 +6,47 @@ VENV := venv
 PYTHON := $(VENV)/bin/python3
 PIP := $(VENV)/bin/pip3
 
+# Detect environment type
+CI_ENV := $(CI)
+IN_VENV := $(shell python3 -c "import sys; print('1' if sys.prefix != sys.base_prefix else '0')" 2>/dev/null || echo "0")
+
+# Choose Python/Pip based on environment
+ifeq ($(CI_ENV),true)
+    # CI/CD environment - use system python/pip
+    USE_PYTHON := python3
+    USE_PIP := pip3
+    VENV_STATUS := CI/CD (no venv)
+    VENV_ACTIVE := false
+else ifeq ($(IN_VENV),1)
+    # We're in a venv - use venv python/pip
+    USE_PYTHON := $(PYTHON)
+    USE_PIP := $(PIP)
+    VENV_STATUS := Active
+    VENV_ACTIVE := true
+else ifeq ($(wildcard $(VENV)/bin/python3),)
+    # No venv exists - warn user
+    USE_PYTHON := python3
+    USE_PIP := pip3
+    VENV_STATUS := None - run 'make venv' first
+    VENV_ACTIVE := false
+else
+    # Venv exists but not activated - warn and use venv
+    USE_PYTHON := $(PYTHON)
+    USE_PIP := $(PIP)
+    VENV_STATUS := Available - activate with 'source venv/bin/activate'
+    VENV_ACTIVE := false
+endif
+
+# Warn if venv is not active but exists
+define check_venv
+	@if [ "$(VENV_ACTIVE)" = "false" ] && [ -d "$(VENV)" ]; then \
+		echo "⚠️  Virtual environment exists but not activated."; \
+		echo "   Run: source $(VENV)/bin/activate"; \
+		echo "   Or use: make activate"; \
+		echo ""; \
+	fi
+endef
+
 .PHONY: help venv install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list ci check-env docs-serve backup-db restore-db activate deactivate
 
 # Default target
@@ -31,19 +72,21 @@ deactivate: ## Show command to deactivate virtual environment
 	@echo "deactivate"
 
 # Installation
-install: venv ## Install production dependencies
-	$(PIP) install -r requirements.txt
+install: ## Install production dependencies
+	$(call check_venv)
+	$(USE_PIP) install -r requirements.txt
 
-install-dev: venv ## Install development dependencies
-	$(PIP) install -r requirements.txt
-	$(PIP) install -r requirements-dev.txt
+install-dev: ## Install development dependencies
+	$(call check_venv)
+	$(USE_PIP) install -r requirements.txt
+	$(USE_PIP) install -r requirements-dev.txt
 
 # Development setup
 setup-dev: install-dev ## Set up development environment
-	$(PIP) install pre-commit --quiet || true
+	$(USE_PIP) install pre-commit --quiet || true
 	pre-commit install || true
 	@echo "Development environment setup complete!"
-	@echo "To activate the virtual environment: source $(VENV)/bin/activate"
+	@echo "Virtual environment status: $(VENV_STATUS)"
 
 setup-gcp: ## Set up Google Cloud SDK and authenticate
 	@echo "Setting up Google Cloud..."
@@ -53,60 +96,72 @@ setup-gcp: ## Set up Google Cloud SDK and authenticate
 
 # Testing
 test: ## Run all tests
-	$(PYTHON) -m pytest
+	$(call check_venv)
+	$(USE_PYTHON) -m pytest
 
 test-verbose: ## Run tests with verbose output
-	$(PYTHON) -m pytest -v --tb=short
+	$(call check_venv)
+	$(USE_PYTHON) -m pytest -v --tb=short
 
 test-cov: ## Run tests with coverage report
-	$(PYTHON) -m pytest --cov=src --cov-report=html --cov-report=term-missing
+	$(call check_venv)
+	$(USE_PYTHON) -m pytest --cov=src --cov-report=html --cov-report=term-missing
 
 test-watch: ## Run tests in watch mode
-	$(PYTHON) -m pytest-watch
+	$(call check_venv)
+	$(USE_PYTHON) -m pytest-watch
 
 # Code Quality
 lint: ## Run all linting tools (flake8, ruff, mypy, bandit)
+	$(call check_venv)
 	@echo "Running flake8..."
-	$(PYTHON) -m flake8 src tests --max-line-length=88 --extend-ignore=E203,W503
+	$(USE_PYTHON) -m flake8 src tests --max-line-length=88 --extend-ignore=E203,W503
 	@echo "Running ruff..."
-	$(PYTHON) -m ruff check src tests
+	$(USE_PYTHON) -m ruff check src tests
 	@echo "Running mypy..."
-	$(PYTHON) -m mypy src
+	$(USE_PYTHON) -m mypy src
 	@echo "Running bandit..."
-	$(PYTHON) -m bandit -r src -f json -o bandit-results.json || true
+	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || true
 
 format: ## Format code with Black and sort imports with ruff
-	$(PYTHON) -m black src tests
-	$(PYTHON) -m ruff check --fix src tests
+	$(call check_venv)
+	$(USE_PYTHON) -m black src tests
+	$(USE_PYTHON) -m ruff check --fix src tests
 
 format-check: ## Check code formatting without making changes
-	$(PYTHON) -m black --check src tests
-	$(PYTHON) -m ruff check src tests
+	$(call check_venv)
+	$(USE_PYTHON) -m black --check src tests
+	$(USE_PYTHON) -m ruff check src tests
 
 type-check: ## Run mypy type checking with strict settings
-	$(PYTHON) -m mypy src --strict --show-error-codes
+	$(call check_venv)
+	$(USE_PYTHON) -m mypy src --strict --show-error-codes
 
 type-check-report: ## Generate mypy type checking report
-	$(PYTHON) -m mypy src --html-report mypy-report
+	$(call check_venv)
+	$(USE_PYTHON) -m mypy src --html-report mypy-report
 
 security-audit: ## Run comprehensive security audit (pip-audit, safety, bandit)
+	$(call check_venv)
 	@echo "Running pip-audit..."
-	$(PIP) install pip-audit --quiet || true
+	$(USE_PIP) install pip-audit --quiet || true
 	pip-audit --format json | tee pip-audit-results.json || true
 	@echo "Running safety..."
-	$(PIP) install safety --quiet || true
+	$(USE_PIP) install safety --quiet || true
 	safety check --output json | tee safety-results.json || true
 	@echo "Running bandit..."
-	$(PYTHON) -m bandit -r src -f json -o bandit-results.json || true
+	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || true
 
 security-full: security-audit ## Full security assessment with all tools
 
 # Local Development
 run-local: ## Run the application locally
-	$(PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+	$(call check_venv)
+	$(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
 run-dash: ## Run the Dash curation interface locally
-	$(PYTHON) -c "from src.dash_app import app; app.run_server(host='0.0.0.0', port=8050, debug=True)"
+	$(call check_venv)
+	$(USE_PYTHON) -c "from src.dash_app import app; app.run_server(host='0.0.0.0', port=8050, debug=True)"
 
 run-docker: docker-build ## Build and run with Docker
 	docker run -p 8080:8080 med13-resource-library
@@ -135,7 +190,8 @@ db-reset: ## Reset database (WARNING: destroys data)
 	alembic downgrade base
 
 db-seed: ## Seed database with test data
-	$(PYTHON) scripts/seed_database.py
+	$(call check_venv)
+	$(USE_PYTHON) scripts/seed_database.py
 
 # Deployment
 deploy-staging: ## Deploy to staging environment
@@ -191,18 +247,23 @@ ci: install-dev lint test security-audit ## Run full CI pipeline locally
 
 # Environment checks
 check-env: ## Check if development environment is properly set up
+	@echo "🐍 Python Environment Status:"
+	@echo "   Virtual Environment: $(VENV_STATUS)"
+	@echo "   Python Executable: $(USE_PYTHON)"
+	@echo ""
 	@echo "Checking Python version..."
-	$(PYTHON) --version
+	$(USE_PYTHON) --version
 	@echo "Checking pip version..."
-	$(PIP) --version
+	$(USE_PIP) --version
 	@echo "Checking if requirements are installed..."
-	$(PYTHON) -c "import fastapi, uvicorn, sqlalchemy, pydantic; print('Core dependencies OK')"
+	$(USE_PYTHON) -c "import fastapi, uvicorn, sqlalchemy, pydantic; print('✅ Core dependencies OK')" 2>/dev/null || echo "❌ Core dependencies missing - run 'make install-dev'"
 	@echo "Checking pre-commit..."
-	pre-commit --version || echo "pre-commit not installed"
+	pre-commit --version 2>/dev/null || echo "⚠️  pre-commit not installed - run 'make setup-dev'"
 
 # Documentation
 docs-serve: ## Serve documentation locally
-	cd docs && $(PYTHON) -m http.server 8000
+	$(call check_venv)
+	cd docs && $(USE_PYTHON) -m http.server 8000
 
 # Backup and Recovery
 backup-db: ## Create database backup (SQLite)
