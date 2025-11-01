@@ -9,41 +9,29 @@ Publish regular snapshots (with DOIs) so researchers and clinicians can download
 Acknowledge that Phase 0 is a preparatory library; the relational store will be discarded or migrated in Phase 1 when the knowledge graph is built.
 Data Sources
 We compile data from trusted biomedical resources:
+Fully obtainable (open & structured)
 ClinVar / ClinGen: variant interpretations and curation status.
 Human Phenotype Ontology (HPO): standard phenotype terms and hierarchies.
-PubMed / LitVar: literature references linking MED13 variants to phenotypes.
-OMIM / Orphanet: gene–disease associations for rare disorders.
-Gene Ontology (UniProt optional): gene function annotations.
+PubMed / LitVar: literature metadata linking MED13 variants to phenotypes.
+Orphanet: gene–disease associations for rare disorders.
+Partially obtainable (APIs)
+UniProt, Gene Ontology and GTEx: gene function annotations, protein interactions and tissue expression patterns.
 Crossref / Crossmark: article metadata and retraction status.
-Other ontologies (optional): e.g. GO, DOID for additional context.
+Other ontologies (GO, GG, DOID): additional biomedical context.
+Phase 1 only (requires collaboration)
+Functional studies, treatment outcomes and natural history data: extracted from case reports and clinical registries; placeholders exist but automated ingestion is deferred to Phase 1.
 Each source is ingested via official APIs or bulk files to ensure reproducibility. Licensing metadata is recorded for every source to respect redistribution rights.
-Data Model
-Phase 0 stores data in simple relational tables. Each table represents an entity or relationship. Filterable attributes are top‑level columns; unstructured metadata is kept in a JSONB field.
-Table
-Key Columns
-Description
-genes
-gene_id, symbol
-Unique gene identifier and basic metadata.
-variants
-variant_id, gene_id, hgvs, clinvar_id
-Sequence variants of MED13 linked to the gene.
-phenotypes
-hpo_id, label, definition
-Phenotype terms from HPO.
-publications
-pub_id, doi, pmid, title
-Literature references from PubMed or Crossref.
-evidence
-evidence_id, variant_id, hpo_id, source, evidence_level, curation_status, summary, provenance
-Links variants to phenotypes with supporting references; filterable fields are columns, and raw metadata is stored in the provenance JSONB column.
 
+Additional Fields and Placeholders
+To prepare for future expansions and Phase 1, the data model includes optional fields for scientific context and placeholders for clinical data.
+Gene enhancements: optional fields for protein domains, subcellular localization, tissue expression patterns (e.g., from GTEx), Gene Ontology terms, and interacting proteins. These enrich the genes table without impacting Phase 0 performance.
+Evidence placeholders: optional fields such as treatment_response, functional_studies, and patient_cohorts in the evidence table. These serve as placeholders for Phase 1 data (treatment outcomes, experimental evidence and cohort information) and remain empty in Phase 0.
 Technology Stack
 Layer
 Tool
 Rationale
 ETL & validation
-Python  , Pydantic models, pytest
+Python 3.11, Pydantic models, pytest
 Strong typing and testable transformations.
 Metadata store
 PostgreSQL with JSONB or Google Cloud Storage (CSV/JSON)
