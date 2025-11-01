@@ -66,6 +66,9 @@ med13-resource-library/
 ### Available Commands
 
 ```bash
+# Quality Assurance
+make all               # Run complete pre-commit quality suite (recommended)
+
 # Environment Management
 make venv              # Create virtual environment
 make activate          # Show activation command
@@ -126,7 +129,10 @@ The Makefile automatically detects your environment:
 # Fresh development setup
 make setup-dev
 
-# Make some changes, then:
+# Development cycle - run this before commit/push
+make all               # Complete quality assurance (recommended)
+
+# Or run individual checks
 make format            # Auto-format code
 make lint              # Check code quality
 make test              # Run tests
