@@ -1,0 +1,461 @@
+"""
+Publication identifier normalization service.
+
+Standardizes publication identifiers from different sources (PubMed, DOI, PMC, etc.)
+into consistent formats for cross-referencing and deduplication.
+"""
+
+import re
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
+from enum import Enum
+from datetime import datetime
+
+
+class PublicationIdentifierType(Enum):
+    """Types of publication identifiers."""
+
+    PUBMED_ID = "pubmed_id"
+    DOI = "doi"
+    PMC_ID = "pmc_id"
+    PMID = "pmid"
+    OTHER = "other"
+
+
+@dataclass
+class NormalizedPublication:
+    """Normalized publication identifier with metadata."""
+
+    primary_id: str
+    id_type: PublicationIdentifierType
+    title: Optional[str]
+    authors: List[str]
+    journal: Optional[str]
+    publication_date: Optional[datetime]
+    doi: Optional[str]
+    pmc_id: Optional[str]
+    pubmed_id: Optional[str]
+    cross_references: Dict[str, List[str]]
+    source: str
+    confidence_score: float
+
+
+class PublicationNormalizer:
+    """
+    Normalizes publication identifiers from different sources.
+
+    Handles standardization of publication IDs (PubMed, DOI, PMC, etc.)
+    and metadata for consistent representation.
+    """
+
+    def __init__(self):
+        # Identifier patterns
+        self.identifier_patterns = {
+            "pubmed": re.compile(r"^\d+$"),  # PubMed IDs are just numbers
+            "doi": re.compile(r"^10\.\d{4,9}/[-._;()/:A-Z0-9]+$", re.IGNORECASE),
+            "pmc": re.compile(r"^PMC\d+$", re.IGNORECASE),
+        }
+
+        # Cache for normalized publications
+        self.normalized_cache: Dict[str, NormalizedPublication] = {}
+
+    def normalize(
+        self, raw_publication_data: Dict[str, Any], source: str = "unknown"
+    ) -> Optional[NormalizedPublication]:
+        """
+        Normalize publication data from various sources.
+
+        Args:
+            raw_publication_data: Raw publication data from parsers
+            source: Source of the data (pubmed, uniprot, etc.)
+
+        Returns:
+            Normalized publication object or None if normalization fails
+        """
+        try:
+            if source.lower() == "pubmed":
+                return self._normalize_pubmed_publication(raw_publication_data)
+            elif source.lower() == "uniprot":
+                return self._normalize_uniprot_publication(raw_publication_data)
+            else:
+                return self._normalize_generic_publication(raw_publication_data, source)
+
+        except Exception as e:
+            print(f"Error normalizing publication data from {source}: {e}")
+            return None
+
+    def _normalize_pubmed_publication(
+        self, publication_data: Dict[str, Any]
+    ) -> Optional[NormalizedPublication]:
+        """Normalize publication data from PubMed."""
+        pubmed_id = publication_data.get("pubmed_id")
+        title = publication_data.get("title")
+
+        if not pubmed_id:
+            return None
+
+        primary_id = pubmed_id
+        id_type = PublicationIdentifierType.PUBMED_ID
+
+        # Extract authors
+        authors = self._extract_pubmed_authors(publication_data)
+
+        # Extract journal information
+        journal = self._extract_pubmed_journal(publication_data)
+
+        # Extract publication date
+        publication_date = publication_data.get("publication_date")
+
+        # Extract identifiers
+        doi = publication_data.get("doi")
+        pmc_id = publication_data.get("pmc_id")
+
+        # Build cross-references
+        cross_refs = {"PUBMED": [pubmed_id]}
+        if doi:
+            cross_refs["DOI"] = [doi]
+        if pmc_id:
+            cross_refs["PMC"] = [pmc_id]
+
+        normalized = NormalizedPublication(
+            primary_id=primary_id,
+            id_type=id_type,
+            title=title,
+            authors=authors,
+            journal=journal,
+            publication_date=publication_date,
+            doi=doi,
+            pmc_id=pmc_id,
+            pubmed_id=pubmed_id,
+            cross_references=cross_refs,
+            source="pubmed",
+            confidence_score=0.95,  # Very high confidence for PubMed data
+        )
+
+        self.normalized_cache[primary_id] = normalized
+        return normalized
+
+    def _normalize_uniprot_publication(
+        self, publication_data: Dict[str, Any]
+    ) -> Optional[NormalizedPublication]:
+        """Normalize publication data from UniProt."""
+        citation = publication_data.get("citation", {})
+        title = citation.get("title")
+        pubmed_id = citation.get("pubmedId")
+
+        if not title and not pubmed_id:
+            return None
+
+        # Use PubMed ID as primary if available, otherwise title
+        if pubmed_id:
+            primary_id = pubmed_id
+            id_type = PublicationIdentifierType.PUBMED_ID
+        else:
+            primary_id = title or "unknown"
+            id_type = PublicationIdentifierType.OTHER
+
+        # Extract authors
+        authors = citation.get("authors", [])
+
+        # Extract publication date
+        pub_date_str = citation.get("publicationDate", {}).get("value")
+        publication_date = None
+        if pub_date_str:
+            try:
+                # Try to parse various date formats
+                publication_date = self._parse_date_string(pub_date_str)
+            except ValueError:
+                pass
+
+        normalized = NormalizedPublication(
+            primary_id=primary_id,
+            id_type=id_type,
+            title=title,
+            authors=authors,
+            journal=None,  # UniProt may not have journal info
+            publication_date=publication_date,
+            doi=None,
+            pmc_id=None,
+            pubmed_id=pubmed_id,
+            cross_references={},
+            source="uniprot",
+            confidence_score=0.8,  # Good confidence for UniProt citations
+        )
+
+        self.normalized_cache[primary_id] = normalized
+        return normalized
+
+    def _normalize_generic_publication(
+        self, publication_data: Dict[str, Any], source: str
+    ) -> Optional[NormalizedPublication]:
+        """Normalize publication data from generic sources."""
+        # Try to extract common fields
+        pub_id = (
+            publication_data.get("id")
+            or publication_data.get("publication_id")
+            or publication_data.get("pubmed_id")
+            or publication_data.get("doi")
+        )
+
+        title = publication_data.get("title")
+        authors = publication_data.get("authors", [])
+
+        if not pub_id and not title:
+            return None
+
+        # Determine ID type and primary ID
+        if pub_id:
+            id_type = self._identify_publication_type(pub_id)
+            primary_id = pub_id
+        else:
+            id_type = PublicationIdentifierType.OTHER
+            primary_id = title
+
+        # Extract other identifiers if available
+        doi = publication_data.get("doi")
+        pmc_id = publication_data.get("pmc_id")
+        pubmed_id = publication_data.get("pubmed_id")
+
+        normalized = NormalizedPublication(
+            primary_id=primary_id,
+            id_type=id_type,
+            title=title,
+            authors=authors if isinstance(authors, list) else [authors],
+            journal=publication_data.get("journal"),
+            publication_date=publication_data.get("publication_date"),
+            doi=doi,
+            pmc_id=pmc_id,
+            pubmed_id=pubmed_id,
+            cross_references={},
+            source=source,
+            confidence_score=0.6,  # Medium confidence for generic sources
+        )
+
+        self.normalized_cache[primary_id] = normalized
+        return normalized
+
+    def _identify_publication_type(self, pub_id: str) -> PublicationIdentifierType:
+        """Identify the type of publication identifier."""
+        if self.identifier_patterns["pubmed"].match(pub_id):
+            return PublicationIdentifierType.PUBMED_ID
+        elif self.identifier_patterns["doi"].match(pub_id):
+            return PublicationIdentifierType.DOI
+        elif self.identifier_patterns["pmc"].match(pub_id):
+            return PublicationIdentifierType.PMC_ID
+        else:
+            return PublicationIdentifierType.OTHER
+
+    def _extract_pubmed_authors(self, publication_data: Dict[str, Any]) -> List[str]:
+        """Extract author names from PubMed data."""
+        authors = []
+
+        author_data = publication_data.get("authors", [])
+        if isinstance(author_data, list):
+            for author in author_data:
+                if isinstance(author, dict):
+                    # PubMed author format
+                    last_name = author.get("last_name") or author.get("LastName")
+                    first_name = author.get("first_name") or author.get("ForeName")
+                    if last_name:
+                        full_name = last_name
+                        if first_name:
+                            full_name += f", {first_name}"
+                        authors.append(full_name)
+                elif isinstance(author, str):
+                    authors.append(author)
+
+        return authors
+
+    def _extract_pubmed_journal(
+        self, publication_data: Dict[str, Any]
+    ) -> Optional[str]:
+        """Extract journal information from PubMed data."""
+        journal_data = publication_data.get("journal", {})
+
+        if isinstance(journal_data, dict):
+            return journal_data.get("title") or journal_data.get("Title")
+        elif isinstance(journal_data, str):
+            return journal_data
+
+        return None
+
+    def _parse_date_string(self, date_str: str) -> Optional[datetime]:
+        """Parse date string into datetime object."""
+        if not date_str:
+            return None
+
+        # Try various date formats
+        formats = [
+            "%Y",  # Year only
+            "%Y-%m",  # Year-month
+            "%Y-%m-%d",  # Full date
+            "%B %Y",  # Month Year
+            "%b %Y",  # Abbreviated month Year
+        ]
+
+        for fmt in formats:
+            try:
+                parsed_date = datetime.strptime(date_str, fmt)
+                return parsed_date
+            except ValueError:
+                continue
+
+        return None
+
+    def standardize_doi(self, doi: str) -> str:
+        """
+        Standardize DOI format.
+
+        Args:
+            doi: Raw DOI string
+
+        Returns:
+            Standardized DOI string
+        """
+        if not doi:
+            return doi
+
+        # Remove common prefixes and normalize
+        doi = doi.strip()
+        doi = re.sub(r"^https?://(?:dx\.)?doi\.org/", "", doi, flags=re.IGNORECASE)
+        doi = re.sub(r"^doi:", "", doi, flags=re.IGNORECASE)
+
+        # Ensure it starts with 10.
+        if not doi.startswith("10."):
+            doi = f"10.{doi}" if doi else doi
+
+        return doi.lower()
+
+    def merge_publication_data(
+        self, publications: List[NormalizedPublication]
+    ) -> NormalizedPublication:
+        """
+        Merge multiple publication records for the same publication.
+
+        Args:
+            publications: List of normalized publication records for the same publication
+
+        Returns:
+            Single merged publication record
+        """
+        if not publications:
+            raise ValueError("No publications to merge")
+
+        if len(publications) == 1:
+            return publications[0]
+
+        # Use the publication with highest confidence as base
+        base_publication = max(publications, key=lambda p: p.confidence_score)
+
+        # Merge identifiers
+        merged_doi = base_publication.doi
+        merged_pmc = base_publication.pmc_id
+        merged_pubmed = base_publication.pubmed_id
+
+        for pub in publications:
+            if not merged_doi and pub.doi:
+                merged_doi = pub.doi
+            if not merged_pmc and pub.pmc_id:
+                merged_pmc = pub.pmc_id
+            if not merged_pubmed and pub.pubmed_id:
+                merged_pubmed = pub.pubmed_id
+
+        # Merge cross-references
+        merged_refs = {}
+        for pub in publications:
+            for ref_type, ref_ids in pub.cross_references.items():
+                if ref_type not in merged_refs:
+                    merged_refs[ref_type] = []
+                merged_refs[ref_type].extend(ref_ids)
+
+        # Remove duplicates
+        for ref_type in merged_refs:
+            merged_refs[ref_type] = list(set(merged_refs[ref_type]))
+
+        # Merge authors
+        all_authors = []
+        for pub in publications:
+            all_authors.extend(pub.authors)
+        all_authors = list(set(all_authors))  # Remove duplicates
+
+        return NormalizedPublication(
+            primary_id=base_publication.primary_id,
+            id_type=base_publication.id_type,
+            title=base_publication.title,
+            authors=all_authors,
+            journal=base_publication.journal,
+            publication_date=base_publication.publication_date,
+            doi=merged_doi,
+            pmc_id=merged_pmc,
+            pubmed_id=merged_pubmed,
+            cross_references=merged_refs,
+            source="merged",
+            confidence_score=min(1.0, base_publication.confidence_score + 0.1),
+        )
+
+    def validate_normalized_publication(
+        self, publication: NormalizedPublication
+    ) -> List[str]:
+        """
+        Validate normalized publication data.
+
+        Args:
+            publication: Normalized publication object
+
+        Returns:
+            List of validation error messages (empty if valid)
+        """
+        errors = []
+
+        if not publication.primary_id:
+            errors.append("Missing primary ID")
+
+        if publication.confidence_score < 0 or publication.confidence_score > 1:
+            errors.append("Confidence score out of range [0,1]")
+
+        # Validate DOI format if present
+        if publication.doi:
+            if not self.identifier_patterns["doi"].match(publication.doi):
+                errors.append("Invalid DOI format")
+
+        # Validate PubMed ID format if present
+        if publication.pubmed_id:
+            if not self.identifier_patterns["pubmed"].match(publication.pubmed_id):
+                errors.append("Invalid PubMed ID format")
+
+        # Validate PMC ID format if present
+        if publication.pmc_id:
+            if not self.identifier_patterns["pmc"].match(publication.pmc_id):
+                errors.append("Invalid PMC ID format")
+
+        return errors
+
+    def get_normalized_publication(
+        self, pub_id: str
+    ) -> Optional[NormalizedPublication]:
+        """
+        Retrieve a cached normalized publication by ID.
+
+        Args:
+            pub_id: Publication identifier
+
+        Returns:
+            Normalized publication object or None if not found
+        """
+        return self.normalized_cache.get(pub_id)
+
+    def find_publication_by_doi(self, doi: str) -> Optional[NormalizedPublication]:
+        """
+        Find a normalized publication by DOI.
+
+        Args:
+            doi: DOI string
+
+        Returns:
+            Normalized publication object or None if not found
+        """
+        standardized_doi = self.standardize_doi(doi)
+        for pub in self.normalized_cache.values():
+            if pub.doi and self.standardize_doi(pub.doi) == standardized_doi:
+                return pub
+        return None
