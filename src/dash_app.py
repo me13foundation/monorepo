@@ -1521,7 +1521,7 @@ def update_dashboard_stats(n, settings):
 
 # Callback for review table data
 @app.callback(
-    [Output("review-table", "data"), Output("review-table", "selected_rows")],
+    Output("review-table", "data"),
     [
         Input("apply-filters-btn", "n_clicks"),
         Input("interval-component", "n_intervals"),
@@ -1531,9 +1531,12 @@ def update_dashboard_stats(n, settings):
         State("status-filter", "value"),
         State("priority-filter", "value"),
         State("settings-store", "data"),
+        State("review-table", "selected_rows"),
     ],
 )
-def update_review_table(n_clicks, n_intervals, entity_type, status, priority, settings):
+def update_review_table(
+    n_clicks, n_intervals, entity_type, status, priority, settings, selected_rows
+):
     """Update the review table with filtered data."""
     try:
         # Mock data for now - replace with actual API calls
@@ -1570,11 +1573,11 @@ def update_review_table(n_clicks, n_intervals, entity_type, status, priority, se
             },
         ]
 
-        return mock_data, []
+        return mock_data
 
     except Exception as e:
         logger.error(f"Error updating review table: {e}")
-        return [], []
+        return []
 
 
 # Callback for charts
@@ -1789,7 +1792,7 @@ def update_selected_count(selected_rows, table_data):
 # Callback for bulk operations
 @app.callback(
     [
-        Output("review-table", "selected_rows"),
+        Output("review-table", "selected_rows", allow_duplicate=True),
         Output("bulk-operation-result", "children", allow_duplicate=True),
     ],
     [
