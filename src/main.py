@@ -5,6 +5,7 @@ from typing import Dict, Any
 from src.routes.health import router as health_router
 from src.routes.resources import router as resources_router
 from src.routes.genes import router as genes_router
+from src.routes.dashboard import router as dashboard_router
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import EndpointRateLimitMiddleware
 
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(resources_router)
     app.include_router(genes_router)
+    app.include_router(dashboard_router)
 
     return app
 
