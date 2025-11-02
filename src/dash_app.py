@@ -17,6 +17,9 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Reduce noise from API connection attempts when server isn't running
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
 # Import dash_table - must be after dash import for proper registration
 try:
     from dash import dash_table
