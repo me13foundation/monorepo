@@ -3,7 +3,7 @@ Gene models for MED13 Resource Library.
 Strongly typed Pydantic models with comprehensive validation.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ConfigDict, ValidationInfo
 from enum import Enum
@@ -75,10 +75,12 @@ class Gene(BaseModel):
 
     # Metadata
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Record creation timestamp"
+        default_factory=lambda: datetime.now(UTC),
+        description="Record creation timestamp",
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow, description="Last update timestamp"
+        default_factory=lambda: datetime.now(UTC),
+        description="Last update timestamp",
     )
 
     # Validation methods

@@ -2,6 +2,7 @@
 Unit tests for data transformation pipeline components.
 """
 
+import pytest
 from unittest.mock import Mock, patch
 
 from src.domain.transform.parsers.clinvar_parser import ClinVarParser, ClinVarVariant
@@ -10,6 +11,7 @@ from src.domain.transform.parsers.pubmed_parser import PubMedParser, PubMedPubli
 from src.domain.transform.normalizers.gene_normalizer import (
     GeneNormalizer,
     NormalizedGene,
+    GeneIdentifierType,
 )
 from src.domain.transform.normalizers.variant_normalizer import (
     VariantNormalizer,
@@ -25,9 +27,10 @@ from src.domain.transform.transformers.etl_transformer import ETLTransformer
 from src.domain.transform.transformers.transformation_pipeline import (
     TransformationPipeline,
     PipelineConfig,
+    PipelineMode,
 )
 
-from src.domain.transform.validation import (
+from src.domain.validation.rules.base_rules import (
     DataQualityValidator,
     ValidationLevel,
     ValidationSeverity,
@@ -179,7 +182,7 @@ class TestGeneNormalizer:
         """Test gene symbol validation."""
         gene = NormalizedGene(
             primary_id="KCNT1",
-            id_type=self.normalizer._identify_type("KCNT1"),
+            id_type=GeneIdentifierType.SYMBOL,
             symbol="KCNT1",
             name="potassium sodium-activated channel subfamily T member 1",
             synonyms=[],
@@ -425,7 +428,8 @@ class TestTransformationPipeline:
         assert not self.pipeline.is_running
         assert self.pipeline.current_progress == 0.0
 
-    def test_pipeline_config_validation(self):
+    @pytest.mark.asyncio
+    async def test_pipeline_config_validation(self):
         """Test pipeline configuration validation."""
         # Valid config should pass
         config = PipelineConfig(max_concurrent_sources=2, batch_size=100)
@@ -435,7 +439,7 @@ class TestTransformationPipeline:
         config = PipelineConfig(max_concurrent_sources=0)
         pipeline = TransformationPipeline(config)
 
-        errors = pipeline.validate_pipeline_config()
+        errors = await pipeline.validate_pipeline_config()
         assert len(errors) > 0  # Should have validation errors
 
     def test_get_pipeline_status(self):
@@ -457,7 +461,7 @@ class TestTransformationIntegration:
     def setup_method(self):
         self.pipeline = TransformationPipeline(
             PipelineConfig(
-                mode=TransformationPipeline.PipelineMode.SEQUENTIAL,
+                mode=PipelineMode.SEQUENTIAL,
                 enable_validation=False,  # Skip for faster testing
             )
         )

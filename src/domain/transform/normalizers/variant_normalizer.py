@@ -57,7 +57,7 @@ class VariantNormalizer:
     and genomic coordinates for consistent representation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # HGVS notation patterns
         self.hgvs_patterns = {
             "c": re.compile(r"^c\.\d+.*$"),  # Coding DNA
@@ -305,7 +305,7 @@ class VariantNormalizer:
         base_variant = max(variants, key=lambda v: v.confidence_score)
 
         # Merge cross-references
-        merged_refs = {}
+        merged_refs: Dict[str, List[str]] = {}
         for variant in variants:
             for ref_type, ref_ids in variant.cross_references.items():
                 if ref_type not in merged_refs:

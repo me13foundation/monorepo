@@ -3,8 +3,10 @@ PubMed API client for MED13 Resource Library.
 Fetches scientific literature and publication data from PubMed.
 """
 
+from __future__ import annotations
+
 import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 from xml.etree import ElementTree as ET
 
 from .base_ingestor import BaseIngestor
@@ -19,7 +21,7 @@ class PubMedIngestor(BaseIngestor):
     associated conditions.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             source_name="pubmed",
             base_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
@@ -27,7 +29,9 @@ class PubMedIngestor(BaseIngestor):
             timeout_seconds=60,  # PubMed can be slow
         )
 
-    async def fetch_data(self, query: str = "MED13", **kwargs) -> List[Dict[str, Any]]:
+    async def fetch_data(
+        self, query: str = "MED13", **kwargs: Any
+    ) -> List[Dict[str, Any]]:
         """
         Fetch PubMed data for specified search query.
 
@@ -44,7 +48,7 @@ class PubMedIngestor(BaseIngestor):
             return []
 
         # Step 2: Fetch detailed records in batches
-        all_records = []
+        all_records: List[Dict[str, Any]] = []
         batch_size = 50  # PubMed API limit
 
         for i in range(0, len(article_ids), batch_size):
@@ -57,7 +61,7 @@ class PubMedIngestor(BaseIngestor):
 
         return all_records
 
-    async def _search_publications(self, query: str, **kwargs) -> List[str]:
+    async def _search_publications(self, query: str, **kwargs: Any) -> List[str]:
         """
         Search PubMed for publications matching the query.
 
@@ -88,7 +92,8 @@ class PubMedIngestor(BaseIngestor):
             "retmax": kwargs.get("max_results", 500),  # Limit results
             "sort": "relevance",
             "datetype": "pdat",
-            "mindate": kwargs.get("mindate", "2000"),  # Default to 2000 onwards
+            "mindate": kwargs.get("mindate"),  # Publication date from
+            "maxdate": kwargs.get("maxdate"),  # Publication date to
         }
 
         response = await self._make_request("GET", "esearch.fcgi", params=params)
@@ -153,7 +158,7 @@ class PubMedIngestor(BaseIngestor):
         """
         try:
             root = ET.fromstring(xml_content)
-            records = []
+            records: List[Dict[str, Any]] = []
 
             # PubMed XML structure: MedlineCitation elements
             for citation in root.findall(".//MedlineCitation"):
@@ -216,7 +221,9 @@ class PubMedIngestor(BaseIngestor):
         elem = element.find(xpath)
         return elem.text.strip() if elem is not None and elem.text else None
 
-    def _extract_journal_info(self, citation: ET.Element) -> Optional[Dict[str, str]]:
+    def _extract_journal_info(
+        self, citation: ET.Element
+    ) -> Optional[Dict[str, Optional[str]]]:
         """Extract journal information."""
         journal_elem = citation.find(".//Journal")
         if journal_elem is None:
@@ -228,9 +235,9 @@ class PubMedIngestor(BaseIngestor):
             "issn": self._extract_text(journal_elem, ".//ISSN"),
         }
 
-    def _extract_authors(self, citation: ET.Element) -> List[Dict[str, str]]:
+    def _extract_authors(self, citation: ET.Element) -> List[Dict[str, Optional[str]]]:
         """Extract author information."""
-        authors = []
+        authors: List[Dict[str, Optional[str]]] = []
         for author_elem in citation.findall(".//Author"):
             author = {
                 "last_name": self._extract_text(author_elem, ".//LastName"),
@@ -273,7 +280,7 @@ class PubMedIngestor(BaseIngestor):
 
     def _extract_publication_types(self, citation: ET.Element) -> List[str]:
         """Extract publication types."""
-        types = []
+        types: List[str] = []
         for type_elem in citation.findall(".//PublicationType"):
             if type_elem.text:
                 types.append(type_elem.text.strip())
@@ -281,7 +288,7 @@ class PubMedIngestor(BaseIngestor):
 
     def _extract_keywords(self, citation: ET.Element) -> List[str]:
         """Extract keywords."""
-        keywords = []
+        keywords: List[str] = []
         for kw_elem in citation.findall(".//Keyword"):
             if kw_elem.text:
                 keywords.append(kw_elem.text.strip())
@@ -330,7 +337,8 @@ class PubMedIngestor(BaseIngestor):
             reasons.append("MED13 in abstract")
 
         # Check keywords
-        keywords = [kw.lower() for kw in record.get("keywords", [])]
+        keywords_raw = record.get("keywords", [])
+        keywords = [kw.lower() for kw in keywords_raw if isinstance(kw, str)]
         med13_keywords = [kw for kw in keywords if "med13" in kw]
         if med13_keywords:
             relevance_score += 3
@@ -342,7 +350,7 @@ class PubMedIngestor(BaseIngestor):
             "is_relevant": relevance_score >= 5,
         }
 
-    async def fetch_med13_publications(self, **kwargs) -> List[Dict[str, Any]]:
+    async def fetch_med13_publications(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Convenience method to fetch MED13-related publications.
 
@@ -364,7 +372,7 @@ class PubMedIngestor(BaseIngestor):
         return relevant_records
 
     async def fetch_recent_publications(
-        self, days_back: int = 365, **kwargs
+        self, days_back: int = 365, **kwargs: Any
     ) -> List[Dict[str, Any]]:
         """
         Fetch recent publications related to MED13.

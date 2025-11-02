@@ -214,6 +214,19 @@ class TestValidationWorkflowIntegration:
         self.orchestrator.on_quality_alert = self._handle_quality_alert
 
         self.alerts_received = []
+        self.test_gene = {
+            "symbol": "TP53",
+            "hgnc_id": "HGNC:11998",
+            "name": "tumor protein p53",
+            "source": "test",
+        }
+        self.test_variant = {
+            "clinvar_id": "123456",
+            "variation_name": "c.123A>G",
+            "gene_symbol": "TP53",
+            "clinical_significance": "Pathogenic",
+            "source": "test",
+        }
 
     def _handle_quality_alert(self, pipeline_name: str, alert: dict):
         """Handle quality alerts during testing."""

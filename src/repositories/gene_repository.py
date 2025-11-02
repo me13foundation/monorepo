@@ -3,8 +3,8 @@ Gene repository for MED13 Resource Library.
 Data access layer for gene entities with specialized queries.
 """
 
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select, or_
+from typing import List, Optional, Dict, Any, Tuple
+from sqlalchemy import select, or_, func, asc, desc
 
 from .base import BaseRepository, NotFoundError
 from src.models.database import GeneModel
@@ -91,6 +91,58 @@ class GeneRepository(BaseRepository[GeneModel, int]):
             .limit(limit)
         )
         return list(self.session.execute(stmt).scalars())
+
+    def paginate_genes(
+        self,
+        page: int,
+        per_page: int,
+        sort_by: str,
+        sort_order: str,
+        search: Optional[str] = None,
+    ) -> Tuple[List[GeneModel], int]:
+        """
+        Retrieve paginated genes with optional search and sorting.
+
+        Args:
+            page: Page number starting at 1
+            per_page: Number of records per page
+            sort_by: Field to sort by
+            sort_order: Sort direction ('asc' or 'desc')
+            search: Optional search string
+
+        Returns:
+            Tuple of (records list, total count)
+        """
+        offset = max(page - 1, 0) * per_page
+
+        sortable_fields = {
+            "symbol": GeneModel.symbol,
+            "name": GeneModel.name,
+            "gene_type": GeneModel.gene_type,
+            "chromosome": GeneModel.chromosome,
+            "created_at": GeneModel.created_at,
+        }
+
+        sort_column = sortable_fields.get(sort_by, GeneModel.symbol)
+        order_clause = (
+            desc(sort_column) if sort_order.lower() == "desc" else asc(sort_column)
+        )
+
+        stmt = select(GeneModel).order_by(order_clause).offset(offset).limit(per_page)
+        count_stmt = select(func.count()).select_from(GeneModel)
+
+        if search:
+            pattern = f"%{search}%"
+            predicate = or_(
+                GeneModel.symbol.ilike(pattern),
+                GeneModel.name.ilike(pattern),
+            )
+            stmt = stmt.where(predicate)
+            count_stmt = count_stmt.where(predicate)
+
+        items = list(self.session.execute(stmt).scalars())
+        total = self.session.execute(count_stmt).scalar_one()
+        return items, int(total)
 
     def find_with_variants(self, gene_id: int) -> Optional[GeneModel]:
         """

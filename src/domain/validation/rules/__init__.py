@@ -6,12 +6,13 @@ format checking to ensure scientific and clinical accuracy.
 """
 
 from .base_rules import (
-    ValidationRule,
+    DataQualityValidator,
     ValidationRuleEngine,
-    ValidationLevel,
-    ValidationSeverity,
-    ValidationResult,
     ValidationIssue,
+    ValidationLevel,
+    ValidationResult,
+    ValidationRule,
+    ValidationSeverity,
 )
 from .gene_rules import GeneValidationRules
 from .variant_rules import VariantValidationRules
@@ -21,6 +22,7 @@ from .relationship_rules import RelationshipValidationRules
 
 __all__ = [
     "ValidationRule",
+    "DataQualityValidator",
     "ValidationRuleEngine",
     "ValidationLevel",
     "ValidationSeverity",

@@ -6,9 +6,11 @@ Implements token bucket algorithm for rate limiting based on client IP.
 
 import time
 from collections import defaultdict
-from typing import Dict
+from typing import Any, Awaitable, Callable, DefaultDict, Dict, List, Optional
+
 from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 
 class TokenBucket:
@@ -22,10 +24,10 @@ class TokenBucket:
             capacity: Maximum number of tokens (requests per window)
             refill_rate: Tokens added per second
         """
-        self.capacity = capacity
-        self.refill_rate = refill_rate
-        self.tokens = capacity
-        self.last_refill = time.time()
+        self.capacity: int = capacity
+        self.refill_rate: float = refill_rate
+        self.tokens: float = float(capacity)
+        self.last_refill: float = time.time()
 
     def consume(self, tokens: int = 1) -> bool:
         """Try to consume tokens. Returns True if successful."""
@@ -37,29 +39,34 @@ class TokenBucket:
 
         return False
 
-    def _refill(self):
+    def _refill(self) -> None:
         """Refill tokens based on elapsed time."""
         now = time.time()
         elapsed = now - self.last_refill
         tokens_to_add = elapsed * self.refill_rate
-
-        self.tokens = min(self.capacity, self.tokens + tokens_to_add)
+        self.tokens = min(float(self.capacity), self.tokens + tokens_to_add)
         self.last_refill = now
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Middleware to enforce rate limiting."""
 
-    def __init__(self, app, exclude_paths: list = None):
+    def __init__(
+        self,
+        app: Callable[..., Any],
+        exclude_paths: Optional[List[str]] = None,
+    ) -> None:
         super().__init__(app)
-        self.exclude_paths = exclude_paths or ["/health/"]
-        self.buckets: Dict[str, TokenBucket] = defaultdict(
+        self.exclude_paths: List[str] = exclude_paths or ["/health/"]
+        self.buckets: DefaultDict[str, TokenBucket] = defaultdict(
             lambda: TokenBucket(
                 capacity=100, refill_rate=10
             )  # 100 requests, 10 per second
         )
 
-    async def dispatch(self, request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Process each request through rate limiting middleware."""
 
         # Skip rate limiting for excluded paths
@@ -116,11 +123,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
     """More granular rate limiting based on endpoint and HTTP method."""
 
-    def __init__(self, app):
+    def __init__(self, app: Callable[..., Any]) -> None:
         super().__init__(app)
 
         # Different limits for different endpoints
-        self.endpoint_limits = {
+        self.endpoint_limits: Dict[str, DefaultDict[str, TokenBucket]] = {
             "GET": defaultdict(
                 lambda: TokenBucket(capacity=200, refill_rate=20)
             ),  # 200 req, 20/sec
@@ -135,7 +142,9 @@ class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
             ),  # 20 req, 2/sec
         }
 
-    async def dispatch(self, request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """Apply different rate limits based on HTTP method."""
 
         # Skip for health checks

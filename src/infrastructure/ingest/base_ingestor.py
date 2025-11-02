@@ -6,8 +6,9 @@ Provides common functionality for API clients with rate limiting and error handl
 import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
+from types import TracebackType
 from typing import Any, Dict, List, Optional
 import json
 import time
@@ -58,11 +59,11 @@ class RateLimiter:
     """Simple token bucket rate limiter."""
 
     def __init__(self, requests_per_minute: int):
-        self.requests_per_minute = requests_per_minute
-        self.requests_per_second = requests_per_minute / 60.0
-        self.tokens = requests_per_minute
-        self.last_update = time.time()
-        self.max_tokens = requests_per_minute
+        self.requests_per_minute: int = requests_per_minute
+        self.requests_per_second: float = requests_per_minute / 60.0
+        self.tokens: float = float(requests_per_minute)
+        self.last_update: float = time.time()
+        self.max_tokens: float = float(requests_per_minute)
 
     def acquire(self) -> bool:
         """Acquire a token. Returns True if successful."""
@@ -107,37 +108,42 @@ class BaseIngestor(ABC):
         max_retries: int = 3,
         raw_data_dir: Optional[Path] = None,
     ):
-        self.source_name = source_name
-        self.base_url = base_url
+        self.source_name: str = source_name
+        self.base_url: str = base_url
         self.rate_limiter = RateLimiter(requests_per_minute)
-        self.timeout_seconds = timeout_seconds
-        self.max_retries = max_retries
+        self.timeout_seconds: int = timeout_seconds
+        self.max_retries: int = max_retries
 
         # Raw data storage
-        self.raw_data_dir = raw_data_dir or Path("data/raw") / source_name
+        self.raw_data_dir: Path = raw_data_dir or Path("data/raw") / source_name
         self.raw_data_dir.mkdir(parents=True, exist_ok=True)
 
         # Circuit breaker state
-        self.failure_count = 0
-        self.last_failure_time = None
-        self.circuit_open = False
+        self.failure_count: int = 0
+        self.last_failure_time: Optional[datetime] = None
+        self.circuit_open: bool = False
 
         # HTTP client
-        self.client = httpx.AsyncClient(
+        self.client: httpx.AsyncClient = httpx.AsyncClient(
             timeout=httpx.Timeout(timeout_seconds),
             headers={"User-Agent": "MED13-Resource-Library/1.0 (research@med13.org)"},
         )
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> "BaseIngestor":
         """Async context manager entry."""
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         """Async context manager exit."""
         await self.client.aclose()
 
     @abstractmethod
-    async def fetch_data(self, **kwargs) -> List[Dict[str, Any]]:
+    async def fetch_data(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Abstract method to fetch data from the source.
 
@@ -149,7 +155,7 @@ class BaseIngestor(ABC):
         """
         pass
 
-    async def ingest(self, **kwargs) -> IngestionResult:
+    async def ingest(self, **kwargs: Any) -> IngestionResult:
         """
         Main ingestion method with error handling and provenance tracking.
 
@@ -159,12 +165,14 @@ class BaseIngestor(ABC):
         Returns:
             IngestionResult with all operation details
         """
-        start_time = datetime.utcnow()
+        start_time = datetime.now(UTC)
         # Map source name to DataSource enum
         data_source_enum = DataSource(self.source_name)
 
         provenance = Provenance(
             source=data_source_enum,
+            source_version=None,
+            source_url=self.base_url,
             acquired_at=start_time,
             acquired_by="MED13-Resource-Library",
             processing_steps=[f"Ingested from {self.source_name}"],
@@ -172,8 +180,8 @@ class BaseIngestor(ABC):
             quality_score=1.0,
         )
 
-        errors = []
-        data = []
+        errors: List[IngestionError] = []
+        data: List[Dict[str, Any]] = []
 
         try:
             # Check circuit breaker
@@ -201,7 +209,7 @@ class BaseIngestor(ABC):
                 data=data,
                 provenance=provenance,
                 errors=errors,
-                duration_seconds=(datetime.utcnow() - start_time).total_seconds(),
+                duration_seconds=(datetime.now(UTC) - start_time).total_seconds(),
                 timestamp=start_time,
             )
 
@@ -221,12 +229,12 @@ class BaseIngestor(ABC):
                 data=data,
                 provenance=provenance,
                 errors=errors,
-                duration_seconds=(datetime.utcnow() - start_time).total_seconds(),
+                duration_seconds=(datetime.now(UTC) - start_time).total_seconds(),
                 timestamp=start_time,
             )
 
     async def _make_request(
-        self, method: str, endpoint: str, **kwargs
+        self, method: str, endpoint: str, **kwargs: Any
     ) -> httpx.Response:
         """
         Make HTTP request with rate limiting and retry logic.
@@ -316,7 +324,7 @@ class BaseIngestor(ABC):
     def _record_failure(self) -> None:
         """Record a failure for circuit breaker logic."""
         self.failure_count += 1
-        self.last_failure_time = datetime.utcnow()
+        self.last_failure_time = datetime.now(UTC)
 
         # Open circuit after 5 consecutive failures
         if self.failure_count >= 5:

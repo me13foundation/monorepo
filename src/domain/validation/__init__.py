@@ -11,6 +11,7 @@ Components:
 """
 
 from .rules import (
+    DataQualityValidator,
     ValidationRule,
     GeneValidationRules,
     VariantValidationRules,
@@ -35,6 +36,7 @@ from .reporting import (
 __all__ = [
     # Rules
     "ValidationRule",
+    "DataQualityValidator",
     "GeneValidationRules",
     "VariantValidationRules",
     "PhenotypeValidationRules",

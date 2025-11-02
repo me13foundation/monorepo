@@ -6,7 +6,7 @@ into consistent formats for cross-referencing and deduplication.
 """
 
 import re
-from typing import Dict, List, Any, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
@@ -47,15 +47,12 @@ class GeneNormalizer:
     from ClinVar, UniProt, and other biomedical databases.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Common gene symbol normalization patterns
-        self.symbol_patterns = {
-            # Case normalization
-            "patterns": [
-                (r"^([A-Z][A-Z0-9-]+)$", lambda m: m.group(1).upper()),
-                (r"^([a-z][a-z0-9-]+)$", lambda m: m.group(1).upper()),
-            ]
-        }
+        self.symbol_patterns: List[Tuple[str, Callable[[re.Match[str]], str]]] = [
+            (r"^([A-Z][A-Z0-9-]+)$", lambda m: m.group(1).upper()),
+            (r"^([a-z][a-z0-9-]+)$", lambda m: m.group(1).upper()),
+        ]
 
         # Cross-reference mappings (simplified for this implementation)
         self.cross_ref_mappings = {
@@ -98,9 +95,9 @@ class GeneNormalizer:
         self, gene_data: Dict[str, Any]
     ) -> Optional[NormalizedGene]:
         """Normalize gene data from ClinVar."""
-        symbol = gene_data.get("gene_symbol")
-        gene_id = gene_data.get("gene_id")
-        gene_name = gene_data.get("gene_name")
+        symbol = gene_data.get("gene_symbol") or gene_data.get("symbol")
+        gene_id = gene_data.get("gene_id") or gene_data.get("id")
+        gene_name = gene_data.get("gene_name") or gene_data.get("name")
 
         if not symbol and not gene_id:
             return None
@@ -206,10 +203,11 @@ class GeneNormalizer:
             return symbol
 
         # Apply normalization patterns
-        for pattern, replacement in self.symbol_patterns["patterns"]:
+        for pattern, replacement in self.symbol_patterns:
             match = re.match(pattern, symbol.strip())
             if match:
-                return replacement(match)
+                result = replacement(match)
+                return result if isinstance(result, str) else symbol.strip().upper()
 
         # Default: uppercase
         return symbol.strip().upper()
@@ -234,7 +232,7 @@ class GeneNormalizer:
         base_gene = max(genes, key=lambda g: g.confidence_score)
 
         # Merge cross-references
-        merged_refs = {}
+        merged_refs: Dict[str, List[str]] = {}
         for gene in genes:
             for ref_type, ref_ids in gene.cross_references.items():
                 if ref_type not in merged_refs:

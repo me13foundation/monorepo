@@ -46,7 +46,7 @@ class ReleaseManager:
     async def create_release(
         self,
         package_path: Path,
-        version: str,
+        version: Optional[str],
         release_notes: Optional[str] = None,
         version_type: Optional[VersionType] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -69,7 +69,9 @@ class ReleaseManager:
             existing_versions = self.storage.list_versions(self.package_name)
             if existing_versions:
                 latest = self.versioner.get_latest_version(existing_versions)
-                if latest and version_type:
+                if latest is None:
+                    version = "1.0.0"
+                elif version_type is not None:
                     version = self.versioner.increment_version(latest, version_type)
                 else:
                     version = self.versioner.increment_version(

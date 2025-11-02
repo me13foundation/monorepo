@@ -126,7 +126,7 @@ class ROCrateBuilder:
         }
 
         # Root dataset entity
-        root_dataset = {
+        root_dataset: Dict[str, Any] = {
             "@id": root_dataset_id,
             "@type": "Dataset",
             "name": self.name,
@@ -152,11 +152,12 @@ class ROCrateBuilder:
             ],
         }
 
+        has_part: List[Dict[str, Any]] = []
+
         # Add provenance if available
         if provenance_info:
-            root_dataset["hasPart"] = []
             for source in provenance_info.get("sources", []):
-                root_dataset["hasPart"].append(
+                has_part.append(
                     {
                         "@type": "DataDownload",
                         "name": source.get("name"),
@@ -166,7 +167,7 @@ class ROCrateBuilder:
                 )
 
         # Build file entities
-        file_entities = []
+        file_entities: List[Dict[str, Any]] = []
         for file_info in data_files:
             file_entity = {
                 "@id": file_info["path"],
@@ -185,9 +186,11 @@ class ROCrateBuilder:
 
             file_entities.append(file_entity)
 
-        # Add files to root dataset
         if file_entities:
-            root_dataset["hasPart"] = root_dataset.get("hasPart", []) + file_entities
+            has_part.extend(file_entities)
+
+        if has_part:
+            root_dataset["hasPart"] = has_part
 
         # Build complete metadata structure
         metadata = {

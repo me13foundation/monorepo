@@ -74,7 +74,7 @@ class LicenseValidator:
             }
 
         try:
-            import yaml
+            import yaml  # type: ignore[import-untyped]
 
             with open(manifest_path, "r", encoding="utf-8") as f:
                 manifest = yaml.safe_load(f)

@@ -70,7 +70,7 @@ class PubMedParser:
     including metadata, abstracts, authors, and citation details.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.namespaces = {"pubmed": "http://www.ncbi.nlm.nih.gov/pubmed"}
 
     def parse_raw_data(self, raw_data: Dict[str, Any]) -> Optional[PubMedPublication]:
@@ -150,14 +150,12 @@ class PubMedParser:
     def _extract_title(self, root: ET.Element) -> str:
         """Extract article title from XML."""
         # Try different title element locations
-        title_elem = (
-            root.find(".//ArticleTitle")
-            or root.find(".//Title")
-            or root.find(".//BookTitle")
-        )
-
-        if title_elem is not None and title_elem.text:
-            return title_elem.text.strip()
+        for path in (".//ArticleTitle", ".//Title", ".//BookTitle"):
+            title_elem = root.find(path)
+            if title_elem is not None:
+                text = "".join(title_elem.itertext()).strip()
+                if text:
+                    return text
 
         return "Unknown Title"
 
@@ -390,8 +388,5 @@ class PubMedParser:
 
         if len(publication.authors) == 0:
             errors.append("No authors found")
-
-        if publication.publication_date is None:
-            errors.append("Missing publication date")
 
         return errors

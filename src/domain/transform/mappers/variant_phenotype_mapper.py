@@ -270,37 +270,32 @@ class VariantPhenotypeMapper:
         ]
 
     def get_relationship_statistics(self) -> Dict[str, Any]:
-        """
-        Get statistics about variant-phenotype relationships.
+        """Compute aggregate statistics for mapped relationships."""
 
-        Returns:
-            Dictionary with relationship statistics
-        """
-        stats = {
-            "total_relationships": 0,
-            "variants_with_phenotypes": len(self.variant_to_phenotypes),
-            "phenotypes_with_variants": len(self.phenotype_to_variants),
-            "relationship_types": {},
-            "confidence_distribution": {"high": 0, "medium": 0, "low": 0},
-        }
+        total_relationships = 0
+        relationship_types: Dict[str, int] = {}
+        confidence_distribution = {"high": 0, "medium": 0, "low": 0}
 
         for links in self.variant_to_phenotypes.values():
-            stats["total_relationships"] += len(links)
+            total_relationships += len(links)
             for link in links:
                 rel_type = link.relationship_type.value
-                if rel_type not in stats["relationship_types"]:
-                    stats["relationship_types"][rel_type] = 0
-                stats["relationship_types"][rel_type] += 1
+                relationship_types[rel_type] = relationship_types.get(rel_type, 0) + 1
 
-                # Confidence distribution
                 if link.confidence_score >= 0.8:
-                    stats["confidence_distribution"]["high"] += 1
+                    confidence_distribution["high"] += 1
                 elif link.confidence_score >= 0.5:
-                    stats["confidence_distribution"]["medium"] += 1
+                    confidence_distribution["medium"] += 1
                 else:
-                    stats["confidence_distribution"]["low"] += 1
+                    confidence_distribution["low"] += 1
 
-        return stats
+        return {
+            "total_relationships": total_relationships,
+            "variants_with_phenotypes": len(self.variant_to_phenotypes),
+            "phenotypes_with_variants": len(self.phenotype_to_variants),
+            "relationship_types": relationship_types,
+            "confidence_distribution": confidence_distribution,
+        }
 
     def validate_mapping(self, link: VariantPhenotypeLink) -> List[str]:
         """
@@ -328,7 +323,7 @@ class VariantPhenotypeMapper:
 
         return errors
 
-    def merge_duplicate_links(self):
+    def merge_duplicate_links(self) -> None:
         """Merge duplicate variant-phenotype links."""
         # This would remove duplicates and merge evidence
         # Simplified implementation

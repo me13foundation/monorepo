@@ -46,6 +46,9 @@ class PipelineResult:
     execution_time: float
     stages_completed: List[str]
 
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
 
 class TransformationPipeline:
     """
@@ -174,7 +177,7 @@ class TransformationPipeline:
         )
         return await self._execute_sequential(raw_data)
 
-    def _update_progress(self, message: str, progress: float):
+    def _update_progress(self, message: str, progress: float) -> None:
         """Update progress and notify callback if configured."""
         self.current_progress = progress
         self.logger.info(f"Progress: {progress:.1f}% - {message}")
@@ -230,7 +233,7 @@ class TransformationPipeline:
             "transformer_status": self.transformer.get_transformation_status(),
         }
 
-    async def cleanup_failed_execution(self):
+    async def cleanup_failed_execution(self) -> None:
         """Clean up after a failed pipeline execution."""
         # Remove any partially written output files
         try:

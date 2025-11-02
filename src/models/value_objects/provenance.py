@@ -3,7 +3,7 @@ Value object for data provenance and lineage tracking.
 Immutable objects that track the origin and history of MED13 data.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional, Dict, Any
 from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
@@ -37,7 +37,8 @@ class Provenance(BaseModel):
 
     # Acquisition metadata
     acquired_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When data was acquired"
+        default_factory=lambda: datetime.now(UTC),
+        description="When data was acquired",
     )
     acquired_by: str = Field(..., description="System/user that acquired the data")
 

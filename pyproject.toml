@@ -85,6 +85,10 @@ module = [
     "alembic.*",
     "plotly.*",
     "dash.*",
+    "dash_bootstrap_components.*",
+    "requests.*",
+    "dash_table",
+    "dash_table.*",
 ]
 ignore_missing_imports = true
 

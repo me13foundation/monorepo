@@ -2,10 +2,10 @@
 License compliance checking for MED13 Resource Library packages.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 from enum import Enum
 from pathlib import Path
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 class LicenseCompatibility(str, Enum):
@@ -118,8 +118,9 @@ class LicenseManager:
         Returns:
             License manifest dictionary
         """
-        manifest = {
-            "package_license": "CC-BY-4.0",
+        package_license = "CC-BY-4.0"
+        manifest: Dict[str, Any] = {
+            "package_license": package_license,
             "sources": licenses,
             "compliance": {
                 "status": "compliant",
@@ -131,12 +132,14 @@ class LicenseManager:
         for license_info in licenses:
             source_license = license_info.get("license", "unknown")
             compatibility = LicenseManager.check_compatibility(
-                source_license, manifest["package_license"]
+                source_license, package_license
             )
 
             if compatibility == LicenseCompatibility.INCOMPATIBLE:
-                manifest["compliance"]["status"] = "non-compliant"
-                manifest["compliance"]["issues"].append(
+                compliance = manifest["compliance"]
+                issues_list = cast(List[str], compliance.setdefault("issues", []))
+                compliance["status"] = "non-compliant"
+                issues_list.append(
                     f"Incompatible license: {source_license} "
                     f"from {license_info.get('source', 'unknown')}"
                 )

@@ -26,10 +26,10 @@ class ProvenanceTracker:
         Returns:
             Serialized provenance dictionary
         """
-        sources = []
+        sources: List[Dict[str, Any]] = []
 
         for prov in provenance_records:
-            source_info = {
+            source_info: Dict[str, Any] = {
                 "@type": "DataDownload",
                 "name": prov.source.value,
                 "datePublished": (
@@ -96,12 +96,18 @@ class ProvenanceTracker:
         provenance_info = ProvenanceTracker.serialize_provenance(provenance_records)
 
         if "@graph" in metadata:
-            # Find root dataset
-            for entity in metadata["@graph"]:
-                if entity.get("@id") == "./":
-                    if "hasPart" not in entity:
-                        entity["hasPart"] = []
-                    entity["hasPart"].extend(provenance_info["sources"])
+            graph_entities = metadata.get("@graph")
+            if isinstance(graph_entities, list):
+                for entity in graph_entities:
+                    if not isinstance(entity, dict):
+                        continue
+                    if entity.get("@id") != "./":
+                        continue
+                    has_part = entity.setdefault("hasPart", [])
+                    if isinstance(has_part, list):
+                        has_part.extend(provenance_info["sources"])
+                    else:
+                        entity["hasPart"] = list(provenance_info["sources"])
                     break
 
         return metadata

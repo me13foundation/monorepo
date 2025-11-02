@@ -7,7 +7,7 @@ strategies to optimize validation performance.
 
 from .caching import ValidationCache, CacheConfig
 from .parallel_processing import ParallelValidator, ParallelConfig
-from .selective_validation import SelectiveValidator, ValidationProfile
+from .selective_validation import SelectiveValidator, SelectionStrategy
 
 __all__ = [
     "ValidationCache",
@@ -15,5 +15,5 @@ __all__ = [
     "ParallelValidator",
     "ParallelConfig",
     "SelectiveValidator",
-    "ValidationProfile",
+    "SelectionStrategy",
 ]

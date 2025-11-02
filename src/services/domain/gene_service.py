@@ -3,7 +3,7 @@ Gene service for MED13 Resource Library.
 Business logic for gene entity operations and validations.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 
 from src.repositories import GeneRepository, VariantRepository
@@ -31,10 +31,11 @@ class GeneService(BaseService[GeneModel]):
 
     def create_gene(
         self,
-        gene_id: str,
         symbol: str,
         name: Optional[str] = None,
+        description: Optional[str] = None,
         gene_type: str = "protein_coding",
+        gene_id: Optional[str] = None,
         chromosome: Optional[str] = None,
         start_position: Optional[int] = None,
         end_position: Optional[int] = None,
@@ -47,10 +48,11 @@ class GeneService(BaseService[GeneModel]):
         Create a new gene with validation.
 
         Args:
-            gene_id: Unique gene identifier
             symbol: Gene symbol
             name: Full gene name
+            description: Gene description
             gene_type: Type of gene
+            gene_id: Optional pre-defined gene identifier
             chromosome: Chromosome location
             start_position: Start position on chromosome
             end_position: End position on chromosome
@@ -71,11 +73,15 @@ class GeneService(BaseService[GeneModel]):
             if end_position < start_position:
                 raise ValueError("End position must be greater than start position")
 
+        normalized_symbol = symbol.upper()
+        gene_identifier = gene_id or normalized_symbol
+
         # Create the gene
         gene = GeneModel(
-            gene_id=gene_id,
-            symbol=symbol.upper(),
+            gene_id=gene_identifier,
+            symbol=normalized_symbol,
             name=name,
+            description=description,
             gene_type=gene_type,
             chromosome=chromosome,
             start_position=start_position,
@@ -91,6 +97,31 @@ class GeneService(BaseService[GeneModel]):
             pass
 
         return self.repository.create(gene)
+
+    def list_genes(
+        self,
+        page: int,
+        per_page: int,
+        sort_by: str,
+        sort_order: str,
+        search: Optional[str] = None,
+    ) -> Tuple[List[GeneModel], int]:
+        """Retrieve paginated genes with optional search."""
+        return self.gene_repo.paginate_genes(
+            page=page,
+            per_page=per_page,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            search=search,
+        )
+
+    def get_gene_by_id(self, gene_id: str) -> Optional[GeneModel]:
+        """Retrieve a gene by its public gene identifier."""
+        return self.gene_repo.find_by_gene_id(gene_id)
+
+    def get_gene_by_symbol(self, symbol: str) -> Optional[GeneModel]:
+        """Retrieve a gene by its symbol."""
+        return self.gene_repo.find_by_symbol(symbol.upper())
 
     def find_gene_by_identifier(
         self, identifier: GeneIdentifier
@@ -151,6 +182,31 @@ class GeneService(BaseService[GeneModel]):
         """
         return self.gene_repo.search_by_name_or_symbol(query, limit)
 
+    def update_gene(self, gene_id: str, updates: Dict[str, Any]) -> GeneModel:
+        """Update mutable gene fields by gene identifier."""
+        gene = self.gene_repo.find_by_gene_id_or_fail(gene_id)
+
+        allowed_fields = {
+            "name",
+            "description",
+            "gene_type",
+            "chromosome",
+            "start_position",
+            "end_position",
+            "ensembl_id",
+            "ncbi_gene_id",
+            "uniprot_id",
+        }
+
+        sanitized_updates = {
+            key: value for key, value in updates.items() if key in allowed_fields
+        }
+
+        if not sanitized_updates:
+            raise ValueError("No valid fields provided for update")
+
+        return self.repository.update(gene.id, sanitized_updates)
+
     def update_gene_locations(
         self,
         gene_id: int,
@@ -192,13 +248,63 @@ class GeneService(BaseService[GeneModel]):
 
         return self.repository.update(gene_id, updates)
 
-    def get_gene_statistics(self) -> Dict[str, Any]:
+    def delete_gene(self, gene_id: str) -> None:
+        """Delete a gene by its gene identifier."""
+        gene = self.gene_repo.find_by_gene_id_or_fail(gene_id)
+        self.repository.delete(gene.id)
+
+    def get_gene_variants(self, gene_id: str) -> List[Dict[str, Any]]:
+        """Return serialized variants associated with a gene."""
+        gene = self.gene_repo.find_by_gene_id(gene_id)
+        if gene is None:
+            return []
+
+        variants = self.variant_repo.find_by_gene(gene.id)
+        serialized: List[Dict[str, Any]] = []
+        for variant in variants:
+            serialized.append(
+                {
+                    "variant_id": variant.variant_id,
+                    "clinvar_id": variant.clinvar_id,
+                    "chromosome": variant.chromosome,
+                    "position": variant.position,
+                    "clinical_significance": getattr(
+                        variant, "clinical_significance", None
+                    ),
+                }
+            )
+        return serialized
+
+    def get_gene_phenotypes(self, gene_id: str) -> List[Dict[str, Any]]:
+        """Return related phenotypes for a gene (placeholder implementation)."""
+        # Phenotype relationships are not yet modeled; return empty list for now.
+        return []
+
+    def gene_has_variants(self, gene_id: str) -> bool:
+        """Check whether a gene has associated variants."""
+        gene = self.gene_repo.find_by_gene_id(gene_id)
+        if gene is None:
+            return False
+        variants = self.variant_repo.find_by_gene(gene.id, limit=1)
+        return bool(variants)
+
+    def get_gene_statistics(self, gene_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Get comprehensive statistics about genes.
 
         Returns:
             Dictionary with gene statistics
         """
+        if gene_id:
+            gene = self.gene_repo.find_by_gene_id_or_fail(gene_id)
+            variants = self.variant_repo.find_by_gene(gene.id)
+            return {
+                "gene_id": gene.gene_id,
+                "symbol": gene.symbol,
+                "variant_count": len(variants),
+                "has_location": gene.chromosome is not None,
+            }
+
         stats = self.gene_repo.get_gene_statistics()
 
         # Add additional computed statistics

@@ -5,10 +5,11 @@ Provides integration with Zenodo API for depositing research data packages
 and minting DOIs.
 """
 
-import httpx
-from typing import Dict, Any, Optional, List
-from pathlib import Path
 import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional, cast
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,7 @@ class ZenodoClient:
                 create_url, headers=self.headers, json=metadata
             )
             response.raise_for_status()
-            deposit = response.json()
+            deposit = cast(Dict[str, Any], response.json())
 
             bucket_url = deposit["links"]["bucket"]
 
@@ -123,7 +124,7 @@ class ZenodoClient:
             )
             response = await client.post(publish_url, headers=self.headers)
             response.raise_for_status()
-            return response.json()
+            return cast(Dict[str, Any], response.json())
 
     async def get_deposit(self, deposit_id: int) -> Dict[str, Any]:
         """
@@ -139,7 +140,7 @@ class ZenodoClient:
             url = f"{self.base_url}/deposit/depositions/{deposit_id}"
             response = await client.get(url, headers=self.headers)
             response.raise_for_status()
-            return response.json()
+            return cast(Dict[str, Any], response.json())
 
     async def update_deposit(
         self, deposit_id: int, metadata: Dict[str, Any]
@@ -158,7 +159,7 @@ class ZenodoClient:
             url = f"{self.base_url}/deposit/depositions/{deposit_id}"
             response = await client.put(url, headers=self.headers, json=metadata)
             response.raise_for_status()
-            return response.json()
+            return cast(Dict[str, Any], response.json())
 
     def extract_doi(self, deposit: Dict[str, Any]) -> Optional[str]:
         """
@@ -170,4 +171,14 @@ class ZenodoClient:
         Returns:
             DOI string or None
         """
-        return deposit.get("doi") or deposit.get("metadata", {}).get("doi")
+        doi_value = deposit.get("doi")
+        if isinstance(doi_value, str):
+            return doi_value
+
+        metadata = deposit.get("metadata")
+        if isinstance(metadata, dict):
+            metadata_doi = metadata.get("doi")
+            if isinstance(metadata_doi, str):
+                return metadata_doi
+
+        return None

@@ -138,7 +138,7 @@ class UniProtParser:
     including sequences, functions, annotations, and cross-references.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.protein_cache: Dict[str, UniProtProtein] = {}
 
     def parse_raw_data(self, raw_data: Dict[str, Any]) -> Optional[UniProtProtein]:
@@ -226,12 +226,17 @@ class UniProtParser:
         recommended = protein_desc.get("recommendedName", {})
         full_name = recommended.get("fullName", {})
 
-        name = full_name.get("value")
-        if name:
-            return name
+        name_value = full_name.get("value")
+        if isinstance(name_value, str):
+            return name_value
 
         # Fallback to entry name
-        return data.get("uniProtkbId", "Unknown Protein")
+        entry_name = data.get("uniProtkbId", "Unknown Protein")
+        if isinstance(entry_name, str):
+            return entry_name
+
+        # Ensure we always return a string even if unexpected types appear
+        return "Unknown Protein"
 
     def _extract_status(self, data: Dict[str, Any]) -> UniProtStatus:
         """Extract entry status."""
@@ -351,7 +356,7 @@ class UniProtParser:
         self, data: Dict[str, Any]
     ) -> Dict[str, List[str]]:
         """Extract database cross-references."""
-        db_refs = {}
+        db_refs: Dict[str, List[str]] = {}
 
         for db_ref in data.get("dbReferences", []):
             db_type = db_ref.get("type")
@@ -371,7 +376,7 @@ class UniProtParser:
 
     def _extract_comments(self, data: Dict[str, Any]) -> Dict[str, List[str]]:
         """Extract comments by type."""
-        comments = {}
+        comments: Dict[str, List[str]] = {}
 
         for comment in data.get("comments", []):
             comment_type = comment.get("commentType")

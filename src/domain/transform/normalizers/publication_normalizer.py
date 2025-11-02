@@ -48,7 +48,7 @@ class PublicationNormalizer:
     and metadata for consistent representation.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Identifier patterns
         self.identifier_patterns = {
             "pubmed": re.compile(r"^\d+$"),  # PubMed IDs are just numbers
@@ -361,7 +361,7 @@ class PublicationNormalizer:
                 merged_pubmed = pub.pubmed_id
 
         # Merge cross-references
-        merged_refs = {}
+        merged_refs: Dict[str, List[str]] = {}
         for pub in publications:
             for ref_type, ref_ids in pub.cross_references.items():
                 if ref_type not in merged_refs:

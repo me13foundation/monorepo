@@ -25,16 +25,16 @@ class MetadataGenerator:
         Returns:
             Provenance metadata dictionary
         """
-        sources = []
+        sources: List[Dict[str, Any]] = []
         for prov in provenance_records:
-            source_info = {
+            source_info: Dict[str, Any] = {
                 "@type": "DataDownload",
                 "name": prov.source.value,
                 "url": prov.source_url or "",
                 "datePublished": (
                     prov.acquired_at.isoformat()
                     if prov.acquired_at
-                    else datetime.utcnow().isoformat()
+                    else datetime.now(UTC).isoformat()
                 ),
             }
 

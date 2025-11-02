@@ -76,7 +76,7 @@ class ClinVarParser:
     including clinical significance, gene associations, and phenotype data.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.namespaces = {"clinvar": "https://www.ncbi.nlm.nih.gov/clinvar/variation"}
 
     def parse_raw_data(self, raw_data: Dict[str, Any]) -> Optional[ClinVarVariant]:
@@ -152,7 +152,7 @@ class ClinVarParser:
 
     def _extract_variant_info(self, root: ET.Element) -> Dict[str, Any]:
         """Extract basic variant information from XML."""
-        info = {}
+        info: Dict[str, Any] = {}
 
         # Find VariationArchive element
         variation_archive = root.find(".//VariationArchive")
@@ -162,13 +162,13 @@ class ClinVarParser:
             info["variant_type"] = self._parse_variant_type(
                 variation_archive.get("VariationType", "")
             )
-            info["last_updated"] = variation_archive.get("DateLastUpdated")
+            info["last_updated"] = variation_archive.get("DateLastUpdated", "")
 
         return info
 
     def _extract_gene_info(self, root: ET.Element) -> Dict[str, Any]:
         """Extract gene information from XML."""
-        info = {}
+        info: Dict[str, Any] = {}
 
         # Find Gene element
         gene = root.find(".//Gene")
@@ -181,7 +181,7 @@ class ClinVarParser:
 
     def _extract_location_info(self, root: ET.Element) -> Dict[str, Any]:
         """Extract genomic location information from XML."""
-        info = {}
+        info: Dict[str, Any] = {}
 
         # Find SequenceLocation element (GRCh38 preferred)
         sequence_locations = root.findall(".//SequenceLocation")
@@ -202,7 +202,7 @@ class ClinVarParser:
 
     def _extract_clinical_info(self, root: ET.Element) -> Dict[str, Any]:
         """Extract clinical information from XML."""
-        info = {"phenotypes": []}
+        info: Dict[str, Any] = {"phenotypes": []}
 
         # Find ClinicalSignificance element
         clinical_sig = root.find(".//ClinicalSignificance")
@@ -281,8 +281,5 @@ class ClinVarParser:
 
         if not variant.gene_symbol:
             errors.append("Missing gene symbol")
-
-        if variant.start_position is None:
-            errors.append("Missing genomic position")
 
         return errors

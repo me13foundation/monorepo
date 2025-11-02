@@ -64,7 +64,7 @@ class HPOParser:
     extracting structured phenotype information with hierarchical relationships.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.term_cache: Dict[str, HPOTerm] = {}
 
     def parse_raw_data(self, raw_data: Dict[str, Any]) -> Optional[HPOTerm]:
@@ -247,7 +247,7 @@ class HPOParser:
         related_terms = []
         visited = set()
 
-        def traverse(current_term: HPOTerm, depth: int):
+        def traverse(current_term: HPOTerm, depth: int) -> None:
             if depth >= max_depth or current_term.hpo_id in visited:
                 return
 

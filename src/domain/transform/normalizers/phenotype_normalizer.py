@@ -45,7 +45,7 @@ class PhenotypeNormalizer:
     OMIM, Orphanet, and other phenotype databases.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Identifier patterns
         self.identifier_patterns = {
             "hpo": re.compile(r"^HP:\d+$"),
@@ -300,7 +300,7 @@ class PhenotypeNormalizer:
         base_phenotype = max(phenotypes, key=lambda p: p.confidence_score)
 
         # Merge cross-references
-        merged_refs = {}
+        merged_refs: Dict[str, List[str]] = {}
         for phenotype in phenotypes:
             for ref_type, ref_ids in phenotype.cross_references.items():
                 if ref_type not in merged_refs:

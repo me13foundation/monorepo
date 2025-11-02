@@ -2,9 +2,9 @@
 License manifest generation utilities.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, cast
 from pathlib import Path
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from .manager import LicenseManager, LicenseCompatibility
 
@@ -29,7 +29,7 @@ class LicenseManifestGenerator:
         Returns:
             License manifest dictionary
         """
-        manifest = {
+        manifest: Dict[str, Any] = {
             "package_license": package_license,
             "sources": source_licenses,
             "compliance": {
@@ -49,13 +49,15 @@ class LicenseManifestGenerator:
             )
 
             if compatibility == LicenseCompatibility.MISSING:
-                manifest["compliance"]["warnings"].append(
-                    f"Missing license for source: {source_name}"
-                )
+                compliance = manifest["compliance"]
+                warnings = cast(List[str], compliance.setdefault("warnings", []))
+                warnings.append(f"Missing license for source: {source_name}")
 
             elif compatibility == LicenseCompatibility.INCOMPATIBLE:
-                manifest["compliance"]["status"] = "non-compliant"
-                manifest["compliance"]["issues"].append(
+                compliance = manifest["compliance"]
+                compliance["status"] = "non-compliant"
+                issues_list = cast(List[str], compliance.setdefault("issues", []))
+                issues_list.append(
                     f"Incompatible license '{source_license}' "
                     f"from source '{source_name}'"
                 )

@@ -7,6 +7,7 @@ Pydantic models for variant-related API requests and responses.
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic_core.core_schema import ValidationInfo
 from enum import Enum
 
 
@@ -97,7 +98,7 @@ class VariantCreate(BaseModel):
 
     @field_validator("variant_id", mode="before")
     @classmethod
-    def generate_variant_id(cls, v: Optional[str], info) -> str:
+    def generate_variant_id(cls, v: Optional[str], info: ValidationInfo) -> str:
         """Generate variant ID if not provided."""
         if v is None:
             data = info.data

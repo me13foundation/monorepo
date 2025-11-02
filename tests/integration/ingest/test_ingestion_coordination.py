@@ -5,7 +5,7 @@ Tests parallel execution, error handling, and result aggregation.
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime
+from datetime import UTC, datetime
 
 from src.infrastructure.ingest.coordinator import (
     IngestionCoordinator,
@@ -34,8 +34,8 @@ class TestIngestionCoordinator:
             records_failed=0,
             data=[{"id": 1}, {"id": 2}],
             provenance=Provenance(
-                data_source=DataSource(source_name="test_source"),
-                acquired_at=datetime.utcnow(),
+                source=DataSource.CLINVAR,
+                acquired_at=datetime.now(UTC),
                 acquired_by="test",
                 processing_steps=["Test step"],
                 validation_status="valid",
@@ -43,7 +43,7 @@ class TestIngestionCoordinator:
             ),
             errors=[],
             duration_seconds=1.5,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
 
     def test_coordinator_initialization(self, coordinator):
@@ -97,8 +97,8 @@ class TestIngestionCoordinator:
                 records_failed=0,
                 data=[{"id": j} for j in range(5)],
                 provenance=Provenance(
-                    data_source=DataSource(source_name=f"source_{i}"),
-                    acquired_at=datetime.utcnow(),
+                    source=DataSource.CLINVAR,
+                    acquired_at=datetime.now(UTC),
                     acquired_by="test",
                     processing_steps=["Test step"],
                     validation_status="valid",
@@ -106,7 +106,7 @@ class TestIngestionCoordinator:
                 ),
                 errors=[],
                 duration_seconds=1.0,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(UTC),
             )
             results.append(result)
 
@@ -144,14 +144,14 @@ class TestIngestionCoordinator:
         """Test coordination handles task failures gracefully."""
         # Create success result
         success_result = IngestionResult(
-            source="success_source",
+            source="clinvar",
             status=IngestionStatus.COMPLETED,
             records_processed=5,
             records_failed=0,
             data=[{"id": 1}],
             provenance=Provenance(
-                data_source=DataSource(source_name="success_source"),
-                acquired_at=datetime.utcnow(),
+                source=DataSource.CLINVAR,
+                acquired_at=datetime.now(UTC),
                 acquired_by="test",
                 processing_steps=["Success"],
                 validation_status="valid",
@@ -159,7 +159,7 @@ class TestIngestionCoordinator:
             ),
             errors=[],
             duration_seconds=1.0,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
 
         # Create mock classes
@@ -180,11 +180,9 @@ class TestIngestionCoordinator:
         # Create tasks
         tasks = [
             IngestionTask(
-                source="success", ingestor_class=success_class, parameters={}
+                source="clinvar", ingestor_class=success_class, parameters={}
             ),
-            IngestionTask(
-                source="failure", ingestor_class=failure_class, parameters={}
-            ),
+            IngestionTask(source="pubmed", ingestor_class=failure_class, parameters={}),
         ]
 
         # Execute coordination
@@ -212,8 +210,8 @@ class TestIngestionCoordinator:
                 records_failed=0,
                 data=[{"id": j} for j in range(3)],
                 provenance=Provenance(
-                    data_source=DataSource(source_name=f"source_{i}"),
-                    acquired_at=datetime.utcnow(),
+                    source=DataSource.CLINVAR,
+                    acquired_at=datetime.now(UTC),
                     acquired_by="test",
                     processing_steps=["Sequential test"],
                     validation_status="valid",
@@ -221,7 +219,7 @@ class TestIngestionCoordinator:
                 ),
                 errors=[],
                 duration_seconds=0.5,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(UTC),
             )
             results.append(result)
 

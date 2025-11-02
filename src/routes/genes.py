@@ -4,19 +4,13 @@ Gene API routes for MED13 Resource Library.
 RESTful endpoints for gene management with CRUD operations.
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any
 from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
 from src.services.domain.gene_service import GeneService
-from src.models.api import (
-    GeneResponse,
-    GeneCreate,
-    GeneUpdate,
-    PaginationParams,
-    PaginatedResponse,
-)
+from src.models.api import GeneResponse, GeneCreate, GeneUpdate, PaginatedResponse
 
 router = APIRouter(prefix="/genes", tags=["genes"])
 
@@ -29,7 +23,7 @@ async def get_genes(
     sort_by: str = Query("symbol", description="Sort field"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
     db: Session = Depends(get_session),
-):
+) -> PaginatedResponse[GeneResponse]:
     """
     Retrieve a paginated list of genes.
 
@@ -37,20 +31,14 @@ async def get_genes(
     """
     service = GeneService(db)
 
-    # Build query parameters
-    pagination = PaginationParams(
-        page=page, per_page=per_page, sort_by=sort_by, sort_order=sort_order
-    )
-
     try:
-        if search:
-            # Use search functionality
-            genes = service.search_genes(search, pagination.page, pagination.per_page)
-            total = service.count_search_results(search)
-        else:
-            # Get all genes with pagination
-            genes = service.get_all_genes(pagination.page, pagination.per_page)
-            total = service.count_all_genes()
+        genes, total = service.list_genes(
+            page=page,
+            per_page=per_page,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            search=search,
+        )
 
         # Convert to response models
         gene_responses = [GeneResponse.model_validate(gene) for gene in genes]
@@ -81,7 +69,7 @@ async def get_gene(
         False, description="Include associated phenotypes"
     ),
     db: Session = Depends(get_session),
-):
+) -> GeneResponse:
     """
     Retrieve a specific gene by its identifier.
 
@@ -95,15 +83,17 @@ async def get_gene(
             raise HTTPException(status_code=404, detail=f"Gene {gene_id} not found")
 
         # Add computed fields
-        gene_data = GeneResponse.model_validate(gene).model_dump()
+        gene_response = GeneResponse.model_validate(gene)
+        gene_data = gene_response.model_dump()
 
         if include_variants:
             variants = service.get_gene_variants(gene_id)
-            gene_data["variants"] = [v.model_dump() for v in variants]
+            gene_data["variants"] = variants
+            gene_data["variant_count"] = len(variants)
 
         if include_phenotypes:
             phenotypes = service.get_gene_phenotypes(gene_id)
-            gene_data["phenotypes"] = [p.model_dump() for p in phenotypes]
+            gene_data["phenotypes"] = phenotypes
 
         return GeneResponse(**gene_data)
 
@@ -121,7 +111,7 @@ async def get_gene(
 async def create_gene(
     gene: GeneCreate,
     db: Session = Depends(get_session),
-):
+) -> GeneResponse:
     """
     Create a new gene record.
 
@@ -141,7 +131,7 @@ async def create_gene(
             symbol=gene.symbol,
             name=gene.name,
             description=gene.description,
-            gene_type=gene.gene_type,
+            gene_type=gene.gene_type.value,
             chromosome=gene.chromosome,
             start_position=gene.start_position,
             end_position=gene.end_position,
@@ -163,7 +153,7 @@ async def update_gene(
     gene_id: str,
     gene_update: GeneUpdate,
     db: Session = Depends(get_session),
-):
+) -> GeneResponse:
     """
     Update an existing gene record.
 
@@ -193,7 +183,7 @@ async def update_gene(
 async def delete_gene(
     gene_id: str,
     db: Session = Depends(get_session),
-):
+) -> None:
     """
     Delete a gene record.
 
@@ -208,10 +198,10 @@ async def delete_gene(
             raise HTTPException(status_code=404, detail=f"Gene {gene_id} not found")
 
         # Check if gene has associated variants
-        if existing_gene.variants:
+        if service.gene_has_variants(gene_id):
             raise HTTPException(
                 status_code=409,
-                detail=f"Cannot delete gene {gene_id}: has {len(existing_gene.variants)} associated variants",
+                detail=f"Cannot delete gene {gene_id}: associated variants exist",
             )
 
         service.delete_gene(gene_id)
@@ -227,7 +217,7 @@ async def delete_gene(
 async def get_gene_statistics(
     gene_id: str,
     db: Session = Depends(get_session),
-):
+) -> Dict[str, Any]:
     """
     Retrieve statistics for a specific gene.
 

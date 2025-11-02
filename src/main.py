@@ -8,6 +8,7 @@ from src.routes.genes import router as genes_router
 from src.routes.dashboard import router as dashboard_router
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import EndpointRateLimitMiddleware
+from src.routes.curation import router as curation_router
 
 
 def create_app() -> FastAPI:
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
     app.include_router(resources_router)
     app.include_router(genes_router)
     app.include_router(dashboard_router)
+    app.include_router(curation_router)
 
     return app
 

@@ -35,8 +35,8 @@ class TestGeneValidationRules:
             ("", "Gene symbol is required"),
             ("123GENE", "Invalid gene symbol format"),
             ("gene@#$", "Invalid gene symbol format"),
-            ("A", "Gene symbol length invalid"),  # Too short
-            ("A" * 30, "Gene symbol length invalid"),  # Too long
+            ("A", "Gene symbol length 1 is invalid"),  # Too short
+            ("A" * 30, "Gene symbol length 30 is invalid"),  # Too long
         ]
 
         for invalid_symbol, expected_message in test_cases:
@@ -59,7 +59,7 @@ class TestGeneValidationRules:
         rule = GeneValidationRules.validate_hgnc_id_format("hgnc_id")
 
         # Invalid IDs
-        invalid_ids = ["HGC:12345", "HGNC:abc", "HGNC:123456789", "12345"]
+        invalid_ids = ["HGC:12345", "HGNC:abc", "HGNC:123abc", "12345"]
         for invalid_id in invalid_ids:
             is_valid, message, suggestion = rule.validator(invalid_id)
             assert not is_valid

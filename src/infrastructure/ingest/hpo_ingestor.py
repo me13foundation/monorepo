@@ -3,9 +3,12 @@ HPO (Human Phenotype Ontology) loader for MED13 Resource Library.
 Loads phenotype ontology data from HPO releases.
 """
 
-from typing import Dict, List, Any, Optional, Set
-from urllib.parse import urlparse
+from __future__ import annotations
+
 import gzip
+from typing import Any, Dict, List, Optional, Set, Union, cast
+from urllib.parse import urlparse
+from xml.etree import ElementTree as ET
 
 from .base_ingestor import BaseIngestor
 
@@ -18,7 +21,7 @@ class HPOIngestor(BaseIngestor):
     definitions, and hierarchical relationships.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             source_name="hpo",
             base_url=(
@@ -28,7 +31,7 @@ class HPOIngestor(BaseIngestor):
             timeout_seconds=120,  # Large file downloads
         )
 
-    async def fetch_data(self, **kwargs) -> List[Dict[str, Any]]:
+    async def fetch_data(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Fetch HPO ontology data.
 
@@ -165,7 +168,7 @@ class HPOIngestor(BaseIngestor):
         Returns:
             List of parsed phenotype records
         """
-        phenotypes = []
+        phenotypes: List[Dict[str, Any]] = []
 
         try:
             # Determine file format and parse accordingly
@@ -208,8 +211,8 @@ class HPOIngestor(BaseIngestor):
         Returns:
             List of phenotype records
         """
-        phenotypes = []
-        current_term = {}
+        phenotypes: List[Dict[str, Any]] = []
+        current_term: Dict[str, Union[str, List[str]]] = {}
         in_term = False
 
         for line in content.split("\n"):
@@ -219,13 +222,13 @@ class HPOIngestor(BaseIngestor):
                 # Save previous term if exists
                 if current_term and "id" in current_term:
                     phenotypes.append(self._normalize_obo_term(current_term))
-                current_term = {}
+                current_term = cast(Dict[str, Union[str, List[str]]], {})
                 in_term = True
             elif line == "" and in_term:
                 # End of term
                 if current_term and "id" in current_term:
                     phenotypes.append(self._normalize_obo_term(current_term))
-                current_term = {}
+                current_term = cast(Dict[str, Union[str, List[str]]], {})
                 in_term = False
             elif in_term and ":" in line:
                 # Parse key-value pairs
@@ -233,13 +236,13 @@ class HPOIngestor(BaseIngestor):
                 key = key.strip()
                 value = value.strip()
 
-                if key in current_term:
-                    # Handle multiple values (convert to list)
-                    if not isinstance(current_term[key], list):
-                        current_term[key] = [current_term[key]]
-                    current_term[key].append(value)
-                else:
+                existing = current_term.get(key)
+                if existing is None:
                     current_term[key] = value
+                elif isinstance(existing, list):
+                    existing.append(value)
+                else:
+                    current_term[key] = [existing, value]
 
         # Don't forget the last term
         if current_term and "id" in current_term:
@@ -247,7 +250,9 @@ class HPOIngestor(BaseIngestor):
 
         return phenotypes
 
-    def _normalize_obo_term(self, term: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_obo_term(
+        self, term: Dict[str, Union[str, List[str]]]
+    ) -> Dict[str, Any]:
         """
         Normalize OBO term data into consistent structure.
 
@@ -259,8 +264,19 @@ class HPOIngestor(BaseIngestor):
         """
         # Ensure lists for multi-value fields
         for field in ["is_a", "synonym", "xref"]:
-            if field in term and not isinstance(term[field], list):
-                term[field] = [term[field]]
+            value = term.get(field)
+            if value is None:
+                continue
+            if isinstance(value, list):
+                continue
+            if isinstance(value, str):
+                term[field] = [value]
+
+        is_obsolete_raw = term.get("is_obsolete", "false")
+        if isinstance(is_obsolete_raw, list):
+            is_obsolete_text = " ".join(is_obsolete_raw)
+        else:
+            is_obsolete_text = str(is_obsolete_raw)
 
         return {
             "hpo_id": term.get("id", ""),
@@ -269,7 +285,7 @@ class HPOIngestor(BaseIngestor):
             "synonyms": term.get("synonym", []),
             "parents": term.get("is_a", []),
             "xrefs": term.get("xref", []),
-            "is_obsolete": term.get("is_obsolete", "false").lower() == "true",
+            "is_obsolete": is_obsolete_text.lower() == "true",
             "namespace": term.get("namespace", "HP"),
             "comment": term.get("comment", ""),
             "source": "hpo",
@@ -289,12 +305,10 @@ class HPOIngestor(BaseIngestor):
         # Simplified OWL parsing - in production would use proper OWL library
         # This is a basic implementation that extracts basic information
 
-        phenotypes = []
+        phenotypes: List[Dict[str, Any]] = []
         try:
             # Very basic XML parsing for OWL format
             # In production, would use libraries like owlready2 or rdflib
-            import xml.etree.ElementTree as ET
-
             root = ET.fromstring(content)
 
             # Extract Class elements (phenotype terms)
@@ -317,7 +331,7 @@ class HPOIngestor(BaseIngestor):
 
         return phenotypes
 
-    def _parse_owl_class(self, class_elem) -> Optional[Dict[str, Any]]:
+    def _parse_owl_class(self, class_elem: ET.Element) -> Optional[Dict[str, Any]]:
         """Parse individual OWL class element."""
         # Simplified OWL class parsing
         # In production would be much more comprehensive
@@ -384,7 +398,7 @@ class HPOIngestor(BaseIngestor):
             MED13-relevant phenotype records
         """
         # MED13-related phenotypes based on known associations
-        med13_keywords = [
+        med13_keywords: List[str] = [
             "intellectual disability",
             "developmental delay",
             "autism",
@@ -397,10 +411,19 @@ class HPOIngestor(BaseIngestor):
             "kidney anomaly",
         ]
 
-        relevant_terms = []
+        relevant_terms: List[Dict[str, Any]] = []
         for phenotype in phenotypes:
-            name = phenotype.get("name", "").lower()
-            definition = phenotype.get("definition", "").lower()
+            name_raw = phenotype.get("name", "")
+            name = (
+                name_raw.lower() if isinstance(name_raw, str) else str(name_raw).lower()
+            )
+
+            definition_raw = phenotype.get("definition", "")
+            if isinstance(definition_raw, list):
+                definition_text = " ".join(str(item) for item in definition_raw)
+            else:
+                definition_text = str(definition_raw)
+            definition = definition_text.lower()
 
             # Check if any MED13-related keywords are present
             is_relevant = any(
@@ -451,7 +474,7 @@ class HPOIngestor(BaseIngestor):
             Hierarchical structure
         """
         # Create lookup by ID
-        phenotype_dict = {p["hpo_id"]: p for p in phenotypes}
+        phenotype_dict: Dict[str, Dict[str, Any]] = {p["hpo_id"]: p for p in phenotypes}
 
         # Build parent-child relationships
 
@@ -467,7 +490,7 @@ class HPOIngestor(BaseIngestor):
                 return {"error": "Term not found", "hpo_id": term_id}
 
             # Get children (terms that have this as parent)
-            children = []
+            children: List[Dict[str, Any]] = []
             for pid, pterm in phenotype_dict.items():
                 if pid != term_id:
                     parents = pterm.get("parents", [])
@@ -485,10 +508,12 @@ class HPOIngestor(BaseIngestor):
                 "synonyms": term.get("synonyms", []),
             }
 
-        visited = set()
+        visited: Set[str] = set()
         return build_subtree(root_id, visited)
 
-    async def search_phenotypes(self, query: str, **kwargs) -> List[Dict[str, Any]]:
+    async def search_phenotypes(
+        self, query: str, **kwargs: Any
+    ) -> List[Dict[str, Any]]:
         """
         Search phenotypes by name or definition.
 
@@ -502,7 +527,7 @@ class HPOIngestor(BaseIngestor):
         all_phenotypes = await self.fetch_data(**kwargs)
 
         query_lower = query.lower()
-        matches = []
+        matches: List[Dict[str, Any]] = []
 
         for phenotype in all_phenotypes:
             name = phenotype.get("name", "").lower()

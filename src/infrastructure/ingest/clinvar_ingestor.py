@@ -3,8 +3,10 @@ ClinVar API client for MED13 Resource Library.
 Fetches genetic variant data from ClinVar database.
 """
 
+from __future__ import annotations
+
 import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from .base_ingestor import BaseIngestor
 
@@ -18,7 +20,7 @@ class ClinVarIngestor(BaseIngestor):
     related to MED13.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(
             source_name="clinvar",
             base_url="https://eutils.ncbi.nlm.nih.gov/entrez/eutils",
@@ -28,7 +30,7 @@ class ClinVarIngestor(BaseIngestor):
         )
 
     async def fetch_data(
-        self, gene_symbol: str = "MED13", **kwargs
+        self, gene_symbol: str = "MED13", **kwargs: Any
     ) -> List[Dict[str, Any]]:
         """
         Fetch ClinVar data for specified gene.
@@ -46,7 +48,7 @@ class ClinVarIngestor(BaseIngestor):
             return []
 
         # Step 2: Fetch detailed records in batches
-        all_records = []
+        all_records: List[Dict[str, Any]] = []
         batch_size = 50  # ClinVar API limit
 
         for i in range(0, len(variant_ids), batch_size):
@@ -59,7 +61,7 @@ class ClinVarIngestor(BaseIngestor):
 
         return all_records
 
-    async def _search_variants(self, gene_symbol: str, **kwargs) -> List[str]:
+    async def _search_variants(self, gene_symbol: str, **kwargs: Any) -> List[str]:
         """
         Search ClinVar for variants related to a gene.
 
@@ -138,7 +140,7 @@ class ClinVarIngestor(BaseIngestor):
         )
         summary_data = response.json()
 
-        records = []
+        records: List[Dict[str, Any]] = []
         for uid, summary in summary_data.get("result", {}).items():
             if uid == "uids":
                 continue
@@ -212,7 +214,7 @@ class ClinVarIngestor(BaseIngestor):
         except Exception:
             return {"parsing_error": "Failed to parse ClinVar XML"}
 
-    async def fetch_med13_variants(self, **kwargs) -> List[Dict[str, Any]]:
+    async def fetch_med13_variants(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Convenience method to fetch all MED13-related variants.
 
@@ -225,7 +227,7 @@ class ClinVarIngestor(BaseIngestor):
         return await self.fetch_data("MED13", **kwargs)
 
     async def fetch_by_variant_type(
-        self, variant_types: List[str], **kwargs
+        self, variant_types: List[str], **kwargs: Any
     ) -> List[Dict[str, Any]]:
         """
         Fetch variants by specific types.
@@ -237,9 +239,9 @@ class ClinVarIngestor(BaseIngestor):
         Returns:
             List of variant records
         """
-        all_records = []
+        all_records: List[Dict[str, Any]] = []
         for variant_type in variant_types:
-            kwargs_copy = kwargs.copy()
+            kwargs_copy: Dict[str, Any] = kwargs.copy()
             kwargs_copy["variant_type"] = variant_type
             records = await self.fetch_med13_variants(**kwargs_copy)
             all_records.extend(records)
@@ -247,7 +249,7 @@ class ClinVarIngestor(BaseIngestor):
         return all_records
 
     async def fetch_by_clinical_significance(
-        self, significances: List[str], **kwargs
+        self, significances: List[str], **kwargs: Any
     ) -> List[Dict[str, Any]]:
         """
         Fetch variants by clinical significance.
@@ -259,9 +261,9 @@ class ClinVarIngestor(BaseIngestor):
         Returns:
             List of variant records
         """
-        all_records = []
+        all_records: List[Dict[str, Any]] = []
         for significance in significances:
-            kwargs_copy = kwargs.copy()
+            kwargs_copy: Dict[str, Any] = kwargs.copy()
             kwargs_copy["clinical_significance"] = significance
             records = await self.fetch_med13_variants(**kwargs_copy)
             all_records.extend(records)

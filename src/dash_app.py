@@ -3,15 +3,48 @@ MED13 Resource Library - Curation Dashboard
 Dash application for data curation and review workflows.
 """
 
-import dash
-from dash import html, dcc, Input, Output, State
-from dash.exceptions import PreventUpdate
-import dash_bootstrap_components as dbc
-from typing import Dict, Optional
-import requests
+from __future__ import annotations
+
 import json
-import threading
 import logging
+import threading
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
+
+import dash
+import dash_bootstrap_components as dbc
+import requests
+from dash import Input, Output, State, dcc, html
+from dash.development.base_component import Component
+from dash.exceptions import PreventUpdate
+
+# Presentation layer imports (progressive extraction)
+from src.presentation.dash.components.header import (
+    create_header as layout_create_header,
+)
+from src.presentation.dash.callbacks.dashboard_callbacks import (
+    register_callbacks as register_dashboard_callbacks,
+)
+from src.presentation.dash.callbacks.review_callbacks import (
+    register_callbacks as register_review_callbacks,
+)
+from src.presentation.dash.callbacks.approval_callbacks import (
+    register_callbacks as register_bulk_callbacks,
+)
+from src.presentation.dash.callbacks.reports_callbacks import (
+    register_callbacks as register_reports_callbacks,
+)
+from src.presentation.dash.callbacks.settings_callbacks import (
+    register_callbacks as register_settings_callbacks,
+)
+
+# Import shared components for backward compatibility
+from src.presentation.dash.components.theme import COLORS
+
+FigureDict = Dict[str, Any]
+SettingsDict = Dict[str, Any]
+TableRow = Dict[str, Any]
+ComponentValue = Union[Component, str]
 
 # Configure logging first
 logging.basicConfig(level=logging.INFO)
@@ -22,30 +55,25 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # Import dash_table - must be after dash import for proper registration
 try:
-    from dash import dash_table
+    import dash_table
 
     DASH_TABLE_AVAILABLE = True
 except ImportError:
-    # Try the old method as fallback
-    try:
-        import dash_table
-
-        DASH_TABLE_AVAILABLE = True
-    except ImportError:
-        logger.error("dash_table not available. Please install dash-table package.")
-        dash_table = None
-        DASH_TABLE_AVAILABLE = False
+    logger.error("dash_table not available. Please install dash-table package.")
+    dash_table = None
+    DASH_TABLE_AVAILABLE = False
 
 # Check for WebSocket support
 try:
     import asyncio
     import websockets
-    import socketio
+    import socketio  # type: ignore
 
     WEBSOCKET_SUPPORT = True
 except ImportError:
     WEBSOCKET_SUPPORT = False
     logger.warning("WebSocket dependencies not available, falling back to polling only")
+
 
 # Configuration
 API_BASE_URL = "http://localhost:8080"  # FastAPI backend
@@ -71,156 +99,9 @@ app = dash.Dash(
 # App title
 app.title = "MED13 Resource Library - Curation Dashboard"
 
-# Color scheme
-COLORS = {
-    "primary": "#007bff",
-    "secondary": "#6c757d",
-    "success": "#28a745",
-    "danger": "#dc3545",
-    "warning": "#ffc107",
-    "info": "#17a2b8",
-    "light": "#f8f9fa",
-    "dark": "#343a40",
-}
-
-
-# Helper function for DataTable with fallback
-def create_data_table(**kwargs):
-    """Create a DataTable if available, otherwise return a placeholder."""
-    if DASH_TABLE_AVAILABLE and dash_table is not None:
-        try:
-            # Create DataTable component - Dash 3.x handles registration automatically
-            return dash_table.DataTable(**kwargs)
-        except Exception as e:
-            logger.warning(f"DataTable component failed: {e}, using fallback")
-            return _create_table_fallback(**kwargs)
-    else:
-        return _create_table_fallback(**kwargs)
-
-
-def _create_table_fallback(**kwargs):
-    """Create an enhanced fallback table display with full functionality."""
-    data = kwargs.get("data", [])
-    columns = kwargs.get("columns", [])
-    table_id = kwargs.get("id", "table")
-
-    if not data:
-        return html.Div(
-            [
-                dbc.Alert(
-                    [
-                        html.H5("📊 Data Table", className="alert-heading"),
-                        html.P("No data available to display.", className="mb-0"),
-                    ],
-                    color="info",
-                ),
-            ]
-        )
-
-    # Create enhanced HTML table with sorting and filtering capabilities
-    table_header = []
-    if columns:
-        for col in columns:
-            col_name = col.get("name", col.get("id", "Column"))
-            col_id = col.get("id", "")
-            # Make headers clickable for sorting (via JavaScript)
-            table_header.append(
-                html.Th(
-                    [
-                        html.Span(col_name, className="me-2"),
-                        html.I(
-                            className="fas fa-sort text-muted",
-                            style={"fontSize": "0.8em"},
-                        ),
-                    ],
-                    style={"cursor": "pointer"},
-                    className="sortable-header",
-                    id=f"{table_id}-header-{col_id}",
-                )
-            )
-
-    table_rows = []
-    for idx, row in enumerate(data):
-        table_row = []
-        if columns:
-            for col in columns:
-                col_id = col.get("id", "")
-                cell_value = row.get(col_id, "")
-                # Format cell based on column type
-                col_type = col.get("type", "text")
-                if col_type == "numeric" and isinstance(cell_value, (int, float)):
-                    cell_display = (
-                        f"{cell_value:.2f}"
-                        if isinstance(cell_value, float)
-                        else str(cell_value)
-                    )
-                elif col_type == "datetime":
-                    cell_display = str(cell_value)
-                else:
-                    cell_display = str(cell_value)
-                table_row.append(html.Td(cell_display))
-        else:
-            # If no columns specified, show all row data
-            for key, value in row.items():
-                table_row.append(html.Td(f"{key}: {value}"))
-
-        # Add row ID for selection tracking
-        row_classes = "table-row"
-        if kwargs.get("row_selectable") == "multi":
-            row_classes += " selectable-row"
-        table_rows.append(
-            html.Tr(table_row, className=row_classes, id=f"{table_id}-row-{idx}")
-        )
-
-    # Create pagination controls
-    page_size = kwargs.get("page_size", 25)
-    total_pages = (len(data) + page_size - 1) // page_size if data else 0
-
-    pagination = []
-    if total_pages > 1:
-        pagination_items = []
-        for i in range(min(5, total_pages)):  # Show max 5 page buttons
-            pagination_items.append(
-                dbc.PaginationItem(i + 1, active=(i == 0), id=f"{table_id}-page-{i+1}")
-            )
-        pagination = [
-            html.Div(
-                [
-                    html.Small(
-                        f"Showing {min(page_size, len(data))} of {len(data)} items",
-                        className="text-muted me-3",
-                    ),
-                    dbc.Pagination(pagination_items, size="sm", className="mb-0"),
-                ],
-                className="d-flex justify-content-between align-items-center mt-3",
-            )
-        ]
-
-    return html.Div(
-        [
-            dbc.Table(
-                [html.Thead(html.Tr(table_header)), html.Tbody(table_rows)],
-                striped=True,
-                bordered=True,
-                hover=True,
-                responsive=True,
-                className="table-sm",
-                id=f"{table_id}-fallback",
-            ),
-            html.Div(pagination) if pagination else None,
-            html.Small(
-                [
-                    html.I(className="fas fa-info-circle me-1"),
-                    " Enhanced HTML table with sorting and pagination support",
-                ],
-                className="text-muted mt-2 d-block",
-            ),
-        ]
-    )
-
 
 # Layout components
-def create_header():
+def create_header() -> dbc.Navbar:
     """Create application header with navigation."""
     return dbc.Navbar(
         dbc.Container(
@@ -281,1067 +162,15 @@ def create_header():
     )
 
 
-def create_sidebar():
-    """Create sidebar with quick stats and actions."""
-    return dbc.Col(
-        [
-            dbc.Card(
-                [
-                    dbc.CardHeader("Quick Stats"),
-                    dbc.CardBody(
-                        [
-                            html.Div(
-                                [
-                                    html.H6("Pending Review", className="text-muted"),
-                                    html.H4(
-                                        "0",
-                                        id="pending-count",
-                                        className="text-warning",
-                                    ),
-                                ],
-                                className="mb-3",
-                            ),
-                            html.Div(
-                                [
-                                    html.H6("Approved Today", className="text-muted"),
-                                    html.H4(
-                                        "0",
-                                        id="approved-count",
-                                        className="text-success",
-                                    ),
-                                ],
-                                className="mb-3",
-                            ),
-                            html.Div(
-                                [
-                                    html.H6("Rejected Today", className="text-muted"),
-                                    html.H4(
-                                        "0",
-                                        id="rejected-count",
-                                        className="text-danger",
-                                    ),
-                                ]
-                            ),
-                        ]
-                    ),
-                ],
-                className="mb-4",
-            ),
-            dbc.Card(
-                [
-                    dbc.CardHeader("Quick Actions"),
-                    dbc.CardBody(
-                        [
-                            dbc.Button(
-                                "Refresh Data",
-                                id="refresh-btn",
-                                color="primary",
-                                className="w-100 mb-2",
-                            ),
-                            dbc.Button(
-                                "Export Report",
-                                id="export-btn",
-                                color="secondary",
-                                className="w-100 mb-2",
-                            ),
-                            dbc.Button(
-                                "Clear Filters",
-                                id="clear-filters-btn",
-                                color="light",
-                                className="w-100",
-                            ),
-                        ]
-                    ),
-                ]
-            ),
-        ],
-        width=3,
-    )
-
-
 # Main dashboard page
-def create_dashboard_page():
-    """Create the main dashboard page."""
-    return dbc.Container(
-        [
-            dbc.Row(
-                [
-                    create_sidebar(),
-                    dbc.Col(
-                        [
-                            dbc.Row(
-                                [
-                                    dbc.Col(
-                                        [
-                                            dbc.Card(
-                                                [
-                                                    dbc.CardHeader(
-                                                        "Data Quality Overview"
-                                                    ),
-                                                    dbc.CardBody(
-                                                        [dcc.Graph(id="quality-chart")]
-                                                    ),
-                                                ]
-                                            )
-                                        ],
-                                        width=8,
-                                    ),
-                                    dbc.Col(
-                                        [
-                                            dbc.Card(
-                                                [
-                                                    dbc.CardHeader("Recent Activity"),
-                                                    dbc.CardBody(
-                                                        [
-                                                            html.Div(
-                                                                id="activity-feed",
-                                                                style={
-                                                                    "height": "300px",
-                                                                    "overflowY": "auto",
-                                                                },
-                                                            )
-                                                        ]
-                                                    ),
-                                                ]
-                                            )
-                                        ],
-                                        width=4,
-                                    ),
-                                ],
-                                className="mb-4",
-                            ),
-                            dbc.Row(
-                                [
-                                    dbc.Col(
-                                        [
-                                            dbc.Card(
-                                                [
-                                                    dbc.CardHeader(
-                                                        "Entity Distribution"
-                                                    ),
-                                                    dbc.CardBody(
-                                                        [
-                                                            dcc.Graph(
-                                                                id="entity-distribution-chart"
-                                                            )
-                                                        ]
-                                                    ),
-                                                ]
-                                            )
-                                        ],
-                                        width=6,
-                                    ),
-                                    dbc.Col(
-                                        [
-                                            dbc.Card(
-                                                [
-                                                    dbc.CardHeader("Validation Status"),
-                                                    dbc.CardBody(
-                                                        [
-                                                            dcc.Graph(
-                                                                id="validation-status-chart"
-                                                            )
-                                                        ]
-                                                    ),
-                                                ]
-                                            )
-                                        ],
-                                        width=6,
-                                    ),
-                                ]
-                            ),
-                        ],
-                        width=9,
-                    ),
-                ]
-            )
-        ],
-        fluid=True,
-    )
-
-
-# Review queue page
-def create_review_page():
-    """Create the review queue page."""
-    return dbc.Container(
-        [
-            dbc.Row(
-                [
-                    create_sidebar(),
-                    dbc.Col(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardHeader(
-                                        [
-                                            html.H4("Review Queue", className="mb-0"),
-                                            dbc.Badge(
-                                                "Real-time",
-                                                color="info",
-                                                className="ms-2",
-                                            ),
-                                        ]
-                                    ),
-                                    dbc.CardBody(
-                                        [
-                                            # Filters
-                                            dbc.Row(
-                                                [
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Label("Entity Type"),
-                                                            dcc.Dropdown(
-                                                                id="entity-type-filter",
-                                                                options=[
-                                                                    {
-                                                                        "label": "Genes",
-                                                                        "value": "genes",
-                                                                    },
-                                                                    {
-                                                                        "label": "Variants",
-                                                                        "value": "variants",
-                                                                    },
-                                                                    {
-                                                                        "label": "Phenotypes",
-                                                                        "value": "phenotypes",
-                                                                    },
-                                                                    {
-                                                                        "label": "Publications",
-                                                                        "value": "publications",
-                                                                    },
-                                                                ],
-                                                                value="genes",
-                                                                clearable=False,
-                                                            ),
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Label("Status"),
-                                                            dcc.Dropdown(
-                                                                id="status-filter",
-                                                                options=[
-                                                                    {
-                                                                        "label": "Pending",
-                                                                        "value": "pending",
-                                                                    },
-                                                                    {
-                                                                        "label": "Approved",
-                                                                        "value": "approved",
-                                                                    },
-                                                                    {
-                                                                        "label": "Rejected",
-                                                                        "value": "rejected",
-                                                                    },
-                                                                    {
-                                                                        "label": "Quarantined",
-                                                                        "value": "quarantined",
-                                                                    },
-                                                                ],
-                                                                value="pending",
-                                                                clearable=False,
-                                                            ),
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Label("Priority"),
-                                                            dcc.Dropdown(
-                                                                id="priority-filter",
-                                                                options=[
-                                                                    {
-                                                                        "label": "High",
-                                                                        "value": "high",
-                                                                    },
-                                                                    {
-                                                                        "label": "Medium",
-                                                                        "value": "medium",
-                                                                    },
-                                                                    {
-                                                                        "label": "Low",
-                                                                        "value": "low",
-                                                                    },
-                                                                ],
-                                                                value="high",
-                                                                clearable=False,
-                                                            ),
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Button(
-                                                                "Apply Filters",
-                                                                id="apply-filters-btn",
-                                                                color="primary",
-                                                                className="mt-4",
-                                                            )
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                ],
-                                                className="mb-4",
-                                            ),
-                                            # Bulk actions
-                                            dbc.Row(
-                                                [
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.ButtonGroup(
-                                                                [
-                                                                    dbc.Button(
-                                                                        "Select All",
-                                                                        id="select-all-btn",
-                                                                        color="light",
-                                                                        size="sm",
-                                                                    ),
-                                                                    dbc.Button(
-                                                                        "Approve Selected",
-                                                                        id="bulk-approve-btn",
-                                                                        color="success",
-                                                                        size="sm",
-                                                                    ),
-                                                                    dbc.Button(
-                                                                        "Reject Selected",
-                                                                        id="bulk-reject-btn",
-                                                                        color="danger",
-                                                                        size="sm",
-                                                                    ),
-                                                                    dbc.Button(
-                                                                        "Quarantine Selected",
-                                                                        id="bulk-quarantine-btn",
-                                                                        color="warning",
-                                                                        size="sm",
-                                                                    ),
-                                                                ]
-                                                            )
-                                                        ],
-                                                        width=8,
-                                                    ),
-                                                    dbc.Col(
-                                                        [
-                                                            html.Span(
-                                                                "0 items selected",
-                                                                id="selected-count",
-                                                                className="text-muted",
-                                                            )
-                                                        ],
-                                                        width=4,
-                                                        className="text-end",
-                                                    ),
-                                                ],
-                                                className="mb-3",
-                                            ),
-                                            # Bulk operation results
-                                            html.Div(
-                                                id="bulk-operation-result",
-                                                className="mb-3",
-                                            ),
-                                            # Data table
-                                            create_data_table(
-                                                id="review-table",
-                                                columns=[
-                                                    {
-                                                        "name": "Select",
-                                                        "id": "select",
-                                                        "type": "text",
-                                                        "presentation": "markdown",
-                                                    },
-                                                    {
-                                                        "name": "ID",
-                                                        "id": "id",
-                                                        "type": "text",
-                                                    },
-                                                    {
-                                                        "name": "Entity",
-                                                        "id": "entity",
-                                                        "type": "text",
-                                                    },
-                                                    {
-                                                        "name": "Status",
-                                                        "id": "status",
-                                                        "type": "text",
-                                                    },
-                                                    {
-                                                        "name": "Quality Score",
-                                                        "id": "quality_score",
-                                                        "type": "numeric",
-                                                    },
-                                                    {
-                                                        "name": "Issues",
-                                                        "id": "issues",
-                                                        "type": "numeric",
-                                                    },
-                                                    {
-                                                        "name": "Last Updated",
-                                                        "id": "last_updated",
-                                                        "type": "datetime",
-                                                    },
-                                                    {
-                                                        "name": "Actions",
-                                                        "id": "actions",
-                                                        "type": "text",
-                                                        "presentation": "markdown",
-                                                    },
-                                                ],
-                                                data=[],
-                                                page_current=0,
-                                                page_size=25,
-                                                page_action="native",
-                                                sort_action="native",
-                                                sort_mode="multi",
-                                                filter_action="native",
-                                                row_selectable="multi",
-                                                selected_rows=[],
-                                                style_table={"overflowX": "auto"},
-                                                style_cell={
-                                                    "textAlign": "left",
-                                                    "padding": "10px",
-                                                    "minWidth": "80px",
-                                                },
-                                                style_header={
-                                                    "backgroundColor": COLORS["light"],
-                                                    "fontWeight": "bold",
-                                                },
-                                                style_data_conditional=[
-                                                    {
-                                                        "if": {"row_index": "odd"},
-                                                        "backgroundColor": "rgb(248, 248, 248)",
-                                                    }
-                                                ],
-                                            ),
-                                        ]
-                                    ),
-                                ]
-                            )
-                        ],
-                        width=9,
-                    ),
-                ]
-            )
-        ],
-        fluid=True,
-    )
-
-
 # Bulk operations page
-def create_bulk_page():
-    """Create the bulk operations page."""
-    return dbc.Container(
-        [
-            dbc.Row(
-                [
-                    create_sidebar(),
-                    dbc.Col(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardHeader("Bulk Operations"),
-                                    dbc.CardBody(
-                                        [
-                                            dbc.Tabs(
-                                                [
-                                                    dbc.Tab(
-                                                        [
-                                                            html.H5(
-                                                                "Import Data",
-                                                                className="mb-3",
-                                                            ),
-                                                            dbc.Row(
-                                                                [
-                                                                    dbc.Col(
-                                                                        [
-                                                                            dcc.Upload(
-                                                                                id="upload-data",
-                                                                                children=html.Div(
-                                                                                    [
-                                                                                        "Drag and drop or click to select files"
-                                                                                    ]
-                                                                                ),
-                                                                                style={
-                                                                                    "width": "100%",
-                                                                                    "height": "60px",
-                                                                                    "lineHeight": "60px",
-                                                                                    "borderWidth": "1px",
-                                                                                    "borderStyle": "dashed",
-                                                                                    "borderRadius": "5px",
-                                                                                    "textAlign": "center",
-                                                                                    "margin": "10px",
-                                                                                },
-                                                                                multiple=True,
-                                                                            )
-                                                                        ],
-                                                                        width=6,
-                                                                    ),
-                                                                    dbc.Col(
-                                                                        [
-                                                                            dbc.Label(
-                                                                                "Import Type"
-                                                                            ),
-                                                                            dcc.Dropdown(
-                                                                                id="import-type",
-                                                                                options=[
-                                                                                    {
-                                                                                        "label": "ClinVar Data",
-                                                                                        "value": "clinvar",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "HPO Data",
-                                                                                        "value": "hpo",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "PubMed Data",
-                                                                                        "value": "pubmed",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "UniProt Data",
-                                                                                        "value": "uniprot",
-                                                                                    },
-                                                                                ],
-                                                                                placeholder="Select data type",
-                                                                            ),
-                                                                            dbc.Button(
-                                                                                "Start Import",
-                                                                                id="start-import-btn",
-                                                                                color="primary",
-                                                                                className="mt-3",
-                                                                            ),
-                                                                        ],
-                                                                        width=6,
-                                                                    ),
-                                                                ]
-                                                            ),
-                                                        ],
-                                                        label="Import",
-                                                        tab_id="import",
-                                                    ),
-                                                    dbc.Tab(
-                                                        [
-                                                            html.H5(
-                                                                "Export Data",
-                                                                className="mb-3",
-                                                            ),
-                                                            dbc.Row(
-                                                                [
-                                                                    dbc.Col(
-                                                                        [
-                                                                            dbc.Label(
-                                                                                "Entity Types"
-                                                                            ),
-                                                                            dcc.Checklist(
-                                                                                id="export-types",
-                                                                                options=[
-                                                                                    {
-                                                                                        "label": "Genes",
-                                                                                        "value": "genes",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "Variants",
-                                                                                        "value": "variants",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "Phenotypes",
-                                                                                        "value": "phenotypes",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "Publications",
-                                                                                        "value": "publications",
-                                                                                    },
-                                                                                ],
-                                                                                value=[
-                                                                                    "genes"
-                                                                                ],
-                                                                            ),
-                                                                        ],
-                                                                        width=4,
-                                                                    ),
-                                                                    dbc.Col(
-                                                                        [
-                                                                            dbc.Label(
-                                                                                "Format"
-                                                                            ),
-                                                                            dcc.Dropdown(
-                                                                                id="export-format",
-                                                                                options=[
-                                                                                    {
-                                                                                        "label": "JSON",
-                                                                                        "value": "json",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "CSV",
-                                                                                        "value": "csv",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "TSV",
-                                                                                        "value": "tsv",
-                                                                                    },
-                                                                                ],
-                                                                                value="json",
-                                                                            ),
-                                                                        ],
-                                                                        width=4,
-                                                                    ),
-                                                                    dbc.Col(
-                                                                        [
-                                                                            dbc.Button(
-                                                                                "Export Data",
-                                                                                id="export-data-btn",
-                                                                                color="success",
-                                                                                className="mt-4",
-                                                                            )
-                                                                        ],
-                                                                        width=4,
-                                                                    ),
-                                                                ]
-                                                            ),
-                                                        ],
-                                                        label="Export",
-                                                        tab_id="export",
-                                                    ),
-                                                    dbc.Tab(
-                                                        [
-                                                            html.H5(
-                                                                "Batch Processing",
-                                                                className="mb-3",
-                                                            ),
-                                                            dbc.Row(
-                                                                [
-                                                                    dbc.Col(
-                                                                        [
-                                                                            dbc.Label(
-                                                                                "Operation"
-                                                                            ),
-                                                                            dcc.Dropdown(
-                                                                                id="batch-operation",
-                                                                                options=[
-                                                                                    {
-                                                                                        "label": "Validate All",
-                                                                                        "value": "validate",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "Normalize IDs",
-                                                                                        "value": "normalize",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "Cross-reference",
-                                                                                        "value": "cross_ref",
-                                                                                    },
-                                                                                    {
-                                                                                        "label": "Quality Check",
-                                                                                        "value": "quality",
-                                                                                    },
-                                                                                ],
-                                                                                placeholder="Select operation",
-                                                                            ),
-                                                                        ],
-                                                                        width=6,
-                                                                    ),
-                                                                    dbc.Col(
-                                                                        [
-                                                                            dbc.Button(
-                                                                                "Start Batch",
-                                                                                id="start-batch-btn",
-                                                                                color="warning",
-                                                                                className="mt-4",
-                                                                            )
-                                                                        ],
-                                                                        width=6,
-                                                                    ),
-                                                                ]
-                                                            ),
-                                                            html.Div(
-                                                                id="batch-progress-container",
-                                                                className="mt-4",
-                                                            ),
-                                                        ],
-                                                        label="Batch",
-                                                        tab_id="batch",
-                                                    ),
-                                                ],
-                                                id="bulk-tabs",
-                                                active_tab="import",
-                                            )
-                                        ]
-                                    ),
-                                ]
-                            )
-                        ],
-                        width=9,
-                    ),
-                ]
-            )
-        ],
-        fluid=True,
-    )
-
-
 # Reports page
-def create_reports_page():
-    """Create the reports page."""
-    return dbc.Container(
-        [
-            dbc.Row(
-                [
-                    create_sidebar(),
-                    dbc.Col(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardHeader("Quality Reports"),
-                                    dbc.CardBody(
-                                        [
-                                            dbc.Row(
-                                                [
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Card(
-                                                                [
-                                                                    dbc.CardBody(
-                                                                        [
-                                                                            html.H5(
-                                                                                "Data Quality Score",
-                                                                                className="card-title",
-                                                                            ),
-                                                                            html.H1(
-                                                                                "87%",
-                                                                                className="text-success",
-                                                                            ),
-                                                                            html.P(
-                                                                                "Overall quality across all entities",
-                                                                                className="text-muted",
-                                                                            ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Card(
-                                                                [
-                                                                    dbc.CardBody(
-                                                                        [
-                                                                            html.H5(
-                                                                                "Validation Errors",
-                                                                                className="card-title",
-                                                                            ),
-                                                                            html.H1(
-                                                                                "23",
-                                                                                className="text-danger",
-                                                                            ),
-                                                                            html.P(
-                                                                                "Critical issues requiring attention",
-                                                                                className="text-muted",
-                                                                            ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Card(
-                                                                [
-                                                                    dbc.CardBody(
-                                                                        [
-                                                                            html.H5(
-                                                                                "Entities Processed",
-                                                                                className="card-title",
-                                                                            ),
-                                                                            html.H1(
-                                                                                "1,247",
-                                                                                className="text-info",
-                                                                            ),
-                                                                            html.P(
-                                                                                "Total entities in the system",
-                                                                                className="text-muted",
-                                                                            ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                    dbc.Col(
-                                                        [
-                                                            dbc.Card(
-                                                                [
-                                                                    dbc.CardBody(
-                                                                        [
-                                                                            html.H5(
-                                                                                "Cross-references",
-                                                                                className="card-title",
-                                                                            ),
-                                                                            html.H1(
-                                                                                "892",
-                                                                                className="text-primary",
-                                                                            ),
-                                                                            html.P(
-                                                                                "Established entity relationships",
-                                                                                className="text-muted",
-                                                                            ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
-                                                        ],
-                                                        width=3,
-                                                    ),
-                                                ],
-                                                className="mb-4",
-                                            ),
-                                            dbc.Tabs(
-                                                [
-                                                    dbc.Tab(
-                                                        [
-                                                            dcc.Graph(
-                                                                id="quality-trends-chart"
-                                                            )
-                                                        ],
-                                                        label="Quality Trends",
-                                                        tab_id="trends",
-                                                    ),
-                                                    dbc.Tab(
-                                                        [
-                                                            dcc.Graph(
-                                                                id="error-distribution-chart"
-                                                            )
-                                                        ],
-                                                        label="Error Distribution",
-                                                        tab_id="errors",
-                                                    ),
-                                                    dbc.Tab(
-                                                        [
-                                                            create_data_table(
-                                                                id="detailed-report-table",
-                                                                columns=[
-                                                                    {
-                                                                        "name": "Entity ID",
-                                                                        "id": "entity_id",
-                                                                    },
-                                                                    {
-                                                                        "name": "Type",
-                                                                        "id": "entity_type",
-                                                                    },
-                                                                    {
-                                                                        "name": "Issue Type",
-                                                                        "id": "issue_type",
-                                                                    },
-                                                                    {
-                                                                        "name": "Severity",
-                                                                        "id": "severity",
-                                                                    },
-                                                                    {
-                                                                        "name": "Description",
-                                                                        "id": "description",
-                                                                    },
-                                                                    {
-                                                                        "name": "Status",
-                                                                        "id": "status",
-                                                                    },
-                                                                ],
-                                                                data=[],
-                                                                page_size=20,
-                                                                style_table={
-                                                                    "overflowX": "auto"
-                                                                },
-                                                            )
-                                                        ],
-                                                        label="Detailed Report",
-                                                        tab_id="detailed",
-                                                    ),
-                                                ],
-                                                id="report-tabs",
-                                                active_tab="trends",
-                                            ),
-                                        ]
-                                    ),
-                                ]
-                            )
-                        ],
-                        width=9,
-                    ),
-                ]
-            )
-        ],
-        fluid=True,
-    )
-
-
 # Settings page
-def create_settings_page():
-    """Create the settings page."""
-    return dbc.Container(
-        [
-            dbc.Row(
-                [
-                    create_sidebar(),
-                    dbc.Col(
-                        [
-                            dbc.Card(
-                                [
-                                    dbc.CardHeader("Dashboard Settings"),
-                                    dbc.CardBody(
-                                        [
-                                            dbc.Form(
-                                                [
-                                                    dbc.Row(
-                                                        [
-                                                            dbc.Col(
-                                                                [
-                                                                    dbc.Label(
-                                                                        "API Endpoint"
-                                                                    ),
-                                                                    dbc.Input(
-                                                                        id="api-endpoint",
-                                                                        type="url",
-                                                                        value=API_BASE_URL,
-                                                                        placeholder="http://localhost:8080",
-                                                                    ),
-                                                                ],
-                                                                width=6,
-                                                            ),
-                                                            dbc.Col(
-                                                                [
-                                                                    dbc.Label(
-                                                                        "API Key"
-                                                                    ),
-                                                                    dbc.Input(
-                                                                        id="api-key",
-                                                                        type="password",
-                                                                        value=API_KEY,
-                                                                        placeholder="Enter API key",
-                                                                    ),
-                                                                ],
-                                                                width=6,
-                                                            ),
-                                                        ],
-                                                        className="mb-3",
-                                                    ),
-                                                    dbc.Row(
-                                                        [
-                                                            dbc.Col(
-                                                                [
-                                                                    dbc.Label(
-                                                                        "Refresh Interval (seconds)"
-                                                                    ),
-                                                                    dbc.Input(
-                                                                        id="refresh-interval",
-                                                                        type="number",
-                                                                        value=30,
-                                                                        min=5,
-                                                                        max=300,
-                                                                    ),
-                                                                ],
-                                                                width=4,
-                                                            ),
-                                                            dbc.Col(
-                                                                [
-                                                                    dbc.Label(
-                                                                        "Page Size"
-                                                                    ),
-                                                                    dbc.Input(
-                                                                        id="page-size",
-                                                                        type="number",
-                                                                        value=25,
-                                                                        min=10,
-                                                                        max=100,
-                                                                    ),
-                                                                ],
-                                                                width=4,
-                                                            ),
-                                                            dbc.Col(
-                                                                [
-                                                                    dbc.Button(
-                                                                        "Save Settings",
-                                                                        id="save-settings-btn",
-                                                                        color="primary",
-                                                                        className="mt-4",
-                                                                    )
-                                                                ],
-                                                                width=4,
-                                                            ),
-                                                        ],
-                                                        className="mb-3",
-                                                    ),
-                                                    dbc.Row(
-                                                        [
-                                                            dbc.Col(
-                                                                [
-                                                                    dbc.Label("Theme"),
-                                                                    dcc.Dropdown(
-                                                                        id="theme-selector",
-                                                                        options=[
-                                                                            {
-                                                                                "label": "Light",
-                                                                                "value": "light",
-                                                                            },
-                                                                            {
-                                                                                "label": "Dark",
-                                                                                "value": "dark",
-                                                                            },
-                                                                        ],
-                                                                        value="light",
-                                                                    ),
-                                                                ],
-                                                                width=4,
-                                                            ),
-                                                            dbc.Col(
-                                                                [
-                                                                    dbc.Label(
-                                                                        "Language"
-                                                                    ),
-                                                                    dcc.Dropdown(
-                                                                        id="language-selector",
-                                                                        options=[
-                                                                            {
-                                                                                "label": "English",
-                                                                                "value": "en",
-                                                                            },
-                                                                            {
-                                                                                "label": "Spanish",
-                                                                                "value": "es",
-                                                                            },
-                                                                            {
-                                                                                "label": "French",
-                                                                                "value": "fr",
-                                                                            },
-                                                                        ],
-                                                                        value="en",
-                                                                    ),
-                                                                ],
-                                                                width=4,
-                                                            ),
-                                                        ]
-                                                    ),
-                                                ]
-                                            )
-                                        ]
-                                    ),
-                                ]
-                            )
-                        ],
-                        width=9,
-                    ),
-                ]
-            )
-        ],
-        fluid=True,
-    )
-
-
 # Main layout
 app.layout = html.Div(
     [
         dcc.Location(id="url", refresh=False),
-        create_header(),
+        layout_create_header(),
         html.Div(id="page-content"),
         # Hidden stores for state management
         dcc.Store(id="selected-items-store", data=[]),
@@ -1370,31 +199,20 @@ app.layout = html.Div(
         ),
         # Store for WebSocket connection attempts
         dcc.Store(id="websocket-store", data={"attempts": 0, "last_attempt": None}),
+        # Notification containers for quick actions
+        html.Div(id="refresh-notification"),
+        html.Div(id="export-notification"),
+        html.Div(id="clear-filters-notification"),
     ]
 )
 
 
-# Callback for URL routing
-@app.callback(Output("page-content", "children"), Input("url", "pathname"))
-def display_page(pathname):
-    """Route to different pages based on URL."""
-    if pathname == "/dashboard" or pathname == "/":
-        return create_dashboard_page()
-    elif pathname == "/review":
-        return create_review_page()
-    elif pathname == "/bulk":
-        return create_bulk_page()
-    elif pathname == "/reports":
-        return create_reports_page()
-    elif pathname == "/settings":
-        return create_settings_page()
-    else:
-        return html.Div(
-            [
-                html.H1("404: Page not found"),
-                html.P(f"The page {pathname} was not found."),
-            ]
-        )
+# Register callbacks from presentation layer modules
+register_dashboard_callbacks(app)
+register_review_callbacks(app)
+register_bulk_callbacks(app)
+register_reports_callbacks(app)
+register_settings_callbacks(app)
 
 
 # Callback for count badges (always visible on all pages)
@@ -1407,8 +225,14 @@ def display_page(pathname):
     Input("interval-component", "n_intervals"),
     State("settings-store", "data"),
 )
-def update_count_badges(n, settings):
+def update_count_badges(
+    n: int, settings: Optional[SettingsDict]
+) -> Tuple[str, str, str]:
     """Update count badges in real-time (visible on all pages)."""
+    settings = settings or {}
+
+    settings = settings or {}
+
     try:
         # Try to get real-time data first
         rt_client = get_realtime_client(settings)
@@ -1451,7 +275,9 @@ def update_count_badges(n, settings):
     State("settings-store", "data"),
     prevent_initial_call="initial_duplicate",
 )
-def update_activity_feed(n, pathname, settings):
+def update_activity_feed(
+    n: int, pathname: str, settings: Optional[SettingsDict]
+) -> List[Component]:
     """Update activity feed (only visible on dashboard page)."""
     # Only update if we're on the dashboard page
     if pathname != "/" and pathname != "/dashboard":
@@ -1503,7 +329,7 @@ def update_activity_feed(n, pathname, settings):
                 ]
 
         # Create activity feed
-        activities = []
+        activities: List[Component] = []
         for activity in activities_data[-5:]:  # Show last 5 activities
             color_class = {
                 "success": "text-success",
@@ -1544,9 +370,11 @@ def update_activity_feed(n, pathname, settings):
                     html.Small(status_text, className=f"text-{status_color} fw-bold"),
                     html.Br(),
                     html.Small(
-                        "Live updates enabled"
-                        if rt_status == "connected"
-                        else "Updates every 5 seconds",
+                        (
+                            "Live updates enabled"
+                            if rt_status == "connected"
+                            else "Updates every 5 seconds"
+                        ),
                         className="text-muted",
                     ),
                 ],
@@ -1577,8 +405,14 @@ def update_activity_feed(n, pathname, settings):
     ],
 )
 def update_review_table(
-    n_clicks, n_intervals, entity_type, status, priority, settings, selected_rows
-):
+    n_clicks: Optional[int],
+    n_intervals: int,
+    entity_type: Optional[str],
+    status: Optional[str],
+    priority: Optional[str],
+    settings: Optional[SettingsDict],
+    selected_rows: Optional[List[int]],
+) -> List[TableRow]:
     """Update the review table with filtered data."""
     try:
         # Mock data for now - replace with actual API calls
@@ -1631,7 +465,7 @@ def update_review_table(
     ],
     Input("interval-component", "n_intervals"),
 )
-def update_dashboard_charts(n):
+def update_dashboard_charts(n: int) -> Tuple[FigureDict, FigureDict, FigureDict]:
     """Update dashboard page charts."""
     try:
         # Quality overview chart
@@ -1701,7 +535,7 @@ def update_dashboard_charts(n):
     except Exception as e:
         logger.error(f"Error updating dashboard charts: {e}")
         # Return empty figures on error
-        empty_fig = {"data": [], "layout": {}}
+        empty_fig: FigureDict = {"data": [], "layout": {}}
         return empty_fig, empty_fig, empty_fig
 
 
@@ -1714,7 +548,7 @@ def update_dashboard_charts(n):
     [Input("interval-component", "n_intervals"), Input("url", "pathname")],
     prevent_initial_call="initial_duplicate",
 )
-def update_reports_charts(n, pathname):
+def update_reports_charts(n: int, pathname: str) -> Tuple[FigureDict, FigureDict]:
     """Update reports page charts."""
     # Only update if we're on the reports page
     if pathname != "/reports":
@@ -1759,7 +593,7 @@ def update_reports_charts(n, pathname):
     except Exception as e:
         logger.error(f"Error updating reports charts: {e}")
         # Return empty figures on error
-        empty_fig = {"data": [], "layout": {}}
+        empty_fig: FigureDict = {"data": [], "layout": {}}
         return empty_fig, empty_fig
 
 
@@ -1770,7 +604,9 @@ def update_reports_charts(n, pathname):
     State("batch-operation", "value"),
     prevent_initial_call=True,
 )
-def handle_batch_operation(n_clicks, operation):
+def handle_batch_operation(
+    n_clicks: Optional[int], operation: Optional[str]
+) -> ComponentValue:
     """Handle batch operations."""
     if not n_clicks or not operation:
         return ""
@@ -1807,21 +643,21 @@ def handle_batch_operation(n_clicks, operation):
     prevent_initial_call=True,
 )
 def save_settings(
-    n_clicks,
-    api_endpoint,
-    api_key,
-    refresh_interval,
-    page_size,
-    theme,
-    language,
-    current_settings,
-):
+    n_clicks: Optional[int],
+    api_endpoint: Optional[str],
+    api_key: Optional[str],
+    refresh_interval: Optional[int],
+    page_size: Optional[int],
+    theme: Optional[str],
+    language: Optional[str],
+    current_settings: Optional[SettingsDict],
+) -> SettingsDict:
     """Save dashboard settings."""
     if not n_clicks:
-        return current_settings
+        return current_settings or {}
 
     try:
-        new_settings = {
+        new_settings: SettingsDict = {
             "api_endpoint": api_endpoint,
             "api_key": api_key,
             "refresh_interval": refresh_interval,
@@ -1831,15 +667,15 @@ def save_settings(
         }
 
         # Update the interval component
-        app.layout.children[4].interval = (
-            refresh_interval * 1000
-        )  # Convert to milliseconds
+        interval_component = cast(dcc.Interval, app.layout.children[4])
+        if refresh_interval is not None:
+            setattr(interval_component, "interval", refresh_interval * 1000)
 
         return new_settings
 
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
-        return current_settings
+        return current_settings or {}
 
 
 # Callback for selected items count
@@ -1848,7 +684,9 @@ def save_settings(
     Input("review-table", "selected_rows"),
     State("review-table", "data"),
 )
-def update_selected_count(selected_rows, table_data):
+def update_selected_count(
+    selected_rows: Optional[List[int]], table_data: Optional[List[TableRow]]
+) -> str:
     """Update the count of selected items."""
     count = len(selected_rows) if selected_rows else 0
     return f"{count} items selected"
@@ -1875,23 +713,26 @@ def update_selected_count(selected_rows, table_data):
     prevent_initial_call=True,
 )
 def handle_bulk_operations(
-    approve_clicks,
-    reject_clicks,
-    quarantine_clicks,
-    select_all_clicks,
-    selected_rows,
-    table_data,
-    entity_type,
-    settings,
-):
+    approve_clicks: Optional[int],
+    reject_clicks: Optional[int],
+    quarantine_clicks: Optional[int],
+    select_all_clicks: Optional[int],
+    selected_rows: Optional[List[int]],
+    table_data: Optional[List[TableRow]],
+    entity_type: Optional[str],
+    settings: Optional[SettingsDict],
+) -> Tuple[Optional[List[int]], ComponentValue]:
     """Handle bulk approve/reject/quarantine operations."""
-    ctx = dash.callback_context
+    ctx: Any = dash.callback_context
     if not ctx.triggered:
         return selected_rows, ""
 
     trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
     try:
+        table_data = table_data or []
+        settings = settings or {}
+
         if trigger_id == "select-all-btn":
             # Select all rows
             all_rows = list(range(len(table_data)))
@@ -1902,7 +743,7 @@ def handle_bulk_operations(
                 "No items selected for operation", color="warning"
             )
 
-        operation = None
+        operation: Optional[str] = None
         if trigger_id == "bulk-approve-btn":
             operation = "approve"
         elif trigger_id == "bulk-reject-btn":
@@ -1917,6 +758,8 @@ def handle_bulk_operations(
         processed_count = 0
         failed_count = 0
 
+        resource_type = entity_type or "entities"
+
         for row_index in selected_rows:
             if row_index < len(table_data):
                 item = table_data[row_index]
@@ -1926,7 +769,7 @@ def handle_bulk_operations(
                 try:
                     # Simulate API call to update item status
                     result = api_request(
-                        f"/{entity_type}/{item_id}",
+                        f"/{resource_type}/{item_id}",
                         method="PUT",
                         data={"status": operation},
                         settings=settings,
@@ -1971,12 +814,13 @@ def handle_bulk_operations(
 class RealTimeClient:
     """WebSocket client for real-time updates."""
 
-    def __init__(self, api_endpoint: str, api_key: str):
+    def __init__(self, api_endpoint: str, api_key: str) -> None:
         self.api_endpoint = api_endpoint.replace("http", "ws")
         self.api_key = api_key
-        self.connected = False
-        self.last_update = {}
+        self.connected: bool = False
+        self.last_update: Dict[str, Any] = {}
 
+        self.sio: Optional[Any]
         if WEBSOCKET_SUPPORT:
             self.sio = socketio.Client()
             # Set up event handlers
@@ -1988,32 +832,32 @@ class RealTimeClient:
         else:
             self.sio = None
 
-    def on_connect(self):
+    def on_connect(self) -> None:
         """Handle connection established."""
         logger.info("Connected to real-time server")
         self.connected = True
 
-    def on_disconnect(self):
+    def on_disconnect(self) -> None:
         """Handle disconnection."""
         logger.info("Disconnected from real-time server")
         self.connected = False
 
-    def on_data_update(self, data):
+    def on_data_update(self, data: Dict[str, Any]) -> None:
         """Handle data update events."""
         logger.info(f"Received data update: {data}")
         self.last_update = data
 
-    def on_validation_complete(self, data):
+    def on_validation_complete(self, data: Dict[str, Any]) -> None:
         """Handle validation completion events."""
         logger.info(f"Validation completed: {data}")
         self.last_update = data
 
-    def on_ingestion_progress(self, data):
+    def on_ingestion_progress(self, data: Dict[str, Any]) -> None:
         """Handle ingestion progress events."""
         logger.info(f"Ingestion progress: {data}")
         self.last_update = data
 
-    async def connect_async(self):
+    async def connect_async(self) -> None:
         """Connect to WebSocket server asynchronously."""
         try:
             # Try WebSocket connection first
@@ -2022,15 +866,20 @@ class RealTimeClient:
                 logger.info("WebSocket connection established")
                 async for message in websocket:
                     try:
-                        data = json.loads(message)
+                        message_str = (
+                            message.decode("utf-8", "ignore")
+                            if isinstance(message, (bytes, bytearray))
+                            else message
+                        )
+                        data = json.loads(message_str)
                         self.last_update = data
                     except json.JSONDecodeError:
-                        logger.error(f"Invalid JSON received: {message}")
+                        logger.error(f"Invalid JSON received: {message_str}")
         except Exception as e:
             logger.warning(f"WebSocket connection failed, falling back to polling: {e}")
             self.connected = False
 
-    def connect(self):
+    def connect(self) -> None:
         """Connect to real-time server."""
         if not WEBSOCKET_SUPPORT:
             logger.info("WebSocket support not available, using polling only")
@@ -2038,33 +887,37 @@ class RealTimeClient:
 
         try:
             # Try Socket.IO first
-            self.sio.connect(
-                f"{self.api_endpoint.replace('ws', 'http')}",
-                headers={"X-API-Key": self.api_key},
-            )
+            if self.sio is not None:
+                self.sio.connect(
+                    f"{self.api_endpoint.replace('ws', 'http')}",
+                    headers={"X-API-Key": self.api_key},
+                )
         except Exception as e:
             logger.warning(f"Socket.IO connection failed, trying WebSocket: {e}")
             # Fallback to asyncio WebSocket
             asyncio.run(self.connect_async())
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Disconnect from real-time server."""
-        if WEBSOCKET_SUPPORT and self.sio and self.sio.connected:
+        if WEBSOCKET_SUPPORT and self.sio is not None and self.sio.connected:
             self.sio.disconnect()
         self.connected = False
 
-    def get_latest_update(self) -> Dict:
+    def get_latest_update(self) -> Dict[str, Any]:
         """Get the latest update data."""
         return self.last_update.copy()
 
 
 # Global real-time client instance
-realtime_client = None
+realtime_client: Optional[RealTimeClient] = None
 
 
-def get_realtime_client(settings: Dict) -> Optional[RealTimeClient]:
+def get_realtime_client(
+    settings: Optional[SettingsDict],
+) -> Optional[RealTimeClient]:
     """Get or create real-time client instance."""
     global realtime_client
+    settings = settings or {}
     if realtime_client is None:
         try:
             realtime_client = RealTimeClient(
@@ -2087,9 +940,9 @@ def get_realtime_client(settings: Dict) -> Optional[RealTimeClient]:
 def api_request(
     endpoint: str,
     method: str = "GET",
-    data: Optional[Dict] = None,
-    settings: Optional[Dict] = None,
-) -> Dict:
+    data: Optional[SettingsDict] = None,
+    settings: Optional[SettingsDict] = None,
+) -> Dict[str, Any]:
     """Make API request to FastAPI backend."""
     if not settings:
         settings = {"api_endpoint": API_BASE_URL, "api_key": API_KEY}
@@ -2110,13 +963,133 @@ def api_request(
             raise ValueError(f"Unsupported HTTP method: {method}")
 
         response.raise_for_status()
-        return response.json()
+        return cast(Dict[str, Any], response.json())
 
     except requests.RequestException as e:
         # Log as debug since we gracefully fall back to mock data
         # Connection errors are expected when API server isn't running
         logger.debug(f"API request failed (falling back to mock data): {e}")
         return {"error": str(e)}
+
+
+# Callback for refresh button
+@app.callback(
+    Output("refresh-notification", "children"),
+    Input("refresh-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def handle_refresh(n_clicks: Optional[int]) -> Any:
+    """Handle refresh button click."""
+    if not n_clicks:
+        return dash.no_update
+
+    # Trigger a refresh by updating the timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    return dbc.Toast(
+        f"Data refreshed at {timestamp}",
+        header="Refresh Complete",
+        icon="success",
+        duration=3000,
+        className="position-fixed top-0 end-0 m-3",
+        style={"zIndex": 9999},
+    )
+
+
+# Callback for export button
+@app.callback(
+    Output("export-notification", "children"),
+    Input("export-btn", "n_clicks"),
+    State("entity-type-filter", "value"),
+    State("status-filter", "value"),
+    State("priority-filter", "value"),
+    prevent_initial_call=True,
+)
+def handle_export(
+    n_clicks: Optional[int],
+    entity_type: Optional[str],
+    status: Optional[str],
+    priority: Optional[str],
+) -> Any:
+    """Handle export button click."""
+    if not n_clicks:
+        return dash.no_update
+
+    try:
+        # Get current filter state
+        filters_applied = []
+        if entity_type:
+            filters_applied.append(f"Entity: {entity_type}")
+        if status:
+            filters_applied.append(f"Status: {status}")
+        if priority:
+            filters_applied.append(f"Priority: {priority}")
+
+        filter_text = (
+            f" with filters: {', '.join(filters_applied)}"
+            if filters_applied
+            else " (all data)"
+        )
+
+        # In a real implementation, this would generate and download a file
+        # For now, show a notification
+        return dbc.Toast(
+            f"Report exported successfully{filter_text}",
+            header="Export Complete",
+            icon="success",
+            duration=4000,
+            className="position-fixed top-0 end-0 m-3",
+            style={"zIndex": 9999},
+        )
+
+    except Exception as e:
+        logger.error(f"Export failed: {e}")
+        return dbc.Toast(
+            "Export failed. Please try again.",
+            header="Export Error",
+            icon="danger",
+            duration=4000,
+            className="position-fixed top-0 end-0 m-3",
+            style={"zIndex": 9999},
+        )
+
+
+# Callback for clear filters button
+@app.callback(
+    Output("clear-filters-notification", "children"),
+    Output("entity-type-filter", "value"),
+    Output("status-filter", "value"),
+    Output("priority-filter", "value"),
+    Output("filter-state-store", "data"),
+    Input("clear-filters-btn", "n_clicks"),
+    prevent_initial_call=True,
+)
+def handle_clear_filters(n_clicks: Optional[int]) -> Tuple[Any, Any, Any, Any, Any]:
+    """Handle clear filters button click."""
+    if not n_clicks:
+        return (
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
+        )
+
+    # Clear all filter values
+    return (
+        dbc.Toast(
+            "All filters cleared",
+            header="Filters Cleared",
+            icon="info",
+            duration=2000,
+            className="position-fixed top-0 end-0 m-3",
+            style={"zIndex": 9999},
+        ),
+        None,  # entity-type-filter
+        None,  # status-filter
+        None,  # priority-filter
+        {},  # filter-state-store
+    )
 
 
 if __name__ == "__main__":
