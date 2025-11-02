@@ -326,11 +326,11 @@ Distribute FAIR packages with persistent identifiers.
 ### Phase 1D: Packaging & Publishing (Weeks 11-12)
 
 #### Week 11: FAIR Packaging
-- [ ] RO-Crate generation pipeline
-- [ ] License compliance checking
-- [ ] Metadata enrichment
-- [ ] Package validation
-- [ ] Storage and archival
+- [x] RO-Crate generation pipeline
+- [x] License compliance checking
+- [x] Metadata enrichment
+- [x] Package validation
+- [x] Storage and archival
 
 #### Week 12: Publication System
 - [ ] Zenodo integration
