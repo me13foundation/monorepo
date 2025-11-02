@@ -33,11 +33,38 @@ async def get_dashboard_stats(db: Session = Depends(get_session)) -> Dict[str, A
         publication_repo = PublicationRepository(db)
 
         # Get counts for each entity type
-        gene_count = gene_repo.count()
-        variant_count = variant_repo.count()
-        phenotype_count = phenotype_repo.count()
-        evidence_count = evidence_repo.count()
-        publication_count = publication_repo.count()
+        # Handle database errors gracefully (tables may not exist yet)
+        try:
+            gene_count = gene_repo.count() or 0
+        except Exception:
+            gene_count = 0
+
+        try:
+            variant_count = variant_repo.count() or 0
+        except Exception:
+            variant_count = 0
+
+        try:
+            phenotype_count = phenotype_repo.count() or 0
+        except Exception:
+            phenotype_count = 0
+
+        try:
+            evidence_count = evidence_repo.count() or 0
+        except Exception:
+            evidence_count = 0
+
+        try:
+            publication_count = publication_repo.count() or 0
+        except Exception:
+            publication_count = 0
+
+        # Ensure all counts are integers
+        gene_count = int(gene_count)
+        variant_count = int(variant_count)
+        phenotype_count = int(phenotype_count)
+        evidence_count = int(evidence_count)
+        publication_count = int(publication_count)
 
         # For now, we'll use a simple heuristic:
         # - Pending: recently added items (last 7 days) or items needing review

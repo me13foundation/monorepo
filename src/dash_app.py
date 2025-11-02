@@ -1473,7 +1473,9 @@ def update_activity_feed(n, pathname, settings):
             activities_data = realtime_data.get("activities", [])
         else:
             # Fallback to API polling
-            activities_response = api_request("/activities/recent", settings=settings)
+            activities_response = api_request(
+                "/stats/activities/recent", settings=settings
+            )
             activities_data = (
                 activities_response.get("activities", [])
                 if "error" not in activities_response
