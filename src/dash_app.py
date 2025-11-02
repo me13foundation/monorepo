@@ -55,12 +55,12 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # Import dash_table - must be after dash import for proper registration
 try:
-    import dash_table
+    from dash import dash_table  # type: ignore
 
     DASH_TABLE_AVAILABLE = True
 except ImportError:
     logger.error("dash_table not available. Please install dash-table package.")
-    dash_table = None
+    dash_table = None  # type: ignore
     DASH_TABLE_AVAILABLE = False
 
 # Check for WebSocket support
