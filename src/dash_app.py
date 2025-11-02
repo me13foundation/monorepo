@@ -6,7 +6,6 @@ Dash application for data curation and review workflows.
 import dash
 from dash import html, dcc, Input, Output, State
 from dash.exceptions import PreventUpdate
-from dash import no_update
 import dash_bootstrap_components as dbc
 from typing import Dict, Optional
 import requests
@@ -1395,24 +1394,18 @@ def display_page(pathname):
         )
 
 
-# Callback for real-time data updates
+# Callback for count badges (always visible on all pages)
 @app.callback(
     [
         Output("pending-count", "children"),
         Output("approved-count", "children"),
         Output("rejected-count", "children"),
-        Output("activity-feed", "children", allow_duplicate=True),
     ],
-    [Input("interval-component", "n_intervals"), Input("url", "pathname")],
+    Input("interval-component", "n_intervals"),
     State("settings-store", "data"),
-    prevent_initial_call="initial_duplicate",
 )
-def update_dashboard_stats(n, pathname, settings):
-    """Update dashboard statistics in real-time."""
-    # Only update activity-feed if we're on the dashboard page
-    # But always update counts (they exist on multiple pages)
-    is_dashboard_page = pathname == "/" or pathname == "/dashboard"
-
+def update_count_badges(n, settings):
+    """Update count badges in real-time (visible on all pages)."""
     try:
         # Try to get real-time data first
         rt_client = get_realtime_client(settings)
@@ -1427,23 +1420,65 @@ def update_dashboard_stats(n, pathname, settings):
         if realtime_data:
             # Use real-time data if available
             stats = realtime_data.get("stats", {})
-            activities_data = realtime_data.get("activities", [])
         else:
             # Fallback to API polling
             stats_response = api_request("/stats/dashboard", settings=settings)
             if "error" not in stats_response:
                 stats = stats_response
-                activities_response = api_request(
-                    "/activities/recent", settings=settings
-                )
-                activities_data = (
-                    activities_response.get("activities", [])
-                    if "error" not in activities_response
-                    else []
-                )
             else:
                 # Mock data as final fallback
                 stats = {"pending_count": 12, "approved_count": 8, "rejected_count": 3}
+
+        # Extract stats
+        pending = str(stats.get("pending_count", 0))
+        approved = str(stats.get("approved_count", 0))
+        rejected = str(stats.get("rejected_count", 0))
+
+        return pending, approved, rejected
+
+    except Exception as e:
+        logger.error(f"Error updating count badges: {e}")
+        return "0", "0", "0"
+
+
+# Callback for activity feed (only on dashboard page)
+@app.callback(
+    Output("activity-feed", "children", allow_duplicate=True),
+    [Input("interval-component", "n_intervals"), Input("url", "pathname")],
+    State("settings-store", "data"),
+    prevent_initial_call="initial_duplicate",
+)
+def update_activity_feed(n, pathname, settings):
+    """Update activity feed (only visible on dashboard page)."""
+    # Only update if we're on the dashboard page
+    if pathname != "/" and pathname != "/dashboard":
+        raise PreventUpdate
+
+    try:
+        # Try to get real-time data first
+        rt_client = get_realtime_client(settings)
+        realtime_data = None
+
+        if rt_client:
+            try:
+                realtime_data = rt_client.get_latest_update()
+            except Exception as e:
+                logger.debug(f"Real-time client error: {e}")
+
+        if realtime_data:
+            # Use real-time data if available
+            activities_data = realtime_data.get("activities", [])
+        else:
+            # Fallback to API polling
+            activities_response = api_request("/activities/recent", settings=settings)
+            activities_data = (
+                activities_response.get("activities", [])
+                if "error" not in activities_response
+                else []
+            )
+
+            if not activities_data:
+                # Mock data as final fallback
                 activities_data = [
                     {
                         "message": "Gene BRCA1 validated",
@@ -1462,74 +1497,63 @@ def update_dashboard_stats(n, pathname, settings):
                     },
                 ]
 
-        # Extract stats
-        pending = str(stats.get("pending_count", 0))
-        approved = str(stats.get("approved_count", 0))
-        rejected = str(stats.get("rejected_count", 0))
+        # Create activity feed
+        activities = []
+        for activity in activities_data[-5:]:  # Show last 5 activities
+            color_class = {
+                "success": "text-success",
+                "warning": "text-warning",
+                "danger": "text-danger",
+                "info": "text-info",
+            }.get(activity.get("type", "info"), "text-info")
 
-        # Create activity feed only if on dashboard page
-        if is_dashboard_page:
-            activities = []
-            for activity in activities_data[-5:]:  # Show last 5 activities
-                color_class = {
-                    "success": "text-success",
-                    "warning": "text-warning",
-                    "danger": "text-danger",
-                    "info": "text-info",
-                }.get(activity.get("type", "info"), "text-info")
-
-                activities.append(
-                    html.Div(
-                        [
-                            html.Small(
-                                activity.get("message", "Unknown activity"),
-                                className=color_class,
-                            ),
-                            html.Br(),
-                            html.Small(
-                                activity.get("timestamp", "Unknown time"),
-                                className="text-muted",
-                            ),
-                        ],
-                        className="mb-2",
-                    )
-                )
-
-            # Add connection status indicator
-            rt_status = "connected" if rt_client and rt_client.connected else "polling"
-            status_color = "success" if rt_status == "connected" else "info"
-            status_text = (
-                "🔴 Real-time connection active"
-                if rt_status == "connected"
-                else "🔄 Using fast polling (5s)"
-            )
-            activities.insert(
-                0,
+            activities.append(
                 html.Div(
                     [
                         html.Small(
-                            status_text, className=f"text-{status_color} fw-bold"
+                            activity.get("message", "Unknown activity"),
+                            className=color_class,
                         ),
                         html.Br(),
                         html.Small(
-                            "Live updates enabled"
-                            if rt_status == "connected"
-                            else "Updates every 5 seconds",
+                            activity.get("timestamp", "Unknown time"),
                             className="text-muted",
                         ),
                     ],
                     className="mb-2",
-                ),
+                )
             )
-        else:
-            # Not on dashboard page, don't update activity-feed
-            return pending, approved, rejected, no_update
 
-        return pending, approved, rejected, activities
+        # Add connection status indicator
+        rt_status = "connected" if rt_client and rt_client.connected else "polling"
+        status_color = "success" if rt_status == "connected" else "info"
+        status_text = (
+            "🔴 Real-time connection active"
+            if rt_status == "connected"
+            else "🔄 Using fast polling (5s)"
+        )
+        activities.insert(
+            0,
+            html.Div(
+                [
+                    html.Small(status_text, className=f"text-{status_color} fw-bold"),
+                    html.Br(),
+                    html.Small(
+                        "Live updates enabled"
+                        if rt_status == "connected"
+                        else "Updates every 5 seconds",
+                        className="text-muted",
+                    ),
+                ],
+                className="mb-2",
+            ),
+        )
+
+        return activities
 
     except Exception as e:
-        logger.error(f"Error updating dashboard stats: {e}")
-        return "0", "0", "0", [html.Div("Error loading data")]
+        logger.error(f"Error updating activity feed: {e}")
+        return [html.Div("Error loading data")]
 
 
 # Callback for review table data
