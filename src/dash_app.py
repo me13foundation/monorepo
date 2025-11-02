@@ -2108,7 +2108,9 @@ def api_request(
         return response.json()
 
     except requests.RequestException as e:
-        logger.error(f"API request failed: {e}")
+        # Log as debug since we gracefully fall back to mock data
+        # Connection errors are expected when API server isn't running
+        logger.debug(f"API request failed (falling back to mock data): {e}")
         return {"error": str(e)}
 
 
