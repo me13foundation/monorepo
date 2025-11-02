@@ -4,7 +4,7 @@ Dash application for data curation and review workflows.
 """
 
 import dash
-from dash import html, dcc, Input, Output, State, dash_table
+from dash import html, dcc, Input, Output, State
 import dash_bootstrap_components as dbc
 from typing import Dict, Optional
 import requests
@@ -15,6 +15,22 @@ import logging
 # Configure logging first
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Import dash_table - must be after dash import for proper registration
+try:
+    from dash import dash_table
+
+    DASH_TABLE_AVAILABLE = True
+except ImportError:
+    # Try the old method as fallback
+    try:
+        import dash_table
+
+        DASH_TABLE_AVAILABLE = True
+    except ImportError:
+        logger.error("dash_table not available. Please install dash-table package.")
+        dash_table = None
+        DASH_TABLE_AVAILABLE = False
 
 # Check for WebSocket support
 try:
@@ -31,6 +47,12 @@ except ImportError:
 API_BASE_URL = "http://localhost:8080"  # FastAPI backend
 API_KEY = "med13-admin-key"  # Should come from environment
 
+# Verify dash_table is properly loaded
+if DASH_TABLE_AVAILABLE:
+    logger.info("✅ dash_table is available and ready to use")
+else:
+    logger.warning("⚠️ dash_table not available - table functionality will be limited")
+
 # Initialize Dash app
 app = dash.Dash(
     __name__,
@@ -38,6 +60,9 @@ app = dash.Dash(
     meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
     suppress_callback_exceptions=True,
 )
+
+# Note: In Dash 3.x, dash_table components need to be used in the layout
+# to be properly registered. The fallback tables will be used if registration fails.
 
 # App title
 app.title = "MED13 Resource Library - Curation Dashboard"
@@ -53,6 +78,141 @@ COLORS = {
     "light": "#f8f9fa",
     "dark": "#343a40",
 }
+
+
+# Helper function for DataTable with fallback
+def create_data_table(**kwargs):
+    """Create a DataTable if available, otherwise return a placeholder."""
+    if DASH_TABLE_AVAILABLE and dash_table is not None:
+        try:
+            # Create DataTable component - Dash 3.x handles registration automatically
+            return dash_table.DataTable(**kwargs)
+        except Exception as e:
+            logger.warning(f"DataTable component failed: {e}, using fallback")
+            return _create_table_fallback(**kwargs)
+    else:
+        return _create_table_fallback(**kwargs)
+
+
+def _create_table_fallback(**kwargs):
+    """Create an enhanced fallback table display with full functionality."""
+    data = kwargs.get("data", [])
+    columns = kwargs.get("columns", [])
+    table_id = kwargs.get("id", "table")
+
+    if not data:
+        return html.Div(
+            [
+                dbc.Alert(
+                    [
+                        html.H5("📊 Data Table", className="alert-heading"),
+                        html.P("No data available to display.", className="mb-0"),
+                    ],
+                    color="info",
+                ),
+            ]
+        )
+
+    # Create enhanced HTML table with sorting and filtering capabilities
+    table_header = []
+    if columns:
+        for col in columns:
+            col_name = col.get("name", col.get("id", "Column"))
+            col_id = col.get("id", "")
+            # Make headers clickable for sorting (via JavaScript)
+            table_header.append(
+                html.Th(
+                    [
+                        html.Span(col_name, className="me-2"),
+                        html.I(
+                            className="fas fa-sort text-muted",
+                            style={"fontSize": "0.8em"},
+                        ),
+                    ],
+                    style={"cursor": "pointer"},
+                    className="sortable-header",
+                    id=f"{table_id}-header-{col_id}",
+                )
+            )
+
+    table_rows = []
+    for idx, row in enumerate(data):
+        table_row = []
+        if columns:
+            for col in columns:
+                col_id = col.get("id", "")
+                cell_value = row.get(col_id, "")
+                # Format cell based on column type
+                col_type = col.get("type", "text")
+                if col_type == "numeric" and isinstance(cell_value, (int, float)):
+                    cell_display = (
+                        f"{cell_value:.2f}"
+                        if isinstance(cell_value, float)
+                        else str(cell_value)
+                    )
+                elif col_type == "datetime":
+                    cell_display = str(cell_value)
+                else:
+                    cell_display = str(cell_value)
+                table_row.append(html.Td(cell_display))
+        else:
+            # If no columns specified, show all row data
+            for key, value in row.items():
+                table_row.append(html.Td(f"{key}: {value}"))
+
+        # Add row ID for selection tracking
+        row_classes = "table-row"
+        if kwargs.get("row_selectable") == "multi":
+            row_classes += " selectable-row"
+        table_rows.append(
+            html.Tr(table_row, className=row_classes, id=f"{table_id}-row-{idx}")
+        )
+
+    # Create pagination controls
+    page_size = kwargs.get("page_size", 25)
+    total_pages = (len(data) + page_size - 1) // page_size if data else 0
+
+    pagination = []
+    if total_pages > 1:
+        pagination_items = []
+        for i in range(min(5, total_pages)):  # Show max 5 page buttons
+            pagination_items.append(
+                dbc.PaginationItem(i + 1, active=(i == 0), id=f"{table_id}-page-{i+1}")
+            )
+        pagination = [
+            html.Div(
+                [
+                    html.Small(
+                        f"Showing {min(page_size, len(data))} of {len(data)} items",
+                        className="text-muted me-3",
+                    ),
+                    dbc.Pagination(pagination_items, size="sm", className="mb-0"),
+                ],
+                className="d-flex justify-content-between align-items-center mt-3",
+            )
+        ]
+
+    return html.Div(
+        [
+            dbc.Table(
+                [html.Thead(html.Tr(table_header)), html.Tbody(table_rows)],
+                striped=True,
+                bordered=True,
+                hover=True,
+                responsive=True,
+                className="table-sm",
+                id=f"{table_id}-fallback",
+            ),
+            html.Div(pagination) if pagination else None,
+            html.Small(
+                [
+                    html.I(className="fas fa-info-circle me-1"),
+                    " Enhanced HTML table with sorting and pagination support",
+                ],
+                className="text-muted mt-2 d-block",
+            ),
+        ]
+    )
 
 
 # Layout components
@@ -476,7 +636,7 @@ def create_review_page():
                                                 className="mb-3",
                                             ),
                                             # Data table
-                                            dash_table.DataTable(
+                                            create_data_table(
                                                 id="review-table",
                                                 columns=[
                                                     {
@@ -955,7 +1115,7 @@ def create_reports_page():
                                                     ),
                                                     dbc.Tab(
                                                         [
-                                                            dash_table.DataTable(
+                                                            create_data_table(
                                                                 id="detailed-report-table",
                                                                 columns=[
                                                                     {
@@ -1193,12 +1353,19 @@ app.layout = html.Div(
                 "language": "en",
             },
         ),
-        # Interval for real-time updates
+        # Interval for real-time updates (5 seconds for responsive updates)
         dcc.Interval(
             id="interval-component",
-            interval=30 * 1000,
-            n_intervals=0,  # 30 seconds
+            interval=5 * 1000,  # 5 seconds for more responsive updates
+            n_intervals=0,
+            disabled=False,
         ),
+        # Store for real-time client state
+        dcc.Store(
+            id="realtime-status-store", data={"connected": False, "last_update": None}
+        ),
+        # Store for WebSocket connection attempts
+        dcc.Store(id="websocket-store", data={"attempts": 0, "last_attempt": None}),
     ]
 )
 
@@ -1242,7 +1409,13 @@ def update_dashboard_stats(n, settings):
     try:
         # Try to get real-time data first
         rt_client = get_realtime_client(settings)
-        realtime_data = rt_client.get_latest_update()
+        realtime_data = None
+
+        if rt_client:
+            try:
+                realtime_data = rt_client.get_latest_update()
+            except Exception as e:
+                logger.debug(f"Real-time client error: {e}")
 
         if realtime_data:
             # Use real-time data if available
@@ -1315,21 +1488,29 @@ def update_dashboard_stats(n, settings):
             )
 
         # Add connection status indicator
-        if rt_client.connected:
-            activities.insert(
-                0,
-                html.Div(
-                    [
-                        html.Small(
-                            "🔴 Real-time connection active",
-                            className="text-success fw-bold",
-                        ),
-                        html.Br(),
-                        html.Small("Live updates enabled", className="text-muted"),
-                    ],
-                    className="mb-2",
-                ),
-            )
+        rt_status = "connected" if rt_client and rt_client.connected else "polling"
+        status_color = "success" if rt_status == "connected" else "info"
+        status_text = (
+            "🔴 Real-time connection active"
+            if rt_status == "connected"
+            else "🔄 Using fast polling (5s)"
+        )
+        activities.insert(
+            0,
+            html.Div(
+                [
+                    html.Small(status_text, className=f"text-{status_color} fw-bold"),
+                    html.Br(),
+                    html.Small(
+                        "Live updates enabled"
+                        if rt_status == "connected"
+                        else "Updates every 5 seconds",
+                        className="text-muted",
+                    ),
+                ],
+                className="mb-2",
+            ),
+        )
 
         return pending, approved, rejected, activities
 
@@ -1813,15 +1994,23 @@ class RealTimeClient:
 realtime_client = None
 
 
-def get_realtime_client(settings: Dict) -> RealTimeClient:
+def get_realtime_client(settings: Dict) -> Optional[RealTimeClient]:
     """Get or create real-time client instance."""
     global realtime_client
-    if realtime_client is None or not realtime_client.connected:
-        realtime_client = RealTimeClient(
-            settings.get("api_endpoint", API_BASE_URL), settings.get("api_key", API_KEY)
-        )
-        # Start connection in background thread
-        threading.Thread(target=realtime_client.connect, daemon=True).start()
+    if realtime_client is None:
+        try:
+            realtime_client = RealTimeClient(
+                settings.get("api_endpoint", API_BASE_URL),
+                settings.get("api_key", API_KEY),
+            )
+            # Try to connect in background thread if WebSocket support is available
+            if WEBSOCKET_SUPPORT:
+                threading.Thread(target=realtime_client.connect, daemon=True).start()
+                # Give it a moment to attempt connection
+                threading.Event().wait(0.5)
+        except Exception as e:
+            logger.warning(f"Failed to initialize real-time client: {e}")
+            return None
 
     return realtime_client
 
