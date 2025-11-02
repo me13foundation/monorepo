@@ -1,0 +1,107 @@
+"""
+File upload handling for Zenodo deposits.
+"""
+
+from pathlib import Path
+from typing import List, Dict, Any
+import logging
+
+from .client import ZenodoClient
+
+logger = logging.getLogger(__name__)
+
+
+class ZenodoUploader:
+    """Handle file uploads to Zenodo."""
+
+    def __init__(self, client: ZenodoClient):
+        """
+        Initialize uploader.
+
+        Args:
+            client: ZenodoClient instance
+        """
+        self.client = client
+
+    async def upload_package(
+        self,
+        package_path: Path,
+        metadata: Dict[str, Any],
+        include_subdirectories: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Upload a complete package directory to Zenodo.
+
+        Args:
+            package_path: Path to package directory
+            metadata: Deposit metadata
+            include_subdirectories: Whether to include subdirectories
+
+        Returns:
+            Deposit information dictionary
+        """
+        package_path = Path(package_path)
+
+        if not package_path.exists():
+            raise ValueError(f"Package path does not exist: {package_path}")
+
+        # Collect files to upload
+        files_to_upload = self._collect_files(package_path, include_subdirectories)
+
+        # Create deposit and upload files
+        deposit = await self.client.create_deposit(
+            metadata=metadata, files=files_to_upload
+        )
+
+        return deposit
+
+    def _collect_files(
+        self, base_path: Path, include_subdirectories: bool
+    ) -> List[Path]:
+        """
+        Collect files from package directory.
+
+        Args:
+            base_path: Base directory path
+            include_subdirectories: Whether to include subdirectories
+
+        Returns:
+            List of file paths
+        """
+        files = []
+
+        if base_path.is_file():
+            files.append(base_path)
+        elif base_path.is_dir():
+            if include_subdirectories:
+                files.extend(base_path.rglob("*"))
+            else:
+                files.extend(base_path.glob("*"))
+
+        # Filter to only files (not directories)
+        return [f for f in files if f.is_file()]
+
+    async def upload_files(
+        self,
+        files: List[Path],
+        metadata: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Upload a list of files to Zenodo.
+
+        Args:
+            files: List of file paths
+            metadata: Deposit metadata
+
+        Returns:
+            Deposit information dictionary
+        """
+        # Validate files exist
+        for file_path in files:
+            if not Path(file_path).exists():
+                raise ValueError(f"File not found: {file_path}")
+
+        # Create deposit and upload
+        deposit = await self.client.create_deposit(metadata=metadata, files=files)
+
+        return deposit
