@@ -3,15 +3,23 @@ Phenotype service for MED13 Resource Library.
 Business logic for clinical phenotype operations.
 """
 
-from typing import List, Optional, Dict, Any
+from dataclasses import dataclass
+from typing import List, Optional
 from sqlalchemy.orm import Session
 
-from src.repositories import PhenotypeRepository, EvidenceRepository
-from src.models.database import PhenotypeModel, PhenotypeCategory
+from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
+from src.infrastructure.repositories import SqlAlchemyPhenotypeRepository
 from src.services.domain.base_service import BaseService
 
 
-class PhenotypeService(BaseService[PhenotypeModel]):
+@dataclass
+class PhenotypeHierarchy:
+    phenotype: Phenotype
+    children: List[Phenotype]
+    parent_hpo_id: Optional[str]
+
+
+class PhenotypeService(BaseService[Phenotype]):
     """
     Service for phenotype business logic and operations.
 
@@ -19,18 +27,25 @@ class PhenotypeService(BaseService[PhenotypeModel]):
     HPO hierarchy navigation and clinical categorization.
     """
 
-    def __init__(self, session: Optional[Session] = None):
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        phenotype_repository: Optional[SqlAlchemyPhenotypeRepository] = None,
+    ):
         super().__init__(session)
-        self.phenotype_repo = PhenotypeRepository(session)
-        self.evidence_repo = EvidenceRepository(session)
+        self.phenotype_repo = (
+            phenotype_repository
+            if phenotype_repository
+            else SqlAlchemyPhenotypeRepository(session)
+        )
 
     @property
-    def repository(self) -> PhenotypeRepository:
+    def repository(self) -> SqlAlchemyPhenotypeRepository:
         return self.phenotype_repo
 
     def find_phenotypes_by_category(
-        self, category: PhenotypeCategory, limit: Optional[int] = None
-    ) -> List[PhenotypeModel]:
+        self, category: str, limit: Optional[int] = None
+    ) -> List[Phenotype]:
         """
         Find phenotypes in a specific clinical category.
 
@@ -39,11 +54,12 @@ class PhenotypeService(BaseService[PhenotypeModel]):
             limit: Maximum number of phenotypes to return
 
         Returns:
-            List of PhenotypeModel instances in the category
+            List of Phenotype entities in the category
         """
-        return self.phenotype_repo.find_by_category(category, limit)
+        normalized_category = PhenotypeCategory.validate(category)
+        return self.phenotype_repo.find_by_category(normalized_category, limit)
 
-    def get_phenotype_hierarchy(self, hpo_id: str) -> Dict[str, Any]:
+    def get_phenotype_hierarchy(self, hpo_id: str) -> Optional[PhenotypeHierarchy]:
         """
         Get the phenotype hierarchy for an HPO term.
 
@@ -54,18 +70,18 @@ class PhenotypeService(BaseService[PhenotypeModel]):
             Dictionary with parent and child relationships
         """
         phenotype = self.phenotype_repo.find_by_hpo_id(hpo_id)
-        if not phenotype:
-            return {}
+        if phenotype is None:
+            return None
 
         children = self.phenotype_repo.find_children(hpo_id)
 
-        return {
-            "phenotype": phenotype,
-            "children": children,
-            "parent_hpo_id": phenotype.parent_hpo_id,
-        }
+        return PhenotypeHierarchy(
+            phenotype=phenotype,
+            children=children,
+            parent_hpo_id=phenotype.parent_hpo_id,
+        )
 
-    def search_phenotypes(self, query: str, limit: int = 20) -> List[PhenotypeModel]:
+    def search_phenotypes(self, query: str, limit: int = 20) -> List[Phenotype]:
         """
         Search phenotypes by name, definition, or synonyms.
 
@@ -74,6 +90,6 @@ class PhenotypeService(BaseService[PhenotypeModel]):
             limit: Maximum number of results
 
         Returns:
-            List of matching PhenotypeModel instances
+            List of matching Phenotype entities
         """
         return self.phenotype_repo.search_phenotypes(query, limit)

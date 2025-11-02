@@ -3,16 +3,23 @@ Gene service for MED13 Resource Library.
 Business logic for gene entity operations and validations.
 """
 
-from typing import List, Optional, Dict, Any, Tuple
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
 
-from src.repositories import GeneRepository, VariantRepository
-from src.models.database import GeneModel
-from src.models.value_objects import GeneIdentifier, Provenance
+from src.domain.entities.gene import Gene
+from src.domain.entities.variant import VariantSummary
+from src.domain.value_objects.identifiers import GeneIdentifier
+from src.domain.value_objects.provenance import Provenance
+from src.infrastructure.repositories import SqlAlchemyGeneRepository
+from src.repositories import VariantRepository
 from src.services.domain.base_service import BaseService
 
 
-class GeneService(BaseService[GeneModel]):
+StatisticsValue = int | float | bool | str | None | datetime
+
+
+class GeneService(BaseService[Gene]):
     """
     Service for gene business logic and operations.
 
@@ -20,13 +27,20 @@ class GeneService(BaseService[GeneModel]):
     validation, creation, and relationship management.
     """
 
-    def __init__(self, session: Optional[Session] = None):
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        gene_repository: Optional[SqlAlchemyGeneRepository] = None,
+    ):
         super().__init__(session)
-        self.gene_repo = GeneRepository(session)
+        if gene_repository is not None:
+            self.gene_repo = gene_repository
+        else:
+            self.gene_repo = SqlAlchemyGeneRepository(session)
         self.variant_repo = VariantRepository(session)
 
     @property
-    def repository(self) -> GeneRepository:
+    def repository(self) -> SqlAlchemyGeneRepository:
         return self.gene_repo
 
     def create_gene(
@@ -43,7 +57,7 @@ class GeneService(BaseService[GeneModel]):
         ncbi_gene_id: Optional[int] = None,
         uniprot_id: Optional[str] = None,
         provenance: Optional[Provenance] = None,
-    ) -> GeneModel:
+    ) -> Gene:
         """
         Create a new gene with validation.
 
@@ -77,26 +91,22 @@ class GeneService(BaseService[GeneModel]):
         gene_identifier = gene_id or normalized_symbol
 
         # Create the gene
-        gene = GeneModel(
-            gene_id=gene_identifier,
+        gene_entity = Gene.create(
             symbol=normalized_symbol,
+            gene_id=gene_identifier,
+            gene_type=gene_type,
             name=name,
             description=description,
-            gene_type=gene_type,
             chromosome=chromosome,
             start_position=start_position,
             end_position=end_position,
             ensembl_id=ensembl_id,
             ncbi_gene_id=ncbi_gene_id,
             uniprot_id=uniprot_id,
+            provenance=provenance,
         )
 
-        # Add provenance metadata if provided
-        if provenance:
-            # Could add provenance tracking here
-            pass
-
-        return self.repository.create(gene)
+        return self.repository.create(gene_entity)
 
     def list_genes(
         self,
@@ -105,7 +115,7 @@ class GeneService(BaseService[GeneModel]):
         sort_by: str,
         sort_order: str,
         search: Optional[str] = None,
-    ) -> Tuple[List[GeneModel], int]:
+    ) -> Tuple[List[Gene], int]:
         """Retrieve paginated genes with optional search."""
         return self.gene_repo.paginate_genes(
             page=page,
@@ -115,17 +125,15 @@ class GeneService(BaseService[GeneModel]):
             search=search,
         )
 
-    def get_gene_by_id(self, gene_id: str) -> Optional[GeneModel]:
+    def get_gene_by_id(self, gene_id: str) -> Optional[Gene]:
         """Retrieve a gene by its public gene identifier."""
         return self.gene_repo.find_by_gene_id(gene_id)
 
-    def get_gene_by_symbol(self, symbol: str) -> Optional[GeneModel]:
+    def get_gene_by_symbol(self, symbol: str) -> Optional[Gene]:
         """Retrieve a gene by its symbol."""
         return self.gene_repo.find_by_symbol(symbol.upper())
 
-    def find_gene_by_identifier(
-        self, identifier: GeneIdentifier
-    ) -> Optional[GeneModel]:
+    def find_gene_by_identifier(self, identifier: GeneIdentifier) -> Optional[Gene]:
         """
         Find a gene by its identifier (supports multiple ID types).
 
@@ -153,7 +161,7 @@ class GeneService(BaseService[GeneModel]):
 
         return gene
 
-    def get_gene_with_variants(self, gene_id: int) -> Optional[GeneModel]:
+    def get_gene_with_variants(self, gene_id: int) -> Optional[Gene]:
         """
         Get a gene with its associated variants loaded.
 
@@ -165,11 +173,13 @@ class GeneService(BaseService[GeneModel]):
         """
         gene = self.gene_repo.get_by_id(gene_id)
         if gene:
-            # Load variants (in a real implementation, this would use joined loading)
-            gene.variants = self.variant_repo.find_by_gene(gene_id)
+            variant_models = self.variant_repo.find_by_gene(gene_id)
+            gene.variants = [
+                self._build_variant_summary(variant) for variant in variant_models
+            ]
         return gene
 
-    def search_genes(self, query: str, limit: int = 10) -> List[GeneModel]:
+    def search_genes(self, query: str, limit: int = 10) -> List[Gene]:
         """
         Search genes by symbol or name.
 
@@ -182,7 +192,7 @@ class GeneService(BaseService[GeneModel]):
         """
         return self.gene_repo.search_by_name_or_symbol(query, limit)
 
-    def update_gene(self, gene_id: str, updates: Dict[str, Any]) -> GeneModel:
+    def update_gene(self, gene_id: str, updates: Dict[str, object]) -> Gene:
         """Update mutable gene fields by gene identifier."""
         gene = self.gene_repo.find_by_gene_id_or_fail(gene_id)
 
@@ -205,7 +215,8 @@ class GeneService(BaseService[GeneModel]):
         if not sanitized_updates:
             raise ValueError("No valid fields provided for update")
 
-        return self.repository.update(gene.id, sanitized_updates)
+        gene_db_id = self._require_gene_db_id(gene)
+        return self.repository.update(gene_db_id, sanitized_updates)
 
     def update_gene_locations(
         self,
@@ -213,7 +224,7 @@ class GeneService(BaseService[GeneModel]):
         chromosome: Optional[str] = None,
         start_position: Optional[int] = None,
         end_position: Optional[int] = None,
-    ) -> GeneModel:
+    ) -> Gene:
         """
         Update gene genomic location information.
 
@@ -235,7 +246,7 @@ class GeneService(BaseService[GeneModel]):
             if end_position < start_position:
                 raise ValueError("End position must be greater than start position")
 
-        updates: Dict[str, Any] = {}
+        updates: Dict[str, object] = {}
         if chromosome is not None:
             updates["chromosome"] = chromosome
         if start_position is not None:
@@ -251,31 +262,20 @@ class GeneService(BaseService[GeneModel]):
     def delete_gene(self, gene_id: str) -> None:
         """Delete a gene by its gene identifier."""
         gene = self.gene_repo.find_by_gene_id_or_fail(gene_id)
-        self.repository.delete(gene.id)
+        gene_db_id = self._require_gene_db_id(gene)
+        self.repository.delete(gene_db_id)
 
-    def get_gene_variants(self, gene_id: str) -> List[Dict[str, Any]]:
+    def get_gene_variants(self, gene_id: str) -> List[VariantSummary]:
         """Return serialized variants associated with a gene."""
         gene = self.gene_repo.find_by_gene_id(gene_id)
         if gene is None:
             return []
 
-        variants = self.variant_repo.find_by_gene(gene.id)
-        serialized: List[Dict[str, Any]] = []
-        for variant in variants:
-            serialized.append(
-                {
-                    "variant_id": variant.variant_id,
-                    "clinvar_id": variant.clinvar_id,
-                    "chromosome": variant.chromosome,
-                    "position": variant.position,
-                    "clinical_significance": getattr(
-                        variant, "clinical_significance", None
-                    ),
-                }
-            )
-        return serialized
+        gene_db_id = self._require_gene_db_id(gene)
+        variant_models = self.variant_repo.find_by_gene(gene_db_id)
+        return [self._build_variant_summary(variant) for variant in variant_models]
 
-    def get_gene_phenotypes(self, gene_id: str) -> List[Dict[str, Any]]:
+    def get_gene_phenotypes(self, gene_id: str) -> List[Dict[str, str]]:
         """Return related phenotypes for a gene (placeholder implementation)."""
         # Phenotype relationships are not yet modeled; return empty list for now.
         return []
@@ -285,10 +285,13 @@ class GeneService(BaseService[GeneModel]):
         gene = self.gene_repo.find_by_gene_id(gene_id)
         if gene is None:
             return False
-        variants = self.variant_repo.find_by_gene(gene.id, limit=1)
+        gene_db_id = self._require_gene_db_id(gene)
+        variants = self.variant_repo.find_by_gene(gene_db_id, limit=1)
         return bool(variants)
 
-    def get_gene_statistics(self, gene_id: Optional[str] = None) -> Dict[str, Any]:
+    def get_gene_statistics(
+        self, gene_id: Optional[str] = None
+    ) -> Dict[str, StatisticsValue]:
         """
         Get comprehensive statistics about genes.
 
@@ -297,7 +300,8 @@ class GeneService(BaseService[GeneModel]):
         """
         if gene_id:
             gene = self.gene_repo.find_by_gene_id_or_fail(gene_id)
-            variants = self.variant_repo.find_by_gene(gene.id)
+            gene_db_id = self._require_gene_db_id(gene)
+            variants = self.variant_repo.find_by_gene(gene_db_id)
             return {
                 "gene_id": gene.gene_id,
                 "symbol": gene.symbol,
@@ -305,10 +309,16 @@ class GeneService(BaseService[GeneModel]):
                 "has_location": gene.chromosome is not None,
             }
 
-        stats = self.gene_repo.get_gene_statistics()
+        stats_raw: Dict[str, object] = self.gene_repo.get_gene_statistics()
+        stats: Dict[str, StatisticsValue] = {}
+        for key, value in stats_raw.items():
+            if isinstance(value, (int, float, bool, str, datetime)) or value is None:
+                stats[key] = value
+
+        total_genes = self._coerce_int(stats_raw.get("total_genes"))
+        stats["total_genes"] = total_genes
 
         # Add additional computed statistics
-        total_genes = stats["total_genes"]
         if total_genes > 0:
             # Calculate additional metrics
             genes_with_location = len(
@@ -319,7 +329,7 @@ class GeneService(BaseService[GeneModel]):
                 ]
             )
             stats["genes_with_location"] = genes_with_location
-            stats["location_coverage"] = genes_with_location / total_genes
+            stats["location_coverage"] = genes_with_location / float(total_genes)
 
         return stats
 
@@ -335,7 +345,7 @@ class GeneService(BaseService[GeneModel]):
         """
         return bool(self.repository.exists(gene_id))
 
-    def get_gene_summary(self, gene_id: int) -> Optional[Dict[str, Any]]:
+    def get_gene_summary(self, gene_id: int) -> Optional[Dict[str, StatisticsValue]]:
         """
         Get a summary of gene information including variant counts.
 
@@ -364,3 +374,30 @@ class GeneService(BaseService[GeneModel]):
             "created_at": gene.created_at,
             "updated_at": gene.updated_at,
         }
+
+    def _require_gene_db_id(self, gene: Gene) -> int:
+        if gene.id is None:
+            raise ValueError("Gene is not persisted and lacks a database id")
+        return gene.id
+
+    def _build_variant_summary(self, variant_model: object) -> VariantSummary:
+        return VariantSummary(
+            variant_id=getattr(variant_model, "variant_id"),
+            clinvar_id=getattr(variant_model, "clinvar_id", None),
+            chromosome=getattr(variant_model, "chromosome"),
+            position=getattr(variant_model, "position"),
+            clinical_significance=getattr(variant_model, "clinical_significance", None),
+        )
+
+    @staticmethod
+    def _coerce_int(value: object, default: int = 0) -> int:
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str):
+            try:
+                return int(value)
+            except ValueError:
+                return default
+        return default

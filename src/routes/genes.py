@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from src.database.session import get_session
 from src.services.domain.gene_service import GeneService
+from src.routes.serializers import serialize_gene
 from src.models.api import GeneResponse, GeneCreate, GeneUpdate, PaginatedResponse
 
 router = APIRouter(prefix="/genes", tags=["genes"])
@@ -82,20 +83,22 @@ async def get_gene(
         if not gene:
             raise HTTPException(status_code=404, detail=f"Gene {gene_id} not found")
 
-        # Add computed fields
-        gene_response = GeneResponse.model_validate(gene)
-        gene_data = gene_response.model_dump()
+        variant_summaries = (
+            service.get_gene_variants(gene_id) if include_variants else None
+        )
+        phenotypes = (
+            service.get_gene_phenotypes(gene_id) if include_phenotypes else None
+        )
 
-        if include_variants:
-            variants = service.get_gene_variants(gene_id)
-            gene_data["variants"] = variants
-            gene_data["variant_count"] = len(variants)
+        serialized_gene = serialize_gene(
+            gene,
+            include_variants=include_variants,
+            variants=variant_summaries,
+            include_phenotypes=include_phenotypes,
+            phenotypes=phenotypes,
+        )
 
-        if include_phenotypes:
-            phenotypes = service.get_gene_phenotypes(gene_id)
-            gene_data["phenotypes"] = phenotypes
-
-        return GeneResponse(**gene_data)
+        return GeneResponse.model_validate(serialized_gene)
 
     except HTTPException:
         raise

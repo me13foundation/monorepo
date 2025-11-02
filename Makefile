@@ -47,7 +47,7 @@ define check_venv
 	fi
 endef
 
-.PHONY: help venv install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all ci check-env docs-serve backup-db restore-db activate deactivate
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all ci check-env docs-serve backup-db restore-db activate deactivate
 
 # Default target
 help: ## Show this help message
@@ -243,7 +243,20 @@ clean-all: clean ## Clean everything including build artifacts
 	rm -rf pip-audit-results.json
 
 # Quality Assurance
-all: check-env format lint type-check test security-audit ## Run complete quality assurance suite (pre-commit checklist)
+venv-check: ## Ensure virtual environment is active
+	@if [ "$(VENV_ACTIVE)" = "false" ]; then \
+		echo "❌ Virtual environment is not active!"; \
+		echo ""; \
+		echo "To activate the virtual environment:"; \
+		echo "  source $(VENV)/bin/activate"; \
+		echo ""; \
+		echo "Or use the convenience command:"; \
+		echo "  make activate"; \
+		echo ""; \
+		exit 1; \
+	fi
+
+all: venv-check check-env format lint type-check test security-audit ## Run complete quality assurance suite (pre-commit checklist)
 
 # CI/CD Simulation
 ci: install-dev lint test security-audit ## Run full CI pipeline locally

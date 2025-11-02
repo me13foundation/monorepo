@@ -9,11 +9,14 @@ from typing import Dict, Any
 from datetime import datetime, timedelta
 
 from src.database.session import get_session
-from src.repositories.gene_repository import GeneRepository
-from src.repositories.variant_repository import VariantRepository
-from src.repositories.phenotype_repository import PhenotypeRepository
-from src.repositories.evidence_repository import EvidenceRepository
-from src.repositories.publication_repository import PublicationRepository
+from src.infrastructure.repositories import (
+    SqlAlchemyGeneRepository,
+    SqlAlchemyVariantRepository,
+    SqlAlchemyPhenotypeRepository,
+    SqlAlchemyEvidenceRepository,
+    SqlAlchemyPublicationRepository,
+)
+from src.routes.serializers import build_activity_feed_item, build_dashboard_summary
 
 router = APIRouter(prefix="/stats", tags=["dashboard"])
 
@@ -26,45 +29,18 @@ async def get_dashboard_stats(db: Session = Depends(get_session)) -> Dict[str, A
     Returns counts for pending, approved, and rejected items across all entities.
     """
     try:
-        gene_repo = GeneRepository(db)
-        variant_repo = VariantRepository(db)
-        phenotype_repo = PhenotypeRepository(db)
-        evidence_repo = EvidenceRepository(db)
-        publication_repo = PublicationRepository(db)
+        gene_repo = SqlAlchemyGeneRepository(db)
+        variant_repo = SqlAlchemyVariantRepository(db)
+        phenotype_repo = SqlAlchemyPhenotypeRepository(db)
+        evidence_repo = SqlAlchemyEvidenceRepository(db)
+        publication_repo = SqlAlchemyPublicationRepository(db)
 
-        # Get counts for each entity type
-        # Handle database errors gracefully (tables may not exist yet)
-        try:
-            gene_count = gene_repo.count() or 0
-        except Exception:
-            gene_count = 0
-
-        try:
-            variant_count = variant_repo.count() or 0
-        except Exception:
-            variant_count = 0
-
-        try:
-            phenotype_count = phenotype_repo.count() or 0
-        except Exception:
-            phenotype_count = 0
-
-        try:
-            evidence_count = evidence_repo.count() or 0
-        except Exception:
-            evidence_count = 0
-
-        try:
-            publication_count = publication_repo.count() or 0
-        except Exception:
-            publication_count = 0
-
-        # Ensure all counts are integers
-        gene_count = int(gene_count)
-        variant_count = int(variant_count)
-        phenotype_count = int(phenotype_count)
-        evidence_count = int(evidence_count)
-        publication_count = int(publication_count)
+        # Get counts for each entity type using the shared adapters
+        gene_count = gene_repo.count()
+        variant_count = variant_repo.count()
+        phenotype_count = phenotype_repo.count()
+        evidence_count = evidence_repo.count()
+        publication_count = publication_repo.count()
 
         # For now, we'll use a simple heuristic:
         # - Pending: recently added items (last 7 days) or items needing review
@@ -93,19 +69,20 @@ async def get_dashboard_stats(db: Session = Depends(get_session)) -> Dict[str, A
             pending_count = 145
             rejected_count = 67
 
-        return {
-            "pending_count": pending_count,
-            "approved_count": approved_count,
-            "rejected_count": rejected_count,
-            "total_items": total_items,
-            "entity_counts": {
-                "genes": gene_count,
-                "variants": variant_count,
-                "phenotypes": phenotype_count,
-                "evidence": evidence_count,
-                "publications": publication_count,
-            },
+        entity_counts = {
+            "genes": gene_count,
+            "variants": variant_count,
+            "phenotypes": phenotype_count,
+            "evidence": evidence_count,
+            "publications": publication_count,
         }
+
+        return build_dashboard_summary(
+            entity_counts,
+            pending_count=pending_count,
+            approved_count=approved_count,
+            rejected_count=rejected_count,
+        )
 
     except Exception as e:
         raise HTTPException(
@@ -126,37 +103,38 @@ async def get_recent_activities(
         # For now, return mock activities since we don't have an activity log yet
         # TODO: Implement activity tracking when audit log is added
 
+        now = datetime.now()
         activities = [
-            {
-                "message": "Gene BRCA1 validated",
-                "type": "success",
-                "timestamp": "2 minutes ago",
-                "created_at": (datetime.now() - timedelta(minutes=2)).isoformat(),
-            },
-            {
-                "message": "Variant rs123456 quarantined",
-                "type": "warning",
-                "timestamp": "5 minutes ago",
-                "created_at": (datetime.now() - timedelta(minutes=5)).isoformat(),
-            },
-            {
-                "message": "Publication PMID:12345 approved",
-                "type": "info",
-                "timestamp": "10 minutes ago",
-                "created_at": (datetime.now() - timedelta(minutes=10)).isoformat(),
-            },
-            {
-                "message": "Phenotype HPO:0000001 validated",
-                "type": "success",
-                "timestamp": "15 minutes ago",
-                "created_at": (datetime.now() - timedelta(minutes=15)).isoformat(),
-            },
-            {
-                "message": "Evidence record rejected",
-                "type": "danger",
-                "timestamp": "20 minutes ago",
-                "created_at": (datetime.now() - timedelta(minutes=20)).isoformat(),
-            },
+            build_activity_feed_item(
+                "Gene BRCA1 validated",
+                category="success",
+                icon="mdi:check-circle",
+                timestamp=now - timedelta(minutes=2),
+            ),
+            build_activity_feed_item(
+                "Variant rs123456 quarantined",
+                category="warning",
+                icon="mdi:alert",
+                timestamp=now - timedelta(minutes=5),
+            ),
+            build_activity_feed_item(
+                "Publication PMID:12345 approved",
+                category="info",
+                icon="mdi:file-document",
+                timestamp=now - timedelta(minutes=10),
+            ),
+            build_activity_feed_item(
+                "Phenotype HPO:0000001 validated",
+                category="success",
+                icon="mdi:clipboard-check",
+                timestamp=now - timedelta(minutes=15),
+            ),
+            build_activity_feed_item(
+                "Evidence record rejected",
+                category="danger",
+                icon="mdi:close-circle",
+                timestamp=now - timedelta(minutes=20),
+            ),
         ]
 
         return {

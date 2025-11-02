@@ -3,15 +3,20 @@ Publication service for MED13 Resource Library.
 Business logic for scientific publication operations.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
-from src.repositories import PublicationRepository, EvidenceRepository
-from src.models.database import PublicationModel
+from src.domain.entities.publication import Publication
+from src.infrastructure.repositories import (
+    SqlAlchemyPublicationRepository,
+    SqlAlchemyEvidenceRepository,
+)
 from src.services.domain.base_service import BaseService
 
+PublicationStatisticsValue = int | float | bool | str | None
 
-class PublicationService(BaseService[PublicationModel]):
+
+class PublicationService(BaseService[Publication]):
     """
     Service for publication business logic and operations.
 
@@ -19,18 +24,26 @@ class PublicationService(BaseService[PublicationModel]):
     citation analysis and relevance assessment.
     """
 
-    def __init__(self, session: Optional[Session] = None):
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        publication_repository: Optional[SqlAlchemyPublicationRepository] = None,
+    ):
         super().__init__(session)
-        self.publication_repo = PublicationRepository(session)
-        self.evidence_repo = EvidenceRepository(session)
+        self.publication_repo = (
+            publication_repository
+            if publication_repository
+            else SqlAlchemyPublicationRepository(session)
+        )
+        self.evidence_repo = SqlAlchemyEvidenceRepository(session)
 
     @property
-    def repository(self) -> PublicationRepository:
+    def repository(self) -> SqlAlchemyPublicationRepository:
         return self.publication_repo
 
     def find_med13_relevant_publications(
         self, min_relevance: int = 3, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+    ) -> List[Publication]:
         """
         Find publications relevant to MED13 research.
 
@@ -39,13 +52,11 @@ class PublicationService(BaseService[PublicationModel]):
             limit: Maximum number of publications to return
 
         Returns:
-            List of MED13-relevant PublicationModel instances
+            List of MED13-relevant Publication entities
         """
         return self.publication_repo.find_med13_relevant(min_relevance, limit)
 
-    def search_publications(
-        self, query: str, limit: int = 20
-    ) -> List[PublicationModel]:
+    def search_publications(self, query: str, limit: int = 20) -> List[Publication]:
         """
         Search publications by title, authors, or abstract.
 
@@ -54,13 +65,13 @@ class PublicationService(BaseService[PublicationModel]):
             limit: Maximum number of results
 
         Returns:
-            List of matching PublicationModel instances
+            List of matching Publication entities
         """
         return self.publication_repo.search_publications(query, limit)
 
     def get_publication_with_evidence(
         self, publication_id: int
-    ) -> Optional[PublicationModel]:
+    ) -> Optional[Publication]:
         """
         Get a publication with its associated evidence loaded.
 
@@ -68,11 +79,21 @@ class PublicationService(BaseService[PublicationModel]):
             publication_id: Publication ID to retrieve
 
         Returns:
-            PublicationModel with evidence relationship loaded
+            Publication with evidence relationship loaded
         """
         publication = self.publication_repo.get_by_id(publication_id)
         if publication:
-            publication.evidence = self.evidence_repo.find_by_publication(
-                publication_id
-            )
+            evidence = self.evidence_repo.find_by_publication(publication_id)
+            for record in evidence:
+                publication.add_evidence(record)
         return publication
+
+    def get_publication_statistics(self) -> Dict[str, PublicationStatisticsValue]:
+        raw_stats: Dict[
+            str, object
+        ] = self.publication_repo.get_publication_statistics()
+        stats: Dict[str, PublicationStatisticsValue] = {}
+        for key, value in raw_stats.items():
+            if isinstance(value, (int, float, bool, str)) or value is None:
+                stats[key] = value
+        return stats

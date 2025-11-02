@@ -3,15 +3,17 @@ Evidence service for MED13 Resource Library.
 Business logic for evidence linking variants and phenotypes.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
-from src.repositories import EvidenceRepository
-from src.models.database import EvidenceModel
+from src.domain.entities.evidence import Evidence
+from src.infrastructure.repositories import SqlAlchemyEvidenceRepository
 from src.services.domain.base_service import BaseService
 
+EvidenceStatisticsValue = int | float | bool | str | None
 
-class EvidenceService(BaseService[EvidenceModel]):
+
+class EvidenceService(BaseService[Evidence]):
     """
     Service for evidence business logic and operations.
 
@@ -19,17 +21,25 @@ class EvidenceService(BaseService[EvidenceModel]):
     confidence assessment and relationship validation.
     """
 
-    def __init__(self, session: Optional[Session] = None):
+    def __init__(
+        self,
+        session: Optional[Session] = None,
+        evidence_repository: Optional[SqlAlchemyEvidenceRepository] = None,
+    ):
         super().__init__(session)
-        self.evidence_repo = EvidenceRepository(session)
+        self.evidence_repo = (
+            evidence_repository
+            if evidence_repository
+            else SqlAlchemyEvidenceRepository(session)
+        )
 
     @property
-    def repository(self) -> EvidenceRepository:
+    def repository(self) -> SqlAlchemyEvidenceRepository:
         return self.evidence_repo
 
     def find_high_confidence_evidence(
         self, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+    ) -> List[Evidence]:
         """
         Find evidence with high confidence levels.
 
@@ -37,13 +47,13 @@ class EvidenceService(BaseService[EvidenceModel]):
             limit: Maximum number of evidence records to return
 
         Returns:
-            List of high-confidence EvidenceModel instances
+            List of high-confidence Evidence entities
         """
         return self.evidence_repo.find_high_confidence_evidence(limit)
 
     def find_relationship_evidence(
         self, variant_id: int, phenotype_id: int, min_confidence: float = 0.5
-    ) -> List[EvidenceModel]:
+    ) -> List[Evidence]:
         """
         Find evidence supporting the relationship between a variant and phenotype.
 
@@ -53,17 +63,22 @@ class EvidenceService(BaseService[EvidenceModel]):
             min_confidence: Minimum confidence score
 
         Returns:
-            List of EvidenceModel instances supporting the relationship
+            List of Evidence entities supporting the relationship
         """
         return self.evidence_repo.find_relationship_evidence(
             variant_id, phenotype_id, min_confidence
         )
 
-    def get_evidence_statistics(self) -> Dict[str, Any]:
+    def get_evidence_statistics(self) -> Dict[str, EvidenceStatisticsValue]:
         """
         Get comprehensive statistics about evidence.
 
         Returns:
             Dictionary with evidence statistics
         """
-        return self.evidence_repo.get_evidence_statistics()
+        raw_stats: Dict[str, object] = self.evidence_repo.get_evidence_statistics()
+        stats: Dict[str, EvidenceStatisticsValue] = {}
+        for key, value in raw_stats.items():
+            if isinstance(value, (int, float, bool, str)) or value is None:
+                stats[key] = value
+        return stats
