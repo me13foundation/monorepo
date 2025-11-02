@@ -5,6 +5,7 @@ Dash application for data curation and review workflows.
 
 import dash
 from dash import html, dcc, Input, Output, State
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from typing import Dict, Optional
 import requests
@@ -1580,19 +1581,17 @@ def update_review_table(
         return []
 
 
-# Callback for charts
+# Callback for dashboard page charts (always visible)
 @app.callback(
     [
         Output("quality-chart", "figure"),
         Output("entity-distribution-chart", "figure"),
         Output("validation-status-chart", "figure"),
-        Output("quality-trends-chart", "figure"),
-        Output("error-distribution-chart", "figure"),
     ],
     Input("interval-component", "n_intervals"),
 )
-def update_charts(n):
-    """Update all dashboard charts."""
+def update_dashboard_charts(n):
+    """Update dashboard page charts."""
     try:
         # Quality overview chart
         quality_fig = {
@@ -1656,6 +1655,31 @@ def update_charts(n):
             "layout": {"title": "Validation Status"},
         }
 
+        return quality_fig, entity_fig, validation_fig
+
+    except Exception as e:
+        logger.error(f"Error updating dashboard charts: {e}")
+        # Return empty figures on error
+        empty_fig = {"data": [], "layout": {}}
+        return empty_fig, empty_fig, empty_fig
+
+
+# Callback for reports page charts (only on reports page)
+@app.callback(
+    [
+        Output("quality-trends-chart", "figure", allow_duplicate=True),
+        Output("error-distribution-chart", "figure", allow_duplicate=True),
+    ],
+    [Input("interval-component", "n_intervals"), Input("url", "pathname")],
+    prevent_initial_call=False,
+)
+def update_reports_charts(n, pathname):
+    """Update reports page charts."""
+    # Only update if we're on the reports page
+    if pathname != "/reports":
+        raise PreventUpdate
+
+    try:
         # Quality trends chart
         trends_fig = {
             "data": [
@@ -1689,13 +1713,13 @@ def update_charts(n):
             "layout": {"title": "Error Distribution by Type"},
         }
 
-        return quality_fig, entity_fig, validation_fig, trends_fig, error_fig
+        return trends_fig, error_fig
 
     except Exception as e:
-        logger.error(f"Error updating charts: {e}")
+        logger.error(f"Error updating reports charts: {e}")
         # Return empty figures on error
         empty_fig = {"data": [], "layout": {}}
-        return empty_fig, empty_fig, empty_fig, empty_fig, empty_fig
+        return empty_fig, empty_fig
 
 
 # Callback for bulk operations
