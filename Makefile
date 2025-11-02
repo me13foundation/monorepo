@@ -148,7 +148,7 @@ security-audit: ## Run comprehensive security audit (pip-audit, safety, bandit)
 	pip-audit --format json | tee pip-audit-results.json || true
 	@echo "Running safety..."
 	$(USE_PIP) install safety --quiet || true
-	safety scan --output json | tee safety-results.json || true
+	safety check --output json | tee safety-results.json || true
 	@echo "Running bandit..."
 	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || true
 

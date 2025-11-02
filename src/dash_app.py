@@ -55,7 +55,7 @@ logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 # Import dash_table - must be after dash import for proper registration
 try:
-    from dash import dash_table  # type: ignore
+    from dash import dash_table
 
     DASH_TABLE_AVAILABLE = True
 except ImportError:
