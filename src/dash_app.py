@@ -1671,7 +1671,7 @@ def update_dashboard_charts(n):
         Output("error-distribution-chart", "figure", allow_duplicate=True),
     ],
     [Input("interval-component", "n_intervals"), Input("url", "pathname")],
-    prevent_initial_call=False,
+    prevent_initial_call="initial_duplicate",
 )
 def update_reports_charts(n, pathname):
     """Update reports page charts."""
