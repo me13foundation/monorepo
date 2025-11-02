@@ -2,21 +2,21 @@
 # Install with: pip install -r requirements-dev.txt
 
 # Testing
-pytest>=7.0.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.0.0
-pytest-xdist>=3.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=5.0.0
+pytest-xdist>=3.6.0
 
 # Code Quality & Linting
-black>=23.0.0
-flake8>=6.0.0
-mypy>=1.7.0
-pre-commit>=3.0.0
+black>=24.0.0
+flake8>=7.0.0
+mypy>=1.8.0
+pre-commit>=3.7.0
 ruff>=0.1.0
 
 # Security Scanning
-bandit>=1.7.0
-safety>=2.3.0
+bandit>=1.8.0
+safety>=3.0.0
 
 # Development Tools
 watchdog>=3.0.0
