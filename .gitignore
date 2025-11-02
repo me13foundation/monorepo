@@ -166,3 +166,4 @@ logs/
 
 # Raw API data (generated during testing)
 data/raw/
+data/transformed/
