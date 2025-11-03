@@ -23,7 +23,14 @@ def create_dashboard_page() -> dbc.Container:
                                                         "Data Quality Overview"
                                                     ),
                                                     dbc.CardBody(
-                                                        [dcc.Graph(id="quality-chart")]
+                                                        [
+                                                            dcc.Graph(
+                                                                id="quality-chart",
+                                                                config={
+                                                                    "displayModeBar": False
+                                                                },
+                                                            )
+                                                        ]
                                                     ),
                                                 ]
                                             )
@@ -66,7 +73,10 @@ def create_dashboard_page() -> dbc.Container:
                                                     dbc.CardBody(
                                                         [
                                                             dcc.Graph(
-                                                                id="entity-distribution-chart"
+                                                                id="entity-distribution-chart",
+                                                                config={
+                                                                    "displayModeBar": False
+                                                                },
                                                             )
                                                         ]
                                                     ),
@@ -83,7 +93,10 @@ def create_dashboard_page() -> dbc.Container:
                                                     dbc.CardBody(
                                                         [
                                                             dcc.Graph(
-                                                                id="validation-status-chart"
+                                                                id="validation-status-chart",
+                                                                config={
+                                                                    "displayModeBar": False
+                                                                },
                                                             )
                                                         ]
                                                     ),

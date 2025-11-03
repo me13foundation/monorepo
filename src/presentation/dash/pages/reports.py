@@ -129,7 +129,10 @@ def create_reports_page() -> dbc.Container:
                                                     dbc.Tab(
                                                         [
                                                             dcc.Graph(
-                                                                id="quality-trends-chart"
+                                                                id="quality-trends-chart",
+                                                                config={
+                                                                    "displayModeBar": False
+                                                                },
                                                             )
                                                         ],
                                                         label="Quality Trends",
@@ -138,7 +141,10 @@ def create_reports_page() -> dbc.Container:
                                                     dbc.Tab(
                                                         [
                                                             dcc.Graph(
-                                                                id="error-distribution-chart"
+                                                                id="error-distribution-chart",
+                                                                config={
+                                                                    "displayModeBar": False
+                                                                },
                                                             )
                                                         ],
                                                         label="Error Distribution",

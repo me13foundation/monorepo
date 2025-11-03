@@ -260,7 +260,9 @@ def create_progress_timeline_chart() -> dbc.Card:
         showlegend=True,
     )
 
-    return dbc.Card([dbc.CardBody([dcc.Graph(figure=fig)])])
+    return dbc.Card(
+        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])]
+    )
 
 
 def create_conflict_heatmap() -> dbc.Card:
@@ -298,7 +300,9 @@ def create_conflict_heatmap() -> dbc.Card:
         margin=dict(l=20, r=20, t=40, b=20),
     )
 
-    return dbc.Card([dbc.CardBody([dcc.Graph(figure=fig)])])
+    return dbc.Card(
+        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])]
+    )
 
 
 def create_curator_performance_table() -> dbc.Card:
@@ -432,7 +436,9 @@ def create_variant_category_breakdown() -> dbc.Card:
         showlegend=False,
     )
 
-    return dbc.Card([dbc.CardBody([dcc.Graph(figure=fig)])])
+    return dbc.Card(
+        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])]
+    )
 
 
 def create_recent_activity_feed() -> dbc.Card:

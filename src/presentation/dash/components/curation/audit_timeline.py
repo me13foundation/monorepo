@@ -345,7 +345,7 @@ def _create_event_actions(event: Dict[str, Any], index: int) -> html.Div:
 def create_graph_view(audit_events: List[Dict[str, Any]]) -> dcc.Graph:
     """Create a graph view of audit events over time."""
     if not audit_events:
-        return dcc.Graph()
+        return dcc.Graph(config={"displayModeBar": False})
 
     # Group events by date and type
     events_by_date: Dict[str, Dict[str, int]] = {}
@@ -393,7 +393,7 @@ def create_graph_view(audit_events: List[Dict[str, Any]]) -> dcc.Graph:
         margin=dict(l=20, r=20, t=40, b=20),
     )
 
-    return dcc.Graph(figure=fig)
+    return dcc.Graph(figure=fig, config={"displayModeBar": False})
 
 
 def create_table_view(audit_events: List[Dict[str, Any]]) -> dbc.Table:
