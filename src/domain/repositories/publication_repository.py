@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .base import Repository
 from ..entities.publication import Publication
+from ...types.common import PublicationUpdate
 
 
 class PublicationRepository(Repository[Publication, int]):
@@ -85,6 +86,13 @@ class PublicationRepository(Repository[Publication, int]):
     @abstractmethod
     def find_recent_publications(self, days: int = 30) -> List[Publication]:
         """Find publications from the last N days."""
+        pass
+
+    @abstractmethod
+    def update_publication(
+        self, publication_id: int, updates: PublicationUpdate
+    ) -> Publication:
+        """Update a publication with type-safe update parameters."""
         pass
 
 

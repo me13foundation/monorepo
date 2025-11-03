@@ -9,6 +9,7 @@ from src.domain.repositories.phenotype_repository import (
     PhenotypeRepository as PhenotypeRepositoryInterface,
 )
 from src.domain.repositories.base import QuerySpecification
+from src.types.common import PhenotypeUpdate
 from src.infrastructure.mappers.phenotype_mapper import PhenotypeMapper
 from src.models.database import PhenotypeCategory as DbPhenotypeCategory
 from src.repositories.phenotype_repository import PhenotypeRepository
@@ -131,6 +132,15 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
 
     def update(self, phenotype_id: int, updates: Dict[str, Any]) -> Phenotype:
         model = self._repository.update(phenotype_id, updates)
+        return PhenotypeMapper.to_domain(model)
+
+    def update_phenotype(
+        self, phenotype_id: int, updates: PhenotypeUpdate
+    ) -> Phenotype:
+        """Update a phenotype with type-safe update parameters."""
+        # Convert TypedDict to Dict[str, Any] for the underlying repository
+        updates_dict = dict(updates)
+        model = self._repository.update(phenotype_id, updates_dict)
         return PhenotypeMapper.to_domain(model)
 
 

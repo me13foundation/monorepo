@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .base import Repository
 from ..entities.evidence import Evidence
+from ...types.common import EvidenceUpdate
 
 
 class EvidenceRepository(Repository[Evidence, int]):
@@ -82,6 +83,11 @@ class EvidenceRepository(Repository[Evidence, int]):
     @abstractmethod
     def find_conflicting_evidence(self, variant_id: int) -> List[Evidence]:
         """Find conflicting evidence records for a variant."""
+        pass
+
+    @abstractmethod
+    def update_evidence(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
+        """Update evidence with type-safe update parameters."""
         pass
 
 

@@ -9,6 +9,7 @@ from src.domain.repositories.publication_repository import (
     PublicationRepository as PublicationRepositoryInterface,
 )
 from src.domain.repositories.base import QuerySpecification
+from src.types.common import PublicationUpdate
 from src.infrastructure.mappers.publication_mapper import PublicationMapper
 from src.models.database import PublicationType as DbPublicationType
 from src.repositories.publication_repository import PublicationRepository
@@ -160,6 +161,15 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
 
     def update(self, publication_id: int, updates: Dict[str, Any]) -> Publication:
         model = self._repository.update(publication_id, updates)
+        return PublicationMapper.to_domain(model)
+
+    def update_publication(
+        self, publication_id: int, updates: PublicationUpdate
+    ) -> Publication:
+        """Update a publication with type-safe update parameters."""
+        # Convert TypedDict to Dict[str, Any] for the underlying repository
+        updates_dict = dict(updates)
+        model = self._repository.update(publication_id, updates_dict)
         return PublicationMapper.to_domain(model)
 
     def find_recent_publications(self, days: int = 30) -> List[Publication]:

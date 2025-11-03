@@ -11,6 +11,7 @@ from typing import List, Optional, Tuple
 from .base import Repository
 from ..entities.gene import Gene
 from ..value_objects.identifiers import GeneIdentifier
+from ...types.common import GeneUpdate
 
 
 class GeneRepository(Repository[Gene, int]):
@@ -76,6 +77,11 @@ class GeneRepository(Repository[Gene, int]):
     @abstractmethod
     def get_gene_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about genes in the repository."""
+        pass
+
+    @abstractmethod
+    def update_gene(self, gene_id: int, updates: GeneUpdate) -> Gene:
+        """Update a gene with type-safe update parameters."""
         pass
 
 

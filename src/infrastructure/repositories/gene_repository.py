@@ -10,6 +10,7 @@ from src.domain.repositories.gene_repository import (
 )
 from src.domain.repositories.base import QuerySpecification
 from src.domain.value_objects.identifiers import GeneIdentifier
+from src.types.common import GeneUpdate
 from src.infrastructure.mappers.gene_mapper import GeneMapper
 from src.repositories.gene_repository import GeneRepository
 
@@ -130,6 +131,13 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         """Find a gene with its associated variants loaded."""
         model = self._repository.find_with_variants(gene_id)
         return GeneMapper.to_domain(model) if model else None
+
+    def update_gene(self, gene_id: int, updates: GeneUpdate) -> Gene:
+        """Update a gene with type-safe update parameters."""
+        # Convert TypedDict to Dict[str, Any] for the underlying repository
+        updates_dict = dict(updates)
+        model = self._repository.update(gene_id, updates_dict)
+        return GeneMapper.to_domain(model)
 
 
 __all__ = ["SqlAlchemyGeneRepository"]

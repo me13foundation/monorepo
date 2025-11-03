@@ -9,6 +9,7 @@ from src.domain.repositories.evidence_repository import (
     EvidenceRepository as EvidenceRepositoryInterface,
 )
 from src.domain.repositories.base import QuerySpecification
+from src.types.common import EvidenceUpdate
 from src.domain.value_objects.confidence import EvidenceLevel
 from src.infrastructure.mappers.evidence_mapper import EvidenceMapper
 from src.models.database.evidence import (
@@ -169,6 +170,13 @@ class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
 
     def update(self, evidence_id: int, updates: Dict[str, Any]) -> Evidence:
         model = self._repository.update(evidence_id, updates)
+        return EvidenceMapper.to_domain(model)
+
+    def update_evidence(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
+        """Update evidence with type-safe update parameters."""
+        # Convert TypedDict to Dict[str, Any] for the underlying repository
+        updates_dict = dict(updates)
+        model = self._repository.update(evidence_id, updates_dict)
         return EvidenceMapper.to_domain(model)
 
     def count(self) -> int:

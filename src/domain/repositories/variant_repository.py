@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from .base import Repository
 from ..entities.variant import Variant, VariantSummary
+from ...types.common import VariantUpdate
 
 
 class VariantRepository(Repository[Variant, int]):
@@ -84,6 +85,11 @@ class VariantRepository(Repository[Variant, int]):
     @abstractmethod
     def find_by_gene_symbol(self, gene_symbol: str) -> List[Variant]:
         """Find variants associated with a gene symbol."""
+        pass
+
+    @abstractmethod
+    def update_variant(self, variant_id: int, updates: VariantUpdate) -> Variant:
+        """Update a variant with type-safe update parameters."""
         pass
 
 

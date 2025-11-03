@@ -12,6 +12,7 @@ from src.domain.entities.variant import (
 from src.domain.repositories.variant_repository import (
     VariantRepository as VariantRepositoryInterface,
 )
+from src.types.common import VariantUpdate
 from src.domain.repositories.base import QuerySpecification
 from src.infrastructure.mappers.variant_mapper import VariantMapper
 from src.repositories.variant_repository import VariantRepository
@@ -157,6 +158,13 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         # Simplified implementation
         models = self._repository.find_all(limit=limit)
         return VariantMapper.to_domain_sequence(models)
+
+    def update_variant(self, variant_id: int, updates: VariantUpdate) -> Variant:
+        """Update a variant with type-safe update parameters."""
+        # Convert TypedDict to Dict[str, Any] for the underlying repository
+        updates_dict = dict(updates)
+        model = self._repository.update(variant_id, updates_dict)
+        return VariantMapper.to_domain(model)
 
 
 __all__ = ["SqlAlchemyVariantRepository"]

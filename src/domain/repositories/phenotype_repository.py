@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .base import Repository
 from ..entities.phenotype import Phenotype
+from ...types.common import PhenotypeUpdate
 
 
 class PhenotypeRepository(Repository[Phenotype, int]):
@@ -75,6 +76,13 @@ class PhenotypeRepository(Repository[Phenotype, int]):
     @abstractmethod
     def find_by_ontology_term(self, term_id: str) -> Optional[Phenotype]:
         """Find a phenotype by ontology term ID."""
+        pass
+
+    @abstractmethod
+    def update_phenotype(
+        self, phenotype_id: int, updates: PhenotypeUpdate
+    ) -> Phenotype:
+        """Update a phenotype with type-safe update parameters."""
         pass
 
 

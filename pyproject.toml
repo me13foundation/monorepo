@@ -80,6 +80,11 @@ warn_unreachable = true
 strict_equality = true
 show_error_codes = true
 
+# Stricter Any usage controls (Phase 1)
+disallow_any_generics = true
+disallow_any_unimported = true
+disallow_any_expr = false  # Gradual adoption for expressions
+
 # Module-specific settings
 [[tool.mypy.overrides]]
 module = [
@@ -92,6 +97,15 @@ module = [
     "dash_table.*",
 ]
 ignore_missing_imports = true
+
+# Dash UI components - exclude from strict Any checks
+[[tool.mypy.overrides]]
+module = [
+    "src.presentation.dash.*",
+    "src.dash_app",
+]
+disallow_any_generics = false
+disallow_any_unimported = false
 
 [tool.flake8]
 max-line-length = 88
