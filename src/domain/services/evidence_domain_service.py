@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .base import DomainService
 from ..entities.evidence import Evidence
 from ..value_objects.confidence import Confidence, EvidenceLevel
+from ...types.domain import EvidenceDerivedProperties
 
 
 class EvidenceDomainService(DomainService):
@@ -87,18 +88,68 @@ class EvidenceDomainService(DomainService):
         Returns:
             Dictionary of derived properties
         """
-        derived: Dict[str, Any] = {}
+        # Determine confidence category
+        confidence_score = entity.confidence.score
+        if confidence_score >= 0.8:
+            confidence_category = "high"
+        elif confidence_score >= 0.6:
+            confidence_category = "medium"
+        else:
+            confidence_category = "low"
 
-        # Calculate evidence strength score
-        derived["strength_score"] = self._calculate_evidence_strength(entity)
+        # Determine evidence strength based on level
+        evidence_level = entity.evidence_level
+        if evidence_level == EvidenceLevel.DEFINITIVE:
+            evidence_strength = "definitive"
+        elif evidence_level == EvidenceLevel.STRONG:
+            evidence_strength = "strong"
+        elif evidence_level == EvidenceLevel.MODERATE:
+            evidence_strength = "moderate"
+        else:
+            evidence_strength = "supporting"
 
-        # Determine evidence quality tier
-        derived["quality_tier"] = self._determine_quality_tier(entity)
+        # Check for publication reference (simplified - would need relationship)
+        has_publication = False
 
-        # Check if evidence is recent
-        derived["is_recent"] = self._is_recent_evidence(entity)
+        # Check for functional data based on evidence type
+        has_functional_data = entity.evidence_type in [
+            "functional_study",
+            "biochemical",
+            "animal_model",
+        ]
 
-        return derived
+        # Calculate data completeness score
+        required_fields = [
+            entity.variant_id,
+            entity.phenotype_id,
+            entity.evidence_level,
+        ]
+        optional_fields = [entity.description]
+        required_present = sum(1 for field in required_fields if field is not None)
+        optional_present = sum(1 for field in optional_fields if field is not None)
+        data_completeness_score = (required_present + optional_present * 0.5) / (
+            len(required_fields) + len(optional_fields) * 0.5
+        )
+
+        # Calculate reliability score based on evidence level and confidence
+        reliability_score = confidence_score * (
+            1.0
+            if evidence_level in [EvidenceLevel.DEFINITIVE, EvidenceLevel.STRONG]
+            else 0.8
+        )
+
+        # Create typed result for internal type safety
+        result = EvidenceDerivedProperties(
+            confidence_category=confidence_category,
+            evidence_strength=evidence_strength,
+            has_publication=has_publication,
+            has_functional_data=has_functional_data,
+            data_completeness_score=data_completeness_score,
+            reliability_score=reliability_score,
+        )
+
+        # Return as dict for base class compatibility
+        return result.__dict__
 
     def detect_evidence_conflicts(
         self, evidence_list: List[Evidence]

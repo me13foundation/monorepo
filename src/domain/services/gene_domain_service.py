@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 from .base import DomainService
 from ..entities.gene import Gene, GeneType
 from ..value_objects.identifiers import GeneIdentifier
+from ...types.domain import GeneDerivedProperties
 
 
 class GeneDomainService(DomainService):
@@ -85,16 +86,13 @@ class GeneDomainService(DomainService):
         Returns:
             Dictionary of derived properties
         """
-        derived: Dict[str, Any] = {}
-
         # Calculate genomic size
+        genomic_size = None
         if entity.start_position and entity.end_position:
-            derived["genomic_size"] = entity.end_position - entity.start_position + 1
-        else:
-            derived["genomic_size"] = None
+            genomic_size = entity.end_position - entity.start_position + 1
 
         # Determine if gene has genomic location
-        derived["has_genomic_location"] = (
+        has_genomic_location = (
             entity.chromosome is not None
             and entity.start_position is not None
             and entity.end_position is not None
@@ -102,11 +100,17 @@ class GeneDomainService(DomainService):
 
         # Count external identifiers
         external_ids = [entity.ensembl_id, entity.ncbi_gene_id, entity.uniprot_id]
-        derived["external_id_count"] = len(
-            [id for id in external_ids if id is not None]
+        external_id_count = len([id for id in external_ids if id is not None])
+
+        # Create typed result for internal type safety
+        result = GeneDerivedProperties(
+            genomic_size=genomic_size,
+            has_genomic_location=has_genomic_location,
+            external_id_count=external_id_count,
         )
 
-        return derived
+        # Return as dict for base class compatibility
+        return result.__dict__
 
     def validate_gene_symbol_uniqueness(
         self, symbol: str, existing_symbols: List[str]

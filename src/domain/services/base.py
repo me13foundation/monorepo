@@ -6,7 +6,9 @@ business rules without infrastructure dependencies.
 """
 
 from abc import ABC
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypeVar
+
+T = TypeVar("T")
 
 
 class DomainService(ABC):

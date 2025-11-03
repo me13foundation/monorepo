@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .base import DomainService
 from ..entities.variant import Variant, VariantType
+from ...types.domain import VariantDerivedProperties
 
 
 class VariantDomainService(DomainService):
@@ -96,26 +97,50 @@ class VariantDomainService(DomainService):
         Returns:
             Dictionary of derived properties
         """
-        derived: Dict[str, Any] = {}
+        # Check if variant has population frequency data
+        raw_frequencies = [entity.allele_frequency, entity.gnomad_af]
+        population_frequencies: List[float] = [
+            freq for freq in raw_frequencies if freq is not None
+        ]
+        has_population_data = bool(population_frequencies)
+        population_frequency_count = len(population_frequencies)
 
-        # Determine if variant is rare
-        derived["is_rare"] = self._is_rare_variant(entity)
+        # Calculate average population frequency
+        average_population_frequency = None
+        if has_population_data:
+            average_population_frequency = sum(population_frequencies) / len(
+                population_frequencies
+            )
 
-        # Calculate variant complexity
-        derived["complexity_score"] = self._calculate_complexity_score(entity)
+        # Determine functional impact (simplified - based on variant type)
+        has_functional_impact = entity.variant_type in [
+            "nonsense",
+            "frameshift",
+            "splice_site",
+        ]
 
-        # Determine pathogenicity likelihood
-        derived["pathogenicity_likelihood"] = self._assess_pathogenicity_likelihood(
-            entity
+        # Count evidence
+        evidence_count = len(entity.evidence) if entity.evidence else 0
+
+        # Calculate significance consistency score
+        significance_consistency_score = 0.5  # Default neutral score
+        if entity.evidence:
+            significance_consistency_score = self._calculate_significance_consistency(
+                entity.evidence
+            )
+
+        # Create typed result for internal type safety
+        result = VariantDerivedProperties(
+            has_population_data=has_population_data,
+            population_frequency_count=population_frequency_count,
+            average_population_frequency=average_population_frequency,
+            has_functional_impact=has_functional_impact,
+            evidence_count=evidence_count,
+            significance_consistency_score=significance_consistency_score,
         )
 
-        # Check for population frequency discrepancies
-        derived["frequency_discrepancy"] = self._check_frequency_discrepancy(entity)
-
-        # Count supporting evidence
-        derived["evidence_strength"] = len(entity.evidence) if entity.evidence else 0
-
-        return derived
+        # Return as dict for base class compatibility
+        return result.__dict__
 
     def assess_clinical_significance_confidence(
         self, variant: Variant, evidence_list: List[Any]

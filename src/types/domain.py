@@ -221,6 +221,48 @@ class CompletenessValidationRule(ValidationRule):
         ...
 
 
+# Domain service result types
+class GeneDerivedProperties(TypedDict):
+    """Derived properties calculated for genes."""
+
+    genomic_size: Optional[int]
+    has_genomic_location: bool
+    external_id_count: int
+
+
+class VariantDerivedProperties(TypedDict):
+    """Derived properties calculated for variants."""
+
+    has_population_data: bool
+    population_frequency_count: int
+    average_population_frequency: Optional[float]
+    has_functional_impact: bool
+    evidence_count: int
+    significance_consistency_score: float
+
+
+class EvidenceConsistencyAnalysis(TypedDict):
+    """Result of evidence consistency analysis."""
+
+    total_evidence: int
+    conflicting_evidence: int
+    consistent_evidence: int
+    consistency_score: float
+    dominant_significance: Optional[str]
+    significance_distribution: Dict[str, int]
+
+
+class EvidenceDerivedProperties(TypedDict):
+    """Derived properties calculated for evidence."""
+
+    confidence_category: str
+    evidence_strength: str
+    has_publication: bool
+    has_functional_data: bool
+    data_completeness_score: float
+    reliability_score: float
+
+
 # Normalization types
 class NormalizationResult(TypedDict, total=False):
     """Result of data normalization."""
