@@ -85,12 +85,10 @@ class VariantService(BaseService[SqlAlchemyVariantRepository]):
         Returns:
             Dictionary with variant statistics
         """
-        raw_stats: Dict[str, object] = self.variant_repo.get_variant_statistics()
-        stats: Dict[str, VariantStatisticsValue] = {}
-        for key, value in raw_stats.items():
-            if isinstance(value, (int, float, bool, str)) or value is None:
-                stats[key] = value
-        return stats
+        raw_stats: Dict[
+            str, VariantStatisticsValue
+        ] = self.variant_repo.get_variant_statistics()
+        return dict(raw_stats)
 
     @staticmethod
     def _build_evidence_summary(evidence_model: Evidence) -> EvidenceSummary:

@@ -1,0 +1,328 @@
+"""
+Variant domain service - pure business logic for variant entities.
+
+Encapsulates variant-specific business rules, validations, and logic
+without infrastructure dependencies.
+"""
+
+from typing import Any, Dict, List, Optional
+
+from .base import DomainService
+from ..entities.variant import Variant, VariantType
+
+
+class VariantDomainService(DomainService):
+    """
+    Domain service for Variant business logic.
+
+    Contains pure business rules for variant validation, clinical significance
+    assessment, and derived property calculations.
+    """
+
+    def validate_business_rules(
+        self, entity: Variant, operation: str, context: Optional[Dict[str, Any]] = None
+    ) -> List[str]:
+        """
+        Validate variant business rules.
+
+        Args:
+            entity: Variant entity to validate
+            operation: Operation being performed
+            context: Additional validation context
+
+        Returns:
+            List of validation error messages
+        """
+        errors = []
+
+        # Genomic coordinate validation
+        if entity.position < 1:
+            errors.append("Genomic position must be positive")
+
+        # Allele validation
+        if not entity.reference_allele or not entity.alternate_allele:
+            errors.append("Reference and alternate alleles are required")
+
+        # Frequency validation
+        if entity.allele_frequency is not None:
+            if not (0.0 <= entity.allele_frequency <= 1.0):
+                errors.append("Allele frequency must be between 0.0 and 1.0")
+
+        if entity.gnomad_af is not None:
+            if not (0.0 <= entity.gnomad_af <= 1.0):
+                errors.append("gnomAD frequency must be between 0.0 and 1.0")
+
+        # HGVS validation (basic)
+        if entity.hgvs_genomic and not self._is_valid_hgvs(entity.hgvs_genomic):
+            errors.append("Invalid HGVS genomic notation format")
+
+        if entity.hgvs_protein and not self._is_valid_hgvs(entity.hgvs_protein):
+            errors.append("Invalid HGVS protein notation format")
+
+        return errors
+
+    def apply_business_logic(self, entity: Variant, operation: str) -> Variant:
+        """
+        Apply variant business logic transformations.
+
+        Args:
+            entity: Variant entity to transform
+            operation: Operation being performed
+
+        Returns:
+            Transformed variant entity
+        """
+        # Infer variant type if not specified
+        if (
+            operation in ("create", "update")
+            and entity.variant_type == VariantType.UNKNOWN
+        ):
+            entity.variant_type = self._infer_variant_type(
+                entity.reference_allele, entity.alternate_allele
+            )
+
+        # Normalize chromosome format
+        entity.chromosome = self._normalize_chromosome(entity.chromosome)
+
+        return entity
+
+    def calculate_derived_properties(self, entity: Variant) -> Dict[str, Any]:
+        """
+        Calculate derived properties for a variant.
+
+        Args:
+            entity: Variant entity
+
+        Returns:
+            Dictionary of derived properties
+        """
+        derived: Dict[str, Any] = {}
+
+        # Determine if variant is rare
+        derived["is_rare"] = self._is_rare_variant(entity)
+
+        # Calculate variant complexity
+        derived["complexity_score"] = self._calculate_complexity_score(entity)
+
+        # Determine pathogenicity likelihood
+        derived["pathogenicity_likelihood"] = self._assess_pathogenicity_likelihood(
+            entity
+        )
+
+        # Check for population frequency discrepancies
+        derived["frequency_discrepancy"] = self._check_frequency_discrepancy(entity)
+
+        # Count supporting evidence
+        derived["evidence_strength"] = len(entity.evidence) if entity.evidence else 0
+
+        return derived
+
+    def assess_clinical_significance_confidence(
+        self, variant: Variant, evidence_list: List[Any]
+    ) -> float:
+        """
+        Assess confidence in clinical significance based on evidence.
+
+        Args:
+            variant: Variant entity
+            evidence_list: List of evidence records
+
+        Returns:
+            Confidence score between 0.0 and 1.0
+        """
+        if not evidence_list:
+            return 0.0
+
+        # Simplified confidence calculation
+        base_confidence = 0.5
+
+        # Evidence count factor
+        evidence_factor = min(len(evidence_list) * 0.1, 0.3)
+
+        # Clinical significance consistency factor
+        significance_consistency = self._calculate_significance_consistency(
+            evidence_list
+        )
+        consistency_factor = significance_consistency * 0.2
+
+        return min(base_confidence + evidence_factor + consistency_factor, 1.0)
+
+    def detect_evidence_conflicts(
+        self, variant: Variant, evidence_list: List[Any]
+    ) -> List[str]:
+        """
+        Detect conflicting evidence for a variant.
+
+        Args:
+            variant: Variant entity
+            evidence_list: List of evidence records
+
+        Returns:
+            List of conflict descriptions
+        """
+        conflicts: List[str] = []
+
+        if len(evidence_list) < 2:
+            return conflicts
+
+        significances = [
+            ev.clinical_significance
+            for ev in evidence_list
+            if hasattr(ev, "clinical_significance")
+        ]
+
+        # Check for pathogenic vs benign conflicts
+        pathogenic_count = sum(1 for s in significances if "pathogenic" in s.lower())
+        benign_count = sum(1 for s in significances if "benign" in s.lower())
+
+        if pathogenic_count > 0 and benign_count > 0:
+            conflicts.append(
+                f"Conflicting clinical significance: {pathogenic_count} pathogenic vs {benign_count} benign"
+            )
+
+        # Check frequency discrepancies
+        frequencies = [
+            ev.allele_frequency
+            for ev in evidence_list
+            if hasattr(ev, "allele_frequency") and ev.allele_frequency is not None
+        ]
+        if len(frequencies) > 1:
+            freq_range = max(frequencies) - min(frequencies)
+            if freq_range > 0.01:  # More than 1% difference
+                conflicts.append(f"Large frequency discrepancy: {freq_range:.4f}")
+
+        return conflicts
+
+    def normalize_hgvs_notation(self, hgvs: str) -> str:
+        """
+        Normalize HGVS notation according to standards.
+
+        Args:
+            hgvs: Raw HGVS notation
+
+        Returns:
+            Normalized HGVS notation
+        """
+        if not hgvs:
+            return hgvs
+
+        # Basic normalization - in reality this would be much more complex
+        normalized = hgvs.strip()
+
+        # Ensure consistent formatting for common patterns
+        # This is a simplified implementation
+        return normalized
+
+    def _is_rare_variant(self, variant: Variant) -> bool:
+        """Determine if a variant is considered rare."""
+        # Use the lower frequency for assessment
+        frequency = variant.allele_frequency
+        if variant.gnomad_af is not None:
+            if frequency is None or variant.gnomad_af < frequency:
+                frequency = variant.gnomad_af
+
+        if frequency is None:
+            return False  # Unknown frequency
+
+        return frequency < 0.01  # Less than 1%
+
+    def _calculate_complexity_score(self, variant: Variant) -> float:
+        """Calculate variant complexity score."""
+        score = 0.0
+
+        # Type complexity
+        if variant.variant_type == VariantType.STRUCTURAL:
+            score += 1.0
+        elif variant.variant_type == VariantType.CNV:
+            score += 0.7
+        elif variant.variant_type == VariantType.INDEL:
+            score += 0.5
+
+        # Allele complexity
+        ref_len = len(variant.reference_allele)
+        alt_len = len(variant.alternate_allele)
+        if ref_len != alt_len:
+            score += min(abs(ref_len - alt_len) * 0.1, 0.5)
+
+        return min(score, 1.0)
+
+    def _assess_pathogenicity_likelihood(self, variant: Variant) -> str:
+        """Assess likelihood of pathogenicity."""
+        significance = variant.clinical_significance.lower()
+
+        if "pathogenic" in significance:
+            return "high"
+        elif "likely_pathogenic" in significance:
+            return "medium"
+        elif "uncertain" in significance:
+            return "unknown"
+        elif "likely_benign" in significance:
+            return "low"
+        elif "benign" in significance:
+            return "very_low"
+        else:
+            return "unknown"
+
+    def _check_frequency_discrepancy(self, variant: Variant) -> bool:
+        """Check for discrepancies between reported and population frequencies."""
+        if variant.allele_frequency is None or variant.gnomad_af is None:
+            return False
+
+        # Flag if difference is more than 5%
+        return abs(variant.allele_frequency - variant.gnomad_af) > 0.05
+
+    def _calculate_significance_consistency(self, evidence_list: List[Any]) -> float:
+        """Calculate consistency of clinical significance across evidence."""
+        if not evidence_list:
+            return 0.0
+
+        significances = []
+        for ev in evidence_list:
+            if hasattr(ev, "clinical_significance") and ev.clinical_significance:
+                significances.append(ev.clinical_significance.lower())
+
+        if not significances:
+            return 0.0
+
+        # Count most common significance
+        from collections import Counter
+
+        most_common = Counter(significances).most_common(1)[0][1]
+
+        return most_common / len(significances)
+
+    def _infer_variant_type(self, ref: str, alt: str) -> str:
+        """Infer variant type from alleles."""
+        ref_len = len(ref)
+        alt_len = len(alt)
+
+        if ref_len == 1 and alt_len == 1:
+            return VariantType.SNV
+        if ref_len != alt_len:
+            return VariantType.INDEL
+        # Could be more complex analysis here
+        return VariantType.UNKNOWN
+
+    def _normalize_chromosome(self, chromosome: str) -> str:
+        """Normalize chromosome notation."""
+        if not chromosome:
+            return chromosome
+
+        chrom = chromosome.strip().upper()
+        if not chrom.startswith("CHR"):
+            chrom = f"CHR{chrom}"
+
+        return chrom
+
+    def _is_valid_hgvs(self, hgvs: str) -> bool:
+        """Basic HGVS notation validation."""
+        if not hgvs:
+            return False
+
+        # Very basic validation - real implementation would be much more sophisticated
+        return ":" in hgvs and any(
+            hgvs.startswith(prefix) for prefix in ["c.", "g.", "m.", "n.", "p."]
+        )
+
+
+__all__ = ["VariantDomainService"]

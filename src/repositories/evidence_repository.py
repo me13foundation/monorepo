@@ -3,11 +3,16 @@ Evidence repository for MED13 Resource Library.
 Data access layer for evidence entities linking variants and phenotypes.
 """
 
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select, and_, or_
+from typing import Any, Dict, List, Optional
+from sqlalchemy import and_, or_, select
 
 from .base import BaseRepository
-from src.models.database import EvidenceModel, EvidenceLevel, EvidenceType
+from src.models.database import (
+    EvidenceLevel,
+    EvidenceModel,
+    EvidenceType,
+    VariantModel,
+)
 
 
 class EvidenceRepository(BaseRepository[EvidenceModel, int]):
@@ -99,6 +104,23 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
+    def find_by_gene(self, gene_id: int) -> List[EvidenceModel]:
+        """
+        Find evidence associated with variants belonging to a specific gene.
+
+        Args:
+            gene_id: Gene ID to filter variants by
+
+        Returns:
+            List of EvidenceModel instances linked to the gene
+        """
+        stmt = (
+            select(EvidenceModel)
+            .join(EvidenceModel.variant)
+            .where(VariantModel.gene_id == gene_id)
+        )
+        return list(self.session.execute(stmt).scalars())
+
     def find_by_evidence_level(
         self, level: EvidenceLevel, limit: Optional[int] = None
     ) -> List[EvidenceModel]:
@@ -133,6 +155,25 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         stmt = select(EvidenceModel).where(EvidenceModel.evidence_type == evidence_type)
         if limit:
             stmt = stmt.limit(limit)
+        return list(self.session.execute(stmt).scalars())
+
+    def find_by_confidence_score(
+        self, min_score: float, max_score: float
+    ) -> List[EvidenceModel]:
+        """
+        Find evidence within a confidence score range.
+
+        Args:
+            min_score: Minimum confidence score (inclusive)
+            max_score: Maximum confidence score (inclusive)
+
+        Returns:
+            List of EvidenceModel instances whose confidence scores fall within the range
+        """
+        stmt = select(EvidenceModel).where(
+            EvidenceModel.confidence_score >= min_score,
+            EvidenceModel.confidence_score <= max_score,
+        )
         return list(self.session.execute(stmt).scalars())
 
     def find_high_confidence_evidence(
@@ -192,6 +233,15 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
             "high_confidence_evidence": high_confidence,
             "peer_reviewed_evidence": peer_reviewed,
         }
+
+    def find_by_source(self, source: str) -> List[EvidenceModel]:
+        """
+        Placeholder for evidence source lookup.
+
+        Evidence source metadata is not currently stored, so this returns an empty list.
+        """
+        _ = source  # Prevent unused variable warning
+        return []
 
     def find_relationship_evidence(
         self, variant_id: int, phenotype_id: int, min_confidence: float = 0.0

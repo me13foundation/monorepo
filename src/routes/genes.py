@@ -4,16 +4,25 @@ Gene API routes for MED13 Resource Library.
 RESTful endpoints for gene management with CRUD operations.
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
-from src.services.domain.gene_service import GeneService
+from src.infrastructure.dependency_injection import DependencyContainer
 from src.routes.serializers import serialize_gene
 from src.models.api import GeneResponse, GeneCreate, GeneUpdate, PaginatedResponse
 
+if TYPE_CHECKING:
+    from src.application.services.gene_service import GeneApplicationService
+
 router = APIRouter(prefix="/genes", tags=["genes"])
+
+
+def get_gene_service(db: Session = Depends(get_session)) -> "GeneApplicationService":
+    """Dependency injection for gene application service."""
+    container = DependencyContainer(db)
+    return container.create_gene_application_service()
 
 
 @router.get("/", summary="List genes", response_model=PaginatedResponse[GeneResponse])
@@ -23,14 +32,13 @@ async def get_genes(
     search: Optional[str] = Query(None, description="Search by gene symbol or name"),
     sort_by: str = Query("symbol", description="Sort field"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
-    db: Session = Depends(get_session),
+    service: "GeneApplicationService" = Depends(get_gene_service),
 ) -> PaginatedResponse[GeneResponse]:
     """
     Retrieve a paginated list of genes.
 
     Supports searching by gene symbol or name, and sorting by various fields.
     """
-    service = GeneService(db)
 
     try:
         genes, total = service.list_genes(
@@ -42,7 +50,9 @@ async def get_genes(
         )
 
         # Convert to response models
-        gene_responses = [GeneResponse.model_validate(gene) for gene in genes]
+        gene_responses = [
+            GeneResponse.model_validate(serialize_gene(gene)) for gene in genes
+        ]
 
         total_pages = (total + per_page - 1) // per_page
 
@@ -69,14 +79,13 @@ async def get_gene(
     include_phenotypes: bool = Query(
         False, description="Include associated phenotypes"
     ),
-    db: Session = Depends(get_session),
+    service: "GeneApplicationService" = Depends(get_gene_service),
 ) -> GeneResponse:
     """
     Retrieve a specific gene by its identifier.
 
     Optionally include related variants and phenotypes in the response.
     """
-    service = GeneService(db)
 
     try:
         gene = service.get_gene_by_id(gene_id)
@@ -113,14 +122,13 @@ async def get_gene(
 )
 async def create_gene(
     gene: GeneCreate,
-    db: Session = Depends(get_session),
+    service: "GeneApplicationService" = Depends(get_gene_service),
 ) -> GeneResponse:
     """
     Create a new gene record.
 
     The gene symbol will be automatically converted to uppercase.
     """
-    service = GeneService(db)
 
     try:
         # Check if gene already exists
@@ -143,7 +151,8 @@ async def create_gene(
             uniprot_id=gene.uniprot_id,
         )
 
-        return GeneResponse.model_validate(created_gene)
+        serialized = serialize_gene(created_gene)
+        return GeneResponse.model_validate(serialized)
 
     except HTTPException:
         raise
@@ -155,14 +164,13 @@ async def create_gene(
 async def update_gene(
     gene_id: str,
     gene_update: GeneUpdate,
-    db: Session = Depends(get_session),
+    service: "GeneApplicationService" = Depends(get_gene_service),
 ) -> GeneResponse:
     """
     Update an existing gene record.
 
     Only provided fields will be updated.
     """
-    service = GeneService(db)
 
     try:
         # Check if gene exists
@@ -174,7 +182,8 @@ async def update_gene(
         update_data = gene_update.model_dump(exclude_unset=True)
 
         updated_gene = service.update_gene(gene_id, update_data)
-        return GeneResponse.model_validate(updated_gene)
+        serialized = serialize_gene(updated_gene)
+        return GeneResponse.model_validate(serialized)
 
     except HTTPException:
         raise
@@ -185,14 +194,13 @@ async def update_gene(
 @router.delete("/{gene_id}", summary="Delete gene", status_code=204)
 async def delete_gene(
     gene_id: str,
-    db: Session = Depends(get_session),
+    service: "GeneApplicationService" = Depends(get_gene_service),
 ) -> None:
     """
     Delete a gene record.
 
     This operation cannot be undone.
     """
-    service = GeneService(db)
 
     try:
         # Check if gene exists
@@ -219,14 +227,13 @@ async def delete_gene(
 @router.get("/{gene_id}/statistics", summary="Get gene statistics")
 async def get_gene_statistics(
     gene_id: str,
-    db: Session = Depends(get_session),
+    service: "GeneApplicationService" = Depends(get_gene_service),
 ) -> Dict[str, Any]:
     """
     Retrieve statistics for a specific gene.
 
     Includes variant counts, phenotype associations, and other metrics.
     """
-    service = GeneService(db)
 
     try:
         # Check if gene exists

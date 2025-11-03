@@ -79,9 +79,7 @@ class EvidenceService(BaseService[SqlAlchemyEvidenceRepository]):
         Returns:
             Dictionary with evidence statistics
         """
-        raw_stats: Dict[str, object] = self.evidence_repo.get_evidence_statistics()
-        stats: Dict[str, EvidenceStatisticsValue] = {}
-        for key, value in raw_stats.items():
-            if isinstance(value, (int, float, bool, str)) or value is None:
-                stats[key] = value
-        return stats
+        raw_stats: Dict[
+            str, EvidenceStatisticsValue
+        ] = self.evidence_repo.get_evidence_statistics()
+        return dict(raw_stats)

@@ -5,6 +5,11 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.gene import Gene
+from src.domain.repositories.gene_repository import (
+    GeneRepository as GeneRepositoryInterface,
+)
+from src.domain.repositories.base import QuerySpecification
+from src.domain.value_objects.identifiers import GeneIdentifier
 from src.infrastructure.mappers.gene_mapper import GeneMapper
 from src.repositories.gene_repository import GeneRepository
 
@@ -12,7 +17,7 @@ if TYPE_CHECKING:
     pass
 
 
-class SqlAlchemyGeneRepository:
+class SqlAlchemyGeneRepository(GeneRepositoryInterface):
     """Domain-facing repository backed by the existing SQLAlchemy repository."""
 
     def __init__(self, session: Optional[Session] = None) -> None:
@@ -94,6 +99,37 @@ class SqlAlchemyGeneRepository:
 
     def count(self) -> int:
         return self._repository.count()
+
+    # Required interface implementations
+    def find_by_criteria(self, spec: QuerySpecification) -> List[Gene]:
+        # Simplified implementation - would need more complex query building
+        models = self._repository.find_all(limit=spec.limit, offset=spec.offset)
+        return GeneMapper.to_domain_sequence(models)
+
+    def find_by_identifier(self, identifier: GeneIdentifier) -> Optional[Gene]:
+        """Find a gene by its identifier (supports multiple ID types)."""
+        # Try different ID types in order of preference
+        gene = self.find_by_gene_id(identifier.gene_id)
+        if gene:
+            return gene
+
+        gene = self.find_by_symbol(identifier.symbol)
+        if gene:
+            return gene
+
+        if identifier.ensembl_id:
+            gene = self.find_by_external_id(identifier.ensembl_id)
+        if not gene and identifier.ncbi_gene_id:
+            gene = self.find_by_external_id(str(identifier.ncbi_gene_id))
+        if not gene and identifier.uniprot_id:
+            gene = self.find_by_external_id(identifier.uniprot_id)
+
+        return gene
+
+    def find_with_variants(self, gene_id: int) -> Optional[Gene]:
+        """Find a gene with its associated variants loaded."""
+        model = self._repository.find_with_variants(gene_id)
+        return GeneMapper.to_domain(model) if model else None
 
 
 __all__ = ["SqlAlchemyGeneRepository"]

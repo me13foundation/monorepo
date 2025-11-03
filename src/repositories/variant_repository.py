@@ -3,11 +3,15 @@ Variant repository for MED13 Resource Library.
 Data access layer for genetic variant entities with specialized queries.
 """
 
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select, and_, or_
+from typing import Any, Dict, List, Optional
+from sqlalchemy import and_, or_, select
 
 from .base import BaseRepository, NotFoundError
-from src.models.database import VariantModel, ClinicalSignificance
+from src.models.database import (
+    ClinicalSignificance,
+    GeneModel,
+    VariantModel,
+)
 
 
 class VariantRepository(BaseRepository[VariantModel, int]):
@@ -104,6 +108,29 @@ class VariantRepository(BaseRepository[VariantModel, int]):
         """
         stmt = select(VariantModel).where(
             VariantModel.clinical_significance == significance
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return list(self.session.execute(stmt).scalars())
+
+    def find_by_gene_symbol(
+        self, gene_symbol: str, limit: Optional[int] = None
+    ) -> List[VariantModel]:
+        """
+        Find variants associated with a gene symbol.
+
+        Args:
+            gene_symbol: Gene symbol (case-insensitive)
+            limit: Maximum number of variants to return
+
+        Returns:
+            List of VariantModel instances for the gene
+        """
+        normalized = gene_symbol.upper()
+        stmt = (
+            select(VariantModel)
+            .join(VariantModel.gene)
+            .where(GeneModel.symbol == normalized)
         )
         if limit:
             stmt = stmt.limit(limit)

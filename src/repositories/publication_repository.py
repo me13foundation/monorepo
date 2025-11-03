@@ -3,8 +3,9 @@ Publication repository for MED13 Resource Library.
 Data access layer for scientific publication entities with citation queries.
 """
 
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select, and_, or_
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional
+from sqlalchemy import and_, or_, select
 
 from .base import BaseRepository, NotFoundError
 from src.models.database import PublicationModel, PublicationType
@@ -61,6 +62,18 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         stmt = select(PublicationModel).where(PublicationModel.doi == doi)
         return self.session.execute(stmt).scalar_one_or_none()
 
+    def find_by_pmid(self, pmid: str) -> Optional[PublicationModel]:
+        """
+        Alias for find_by_pubmed_id to align with domain terminology.
+
+        Args:
+            pmid: PubMed identifier
+
+        Returns:
+            PublicationModel instance or None if not found
+        """
+        return self.find_by_pubmed_id(pmid)
+
     def find_by_external_id(self, external_id: str) -> Optional[PublicationModel]:
         """
         Find a publication by any external identifier (PubMed, PMC, DOI).
@@ -96,6 +109,31 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         stmt = select(PublicationModel).where(PublicationModel.publication_year == year)
         if limit:
             stmt = stmt.limit(limit)
+        return list(self.session.execute(stmt).scalars())
+
+    def find_by_year_range(
+        self, start_year: int, end_year: int
+    ) -> List[PublicationModel]:
+        """
+        Find publications between two publication years (inclusive).
+
+        Args:
+            start_year: Minimum publication year
+            end_year: Maximum publication year
+
+        Returns:
+            List of PublicationModel instances within the range
+        """
+        stmt = (
+            select(PublicationModel)
+            .where(
+                and_(
+                    PublicationModel.publication_year >= start_year,
+                    PublicationModel.publication_year <= end_year,
+                )
+            )
+            .order_by(PublicationModel.publication_year.asc())
+        )
         return list(self.session.execute(stmt).scalars())
 
     def find_by_author(
@@ -260,6 +298,29 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
             "open_access_publications": open_access,
             "med13_relevant_publications": len(self.find_med13_relevant()),
         }
+
+    def find_recent_publications(
+        self, days: int = 30, limit: Optional[int] = None
+    ) -> List[PublicationModel]:
+        """
+        Find publications created within the last N days.
+
+        Args:
+            days: Number of days to look back from current time
+            limit: Optional limit of publications
+
+        Returns:
+            List of recently created PublicationModel instances
+        """
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        stmt = (
+            select(PublicationModel)
+            .where(PublicationModel.created_at >= cutoff)
+            .order_by(PublicationModel.created_at.desc())
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return list(self.session.execute(stmt).scalars())
 
     def find_by_pubmed_id_or_fail(self, pubmed_id: str) -> PublicationModel:
         """

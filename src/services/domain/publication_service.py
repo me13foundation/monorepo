@@ -93,10 +93,6 @@ class PublicationService(BaseService[SqlAlchemyPublicationRepository]):
 
     def get_publication_statistics(self) -> Dict[str, PublicationStatisticsValue]:
         raw_stats: Dict[
-            str, object
+            str, PublicationStatisticsValue
         ] = self.publication_repo.get_publication_statistics()
-        stats: Dict[str, PublicationStatisticsValue] = {}
-        for key, value in raw_stats.items():
-            if isinstance(value, (int, float, bool, str)) or value is None:
-                stats[key] = value
-        return stats
+        return dict(raw_stats)
