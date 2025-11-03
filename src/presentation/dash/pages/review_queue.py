@@ -7,6 +7,10 @@ from dash.dcc import Dropdown
 from src.presentation.dash.components.sidebar import create_sidebar
 from src.presentation.dash.components.record_viewer import create_data_table
 from src.presentation.dash.components.theme import COLORS
+from src.presentation.dash.components.curation.clinical_card import (
+    create_clinical_card_grid,
+    create_enhanced_filters,
+)
 
 DropdownOption = Dropdown.Options
 
@@ -50,7 +54,30 @@ def create_review_page() -> dbc.Container:
                                                 color="info",
                                                 className="ms-2",
                                             ),
-                                        ]
+                                            dbc.ButtonGroup(
+                                                [
+                                                    dbc.Button(
+                                                        html.I(className="fas fa-th"),
+                                                        id="card-view-btn",
+                                                        color="outline-primary",
+                                                        size="sm",
+                                                        title="Card View",
+                                                        active=True,
+                                                    ),
+                                                    dbc.Button(
+                                                        html.I(
+                                                            className="fas fa-table"
+                                                        ),
+                                                        id="table-view-btn",
+                                                        color="outline-primary",
+                                                        size="sm",
+                                                        title="Table View",
+                                                    ),
+                                                ],
+                                                className="ms-auto",
+                                            ),
+                                        ],
+                                        className="d-flex justify-content-between align-items-center",
                                     ),
                                     dbc.CardBody(
                                         [
@@ -62,7 +89,7 @@ def create_review_page() -> dbc.Container:
                                                             dcc.Dropdown(
                                                                 id="entity-type-filter",
                                                                 options=ENTITY_TYPE_OPTIONS,
-                                                                value="genes",
+                                                                value="variants",  # Default to variants for clinical review
                                                                 clearable=False,
                                                             ),
                                                         ],
@@ -106,6 +133,8 @@ def create_review_page() -> dbc.Container:
                                                 ],
                                                 className="mb-4",
                                             ),
+                                            # Enhanced Clinical Filters
+                                            create_enhanced_filters(),
                                             dbc.Row(
                                                 [
                                                     dbc.Col(
@@ -159,77 +188,93 @@ def create_review_page() -> dbc.Container:
                                                 id="bulk-operation-result",
                                                 className="mb-3",
                                             ),
-                                            create_data_table(
-                                                id="review-table",
-                                                columns=[
-                                                    {
-                                                        "name": "Select",
-                                                        "id": "select",
-                                                        "type": "text",
-                                                        "presentation": "markdown",
+                                            # Clinical Review Cards Grid
+                                            html.Div(
+                                                id="clinical-card-container",
+                                                children=create_clinical_card_grid(
+                                                    []
+                                                ),  # Will be populated by callbacks
+                                            ),
+                                            # Fallback to old table view (can be toggled)
+                                            html.Div(
+                                                id="table-view-container",
+                                                style={
+                                                    "display": "none"
+                                                },  # Hidden by default
+                                                children=create_data_table(
+                                                    id="review-table",
+                                                    columns=[
+                                                        {
+                                                            "name": "Select",
+                                                            "id": "select",
+                                                            "type": "text",
+                                                            "presentation": "markdown",
+                                                        },
+                                                        {
+                                                            "name": "ID",
+                                                            "id": "id",
+                                                            "type": "text",
+                                                        },
+                                                        {
+                                                            "name": "Entity",
+                                                            "id": "entity",
+                                                            "type": "text",
+                                                        },
+                                                        {
+                                                            "name": "Status",
+                                                            "id": "status",
+                                                            "type": "text",
+                                                        },
+                                                        {
+                                                            "name": "Quality Score",
+                                                            "id": "quality_score",
+                                                            "type": "numeric",
+                                                        },
+                                                        {
+                                                            "name": "Issues",
+                                                            "id": "issues",
+                                                            "type": "numeric",
+                                                        },
+                                                        {
+                                                            "name": "Last Updated",
+                                                            "id": "last_updated",
+                                                            "type": "datetime",
+                                                        },
+                                                        {
+                                                            "name": "Actions",
+                                                            "id": "actions",
+                                                            "type": "text",
+                                                            "presentation": "markdown",
+                                                        },
+                                                    ],
+                                                    data=[],
+                                                    page_current=0,
+                                                    page_size=25,
+                                                    page_action="native",
+                                                    sort_action="native",
+                                                    sort_mode="multi",
+                                                    filter_action="native",
+                                                    row_selectable="multi",
+                                                    selected_rows=[],
+                                                    style_table={"overflowX": "auto"},
+                                                    style_cell={
+                                                        "textAlign": "left",
+                                                        "padding": "10px",
+                                                        "minWidth": "80px",
                                                     },
-                                                    {
-                                                        "name": "ID",
-                                                        "id": "id",
-                                                        "type": "text",
+                                                    style_header={
+                                                        "backgroundColor": COLORS[
+                                                            "light"
+                                                        ],
+                                                        "fontWeight": "bold",
                                                     },
-                                                    {
-                                                        "name": "Entity",
-                                                        "id": "entity",
-                                                        "type": "text",
-                                                    },
-                                                    {
-                                                        "name": "Status",
-                                                        "id": "status",
-                                                        "type": "text",
-                                                    },
-                                                    {
-                                                        "name": "Quality Score",
-                                                        "id": "quality_score",
-                                                        "type": "numeric",
-                                                    },
-                                                    {
-                                                        "name": "Issues",
-                                                        "id": "issues",
-                                                        "type": "numeric",
-                                                    },
-                                                    {
-                                                        "name": "Last Updated",
-                                                        "id": "last_updated",
-                                                        "type": "datetime",
-                                                    },
-                                                    {
-                                                        "name": "Actions",
-                                                        "id": "actions",
-                                                        "type": "text",
-                                                        "presentation": "markdown",
-                                                    },
-                                                ],
-                                                data=[],
-                                                page_current=0,
-                                                page_size=25,
-                                                page_action="native",
-                                                sort_action="native",
-                                                sort_mode="multi",
-                                                filter_action="native",
-                                                row_selectable="multi",
-                                                selected_rows=[],
-                                                style_table={"overflowX": "auto"},
-                                                style_cell={
-                                                    "textAlign": "left",
-                                                    "padding": "10px",
-                                                    "minWidth": "80px",
-                                                },
-                                                style_header={
-                                                    "backgroundColor": COLORS["light"],
-                                                    "fontWeight": "bold",
-                                                },
-                                                style_data_conditional=[
-                                                    {
-                                                        "if": {"row_index": "odd"},
-                                                        "backgroundColor": "rgb(248, 248, 248)",
-                                                    }
-                                                ],
+                                                    style_data_conditional=[
+                                                        {
+                                                            "if": {"row_index": "odd"},
+                                                            "backgroundColor": "rgb(248, 248, 248)",
+                                                        }
+                                                    ],
+                                                ),
                                             ),
                                         ]
                                     ),
