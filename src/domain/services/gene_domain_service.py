@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from .base import DomainService
 from ..entities.gene import Gene, GeneType
 from ..value_objects.identifiers import GeneIdentifier
-from ...types.domain import GeneDerivedProperties
+from ...type_definitions.domain import GeneDerivedProperties
 
 
 class GeneDomainService(DomainService):

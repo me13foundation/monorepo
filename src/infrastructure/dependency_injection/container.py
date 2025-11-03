@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from src.application.services.publication_service import (
         PublicationApplicationService,
     )
+    from src.application.search.search_service import UnifiedSearchService
+    from src.application.export.export_service import BulkExportService
 
 # Domain services
 from src.domain.services.gene_domain_service import GeneDomainService
@@ -165,6 +167,28 @@ class DependencyContainer:
 
         return PublicationApplicationService(
             publication_repository=self.publication_repository,
+        )
+
+    def create_unified_search_service(self) -> "UnifiedSearchService":
+        """Create a unified search service with all entity services."""
+        from src.application.search.search_service import UnifiedSearchService
+
+        return UnifiedSearchService(
+            gene_service=self.create_gene_application_service(),
+            variant_service=self.create_variant_application_service(),
+            phenotype_service=self.create_phenotype_application_service(),
+            evidence_service=self.create_evidence_application_service(),
+        )
+
+    def create_bulk_export_service(self) -> "BulkExportService":
+        """Create a bulk export service with all entity services."""
+        from src.application.export.export_service import BulkExportService
+
+        return BulkExportService(
+            gene_service=self.create_gene_application_service(),
+            variant_service=self.create_variant_application_service(),
+            phenotype_service=self.create_phenotype_application_service(),
+            evidence_service=self.create_evidence_application_service(),
         )
 
     # Curation Services - TODO: Fix ApprovalService constructor

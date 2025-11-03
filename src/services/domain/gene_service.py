@@ -12,7 +12,9 @@ from src.domain.entities.variant import VariantSummary
 from src.domain.value_objects.identifiers import GeneIdentifier
 from src.domain.value_objects.provenance import Provenance
 from src.infrastructure.repositories import SqlAlchemyGeneRepository
-from src.repositories import VariantRepository
+from src.infrastructure.repositories.variant_repository import (
+    SqlAlchemyVariantRepository,
+)
 from src.services.domain.base_service import BaseService
 
 if TYPE_CHECKING:
@@ -40,7 +42,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
             self.gene_repo = gene_repository
         else:
             self.gene_repo = SqlAlchemyGeneRepository(session)
-        self.variant_repo = VariantRepository(session)
+        self.variant_repo = SqlAlchemyVariantRepository(session)
 
     @property
     def repository(self) -> SqlAlchemyGeneRepository:

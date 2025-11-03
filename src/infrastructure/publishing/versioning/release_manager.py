@@ -15,7 +15,7 @@ from src.infrastructure.publishing.versioning.semantic_versioner import (
     SemanticVersioner,
     VersionType,
 )
-from src.types.external_apis import ZenodoMetadata
+from src.type_definitions.external_apis import ZenodoMetadata
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 from .base import Repository
 from ..entities.variant import Variant, VariantSummary
-from ...types.common import VariantUpdate
+from ...type_definitions.common import VariantUpdate
 
 
 class VariantRepository(Repository[Variant, int]):

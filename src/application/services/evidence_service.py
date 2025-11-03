@@ -130,6 +130,10 @@ class EvidenceApplicationService:
         """Find evidence records for a gene."""
         return self._evidence_repository.find_by_gene(gene_id)
 
+    def get_evidence_by_phenotype(self, phenotype_id: int) -> List[Evidence]:
+        """Find evidence records for a phenotype."""
+        return self._evidence_repository.find_by_phenotype(phenotype_id)
+
     def get_evidence_by_publication(self, publication_id: int) -> List[Evidence]:
         """Find evidence records for a publication."""
         return self._evidence_repository.find_by_publication(publication_id)

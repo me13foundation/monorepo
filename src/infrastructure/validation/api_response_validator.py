@@ -7,7 +7,7 @@ helping prevent runtime errors from malformed external data.
 
 import time
 from typing import Any, Dict, List, Optional
-from ...types.external_apis import (
+from ...type_definitions.external_apis import (
     ValidationIssue,
     APIResponseValidationResult,
 )
@@ -154,9 +154,9 @@ class APIResponseValidator:
             is_valid=len([i for i in issues if i["severity"] == "error"]) == 0,
             issues=issues,
             data_quality_score=data_quality_score,
-            sanitized_data=data
-            if data_quality_score > 0.8
-            else None,  # Higher threshold for variant data
+            sanitized_data=(
+                data if data_quality_score > 0.8 else None
+            ),  # Higher threshold for variant data
             validation_time_ms=validation_time,
         )
 

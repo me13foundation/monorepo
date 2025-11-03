@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .base import Repository
 from ..entities.evidence import Evidence
-from ...types.common import EvidenceUpdate
+from ...type_definitions.common import EvidenceUpdate
 
 
 class EvidenceRepository(Repository[Evidence, int]):
@@ -24,6 +24,11 @@ class EvidenceRepository(Repository[Evidence, int]):
     @abstractmethod
     def find_by_variant(self, variant_id: int) -> List[Evidence]:
         """Find evidence records for a variant."""
+        pass
+
+    @abstractmethod
+    def find_by_phenotype(self, phenotype_id: int) -> List[Evidence]:
+        """Find evidence records for a phenotype."""
         pass
 
     @abstractmethod

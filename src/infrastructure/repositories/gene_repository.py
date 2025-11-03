@@ -1,7 +1,13 @@
+"""
+SQLAlchemy implementation of Gene repository for MED13 Resource Library.
+Data access layer for gene entities with specialized queries.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
+from sqlalchemy import select, or_, func, asc, desc, update, delete
 from sqlalchemy.orm import Session
 
 from src.domain.entities.gene import Gene
@@ -10,25 +16,38 @@ from src.domain.repositories.gene_repository import (
 )
 from src.domain.repositories.base import QuerySpecification
 from src.domain.value_objects.identifiers import GeneIdentifier
-from src.types.common import GeneUpdate
+from src.type_definitions.common import GeneUpdate
 from src.infrastructure.mappers.gene_mapper import GeneMapper
-from src.repositories.gene_repository import GeneRepository
+from src.models.database import GeneModel
 
 if TYPE_CHECKING:
     pass
 
 
 class SqlAlchemyGeneRepository(GeneRepositoryInterface):
-    """Domain-facing repository backed by the existing SQLAlchemy repository."""
+    """
+    Repository for Gene entities with specialized gene-specific queries.
+
+    Provides data access operations for gene entities including
+    symbol-based lookups, external ID searches, and relationship queries.
+    """
 
     def __init__(self, session: Optional[Session] = None) -> None:
         self._session = session
-        self._repository = GeneRepository(session)
+
+    @property
+    def session(self) -> Session:
+        """Get the current database session."""
+        if self._session is None:
+            raise ValueError("Session not provided")
+        return self._session
 
     def create(self, gene: Gene) -> Gene:
         model = GeneMapper.to_model(gene)
-        persisted = self._repository.create(model)
-        return GeneMapper.to_domain(persisted)
+        self.session.add(model)
+        self.session.commit()
+        self.session.refresh(model)
+        return GeneMapper.to_domain(model)
 
     def paginate_genes(
         self,
@@ -38,74 +57,221 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         sort_order: str,
         search: Optional[str] = None,
     ) -> Tuple[List[Gene], int]:
-        models, total = self._repository.paginate_genes(
-            page=page,
-            per_page=per_page,
-            sort_by=sort_by,
-            sort_order=sort_order,
-            search=search,
+        """
+        Retrieve paginated genes with optional search and sorting.
+
+        Args:
+            page: Page number starting at 1
+            per_page: Number of records per page
+            sort_by: Field to sort by
+            sort_order: Sort direction ('asc' or 'desc')
+            search: Optional search string
+
+        Returns:
+            Tuple of (records list, total count)
+        """
+        offset = max(page - 1, 0) * per_page
+
+        sortable_fields = {
+            "symbol": GeneModel.symbol,
+            "name": GeneModel.name,
+            "gene_type": GeneModel.gene_type,
+            "chromosome": GeneModel.chromosome,
+            "created_at": GeneModel.created_at,
+        }
+
+        sort_column = sortable_fields.get(sort_by, GeneModel.symbol)
+        order_clause = (
+            desc(sort_column) if sort_order.lower() == "desc" else asc(sort_column)
         )
-        return GeneMapper.to_domain_sequence(models), total
+
+        stmt = select(GeneModel).order_by(order_clause).offset(offset).limit(per_page)
+        count_stmt = select(func.count()).select_from(GeneModel)
+
+        if search:
+            pattern = f"%{search}%"
+            predicate = or_(
+                GeneModel.symbol.ilike(pattern),
+                GeneModel.name.ilike(pattern),
+            )
+            stmt = stmt.where(predicate)
+            count_stmt = count_stmt.where(predicate)
+
+        models = list(self.session.execute(stmt).scalars())
+        total = self.session.execute(count_stmt).scalar_one()
+
+        return GeneMapper.to_domain_sequence(models), int(total)
 
     def find_by_gene_id(self, gene_id: str) -> Optional[Gene]:
-        model = self._repository.find_by_gene_id(gene_id)
+        """
+        Find a gene by its gene_id.
+
+        Args:
+            gene_id: Gene ID to search for
+
+        Returns:
+            GeneModel instance or None if not found
+        """
+        stmt = select(GeneModel).where(GeneModel.gene_id == gene_id)
+        model = self.session.execute(stmt).scalar_one_or_none()
         return GeneMapper.to_domain(model) if model else None
 
     def find_by_symbol(self, symbol: str) -> Optional[Gene]:
-        model = self._repository.find_by_symbol(symbol)
+        """
+        Find a gene by its symbol (case-insensitive).
+
+        Args:
+            symbol: Gene symbol to search for
+
+        Returns:
+            GeneModel instance or None if not found
+        """
+        stmt = select(GeneModel).where(GeneModel.symbol.ilike(symbol.upper()))
+        model = self.session.execute(stmt).scalar_one_or_none()
         return GeneMapper.to_domain(model) if model else None
 
-    def find_by_external_id(self, identifier: str) -> Optional[Gene]:
-        model = self._repository.find_by_external_id(identifier)
+    def find_by_external_id(self, external_id: str) -> Optional[Gene]:
+        """
+        Find a gene by any external identifier (Ensembl, NCBI, UniProt).
+
+        Args:
+            external_id: External identifier to search for
+
+        Returns:
+            GeneModel instance or None if not found
+        """
+        conditions = [
+            GeneModel.ensembl_id == external_id,
+            GeneModel.uniprot_id == external_id,
+        ]
+        if external_id.isdigit():
+            conditions.append(GeneModel.ncbi_gene_id == int(external_id))
+
+        stmt = select(GeneModel).where(or_(*conditions))
+        model = self.session.execute(stmt).scalar_one_or_none()
         return GeneMapper.to_domain(model) if model else None
 
     def find_by_gene_id_or_fail(self, gene_id: str) -> Gene:
-        model = self._repository.find_by_gene_id_or_fail(gene_id)
-        return GeneMapper.to_domain(model)
+        """
+        Find a gene by gene_id, raising exception if not found.
+
+        Args:
+            gene_id: Gene ID to search for
+
+        Returns:
+            Gene instance
+
+        Raises:
+            ValueError: If gene is not found
+        """
+        gene = self.find_by_gene_id(gene_id)
+        if gene is None:
+            raise ValueError(f"Gene with gene_id '{gene_id}' not found")
+        return gene
 
     def find_by_symbol_or_fail(self, symbol: str) -> Gene:
-        model = self._repository.find_by_symbol_or_fail(symbol)
-        return GeneMapper.to_domain(model)
+        """
+        Find a gene by symbol, raising exception if not found.
+
+        Args:
+            symbol: Gene symbol to search for
+
+        Returns:
+            Gene instance
+
+        Raises:
+            ValueError: If gene is not found
+        """
+        gene = self.find_by_symbol(symbol)
+        if gene is None:
+            raise ValueError(f"Gene with symbol '{symbol}' not found")
+        return gene
 
     def get_by_id(self, gene_id: int) -> Optional[Gene]:
-        model = self._repository.get_by_id(gene_id)
+        """Get gene by database ID."""
+        stmt = select(GeneModel).where(GeneModel.id == gene_id)
+        model = self.session.execute(stmt).scalar_one_or_none()
         return GeneMapper.to_domain(model) if model else None
 
     def get_by_id_or_fail(self, gene_id: int) -> Gene:
-        model = self._repository.get_by_id_or_fail(gene_id)
-        return GeneMapper.to_domain(model)
+        """Get gene by database ID, raising exception if not found."""
+        gene = self.get_by_id(gene_id)
+        if gene is None:
+            raise ValueError(f"Gene with id '{gene_id}' not found")
+        return gene
 
     def find_all(
         self, limit: Optional[int] = None, offset: Optional[int] = None
     ) -> List[Gene]:
-        models = self._repository.find_all(limit=limit, offset=offset)
+        """Get all genes with optional pagination."""
+        stmt = select(GeneModel)
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit:
+            stmt = stmt.limit(limit)
+        models = list(self.session.execute(stmt).scalars())
         return GeneMapper.to_domain_sequence(models)
 
     def update(self, gene_id: int, updates: Dict[str, Any]) -> Gene:
-        model = self._repository.update(gene_id, updates)
-        return GeneMapper.to_domain(model)
+        """Update a gene by ID."""
+        stmt = update(GeneModel).where(GeneModel.id == gene_id).values(**updates)
+        self.session.execute(stmt)
+        self.session.commit()
+        # Return updated entity
+        return self.get_by_id_or_fail(gene_id)
 
     def delete(self, gene_id: int) -> bool:
-        return self._repository.delete(gene_id)
+        """Delete a gene by ID."""
+        stmt = delete(GeneModel).where(GeneModel.id == gene_id)
+        self.session.execute(stmt)
+        self.session.commit()
+        # Check if deletion was successful by verifying the entity no longer exists
+        return not self.exists(gene_id)
 
     def exists(self, gene_id: int) -> bool:
-        return self._repository.exists(gene_id)
+        """Check if a gene exists by ID."""
+        stmt = (
+            select(func.count()).select_from(GeneModel).where(GeneModel.id == gene_id)
+        )
+        count = self.session.execute(stmt).scalar_one()
+        return count > 0
 
     def get_gene_statistics(self) -> Dict[str, Any]:
-        return self._repository.get_gene_statistics()
+        """Get statistics about genes in the database."""
+        total_genes = self.count()
+        return {
+            "total_genes": total_genes,
+            "genes_with_variants": 0,  # Would need a join query
+            "genes_with_phenotypes": 0,  # Would need a complex join query
+        }
 
     def search_by_name_or_symbol(self, query: str, limit: int = 10) -> List[Gene]:
-        models = self._repository.search_by_name_or_symbol(query, limit)
+        """Search genes by name or symbol containing the query string."""
+        search_pattern = f"%{query}%"
+        stmt = (
+            select(GeneModel)
+            .where(
+                or_(
+                    GeneModel.symbol.ilike(search_pattern),
+                    GeneModel.name.ilike(search_pattern),
+                )
+            )
+            .limit(limit)
+        )
+        models = list(self.session.execute(stmt).scalars())
         return GeneMapper.to_domain_sequence(models)
 
     def count(self) -> int:
-        return self._repository.count()
+        """Count total genes."""
+        stmt = select(func.count()).select_from(GeneModel)
+        return self.session.execute(stmt).scalar_one()
 
     # Required interface implementations
     def find_by_criteria(self, spec: QuerySpecification) -> List[Gene]:
+        """Find genes by query specification."""
         # Simplified implementation - would need more complex query building
-        models = self._repository.find_all(limit=spec.limit, offset=spec.offset)
-        return GeneMapper.to_domain_sequence(models)
+        models = self.find_all(limit=spec.limit, offset=spec.offset)
+        return models
 
     def find_by_identifier(self, identifier: GeneIdentifier) -> Optional[Gene]:
         """Find a gene by its identifier (supports multiple ID types)."""
@@ -129,15 +295,15 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
 
     def find_with_variants(self, gene_id: int) -> Optional[Gene]:
         """Find a gene with its associated variants loaded."""
-        model = self._repository.find_with_variants(gene_id)
+        stmt = select(GeneModel).where(GeneModel.id == gene_id)
+        model = self.session.execute(stmt).scalar_one_or_none()
         return GeneMapper.to_domain(model) if model else None
 
     def update_gene(self, gene_id: int, updates: GeneUpdate) -> Gene:
         """Update a gene with type-safe update parameters."""
-        # Convert TypedDict to Dict[str, Any] for the underlying repository
+        # Convert TypedDict to Dict[str, Any]
         updates_dict = dict(updates)
-        model = self._repository.update(gene_id, updates_dict)
-        return GeneMapper.to_domain(model)
+        return self.update(gene_id, updates_dict)
 
 
 __all__ = ["SqlAlchemyGeneRepository"]

@@ -24,22 +24,47 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
-      - name: Run security audit
+      - name: Run linting
+        run: ruff check src/ tests/
+
+      - name: Run type checking
+        run: mypy src/
+
+      - name: Run security audit (Bandit)
+        run: |
+          bandit -r src/ -f json -o bandit-results.json
+
+      - name: Upload security scan results (Bandit)
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-results
+          path: bandit-results.json
+
+      - name: Run dependency security audit
         run: |
           pip install pip-audit
           pip-audit --format json | tee pip-audit-results.json
 
-      - name: Upload security scan results
+      - name: Upload dependency security scan results
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: pip-audit-results
           path: pip-audit-results.json
 
-      - name: Run tests
-        run: pytest
+      - name: Run tests with coverage
+        run: pytest --cov=src --cov-report=xml
+
+      - name: Upload coverage reports
+        if: always()
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
 
   deploy-staging:
     needs: test

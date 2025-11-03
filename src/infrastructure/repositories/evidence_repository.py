@@ -9,7 +9,7 @@ from src.domain.repositories.evidence_repository import (
     EvidenceRepository as EvidenceRepositoryInterface,
 )
 from src.domain.repositories.base import QuerySpecification
-from src.types.common import EvidenceUpdate
+from src.type_definitions.common import EvidenceUpdate
 from src.domain.value_objects.confidence import EvidenceLevel
 from src.infrastructure.mappers.evidence_mapper import EvidenceMapper
 from src.models.database.evidence import (

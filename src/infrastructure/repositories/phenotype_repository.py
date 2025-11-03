@@ -9,7 +9,7 @@ from src.domain.repositories.phenotype_repository import (
     PhenotypeRepository as PhenotypeRepositoryInterface,
 )
 from src.domain.repositories.base import QuerySpecification
-from src.types.common import PhenotypeUpdate
+from src.type_definitions.common import PhenotypeUpdate
 from src.infrastructure.mappers.phenotype_mapper import PhenotypeMapper
 from src.models.database import PhenotypeCategory as DbPhenotypeCategory
 from src.repositories.phenotype_repository import PhenotypeRepository

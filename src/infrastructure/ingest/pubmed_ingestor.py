@@ -7,7 +7,8 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any, Dict, List, Optional
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
+from xml.etree.ElementTree import Element
 
 from .base_ingestor import BaseIngestor
 
@@ -176,7 +177,7 @@ class PubMedIngestor(BaseIngestor):
                 }
             ]
 
-    def _parse_single_citation(self, citation: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_single_citation(self, citation: Element) -> Optional[Dict[str, Any]]:
         """
         Parse a single MedlineCitation element.
 
@@ -216,13 +217,13 @@ class PubMedIngestor(BaseIngestor):
         except Exception:
             return None
 
-    def _extract_text(self, element: ET.Element, xpath: str) -> Optional[str]:
+    def _extract_text(self, element: Element, xpath: str) -> Optional[str]:
         """Extract text content from XML element."""
         elem = element.find(xpath)
         return elem.text.strip() if elem is not None and elem.text else None
 
     def _extract_journal_info(
-        self, citation: ET.Element
+        self, citation: Element
     ) -> Optional[Dict[str, Optional[str]]]:
         """Extract journal information."""
         journal_elem = citation.find(".//Journal")
@@ -235,7 +236,7 @@ class PubMedIngestor(BaseIngestor):
             "issn": self._extract_text(journal_elem, ".//ISSN"),
         }
 
-    def _extract_authors(self, citation: ET.Element) -> List[Dict[str, Optional[str]]]:
+    def _extract_authors(self, citation: Element) -> List[Dict[str, Optional[str]]]:
         """Extract author information."""
         authors: List[Dict[str, Optional[str]]] = []
         for author_elem in citation.findall(".//Author"):
@@ -252,7 +253,7 @@ class PubMedIngestor(BaseIngestor):
 
         return authors
 
-    def _extract_publication_date(self, citation: ET.Element) -> Optional[str]:
+    def _extract_publication_date(self, citation: Element) -> Optional[str]:
         """Extract publication date."""
         # Try different date fields in order of preference
         date_fields = [
@@ -278,7 +279,7 @@ class PubMedIngestor(BaseIngestor):
 
         return None
 
-    def _extract_publication_types(self, citation: ET.Element) -> List[str]:
+    def _extract_publication_types(self, citation: Element) -> List[str]:
         """Extract publication types."""
         types: List[str] = []
         for type_elem in citation.findall(".//PublicationType"):
@@ -286,7 +287,7 @@ class PubMedIngestor(BaseIngestor):
                 types.append(type_elem.text.strip())
         return types
 
-    def _extract_keywords(self, citation: ET.Element) -> List[str]:
+    def _extract_keywords(self, citation: Element) -> List[str]:
         """Extract keywords."""
         keywords: List[str] = []
         for kw_elem in citation.findall(".//Keyword"):
@@ -294,7 +295,7 @@ class PubMedIngestor(BaseIngestor):
                 keywords.append(kw_elem.text.strip())
         return keywords
 
-    def _extract_doi(self, citation: ET.Element) -> Optional[str]:
+    def _extract_doi(self, citation: Element) -> Optional[str]:
         """Extract DOI if available."""
         # DOI is typically in ArticleId elements
         for id_elem in citation.findall(".//ArticleId"):
@@ -303,7 +304,7 @@ class PubMedIngestor(BaseIngestor):
                 return id_elem.text.strip()
         return None
 
-    def _extract_pmc_id(self, citation: ET.Element) -> Optional[str]:
+    def _extract_pmc_id(self, citation: Element) -> Optional[str]:
         """Extract PMC ID if available."""
         for id_elem in citation.findall(".//ArticleId"):
             id_type = id_elem.get("IdType")

@@ -5,7 +5,8 @@ Parses PubMed XML data into structured publication records with
 metadata, abstracts, authors, and citation information.
 """
 
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
@@ -147,7 +148,7 @@ class PubMedParser:
 
         return parsed_publications
 
-    def _extract_title(self, root: ET.Element) -> str:
+    def _extract_title(self, root: Element) -> str:
         """Extract article title from XML."""
         # Try different title element locations
         for path in (".//ArticleTitle", ".//Title", ".//BookTitle"):
@@ -159,7 +160,7 @@ class PubMedParser:
 
         return "Unknown Title"
 
-    def _extract_abstract(self, root: ET.Element) -> Optional[str]:
+    def _extract_abstract(self, root: Element) -> Optional[str]:
         """Extract abstract text from XML."""
         abstract_elem = root.find(".//Abstract")
         if abstract_elem is not None:
@@ -182,7 +183,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_authors(self, root: ET.Element) -> List[PubMedAuthor]:
+    def _extract_authors(self, root: Element) -> List[PubMedAuthor]:
         """Extract author information from XML."""
         authors = []
 
@@ -199,7 +200,7 @@ class PubMedParser:
 
         return authors
 
-    def _extract_author_affiliation(self, author_elem: ET.Element) -> Optional[str]:
+    def _extract_author_affiliation(self, author_elem: Element) -> Optional[str]:
         """Extract author affiliation information."""
         # Try different affiliation element locations
         affiliation_elem = author_elem.find(".//Affiliation") or author_elem.find(
@@ -211,7 +212,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_journal(self, root: ET.Element) -> Optional[PubMedJournal]:
+    def _extract_journal(self, root: Element) -> Optional[PubMedJournal]:
         """Extract journal information from XML."""
         journal_elem = root.find(".//Journal")
         if journal_elem is not None:
@@ -229,7 +230,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_publication_date(self, root: ET.Element) -> Optional[datetime]:
+    def _extract_publication_date(self, root: Element) -> Optional[datetime]:
         """Extract publication date from XML."""
         # Try different date element locations
         date_elem = (
@@ -255,7 +256,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_publication_types(self, root: ET.Element) -> List[str]:
+    def _extract_publication_types(self, root: Element) -> List[str]:
         """Extract publication types from XML."""
         pub_types = []
 
@@ -267,7 +268,7 @@ class PubMedParser:
 
         return pub_types
 
-    def _extract_keywords(self, root: ET.Element) -> List[str]:
+    def _extract_keywords(self, root: Element) -> List[str]:
         """Extract keywords from XML."""
         keywords = []
 
@@ -288,7 +289,7 @@ class PubMedParser:
 
         return keywords
 
-    def _extract_doi(self, root: ET.Element) -> Optional[str]:
+    def _extract_doi(self, root: Element) -> Optional[str]:
         """Extract DOI from XML."""
         # Look for DOI in article ID list
         article_id_list = root.find(".//ArticleIdList")
@@ -299,7 +300,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_pmc_id(self, root: ET.Element) -> Optional[str]:
+    def _extract_pmc_id(self, root: Element) -> Optional[str]:
         """Extract PMC ID from XML."""
         # Look for PMC ID in article ID list
         article_id_list = root.find(".//ArticleIdList")
@@ -310,14 +311,14 @@ class PubMedParser:
 
         return None
 
-    def _extract_language(self, root: ET.Element) -> Optional[str]:
+    def _extract_language(self, root: Element) -> Optional[str]:
         """Extract publication language from XML."""
         lang_elem = root.find(".//Language")
         if lang_elem is not None and lang_elem.text:
             return lang_elem.text.strip()
         return None
 
-    def _extract_country(self, root: ET.Element) -> Optional[str]:
+    def _extract_country(self, root: Element) -> Optional[str]:
         """Extract country from XML."""
         # Try different country element locations
         country_elem = root.find(".//Country") or root.find(
@@ -329,7 +330,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_text(self, element: Optional[ET.Element]) -> Optional[str]:
+    def _extract_text(self, element: Optional[Element]) -> Optional[str]:
         """Safely extract text from an XML element."""
         if element is not None and element.text:
             return element.text.strip()

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .base import DomainService
 from ..entities.evidence import Evidence
 from ..value_objects.confidence import Confidence, EvidenceLevel
-from ...types.domain import EvidenceDerivedProperties
+from ...type_definitions.domain import EvidenceDerivedProperties
 
 
 class EvidenceDomainService(DomainService):

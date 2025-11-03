@@ -8,7 +8,8 @@ from __future__ import annotations
 import gzip
 from typing import Any, Dict, List, Optional, Set, Union, cast
 from urllib.parse import urlparse
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
+from xml.etree.ElementTree import Element
 
 from .base_ingestor import BaseIngestor
 
@@ -331,7 +332,7 @@ class HPOIngestor(BaseIngestor):
 
         return phenotypes
 
-    def _parse_owl_class(self, class_elem: ET.Element) -> Optional[Dict[str, Any]]:
+    def _parse_owl_class(self, class_elem: Element) -> Optional[Dict[str, Any]]:
         """Parse individual OWL class element."""
         # Simplified OWL class parsing
         # In production would be much more comprehensive

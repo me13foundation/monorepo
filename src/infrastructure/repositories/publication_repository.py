@@ -9,7 +9,7 @@ from src.domain.repositories.publication_repository import (
     PublicationRepository as PublicationRepositoryInterface,
 )
 from src.domain.repositories.base import QuerySpecification
-from src.types.common import PublicationUpdate
+from src.type_definitions.common import PublicationUpdate
 from src.infrastructure.mappers.publication_mapper import PublicationMapper
 from src.models.database import PublicationType as DbPublicationType
 from src.repositories.publication_repository import PublicationRepository

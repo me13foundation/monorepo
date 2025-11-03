@@ -8,7 +8,8 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import Any, Dict, List, Optional
-from xml.etree import ElementTree as ET
+from defusedxml import ElementTree as ET
+from xml.etree.ElementTree import Element
 
 import httpx
 
@@ -225,7 +226,7 @@ class UniProtIngestor(BaseIngestor):
         ns = {"u": "http://uniprot.org/uniprot", "u2": "https://uniprot.org/uniprot"}
 
         # Try finding entries with different namespace approaches
-        entries: List[ET.Element] = []
+        entries: List[Element] = []
         for ns_name in ["u", "u2"]:
             entries = root.findall(f".//{ns_name}:entry", ns)
             if entries:
@@ -244,7 +245,7 @@ class UniProtIngestor(BaseIngestor):
 
         return records
 
-    def _parse_xml_entry(self, entry: ET.Element) -> Dict[str, Any]:
+    def _parse_xml_entry(self, entry: Element) -> Dict[str, Any]:
         """
         Parse XML entry element into dictionary format.
 
@@ -351,7 +352,7 @@ class UniProtIngestor(BaseIngestor):
 
         return record
 
-    def _parse_protein_description(self, protein_elem: ET.Element) -> Dict[str, Any]:
+    def _parse_protein_description(self, protein_elem: Element) -> Dict[str, Any]:
         """Parse protein description element."""
         ns = {"u": "https://uniprot.org/uniprot"}
         desc: Dict[str, Any] = {}
@@ -365,7 +366,7 @@ class UniProtIngestor(BaseIngestor):
 
         return desc
 
-    def _parse_organism(self, organism_elem: ET.Element) -> Dict[str, Any]:
+    def _parse_organism(self, organism_elem: Element) -> Dict[str, Any]:
         """Parse organism element."""
         ns = {"u": "https://uniprot.org/uniprot"}
         org: Dict[str, Any] = {}
@@ -387,7 +388,7 @@ class UniProtIngestor(BaseIngestor):
 
         return org
 
-    def _parse_comment(self, comment_elem: ET.Element) -> Dict[str, Any]:
+    def _parse_comment(self, comment_elem: Element) -> Dict[str, Any]:
         """Parse comment element."""
         ns = {"u": "https://uniprot.org/uniprot"}
         comment: Dict[str, Any] = {"commentType": comment_elem.get("type")}
@@ -410,7 +411,7 @@ class UniProtIngestor(BaseIngestor):
 
         return comment
 
-    def _parse_reference(self, ref_elem: ET.Element) -> Dict[str, Any]:
+    def _parse_reference(self, ref_elem: Element) -> Dict[str, Any]:
         """Parse reference element."""
         ns = {"u": "https://uniprot.org/uniprot"}
         ref: Dict[str, Any] = {}
@@ -432,7 +433,7 @@ class UniProtIngestor(BaseIngestor):
 
         return ref
 
-    def _parse_feature(self, feature_elem: ET.Element) -> Dict[str, Any]:
+    def _parse_feature(self, feature_elem: Element) -> Dict[str, Any]:
         """Parse feature element."""
         ns = {"u": "https://uniprot.org/uniprot"}
         feature: Dict[str, Any] = {

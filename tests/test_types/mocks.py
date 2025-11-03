@@ -12,13 +12,11 @@ from src.domain.entities.variant import Variant
 from src.domain.entities.phenotype import Phenotype
 from src.domain.entities.evidence import Evidence
 from src.domain.entities.publication import Publication
-from src.domain.repositories.gene_repository import GeneRepositoryInterface
-from src.domain.repositories.variant_repository import VariantRepositoryInterface
-from src.domain.repositories.phenotype_repository import PhenotypeRepositoryInterface
-from src.domain.repositories.evidence_repository import EvidenceRepositoryInterface
-from src.domain.repositories.publication_repository import (
-    PublicationRepositoryInterface,
-)
+from src.domain.repositories.gene_repository import GeneRepository
+from src.domain.repositories.variant_repository import VariantRepository
+from src.domain.repositories.phenotype_repository import PhenotypeRepository
+from src.domain.repositories.evidence_repository import EvidenceRepository
+from src.domain.repositories.publication_repository import PublicationRepository
 from src.services.domain.gene_service import GeneService as GeneDomainService
 from src.services.domain.variant_service import VariantService as VariantDomainService
 from src.services.domain.evidence_service import (
@@ -34,7 +32,7 @@ from .fixtures import (
 )
 
 
-class MockGeneRepository(GeneRepositoryInterface):
+class MockGeneRepository(GeneRepository):
     """Type-safe mock gene repository for testing."""
 
     def __init__(self, genes: Optional[List[TestGene]] = None):
@@ -155,7 +153,7 @@ class MockGeneRepository(GeneRepositoryInterface):
             del self._genes[gene_id]
 
 
-class MockVariantRepository(VariantRepositoryInterface):
+class MockVariantRepository(VariantRepository):
     """Type-safe mock variant repository for testing."""
 
     def __init__(self, variants: Optional[List[TestVariant]] = None):
@@ -282,7 +280,7 @@ class MockVariantRepository(VariantRepositoryInterface):
             del self._variants[variant_id]
 
 
-class MockPhenotypeRepository(PhenotypeRepositoryInterface):
+class MockPhenotypeRepository(PhenotypeRepository):
     """Type-safe mock phenotype repository for testing."""
 
     def __init__(self, phenotypes: Optional[List[TestPhenotype]] = None):
@@ -372,7 +370,7 @@ class MockPhenotypeRepository(PhenotypeRepositoryInterface):
             del self._phenotypes[phenotype_id]
 
 
-class MockEvidenceRepository(EvidenceRepositoryInterface):
+class MockEvidenceRepository(EvidenceRepository):
     """Type-safe mock evidence repository for testing."""
 
     def __init__(self, evidence_list: Optional[List[TestEvidence]] = None):
@@ -461,7 +459,7 @@ class MockEvidenceRepository(EvidenceRepositoryInterface):
             del self._evidence[evidence_id]
 
 
-class MockPublicationRepository(PublicationRepositoryInterface):
+class MockPublicationRepository(PublicationRepository):
     """Type-safe mock publication repository for testing."""
 
     def __init__(self, publications: Optional[List[TestPublication]] = None):

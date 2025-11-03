@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .base import Repository
 from ..entities.publication import Publication
-from ...types.common import PublicationUpdate
+from ...type_definitions.common import PublicationUpdate
 
 
 class PublicationRepository(Repository[Publication, int]):

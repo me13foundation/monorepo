@@ -5,7 +5,8 @@ Parses ClinVar XML data into structured variant records with clinical
 significance, gene associations, and phenotype information.
 """
 
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
@@ -150,7 +151,7 @@ class ClinVarParser:
 
         return parsed_variants
 
-    def _extract_variant_info(self, root: ET.Element) -> Dict[str, Any]:
+    def _extract_variant_info(self, root: Element) -> Dict[str, Any]:
         """Extract basic variant information from XML."""
         info: Dict[str, Any] = {}
 
@@ -166,7 +167,7 @@ class ClinVarParser:
 
         return info
 
-    def _extract_gene_info(self, root: ET.Element) -> Dict[str, Any]:
+    def _extract_gene_info(self, root: Element) -> Dict[str, Any]:
         """Extract gene information from XML."""
         info: Dict[str, Any] = {}
 
@@ -179,7 +180,7 @@ class ClinVarParser:
 
         return info
 
-    def _extract_location_info(self, root: ET.Element) -> Dict[str, Any]:
+    def _extract_location_info(self, root: Element) -> Dict[str, Any]:
         """Extract genomic location information from XML."""
         info: Dict[str, Any] = {}
 
@@ -200,7 +201,7 @@ class ClinVarParser:
 
         return info
 
-    def _extract_clinical_info(self, root: ET.Element) -> Dict[str, Any]:
+    def _extract_clinical_info(self, root: Element) -> Dict[str, Any]:
         """Extract clinical information from XML."""
         info: Dict[str, Any] = {"phenotypes": []}
 

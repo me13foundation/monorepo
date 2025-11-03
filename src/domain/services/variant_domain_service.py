@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 from .base import DomainService
 from ..entities.variant import Variant, VariantType
-from ...types.domain import VariantDerivedProperties
+from ...type_definitions.domain import VariantDerivedProperties
 
 
 class VariantDomainService(DomainService):

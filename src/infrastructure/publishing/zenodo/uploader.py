@@ -7,7 +7,7 @@ from typing import List
 import logging
 
 from .client import ZenodoClient
-from ....types.external_apis import ZenodoMetadata, ZenodoDepositResponse
+from ....type_definitions.external_apis import ZenodoMetadata, ZenodoDepositResponse
 
 logger = logging.getLogger(__name__)
 

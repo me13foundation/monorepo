@@ -12,7 +12,7 @@ from src.domain.entities.variant import (
 from src.domain.repositories.variant_repository import (
     VariantRepository as VariantRepositoryInterface,
 )
-from src.types.common import VariantUpdate
+from src.type_definitions.common import VariantUpdate
 from src.domain.repositories.base import QuerySpecification
 from src.infrastructure.mappers.variant_mapper import VariantMapper
 from src.repositories.variant_repository import VariantRepository

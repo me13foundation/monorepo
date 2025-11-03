@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, cast
 
 import httpx
 
-from ....types.external_apis import (
+from ....type_definitions.external_apis import (
     ZenodoMetadata,
     ZenodoDepositResponse,
     ZenodoPublishResponse,

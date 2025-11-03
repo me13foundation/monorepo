@@ -1094,4 +1094,4 @@ def handle_clear_filters(n_clicks: Optional[int]) -> Tuple[Any, Any, Any, Any, A
 
 if __name__ == "__main__":
     logger.info("Starting MED13 Curation Dashboard...")
-    app.run(host="0.0.0.0", port=8050, debug=True)
+    app.run(host="127.0.0.1", port=8050, debug=True)

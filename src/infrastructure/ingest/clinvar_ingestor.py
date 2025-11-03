@@ -10,7 +10,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from .base_ingestor import BaseIngestor
-from ...types.external_apis import ClinVarSearchResponse
+from ...type_definitions.external_apis import ClinVarSearchResponse
 from ..validation.api_response_validator import APIResponseValidator
 
 logger = logging.getLogger(__name__)

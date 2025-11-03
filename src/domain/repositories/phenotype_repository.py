@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from .base import Repository
 from ..entities.phenotype import Phenotype
-from ...types.common import PhenotypeUpdate
+from ...type_definitions.common import PhenotypeUpdate
 
 
 class PhenotypeRepository(Repository[Phenotype, int]):

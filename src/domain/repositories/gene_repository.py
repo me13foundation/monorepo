@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 from .base import Repository
 from ..entities.gene import Gene
 from ..value_objects.identifiers import GeneIdentifier
-from ...types.common import GeneUpdate
+from ...type_definitions.common import GeneUpdate
 
 
 class GeneRepository(Repository[Gene, int]):
