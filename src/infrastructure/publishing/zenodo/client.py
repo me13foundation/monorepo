@@ -11,6 +11,12 @@ from typing import Any, Dict, List, Optional, cast
 
 import httpx
 
+from ....types.external_apis import (
+    ZenodoMetadata,
+    ZenodoDepositResponse,
+    ZenodoPublishResponse,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,9 +53,9 @@ class ZenodoClient:
 
     async def create_deposit(
         self,
-        metadata: Dict[str, Any],
+        metadata: ZenodoMetadata,
         files: Optional[List[Path]] = None,
-    ) -> Dict[str, Any]:
+    ) -> ZenodoDepositResponse:
         """
         Create a new deposit on Zenodo.
 
@@ -75,7 +81,7 @@ class ZenodoClient:
             if files:
                 await self._upload_files(client, bucket_url, files)
 
-            return deposit
+            return cast(ZenodoDepositResponse, deposit)
 
     async def _upload_files(
         self,
@@ -108,7 +114,7 @@ class ZenodoClient:
                 )
                 response.raise_for_status()
 
-    async def publish_deposit(self, deposit_id: int) -> Dict[str, Any]:
+    async def publish_deposit(self, deposit_id: int) -> ZenodoPublishResponse:
         """
         Publish a deposit (mint DOI).
 
@@ -124,7 +130,7 @@ class ZenodoClient:
             )
             response = await client.post(publish_url, headers=self.headers)
             response.raise_for_status()
-            return cast(Dict[str, Any], response.json())
+            return cast(ZenodoPublishResponse, response.json())
 
     async def get_deposit(self, deposit_id: int) -> Dict[str, Any]:
         """

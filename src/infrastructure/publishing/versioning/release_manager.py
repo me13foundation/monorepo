@@ -4,7 +4,7 @@ Release management and orchestration.
 
 from datetime import datetime, UTC
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, cast
 import logging
 
 from src.application.packaging import PackageStorage
@@ -15,6 +15,7 @@ from src.infrastructure.publishing.versioning.semantic_versioner import (
     SemanticVersioner,
     VersionType,
 )
+from src.types.external_apis import ZenodoMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +128,7 @@ class ReleaseManager:
         version: str,
         release_notes: Optional[str],
         additional_metadata: Optional[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+    ) -> ZenodoMetadata:
         """
         Prepare metadata for Zenodo deposit.
 
@@ -169,7 +170,7 @@ class ReleaseManager:
         if additional_metadata:
             metadata["metadata"].update(additional_metadata)
 
-        return metadata
+        return cast(ZenodoMetadata, metadata)
 
     def list_releases(self) -> List[str]:
         """

@@ -6,9 +6,14 @@ Fetches genetic variant data from ClinVar database.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any, Dict, List, Optional
 
 from .base_ingestor import BaseIngestor
+from ...types.external_apis import ClinVarSearchResponse
+from ..validation.api_response_validator import APIResponseValidator
+
+logger = logging.getLogger(__name__)
 
 
 class ClinVarIngestor(BaseIngestor):
@@ -106,8 +111,21 @@ class ClinVarIngestor(BaseIngestor):
         response = await self._make_request("GET", "esearch.fcgi", params=params)
         data = response.json()
 
-        # Extract variant IDs from search results
-        id_list = data.get("esearchresult", {}).get("idlist", [])
+        # Validate response structure with runtime validation
+        validation_result = APIResponseValidator.validate_clinvar_search_response(data)
+
+        if not validation_result["is_valid"]:
+            logger.warning(
+                f"ClinVar search response validation failed: {validation_result['issues']}"
+            )
+            # Fallback to old extraction method
+            id_list = data.get("esearchresult", {}).get("idlist", [])
+            return [str(vid) for vid in id_list]
+
+        # Use validated data
+        validated_data = validation_result["sanitized_data"] or data
+        search_response: ClinVarSearchResponse = validated_data
+        id_list = search_response["esearchresult"]["idlist"]
         return [str(vid) for vid in id_list]
 
     async def _fetch_variant_details(
@@ -140,8 +158,23 @@ class ClinVarIngestor(BaseIngestor):
         )
         summary_data = response.json()
 
+        # Validate response structure with runtime validation
+        validation_result = APIResponseValidator.validate_clinvar_variant_response(
+            summary_data
+        )
+
+        if not validation_result["is_valid"]:
+            logger.warning(
+                f"ClinVar variant response validation failed: {validation_result['issues']}"
+            )
+            # Fallback to old processing
+            variant_response = summary_data
+        else:
+            # Use validated data
+            variant_response = validation_result["sanitized_data"] or summary_data
+
         records: List[Dict[str, Any]] = []
-        for uid, summary in summary_data.get("result", {}).items():
+        for uid, summary in variant_response.get("result", {}).items():
             if uid == "uids":
                 continue
 

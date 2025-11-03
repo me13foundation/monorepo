@@ -3,10 +3,11 @@ File upload handling for Zenodo deposits.
 """
 
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List
 import logging
 
 from .client import ZenodoClient
+from ....types.external_apis import ZenodoMetadata, ZenodoDepositResponse
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +27,9 @@ class ZenodoUploader:
     async def upload_package(
         self,
         package_path: Path,
-        metadata: Dict[str, Any],
+        metadata: ZenodoMetadata,
         include_subdirectories: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> ZenodoDepositResponse:
         """
         Upload a complete package directory to Zenodo.
 
@@ -84,8 +85,8 @@ class ZenodoUploader:
     async def upload_files(
         self,
         files: List[Path],
-        metadata: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        metadata: ZenodoMetadata,
+    ) -> ZenodoDepositResponse:
         """
         Upload a list of files to Zenodo.
 

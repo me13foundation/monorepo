@@ -2,7 +2,7 @@
 DOI minting service for Zenodo deposits.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 import logging
 
 from .client import ZenodoClient
@@ -44,18 +44,19 @@ class DOIService:
         # Publish deposit (this mints the DOI)
         published_deposit = await self.client.publish_deposit(deposit_id)
 
-        # Extract DOI
-        doi = self.client.extract_doi(published_deposit)
+        # Extract DOI (cast to dict for compatibility)
+        doi = self.client.extract_doi(cast(Dict[str, Any], published_deposit))
 
         if not doi:
             raise ValueError("DOI not found in published deposit response")
 
         logger.info(f"DOI minted successfully: {doi}")
 
+        published_dict = cast(Dict[str, Any], published_deposit)
         return {
             "deposit_id": deposit_id,
             "doi": doi,
-            "url": published_deposit.get("links", {}).get("html", ""),
+            "url": published_dict.get("links", {}).get("html", ""),
             "deposit": published_deposit,
         }
 

@@ -17,6 +17,15 @@ from .common import (
     RawRecord,
 )
 
+from .external_apis import (
+    ClinVarSearchResponse,
+    ClinVarVariantResponse,
+    PubMedSearchResponse,
+    PubMedArticleResponse,
+    HPOOntologyResponse,
+    UniProtEntryResponse,
+)
+
 __all__ = [
     "GeneUpdate",
     "VariantUpdate",
@@ -27,4 +36,10 @@ __all__ = [
     "PaginatedResponse",
     "ValidationResult",
     "RawRecord",
+    "ClinVarSearchResponse",
+    "ClinVarVariantResponse",
+    "PubMedSearchResponse",
+    "PubMedArticleResponse",
+    "HPOOntologyResponse",
+    "UniProtEntryResponse",
 ]
