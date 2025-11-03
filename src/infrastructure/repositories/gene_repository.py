@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from sqlalchemy.orm import Session
 
 from src.domain.entities.gene import Gene
 from src.infrastructure.mappers.gene_mapper import GeneMapper
 from src.repositories.gene_repository import GeneRepository
+
+if TYPE_CHECKING:
+    pass
 
 
 class SqlAlchemyGeneRepository:

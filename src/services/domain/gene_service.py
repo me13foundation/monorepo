@@ -4,7 +4,7 @@ Business logic for gene entity operations and validations.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.gene import Gene
@@ -15,11 +15,14 @@ from src.infrastructure.repositories import SqlAlchemyGeneRepository
 from src.repositories import VariantRepository
 from src.services.domain.base_service import BaseService
 
+if TYPE_CHECKING:
+    pass
+
 
 StatisticsValue = int | float | bool | str | None | datetime
 
 
-class GeneService(BaseService[Gene]):
+class GeneService(BaseService[SqlAlchemyGeneRepository]):
     """
     Service for gene business logic and operations.
 

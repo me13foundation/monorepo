@@ -3,7 +3,7 @@ Variant service for MED13 Resource Library.
 Business logic for genetic variant operations.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.evidence import Evidence
@@ -14,10 +14,13 @@ from src.infrastructure.repositories import (
 )
 from src.services.domain.base_service import BaseService
 
+if TYPE_CHECKING:
+    pass
+
 VariantStatisticsValue = int | float | bool | str | None
 
 
-class VariantService(BaseService[Variant]):
+class VariantService(BaseService[SqlAlchemyVariantRepository]):
     """
     Service for variant business logic and operations.
 

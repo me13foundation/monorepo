@@ -3,7 +3,7 @@ Publication service for MED13 Resource Library.
 Business logic for scientific publication operations.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.publication import Publication
@@ -13,10 +13,13 @@ from src.infrastructure.repositories import (
 )
 from src.services.domain.base_service import BaseService
 
+if TYPE_CHECKING:
+    pass
+
 PublicationStatisticsValue = int | float | bool | str | None
 
 
-class PublicationService(BaseService[Publication]):
+class PublicationService(BaseService[SqlAlchemyPublicationRepository]):
     """
     Service for publication business logic and operations.
 

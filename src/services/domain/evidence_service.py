@@ -3,17 +3,20 @@ Evidence service for MED13 Resource Library.
 Business logic for evidence linking variants and phenotypes.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.evidence import Evidence
 from src.infrastructure.repositories import SqlAlchemyEvidenceRepository
 from src.services.domain.base_service import BaseService
 
+if TYPE_CHECKING:
+    pass
+
 EvidenceStatisticsValue = int | float | bool | str | None
 
 
-class EvidenceService(BaseService[Evidence]):
+class EvidenceService(BaseService[SqlAlchemyEvidenceRepository]):
     """
     Service for evidence business logic and operations.
 

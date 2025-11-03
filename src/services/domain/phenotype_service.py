@@ -4,12 +4,15 @@ Business logic for clinical phenotype operations.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
 from src.infrastructure.repositories import SqlAlchemyPhenotypeRepository
 from src.services.domain.base_service import BaseService
+
+if TYPE_CHECKING:
+    pass
 
 
 @dataclass
@@ -19,7 +22,7 @@ class PhenotypeHierarchy:
     parent_hpo_id: Optional[str]
 
 
-class PhenotypeService(BaseService[Phenotype]):
+class PhenotypeService(BaseService[SqlAlchemyPhenotypeRepository]):
     """
     Service for phenotype business logic and operations.
 

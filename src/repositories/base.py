@@ -4,7 +4,7 @@ Provides common database operations following repository pattern.
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, List, Optional, Any, Dict, Type
+from typing import Generic, TypeVar, List, Optional, Any, Dict, Type, Protocol
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.orm import Session, DeclarativeBase
 from sqlalchemy.exc import IntegrityError, NoResultFound
@@ -12,7 +12,52 @@ from sqlalchemy.exc import IntegrityError, NoResultFound
 from src.database.session import get_session
 
 T = TypeVar("T", bound=DeclarativeBase)  # Model type
-ID = TypeVar("ID")  # ID type
+ID = TypeVar("ID", contravariant=True)  # ID type (contravariant for protocol)
+
+
+class RepositoryProtocol(Protocol[T, ID]):
+    """Protocol defining the repository interface."""
+
+    @property
+    def model_class(self) -> Type[T]:
+        ...
+
+    def get_by_id(self, id: ID) -> Optional[T]:
+        ...
+
+    def get_by_id_or_fail(self, id: ID) -> T:
+        ...
+
+    def find_all(
+        self, limit: Optional[int] = None, offset: Optional[int] = None
+    ) -> List[T]:
+        ...
+
+    def find_by_criteria(
+        self, criteria: Dict[str, Any], limit: Optional[int] = None
+    ) -> List[T]:
+        ...
+
+    def create(self, entity: T) -> T:
+        ...
+
+    def update(self, id: ID, updates: Dict[str, Any]) -> T:
+        ...
+
+    def delete(self, id: ID) -> bool:
+        ...
+
+    def count(self) -> int:
+        ...
+
+    def exists(self, id: ID) -> bool:
+        ...
+
+    def save(self) -> None:
+        ...
+
+    def rollback(self) -> None:
+        ...
 
 
 class RepositoryError(Exception):

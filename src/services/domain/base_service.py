@@ -4,13 +4,17 @@ Common functionality for domain services.
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Optional, Any
+from typing import Generic, TypeVar, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    pass
+
+# RepositoryT represents the repository type used by the service
+RepositoryT = TypeVar("RepositoryT")
 
 
-class BaseService(Generic[T], ABC):
+class BaseService(Generic[RepositoryT], ABC):
     """
     Base class for domain services providing common functionality.
 
@@ -24,7 +28,7 @@ class BaseService(Generic[T], ABC):
 
     @property
     @abstractmethod
-    def repository(self) -> Any:
+    def repository(self) -> RepositoryT:
         """Return the repository instance for this service."""
         pass
 
