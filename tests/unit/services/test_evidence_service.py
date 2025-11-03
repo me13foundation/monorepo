@@ -1,6 +1,7 @@
 import pytest
+from typing import Generator
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 
 from src.models.database import (
     Base,
@@ -13,7 +14,8 @@ from src.services.domain.evidence_service import EvidenceService
 
 
 @pytest.fixture
-def session():
+def session() -> Generator[Session, None, None]:
+    """Create an in-memory SQLite session for testing."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
@@ -24,7 +26,7 @@ def session():
         db_session.close()
 
 
-def seed_high_confidence_evidence(db_session) -> None:
+def seed_high_confidence_evidence(db_session: Session) -> None:
     gene = GeneModel(gene_id="GENE001", symbol="MED13")
     db_session.add(gene)
     db_session.flush()
@@ -63,7 +65,7 @@ def seed_high_confidence_evidence(db_session) -> None:
     db_session.commit()
 
 
-def test_evidence_service_high_confidence(session):
+def test_evidence_service_high_confidence(session: Session) -> None:
     seed_high_confidence_evidence(session)
     service = EvidenceService(session)
 
