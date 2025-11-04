@@ -11,6 +11,7 @@ from src.routes.evidence import router as evidence_router
 from src.routes.search import router as search_router
 from src.routes.export import router as export_router
 from src.routes.dashboard import router as dashboard_router
+from src.routes.admin import router as admin_router
 from src.middleware.auth import AuthMiddleware
 from src.middleware.rate_limit import EndpointRateLimitMiddleware
 from src.routes.curation import router as curation_router
@@ -38,8 +39,10 @@ def create_app() -> FastAPI:
         allow_origins=[
             "https://med13foundation.org",
             "https://curate.med13foundation.org",
-            "http://localhost:3000",
-            "http://localhost:8080",
+            "https://admin.med13foundation.org",
+            "http://localhost:3000",  # Next.js admin interface
+            "http://localhost:8050",  # Dash curation interface
+            "http://localhost:8080",  # FastAPI backend
         ],
         allow_methods=["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
@@ -91,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(search_router)
     app.include_router(export_router)
     app.include_router(dashboard_router)
+    app.include_router(admin_router)
     app.include_router(curation_router)
 
     return app
