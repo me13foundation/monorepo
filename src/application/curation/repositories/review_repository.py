@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Protocol, Sequence
+from typing import List, Optional, Protocol, Sequence
 
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,11 @@ class ReviewRepository(Protocol):
         ...
 
     def add(self, db: Session, record: ReviewRecord) -> ReviewRecord:
+        ...
+
+    def find_by_entity(
+        self, db: Session, entity_type: str, entity_id: str
+    ) -> Optional[ReviewRecord]:
         ...
 
 
@@ -55,6 +60,19 @@ class SqlAlchemyReviewRepository:
         db.commit()
         db.refresh(record)
         return record
+
+    def find_by_entity(
+        self, db: Session, entity_type: str, entity_id: str
+    ) -> Optional[ReviewRecord]:
+        return (
+            db.query(ReviewRecord)
+            .filter(
+                ReviewRecord.entity_type == entity_type,
+                ReviewRecord.entity_id == entity_id,
+            )
+            .order_by(ReviewRecord.last_updated.desc())
+            .first()
+        )
 
 
 __all__ = [

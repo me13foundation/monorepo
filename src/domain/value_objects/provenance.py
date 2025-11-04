@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Mapping, MutableSequence, Optional, Sequence
 
@@ -23,7 +23,7 @@ class Provenance:
     acquired_by: str
     source_version: Optional[str] = None
     source_url: Optional[str] = None
-    acquired_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    acquired_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     processing_steps: Sequence[str] = field(default_factory=tuple)
     quality_score: Optional[float] = None
     validation_status: str = "pending"

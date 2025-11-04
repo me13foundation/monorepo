@@ -45,7 +45,7 @@ GENE_TP53 = {
 # Variant fixtures
 VARIANT_MED13_PATHOGENIC = {
     "variant_id": "VCV000001234",
-    "clinvar_id": "RCV000001234",
+    "clinvar_id": "VCV000001234",
     "variation_name": "c.1234A>G",
     "gene_references": ["MED13"],
     "clinical_significance": "Pathogenic",
@@ -60,7 +60,7 @@ VARIANT_MED13_PATHOGENIC = {
 
 VARIANT_TP53_BENIGN = {
     "variant_id": "VCV000005678",
-    "clinvar_id": "RCV000005678",
+    "clinvar_id": "VCV000005678",
     "variation_name": "c.215C>G",
     "gene_references": ["TP53"],
     "clinical_significance": "Benign",

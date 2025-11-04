@@ -14,6 +14,7 @@ from src.presentation.dash.pages.review_queue import create_review_page
 from src.presentation.dash.pages.approval_history import create_bulk_page
 from src.presentation.dash.pages.reports import create_reports_page
 from src.presentation.dash.pages.settings import create_settings_page
+from src.presentation.dash.pages.data_sources import create_data_sources_page
 
 
 def register_callbacks(app: Dash) -> None:
@@ -29,6 +30,8 @@ def register_callbacks(app: Dash) -> None:
             page = create_reports_page()
         elif pathname == "/settings":
             page = create_settings_page()
+        elif pathname == "/data-sources":
+            page = create_data_sources_page()
         else:
             page = html.Div(
                 [

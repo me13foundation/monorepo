@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, date
+from datetime import datetime, timezone, date
 from typing import Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -58,8 +58,8 @@ class Publication:
     full_text_url: Optional[str] = None
     open_access: bool = False
     evidence: list["Evidence"] = field(default_factory=list, repr=False)
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     id: Optional[int] = None
 
     def __post_init__(self) -> None:
@@ -114,7 +114,7 @@ class Publication:
         self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = datetime.now(timezone.utc)
 
     @staticmethod
     def _normalize_people(names: Tuple[str, ...]) -> Tuple[str, ...]:

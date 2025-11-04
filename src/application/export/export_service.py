@@ -9,7 +9,7 @@ import gzip
 import json
 from enum import Enum
 from io import StringIO
-from typing import Any, Dict, Generator, List, Optional, Union
+from typing import Any, Dict, Generator, List, Optional, Sequence, Union
 
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.variant_service import VariantApplicationService
@@ -316,16 +316,7 @@ class BulkExportService:
             # Handle nested fields with dot notation (e.g., 'identifier.hpo_id')
             if "." in field:
                 parts = field.split(".")
-                current = serialized
-                for part in parts:
-                    if isinstance(current, dict):
-                        current = current.get(part, "")
-                    elif hasattr(current, part):
-                        current = getattr(current, part, "")
-                    else:
-                        current = ""
-                        break  # type: ignore[unreachable]
-                value = current
+                value = self._resolve_nested_value(serialized, parts)
             # Continue with the rest of the field processing
 
             # Convert complex types to strings
@@ -339,6 +330,18 @@ class BulkExportService:
             row[field] = value
 
         return row
+
+    @staticmethod
+    def _resolve_nested_value(source: Any, path: Sequence[str]) -> Any:
+        current: Any = source
+        for part in path:
+            if isinstance(current, dict):
+                current = current.get(part, "")
+            elif hasattr(current, part):
+                current = getattr(current, part, "")
+            else:
+                return ""
+        return current
 
     def _get_gene_fields(self) -> List[str]:
         """Get field names for gene CSV export."""

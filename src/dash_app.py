@@ -37,6 +37,9 @@ from src.presentation.dash.callbacks.reports_callbacks import (
 from src.presentation.dash.callbacks.settings_callbacks import (
     register_callbacks as register_settings_callbacks,
 )
+from src.presentation.dash.callbacks.data_sources_callbacks import (
+    register_callbacks as register_data_sources_callbacks,
+)
 
 # Import shared components for backward compatibility
 from src.presentation.dash.components.theme import COLORS
@@ -213,6 +216,7 @@ register_review_callbacks(app)
 register_bulk_callbacks(app)
 register_reports_callbacks(app)
 register_settings_callbacks(app)
+register_data_sources_callbacks(app)
 
 
 # Callback for count badges (always visible on all pages)
@@ -387,73 +391,6 @@ def update_activity_feed(
     except Exception as e:
         logger.error(f"Error updating activity feed: {e}")
         return [html.Div("Error loading data")]
-
-
-# Callback for review table data
-@app.callback(
-    Output("review-table", "data"),
-    [
-        Input("apply-filters-btn", "n_clicks"),
-        Input("interval-component", "n_intervals"),
-    ],
-    [
-        State("entity-type-filter", "value"),
-        State("status-filter", "value"),
-        State("priority-filter", "value"),
-        State("settings-store", "data"),
-        State("review-table", "selected_rows"),
-    ],
-)
-def update_review_table(
-    n_clicks: Optional[int],
-    n_intervals: int,
-    entity_type: Optional[str],
-    status: Optional[str],
-    priority: Optional[str],
-    settings: Optional[SettingsDict],
-    selected_rows: Optional[List[int]],
-) -> List[TableRow]:
-    """Update the review table with filtered data."""
-    try:
-        # Mock data for now - replace with actual API calls
-        mock_data = [
-            {
-                "select": "",
-                "id": "1",
-                "entity": "BRCA1",
-                "status": "pending",
-                "quality_score": 0.85,
-                "issues": 2,
-                "last_updated": "2024-01-15T10:30:00",
-                "actions": "[Approve](#) | [Reject](#) | [Details](#)",
-            },
-            {
-                "select": "",
-                "id": "2",
-                "entity": "rs123456",
-                "status": "quarantined",
-                "quality_score": 0.45,
-                "issues": 5,
-                "last_updated": "2024-01-15T09:15:00",
-                "actions": "[Approve](#) | [Reject](#) | [Details](#)",
-            },
-            {
-                "select": "",
-                "id": "3",
-                "entity": "HP:0000118",
-                "status": "approved",
-                "quality_score": 0.95,
-                "issues": 0,
-                "last_updated": "2024-01-15T08:45:00",
-                "actions": "[Approve](#) | [Reject](#) | [Details](#)",
-            },
-        ]
-
-        return mock_data
-
-    except Exception as e:
-        logger.error(f"Error updating review table: {e}")
-        return []
 
 
 # Callback for dashboard page charts (always visible)
@@ -676,20 +613,6 @@ def save_settings(
     except Exception as e:
         logger.error(f"Error saving settings: {e}")
         return current_settings or {}
-
-
-# Callback for selected items count
-@app.callback(
-    Output("selected-count", "children"),
-    Input("review-table", "selected_rows"),
-    State("review-table", "data"),
-)
-def update_selected_count(
-    selected_rows: Optional[List[int]], table_data: Optional[List[TableRow]]
-) -> str:
-    """Update the count of selected items."""
-    count = len(selected_rows) if selected_rows else 0
-    return f"{count} items selected"
 
 
 # Callback for bulk operations

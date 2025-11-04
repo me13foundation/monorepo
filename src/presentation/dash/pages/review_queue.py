@@ -11,6 +11,18 @@ from src.presentation.dash.components.curation.clinical_card import (
     create_clinical_card_grid,
     create_enhanced_filters,
 )
+from src.presentation.dash.components.curation.clinical_viewer import (
+    render_clinical_viewer,
+)
+from src.presentation.dash.components.curation.evidence_comparison import (
+    render_evidence_matrix,
+)
+from src.presentation.dash.components.curation.conflict_panel import (
+    render_conflict_panel,
+)
+from src.presentation.dash.components.curation.audit_summary import (
+    render_audit_summary,
+)
 
 DropdownOption = Dropdown.Options
 
@@ -275,6 +287,68 @@ def create_review_page() -> dbc.Container:
                                                         }
                                                     ],
                                                 ),
+                                            ),
+                                            dcc.Store(
+                                                id="curation-detail-store",
+                                                data=None,
+                                            ),
+                                            dbc.Card(
+                                                [
+                                                    dbc.CardHeader(
+                                                        html.Div(
+                                                            [
+                                                                html.H4(
+                                                                    "Clinical Detail",
+                                                                    className="mb-0",
+                                                                ),
+                                                                dbc.Badge(
+                                                                    "Context",
+                                                                    color="primary",
+                                                                    className="ms-2",
+                                                                ),
+                                                            ],
+                                                            className="d-flex align-items-center",
+                                                        )
+                                                    ),
+                                                    dbc.CardBody(
+                                                        dcc.Loading(
+                                                            id="curation-detail-loading",
+                                                            type="default",
+                                                            children=[
+                                                                html.Div(
+                                                                    id="curation-summary-panel",
+                                                                    children=render_clinical_viewer(
+                                                                        None, ()
+                                                                    ),
+                                                                ),
+                                                                html.Hr(),
+                                                                html.Div(
+                                                                    id="curation-evidence-panel",
+                                                                    children=render_evidence_matrix(
+                                                                        ()
+                                                                    ),
+                                                                ),
+                                                                html.Hr(),
+                                                                html.Div(
+                                                                    id="curation-conflict-panel",
+                                                                    children=render_conflict_panel(
+                                                                        ()
+                                                                    ),
+                                                                ),
+                                                                html.Hr(),
+                                                                html.Div(
+                                                                    id="curation-audit-panel",
+                                                                    children=render_audit_summary(
+                                                                        None
+                                                                    ),
+                                                                ),
+                                                            ],
+                                                        )
+                                                    ),
+                                                ],
+                                                id="curation-detail-container",
+                                                className="mt-4 shadow-sm",
+                                                style={"display": "none"},
                                             ),
                                         ]
                                     ),

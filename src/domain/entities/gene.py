@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import re
 from typing import Optional
 
@@ -39,8 +39,8 @@ class Gene:
     start_position: Optional[int] = None
     end_position: Optional[int] = None
     provenance: Optional[Provenance] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     id: Optional[int] = None
     variants: list[VariantSummary] = field(default_factory=list, repr=False)
 
@@ -200,7 +200,7 @@ class Gene:
         self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = datetime.now(timezone.utc)
 
     @staticmethod
     def _normalize_chromosome(chromosome: str) -> str:

@@ -102,8 +102,8 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         return PhenotypeMapper.to_domain(model) if model else None
 
     def find_by_gene_associations(self, gene_id: int) -> List[Phenotype]:
-        # Placeholder implementation
-        return []
+        models = self._repository.find_by_gene_associations(gene_id)
+        return PhenotypeMapper.to_domain_sequence(models)
 
     def find_by_name(self, name: str, fuzzy: bool = False) -> List[Phenotype]:
         models = self._repository.search_phenotypes(name, limit=10)
@@ -113,8 +113,8 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         return self.find_by_hpo_id(term_id)
 
     def find_by_variant_associations(self, variant_id: int) -> List[Phenotype]:
-        # Placeholder implementation
-        return []
+        models = self._repository.find_by_variant_associations(variant_id)
+        return PhenotypeMapper.to_domain_sequence(models)
 
     def paginate_phenotypes(
         self,

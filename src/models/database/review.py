@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from sqlalchemy import String, Integer, Float, DateTime
@@ -20,7 +20,7 @@ class ReviewRecord(Base):
     quality_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     issues: Mapped[int] = mapped_column(Integer, default=0)
     last_updated: Mapped[datetime] = mapped_column(
-        DateTime, default=lambda: datetime.now(UTC)
+        DateTime, default=lambda: datetime.now(timezone.utc)
     )
 
 

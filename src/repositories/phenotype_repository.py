@@ -7,7 +7,12 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy import select, or_
 
 from .base import BaseRepository, NotFoundError
-from src.models.database import PhenotypeModel, PhenotypeCategory
+from src.models.database import (
+    PhenotypeModel,
+    PhenotypeCategory,
+    EvidenceModel,
+    VariantModel,
+)
 
 
 class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
@@ -165,3 +170,28 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
         if phenotype is None:
             raise NotFoundError(f"Phenotype with HPO ID '{hpo_id}' not found")
         return phenotype
+
+    def find_by_variant_associations(self, variant_id: int) -> List[PhenotypeModel]:
+        """
+        Find phenotypes linked to a variant via evidence associations.
+        """
+        stmt = (
+            select(PhenotypeModel)
+            .join(EvidenceModel, EvidenceModel.phenotype_id == PhenotypeModel.id)
+            .where(EvidenceModel.variant_id == variant_id)
+            .order_by(PhenotypeModel.name.asc())
+        ).distinct()
+        return list(self.session.execute(stmt).scalars())
+
+    def find_by_gene_associations(self, gene_id: int) -> List[PhenotypeModel]:
+        """
+        Find phenotypes indirectly associated with a gene via variants.
+        """
+        stmt = (
+            select(PhenotypeModel)
+            .join(EvidenceModel, EvidenceModel.phenotype_id == PhenotypeModel.id)
+            .join(VariantModel, VariantModel.id == EvidenceModel.variant_id)
+            .where(VariantModel.gene_id == gene_id)
+            .order_by(PhenotypeModel.name.asc())
+        ).distinct()
+        return list(self.session.execute(stmt).scalars())

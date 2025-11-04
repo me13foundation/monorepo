@@ -41,6 +41,13 @@ def create_header() -> dbc.Navbar:
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
+                                        "Data Sources",
+                                        href="/data-sources",
+                                        active="exact",
+                                    )
+                                ),
+                                dbc.NavItem(
+                                    dbc.NavLink(
                                         "Settings", href="/settings", active="exact"
                                     )
                                 ),

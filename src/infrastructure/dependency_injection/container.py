@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     )
     from src.application.search.search_service import UnifiedSearchService
     from src.application.export.export_service import BulkExportService
+    from src.application.curation.services.detail_service import CurationDetailService
 
 # Domain services
 from src.domain.services.gene_domain_service import GeneDomainService
@@ -189,6 +190,35 @@ class DependencyContainer:
             variant_service=self.create_variant_application_service(),
             phenotype_service=self.create_phenotype_application_service(),
             evidence_service=self.create_evidence_application_service(),
+        )
+
+    def create_curation_detail_service(self) -> "CurationDetailService":
+        """Create the curation detail service used by curator workflows."""
+        from src.application.curation.conflict_detector import ConflictDetector
+        from src.application.curation.services.detail_service import (
+            CurationDetailService,
+        )
+        from src.application.curation.repositories.review_repository import (
+            SqlAlchemyReviewRepository,
+        )
+
+        if self._session is None:
+            raise RuntimeError(
+                "Curation detail service requires an active database session"
+            )
+
+        conflict_detector = ConflictDetector(
+            variant_domain_service=self.variant_domain_service,
+            evidence_domain_service=self.evidence_domain_service,
+        )
+
+        return CurationDetailService(
+            variant_service=self.create_variant_application_service(),
+            evidence_service=self.create_evidence_application_service(),
+            phenotype_repository=self.phenotype_repository,
+            conflict_detector=conflict_detector,
+            review_repository=SqlAlchemyReviewRepository(),
+            db_session=self._session,
         )
 
     # Curation Services - TODO: Fix ApprovalService constructor

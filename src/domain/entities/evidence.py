@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional
 
 from src.domain.entities.variant import VariantSummary
@@ -61,8 +61,8 @@ class Evidence:
     reviewed: bool = False
     review_date: Optional[date] = None
     reviewer_notes: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     id: Optional[int] = None
 
     def __post_init__(self) -> None:
@@ -99,7 +99,7 @@ class Evidence:
         return confidence
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = datetime.now(timezone.utc)
 
 
 __all__ = ["Evidence", "EvidenceType"]

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 import re
 from typing import Optional
 
@@ -91,8 +91,8 @@ class Variant:
     review_status: Optional[str] = None
     allele_frequency: Optional[float] = None
     gnomad_af: Optional[float] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     id: Optional[int] = None
     evidence_count: int = 0
     evidence: list[EvidenceSummary] = field(default_factory=list, repr=False)
@@ -250,7 +250,7 @@ class Variant:
         self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(UTC)
+        self.updated_at = datetime.now(timezone.utc)
 
     @staticmethod
     def _compose_variant_id(

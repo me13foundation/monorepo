@@ -159,6 +159,68 @@ A top-level dashboard provides feedback loops:
 
 ---
 
+## **6.5 Operational Workflow (Back-End + UI Contract)**
+
+To deliver the enhanced experience, the curation dashboard will consume a single **Curated Record Detail** payload produced by new back-end services and rendered through the Dash component stack.
+
+### **System Flow**
+1. **Queue Selection**
+   Reviewer selects a card in the review queue. Dash emits a detail request to FastAPI.
+2. **Detail Aggregation**
+   FastAPI resolves the `CurationDetailService`, which:
+   * Pulls primary entities (variant, linked phenotypes, evidence) through existing application services.
+   * Invokes the new `ConflictDetector` to generate structured conflict summaries and severity levels.
+   * Packages provenance, audit state, and recommended actions into a typed DTO.
+3. **Payload Serialization**
+   Route serializer converts the DTO into JSON shaped for the front end:
+   ```json
+   {
+     "variant": {...},
+     "phenotypes": [...],
+     "evidence": [...],
+     "conflicts": [...],
+     "provenance": {...},
+     "audit": {...}
+   }
+   ```
+4. **Dash Rendering**
+   The payload is cached in a `dcc.Store` and handed to:
+   * `clinical_viewer` – summary + provenance display.
+   * `evidence_comparison` – source-by-source comparison matrix.
+   * `conflict_panel` – badges, severity, and available resolution actions.
+5. **Reviewer Action**
+   Resolution actions (approve, override, requeue) POST back to `/curation/.../decisions`, which records outcomes through the existing `ReviewService`, emits domain events, and updates audit history.
+
+### **Key New Modules**
+```python
+src/application/curation/
+├── conflict_detector.py        # Evidence & significance reconciliation
+├── services/
+│   └── detail_service.py       # Aggregates curated record payloads
+└── dto.py                      # Typed response objects for curation detail
+
+src/routes/
+└── curation.py                 # Adds GET /curation/{entity_type}/{entity_id}
+
+src/presentation/dash/components/curation/
+├── clinical_viewer.py
+├── evidence_comparison.py
+└── conflict_panel.py
+```
+
+### **Data Contract Highlights**
+* **ConflictSummary** – `{ "kind": "clinical_significance", "severity": "high", "evidence_ids": [...], "message": "Pathogenic vs benign interpretations" }`
+* **EvidenceSnapshot** – normalized representation combining level, source, assertions, confidence score, and supporting references.
+* **AuditInfo** – reviewer assignments, last decision, outstanding tasks, and link to annotation history.
+
+This workflow enforces separation of concerns: heavy analysis lives in the application layer, the API exposes a consistent contract, and Dash focuses solely on rendering and user interaction.
+
+### **Local Demo Seed**
+
+Run `make db-seed` to populate a demo MED13 variant with linked phenotypes, evidence, review metadata, and an audit comment. The script (`scripts/seed_database.py`) is idempotent and ensures the curation dashboard always has illustrative data when developing locally.
+
+---
+
 ## **7. Enhanced Visual System & Components**
 
 ### **Expanded Color & Typography**

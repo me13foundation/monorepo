@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
+from src.infrastructure.dependency_injection import DependencyContainer
 from src.application.curation.repositories.review_repository import (
     SqlAlchemyReviewRepository,
 )
@@ -16,6 +17,7 @@ from src.application.curation.repositories.audit_repository import (
 from src.application.curation.services.review_service import ReviewService, ReviewQuery
 from src.application.curation.services.approval_service import ApprovalService
 from src.application.curation.services.comment_service import CommentService
+from src.application.curation.services.detail_service import CurationDetailService
 from src.models.database.review import ReviewRecord
 
 
@@ -58,6 +60,13 @@ def _approval_service() -> ApprovalService:
 
 def _comment_service() -> CommentService:
     return CommentService(SqlAlchemyAuditRepository())
+
+
+def _curation_detail_service(
+    db: Session = Depends(get_session),
+) -> CurationDetailService:
+    container = DependencyContainer(db)
+    return container.create_curation_detail_service()
 
 
 @router.get("/queue", response_model=list[Dict[str, Any]])
@@ -124,3 +133,28 @@ def comment(req: CommentRequest, db: Session = Depends(get_session)) -> Dict[str
         db, req.entity_type, req.entity_id, req.comment, req.user
     )
     return {"id": comment_id}
+
+
+@router.get("/{entity_type}/{entity_id}", response_model=Dict[str, Any])
+def get_curated_detail(
+    entity_type: str,
+    entity_id: str,
+    service: CurationDetailService = Depends(_curation_detail_service),
+) -> Dict[str, Any]:
+    """
+    Retrieve enriched detail payload for a queued entity.
+
+    Currently supports variant entities and returns a structure compatible
+    with the Dash curation interface.
+    """
+    try:
+        detail = service.get_detail(entity_type, entity_id)
+        return dict(detail.to_serializable())
+    except ValueError as exc:
+        message = str(exc)
+        status_code = (
+            status.HTTP_404_NOT_FOUND
+            if "not found" in message.lower()
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(status_code=status_code, detail=message) from exc
