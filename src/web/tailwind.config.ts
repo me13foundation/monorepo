@@ -87,10 +87,10 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],
-        heading: ["var(--font-heading)", "system-ui", "-apple-system", "sans-serif"],
-        serif: ["var(--font-serif)", "Georgia", "serif"],
-        mono: ["var(--font-mono)", "Menlo", "monospace"],
+        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        heading: ["Nunito Sans", "system-ui", "-apple-system", "sans-serif"],
+        serif: ["Playfair Display", "Georgia", "serif"],
+        mono: ["JetBrains Mono", "Fira Code", "Menlo", "monospace"],
       },
       keyframes: {
         "accordion-down": {

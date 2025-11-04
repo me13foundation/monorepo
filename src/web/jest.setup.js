@@ -24,7 +24,11 @@ jest.mock('next/navigation', () => ({
   usePathname() {
     return '/'
   },
-  redirect: jest.fn(),
+  redirect: jest.fn((url) => {
+    const error = new Error('NEXT_REDIRECT')
+    error.digest = `NEXT_REDIRECT;${url}`
+    throw error
+  }),
 }))
 
 // Mock next-themes

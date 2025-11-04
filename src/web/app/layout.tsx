@@ -1,17 +1,10 @@
 import type { Metadata } from 'next'
-import { Inter, Nunito_Sans, Playfair_Display } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 
-const inter = Inter({ subsets: ['latin'] })
-const nunitoSans = Nunito_Sans({
+const inter = Inter({
   subsets: ['latin'],
-  variable: '--font-heading',
-  display: 'swap'
-})
-const playfairDisplay = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-serif',
   display: 'swap'
 })
 
@@ -29,7 +22,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={`${nunitoSans.variable} ${playfairDisplay.variable}`} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider
           attribute="class"

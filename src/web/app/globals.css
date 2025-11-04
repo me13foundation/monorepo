@@ -53,11 +53,7 @@
   --chart-4: 143 58% 38%;
   --chart-5: 28 78% 52%;
 
-  /* Typography - Readable, Modern, Gentle */
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Nunito Sans', system-ui, -apple-system, sans-serif;
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --font-mono: Menlo, monospace;
+           /* Typography - Readable, Modern, Gentle */
 
   --radius: .5rem;
 

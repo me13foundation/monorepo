@@ -47,7 +47,7 @@ define check_venv
 	fi
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all ci check-env docs-serve backup-db restore-db activate deactivate
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all
 
 # Default target
 help: ## Show this help message
@@ -166,6 +166,21 @@ run-dash: ## Run the Dash curation interface locally
 run-web: ## Run the Next.js admin interface locally
 	cd src/web && npm run dev
 
+stop-local: ## Stop the local FastAPI backend
+	@echo "Stopping FastAPI backend..."
+	-pkill -f "uvicorn main:app" || echo "No FastAPI process found"
+
+stop-dash: ## Stop the Dash curation interface
+	@echo "Stopping Dash UI..."
+	-pkill -f "dash_app" || echo "No Dash process found"
+
+stop-web: ## Stop the Next.js admin interface
+	@echo "Stopping Next.js admin interface..."
+	-pkill -f "npm run dev" || echo "No Next.js process found"
+
+stop-all: stop-local stop-dash stop-web docker-stop ## Stop all services (local + Docker)
+	@echo "All services stopped"
+
 run-docker: docker-build ## Build and run with Docker
 	docker run -p 8080:8080 med13-resource-library
 
@@ -175,6 +190,11 @@ docker-build: ## Build Docker image
 
 docker-run: ## Run Docker container
 	docker run -p 8080:8080 med13-resource-library
+
+docker-stop: ## Stop and remove Docker container
+	@echo "Stopping Docker container..."
+	-docker stop $$(docker ps -q --filter ancestor=med13-resource-library) || echo "No running containers found"
+	-docker rm $$(docker ps -aq --filter ancestor=med13-resource-library) || echo "No containers to remove"
 
 docker-push: docker-build ## Build and push Docker image to GCR
 	docker tag med13-resource-library gcr.io/YOUR_PROJECT_ID/med13-resource-library
@@ -281,7 +301,7 @@ venv-check: ## Ensure virtual environment is active
 		exit 1; \
 	fi
 
-all: venv-check check-env format lint type-check web-build web-lint web-type-check test security-audit ## Run complete quality assurance suite (pre-commit checklist)
+all: venv-check check-env format lint type-check web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (pre-commit checklist)
 
 # CI/CD Simulation
 ci: install-dev lint test security-audit ## Run full CI pipeline locally
