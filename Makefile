@@ -163,6 +163,9 @@ run-dash: ## Run the Dash curation interface locally
 	$(call check_venv)
 	$(USE_PYTHON) -c "from src.dash_app import app; app.run(host='0.0.0.0', port=8050, debug=True)"
 
+run-web: ## Run the Next.js admin interface locally
+	cd src/web && npm run dev
+
 run-docker: docker-build ## Build and run with Docker
 	docker run -p 8080:8080 med13-resource-library
 
@@ -216,6 +219,12 @@ deploy-prod: ## Deploy to production environment
 		--allow-unauthenticated=false \
 		--service-account med13-prod@YOUR_PROJECT_ID.iam.gserviceaccount.com
 
+	gcloud run deploy med13-admin \
+		--source . \
+		--region us-central1 \
+		--allow-unauthenticated=false \
+		--service-account med13-prod@YOUR_PROJECT_ID.iam.gserviceaccount.com
+
 # Cloud Operations
 cloud-logs: ## View Cloud Run logs
 	gcloud logs read "resource.type=cloud_run_revision AND resource.labels.service_name=med13-resource-library" --limit=50
@@ -242,6 +251,22 @@ clean-all: clean ## Clean everything including build artifacts
 	rm -rf .coverage
 	rm -rf pip-audit-results.json
 
+# Next.js Admin Interface
+web-install: ## Install Next.js dependencies
+	cd src/web && npm install
+
+web-build: ## Build Next.js admin interface
+	cd src/web && npm run build
+
+web-lint: ## Lint Next.js code
+	cd src/web && npm run lint
+
+web-type-check: ## Type check Next.js code
+	cd src/web && npm run type-check
+
+web-test: ## Run Next.js tests
+	cd src/web && npm run test
+
 # Quality Assurance
 venv-check: ## Ensure virtual environment is active
 	@if [ "$(VENV_ACTIVE)" = "false" ]; then \
@@ -256,7 +281,7 @@ venv-check: ## Ensure virtual environment is active
 		exit 1; \
 	fi
 
-all: venv-check check-env format lint type-check test security-audit ## Run complete quality assurance suite (pre-commit checklist)
+all: venv-check check-env format lint type-check web-build web-lint web-type-check test security-audit ## Run complete quality assurance suite (pre-commit checklist)
 
 # CI/CD Simulation
 ci: install-dev lint test security-audit ## Run full CI pipeline locally
