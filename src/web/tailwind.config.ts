@@ -87,10 +87,10 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
-        heading: ["var(--font-heading)"],
-        serif: ["var(--font-serif)"],
-        mono: ["var(--font-mono)"],
+        sans: ["var(--font-sans)", "system-ui", "-apple-system", "sans-serif"],
+        heading: ["var(--font-heading)", "system-ui", "-apple-system", "sans-serif"],
+        serif: ["var(--font-serif)", "Georgia", "serif"],
+        mono: ["var(--font-mono)", "Menlo", "monospace"],
       },
       keyframes: {
         "accordion-down": {

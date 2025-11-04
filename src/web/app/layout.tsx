@@ -4,8 +4,16 @@ import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 
 const inter = Inter({ subsets: ['latin'] })
-const nunitoSans = Nunito_Sans({ subsets: ['latin'], variable: '--font-heading' })
-const playfairDisplay = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' })
+const nunitoSans = Nunito_Sans({
+  subsets: ['latin'],
+  variable: '--font-heading',
+  display: 'swap'
+})
+const playfairDisplay = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-serif',
+  display: 'swap'
+})
 
 export const metadata: Metadata = {
   title: 'MED13 Admin',
