@@ -13,14 +13,14 @@ import {
 
 export default function DashboardPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-card shadow-sm border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">MED13 Admin Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-500">
+              <h1 className="text-4xl font-heading font-bold text-foreground">MED13 Admin Dashboard</h1>
+              <p className="mt-2 text-base text-muted-foreground">
                 Manage data sources, users, and system monitoring
               </p>
             </div>
@@ -44,7 +44,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Data Sources</CardTitle>
+              <CardTitle className="text-sm font-heading font-medium">Data Sources</CardTitle>
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -57,7 +57,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
+              <CardTitle className="text-sm font-heading font-medium">Total Records</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <CardTitle className="text-sm font-heading font-medium">Active Users</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -83,7 +83,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">System Health</CardTitle>
+              <CardTitle className="text-sm font-heading font-medium">System Health</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -99,7 +99,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Recent Data Sources</CardTitle>
+              <CardTitle className="font-heading">Recent Data Sources</CardTitle>
               <CardDescription>
                 Latest data source configurations and status
               </CardDescription>
@@ -134,7 +134,7 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>System Activity</CardTitle>
+              <CardTitle className="font-heading">System Activity</CardTitle>
               <CardDescription>
                 Recent system events and ingestion jobs
               </CardDescription>

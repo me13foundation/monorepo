@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Nunito_Sans, Playfair_Display } from 'next/font/google'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
+const nunitoSans = Nunito_Sans({ subsets: ['latin'], variable: '--font-heading' })
+const playfairDisplay = Playfair_Display({ subsets: ['latin'], variable: '--font-serif' })
 
 export const metadata: Metadata = {
   title: 'MED13 Admin',
@@ -18,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${nunitoSans.variable} ${playfairDisplay.variable}`}>
       <body className={inter.className} suppressHydrationWarning>
         {children}
       </body>
