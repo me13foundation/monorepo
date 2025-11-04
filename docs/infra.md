@@ -2,86 +2,159 @@
 
 ## Overview
 
-This document outlines the infrastructure setup for the MED13 Resource Library (Phase 0), a Python-based application deployed on Google Cloud Platform using Cloud Run for serverless deployment with automated CI/CD via GitHub Actions.
+This document outlines the infrastructure for the MED13 Resource Library, a sophisticated biomedical data platform implementing Clean Architecture with multiple microservices deployed on Google Cloud Platform. The system provides both REST APIs and modern web interfaces for managing MED13 genetic variants, phenotypes, evidence, and data sources.
 
 ## Architecture Decisions
 
-### Deployment Platform: Google Cloud Run (Source Deployments)
-**Decision**: Use Cloud Run with source deployments instead of Docker containers
+### Multi-Service Microarchitecture
+**Decision**: Independent Cloud Run services for each major component
 **Rationale**:
-- Operational simplicity prioritized over Docker complexity
-- Intermediate Docker experience - source deployments reduce maintenance overhead
-- Google handles containerization automatically
-- Faster development cycle and easier debugging
-- Sufficient for Python application with standard dependencies
+- **Scalability**: Each service scales independently based on load patterns
+- **Fault Isolation**: One service failure doesn't cascade to others
+- **Technology Flexibility**: Different services can use different tech stacks
+- **Deployment Independence**: Deploy services without affecting others
+- **Resource Optimization**: Pay only for what each service actually uses
 
-### CI/CD Pipeline: GitHub Actions
-**Decision**: Automated deployments triggered by GitHub pushes
-**Rationale**:
-- Native GitHub integration with existing repository
-- Cost-effective (GitHub Actions free tier sufficient)
-- Familiar YAML-based configuration
-- Automatic testing and deployment on main branch pushes
+**Current Services**:
+- `med13-api`: FastAPI backend (REST APIs, business logic)
+- `med13-curation`: Dash researcher interface
+- `med13-admin`: Next.js admin interface (planned)
 
-### Database: SQLite (Development & Production)
-**Decision**: SQLite for all environments - simple, reliable, and sufficient for MED13 data volumes
+### Clean Architecture Implementation
+**Decision**: Domain-Driven Design with strict layer separation
 **Rationale**:
-- Zero-configuration file-based database
-- Perfect for MED13 data volumes (genes, variants, phenotypes, publications, evidence)
-- No operational overhead - database travels with application
-- ACID-compliant with excellent reliability
-- JSON support for flexible metadata storage
-- Private IP connectivity with Cloud Run for security
+- **Testability**: Each layer can be tested in isolation
+- **Maintainability**: Changes in one layer don't affect others
+- **Flexibility**: Easy to swap implementations (database, UI frameworks)
+- **Type Safety**: 100% MyPy compliance prevents runtime errors
+- **Healthcare Critical**: Zero-defect tolerance for medical data
+
+**Layer Structure**:
+```
+Presentation Layer: FastAPI routes + Dash UI + Next.js UI
+Application Layer: Use cases, service orchestration
+Domain Layer: Business entities, rules, invariants
+Infrastructure Layer: Database, external APIs, frameworks
+```
+
+### Database: PostgreSQL with Production Configuration
+**Decision**: PostgreSQL for production with proper connection pooling and monitoring
+**Rationale**:
+- **Scalability**: Handles concurrent connections and complex queries
+- **Data Integrity**: Advanced constraints and transaction support
+- **Performance**: Indexing, query optimization, and caching capabilities
+- **Monitoring**: Built-in performance metrics and health checks
+- **Ecosystem**: Rich tooling and community support for biomedical data
+
+**Migration Path**: Currently using SQLite for development, PostgreSQL ready for production
+
+### CI/CD Pipeline: GitHub Actions with Quality Gates
+**Decision**: Comprehensive automated pipeline with multiple quality checks
+**Rationale**:
+- **Quality Assurance**: Automated linting, type checking, testing, security scanning
+- **Consistency**: Same checks run locally and in CI
+- **Fast Feedback**: Failures caught before production deployment
+- **Healthcare Standards**: Zero-defect pipeline for medical software
 
 ### Secrets Management: Google Cloud Secret Manager
-**Decision**: Centralized secrets management
+**Decision**: Enterprise-grade secrets management with audit trails
 **Rationale**:
-- Secure, audited, and encrypted storage
-- Native Cloud Run integration via IAM
-- Automatic versioning and rotation capabilities
-- Cost-effective at $0.06 per secret per month
-- Eliminates credential exposure in code or environment variables
+- **Security**: Encrypted storage with access logging
+- **Compliance**: HIPAA-ready with proper access controls
+- **Auditability**: Complete audit trail for healthcare data access
+- **Integration**: Native Cloud Run service account support
+- **Cost-Effective**: $0.06/secret/month with versioning
 
 ## Infrastructure Components
 
-### Application Stack
-- **Runtime**: Python 3.12+
-- **Framework**: FastAPI (REST API with OpenAPI docs)
-- **UI**: Plotly Dash for curation interface
-- **Database**: SQLite (development & production)
-- **Deployment**: Cloud Run (serverless with source deployments)
-- **Containerization**: Dockerfile for local development
+### Multi-Service Application Stack
 
-### Google Cloud Services
-- **Cloud Run**: Serverless application hosting
-- **Secret Manager**: Secure secrets storage
-- **Cloud Storage**: Data exports, backups, and archives
-- **Cloud Build**: (Optional) For complex build processes
+#### FastAPI Backend Service (`med13-api`)
+- **Runtime**: Python 3.12+ with Clean Architecture
+- **Framework**: FastAPI with automatic OpenAPI documentation
+- **Architecture**: Domain-Driven Design with strict layer separation
+- **Database**: PostgreSQL (production) / SQLite (development)
+- **Deployment**: Cloud Run with independent scaling
+- **Features**: REST APIs, business logic, data validation, authentication
+
+#### Dash Researcher Interface (`med13-curation`)
+- **Runtime**: Python 3.12+ with Dash framework
+- **UI Framework**: Plotly Dash with Bootstrap components
+- **Purpose**: Researcher curation workflows and data visualization
+- **Integration**: Consumes FastAPI backend APIs
+- **Deployment**: Independent Cloud Run service
+- **Scaling**: Optimized for research user patterns
+
+#### Next.js Admin Interface (`med13-admin`) - Planned
+- **Runtime**: Node.js 18+ with Next.js 14
+- **Framework**: React 18 with TypeScript
+- **UI Library**: Tailwind CSS + shadcn/ui components
+- **Purpose**: Administrative data source management
+- **Integration**: REST APIs + real-time WebSocket updates
+- **Deployment**: Independent Cloud Run service
+
+### Shared Infrastructure Services
+
+#### Database Layer
+- **Production**: PostgreSQL with connection pooling and monitoring
+- **Development**: SQLite for simplified local development
+- **Migration**: Alembic for schema versioning and deployments
+- **Backup**: Automated PostgreSQL backups with point-in-time recovery
+- **Monitoring**: Query performance, connection pooling metrics
+
+#### Google Cloud Services
+- **Cloud Run**: Multi-service serverless container platform
+- **Secret Manager**: Enterprise secrets management with audit trails
+- **Cloud Storage**: Data exports, backups, and long-term archives
+- **Cloud SQL**: Managed PostgreSQL with high availability
+- **Cloud Load Balancing**: Global load distribution across services
+- **Cloud Monitoring**: Comprehensive observability and alerting
 
 ## Repository Structure
 
+**Monorepo Architecture with Clean Architecture Organization**
+
 ```
-.github/
-  workflows/
-    deploy.yml              # GitHub Actions CI/CD pipeline
-Dockerfile                   # Local development and future containerization
-Makefile                     # Development workflow automation
-pyproject.toml               # Modern Python packaging and tool configuration
-requirements.txt             # Production Python dependencies (auto-generated)
-requirements-dev.txt         # Development dependencies
-Procfile                     # Cloud Run source deployment config
-README.md                    # Project documentation
-docs/
-  infra.md                   # This infrastructure guide
-scripts/                     # Utility scripts
-src/                         # Application source code
-  main.py                    # FastAPI application entry point
-  models/                    # Pydantic models with strict typing
-  routes/                    # API endpoints with type hints
-  services/                  # Business logic with comprehensive validation
-  database/                  # Database connection and queries with typing
-tests/                       # Comprehensive test suite
-migrations/                  # Database migration scripts
+med13-resource-library/
+├── src/                          # Shared Python backend (Clean Architecture)
+│   ├── domain/                  # Business logic layer
+│   │   ├── entities/           # Pydantic domain models
+│   │   ├── repositories/       # Repository interfaces
+│   │   └── services/           # Domain services
+│   ├── application/            # Use case orchestration
+│   │   └── services/           # Application services
+│   ├── infrastructure/         # External concerns
+│   │   ├── repositories/       # SQLAlchemy implementations
+│   │   ├── mappers/           # Data transformation
+│   │   └── validation/        # External API validation
+│   ├── presentation/           # UI implementations
+│   │   ├── dash/              # Researcher interface
+│   │   └── web/               # Next.js admin (planned)
+│   ├── routes/                 # FastAPI route definitions
+│   ├── main.py                 # FastAPI application entry point
+│   └── dash_app.py             # Dash application entry point
+│
+├── docs/                        # Documentation
+│   ├── infra.md                # Infrastructure guide (this file)
+│   ├── type_examples.md        # Type safety patterns
+│   └── EngineeringArchitecturePlan.md # Architecture roadmap
+│
+├── tests/                       # Comprehensive test suite
+│   ├── unit/                   # Unit tests by layer
+│   ├── integration/           # Service integration tests
+│   ├── e2e/                   # End-to-end workflow tests
+│   └── fixtures/              # Test data and utilities
+│
+├── .github/                     # CI/CD and automation
+│   └── workflows/              # GitHub Actions pipelines
+│
+├── scripts/                     # Utility and maintenance scripts
+├── alembic/                     # Database migrations
+├── Dockerfile                   # Multi-service container definitions
+├── Makefile                     # Development workflow automation
+├── pyproject.toml              # Python project configuration
+├── requirements*.txt           # Dependency specifications
+└── Procfile                     # Cloud Run deployment configurations
 ```
 
 ## Local Development Setup
@@ -121,33 +194,40 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-### Makefile for Development Workflow
-Use the provided Makefile to automate common development tasks:
+### Makefile Development Workflow
+
+**Comprehensive automation for our multi-service architecture:**
 
 ```bash
-# Get help with available commands
-make help
+# Environment setup
+make setup-dev          # Python 3.12 venv + dependencies
+make activate           # Activate virtual environment
 
-# Set up development environment
-make setup-dev
+# Multi-service development
+make run-local          # FastAPI backend (port 8080)
+make run-dash           # Dash researcher UI (port 8050)
+# Future: make run-web  # Next.js admin UI (port 3000)
 
-# Install dependencies
-make install-dev
+# Quality assurance (Clean Architecture focus)
+make all                # Complete quality gate
+make format            # Black + Ruff formatting
+make lint              # Code quality checks
+make type-check        # MyPy strict validation
+make test              # Pytest with coverage
+make test-cov          # Coverage reporting
 
-# Run tests
-make test
+# Database operations (PostgreSQL/SQLite)
+make db-create         # Create development database
+make db-migrate        # Run Alembic migrations
+alembic revision --autogenerate -m "Add new feature"
 
-# Run application locally
-make run-local
+# Deployment (multi-service)
+make deploy-staging    # Deploy all services to staging
+make deploy-prod       # Deploy all services to production
 
-# Run full CI pipeline locally
-make ci
-
-# Deploy to staging
-make deploy-staging
-
-# Clean up temporary files
-make clean
+# Maintenance
+make backup-db         # Database backup
+make clean             # Remove temporary files
 ```
 
 ## Code Quality & Type Safety
@@ -268,29 +348,30 @@ repos:
 
 ## CI/CD Pipeline
 
-### GitHub Actions Workflow (`.github/workflows/deploy.yml`)
+### Multi-Service Deployment Strategy
+
+**Independent deployment of each service with shared quality gates:**
 
 ```yaml
-name: Deploy to Cloud Run
+# .github/workflows/deploy.yml
+name: Deploy MED13 Services
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-  release:
-    types: [ published ]
+    branches: [main]
 
 env:
   REGION: us-central1
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
 
 jobs:
-  test:
+  # Shared quality gate for all services
+  quality-gate:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -301,101 +382,107 @@ jobs:
         pip install -r requirements.txt
         pip install -r requirements-dev.txt
 
-    - name: Run code quality checks
-      run: |
-        echo "Running Black formatting check..."
-        black --check src tests
-        echo "Running Ruff linting..."
-        ruff check src tests
-        echo "Running flake8..."
-        flake8 src tests --max-line-length=88 --extend-ignore=E203,W503
+    - name: Run quality checks
+      run: make all
 
-    - name: Run type checking
-      run: mypy src --strict --show-error-codes
-
-    - name: Run security audit
-      run: |
-        echo "Running pip-audit..."
-        pip-audit --format json | tee pip-audit-results.json || true
-        echo "Running safety..."
-        safety check --output json | tee safety-results.json || true
-        echo "Running bandit..."
-        bandit -r src -f json -o bandit-results.json || true
-
-    - name: Upload quality check results
-      uses: actions/upload-artifact@v3
-      if: always()
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
       with:
-        name: quality-check-results
-        path: |
-          pip-audit-results.json
-          safety-results.json
-          bandit-results.json
+        name: test-results
+        path: test-results.xml
 
-    - name: Run tests with coverage
-      run: pytest --cov=src --cov-report=xml --cov-report=term-missing
-
-    - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-
-  deploy-staging:
-    needs: test
+  # Deploy FastAPI backend
+  deploy-api:
+    needs: quality-gate
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
-    environment: staging
+    if: github.ref == 'refs/heads/main'
     steps:
     - uses: actions/checkout@v4
-
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY_STAGING }}
-
-    - name: Deploy to Cloud Run (Staging)
+    - name: Deploy to Cloud Run
       uses: google-github-actions/deploy-cloudrun@v2
       with:
-        service: med13-resource-library-staging
+        service: med13-api
         source: .
+        env-vars-file: .env.production
         region: ${{ env.REGION }}
-        allow-unauthenticated: false
 
-  deploy-production:
-    needs: test
+  # Deploy Dash researcher UI
+  deploy-curation:
+    needs: quality-gate
     runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
-    environment: production
+    if: github.ref == 'refs/heads/main'
     steps:
     - uses: actions/checkout@v4
-
-    - name: Authenticate to Google Cloud
-      uses: google-github-actions/auth@v2
-      with:
-        credentials_json: ${{ secrets.GCP_SA_KEY_PROD }}
-
-    - name: Deploy to Cloud Run (Production)
-      uses: google-github-actions/deploy-cloudrun@v2
-      with:
-        service: med13-resource-library
-        source: .
-        region: ${{ env.REGION }}
-        allow-unauthenticated: false
-
-    - name: Deploy Curation UI
+    - name: Deploy Dash UI
       uses: google-github-actions/deploy-cloudrun@v2
       with:
         service: med13-curation
         source: .
+        env-vars-file: .env.production
         region: ${{ env.REGION }}
-        allow-unauthenticated: false
+
+  # Future: Deploy Next.js admin UI
+  # deploy-admin:
+  #   needs: quality-gate
+  #   runs-on: ubuntu-latest
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: Set up Node.js
+  #     uses: actions/setup-node@v4
+  #     with:
+  #       node-version: '18'
+  #   - name: Build Next.js
+  #     run: |
+  #       cd src/web
+  #       npm ci
+  #       npm run build
+  #   - name: Deploy Next.js Admin
+  #     uses: google-github-actions/deploy-cloudrun@v2
+  #     with:
+  #       service: med13-admin
+  #       source: src/web/.next
+  #       region: ${{ env.REGION }}
 ```
 
-### Deployment Configuration
+### Multi-Service Deployment Configuration
 
-#### Procfile (Required for source deployments)
+#### Procfile Configurations (Per Service)
+
+**FastAPI Backend (`Procfile.api`):**
 ```
-web: uvicorn main:app --host 0.0.0.0 --port $PORT
+web: uvicorn src.main:create_app --host 0.0.0.0 --port $PORT --factory
+```
+
+**Dash Researcher UI (`Procfile.dash`):**
+```
+web: python src/dash_app.py
+```
+
+**Next.js Admin UI (`Procfile.admin`) - Planned:**
+```
+web: npm start
+```
+
+#### Environment Configuration
+
+**Development (`.env.development`):**
+```bash
+DATABASE_URL=sqlite:///med13.db
+API_BASE_URL=http://localhost:8080
+DASH_BASE_URL=http://localhost:8050
+SECRET_KEY=dev-secret-key
+DEBUG=True
+```
+
+**Production (`.env.production`):**
+```bash
+DATABASE_URL=postgresql://user:pass@cloudsql-instance/med13
+API_BASE_URL=https://med13-api.com
+DASH_BASE_URL=https://med13-curation.com
+SECRET_KEY=${SECRET_KEY}
+DEBUG=False
+CORS_ORIGINS=https://med13-curation.com,https://med13-admin.com
 ```
 
 #### requirements.txt
@@ -437,158 +524,544 @@ python-multipart>=0.0.6
 
 ## Database Configuration
 
-### SQLite Database (All Environments)
-- **Database**: SQLite file-based database (`med13.db` for dev, `med13_prod.db` for production)
-- **Setup**: Automatic file creation, zero configuration
+### Multi-Environment Database Strategy
+
+#### Development Environment
+- **Database**: SQLite for rapid development and testing
+- **File**: `med13.db` (automatically created)
 - **Migration**: Alembic handles schema changes
-- **Storage**: File included in Cloud Run deployment
-- **Backup**: Simple file copy operations
-- **Data Volume**: Perfect for MED13 resource library size
-- **Concurrency**: ACID-compliant with WAL mode for concurrent reads/writes
+- **Testing**: Isolated database per test run
+
+#### Production Environment
+- **Database**: PostgreSQL via Google Cloud SQL
+- **Instance**: Dedicated Cloud SQL instance with high availability
+- **Connection**: Connection pooling via SQLAlchemy
+- **Migration**: Automated Alembic migrations during deployment
+- **Backup**: Automated daily backups with point-in-time recovery
+- **Monitoring**: Query performance and connection pool metrics
+
+#### Database Schema Management
+```bash
+# Development workflow
+make db-create         # Create SQLite database
+make db-migrate        # Run pending migrations
+alembic revision --autogenerate -m "Add data sources table"
+
+# Production deployment
+# Migrations run automatically during Cloud Run deployment
+# Rollback scripts available for emergency rollbacks
+```
 
 ## Secrets Management
 
-### Required Secrets
+### Multi-Service Secrets Architecture
+
+**Secrets are organized by service and environment:**
+
+#### API Secrets (`med13-api` service)
 - `clinvar-api-key`: ClinVar API access token
 - `pubmed-api-key`: PubMed API key
 - `crossref-api-key`: Crossref API token
 - `omim-api-key`: OMIM API key
-- `oauth-client-secret`: OAuth2 client secret (for curator authentication)
 - `jwt-secret-key`: JWT signing secret
+- `database-password`: PostgreSQL password
 
-### Service Account Setup (Per Environment)
-Create separate service accounts for development, staging, and production environments:
+#### UI Secrets (`med13-curation`, `med13-admin` services)
+- `oauth-client-secret`: OAuth2 client secret
+- `api-key`: For backend API authentication
+- `analytics-key`: Analytics service credentials
+
+#### Shared Infrastructure Secrets
+- `gcp-service-account-key`: Cloud service account credentials
+- `cloudsql-instance-connection-name`: Database connection details
+
+### Service Account Configuration
+
+**Per-service, per-environment service accounts:**
 
 ```bash
-# Create environment-specific service accounts
-gcloud iam service-accounts create med13-dev \
-  --description="MED13 Development environment"
+# Create service accounts for each service
+services=("api" "curation" "admin")
+envs=("dev" "staging" "prod")
 
-gcloud iam service-accounts create med13-staging \
-  --description="MED13 Staging environment"
+for service in "${services[@]}"; do
+  for env in "${envs[@]}"; do
+    # Create service account
+    gcloud iam service-accounts create "med13-${service}-${env}" \
+      --description="MED13 ${service} service - ${env} environment"
 
-gcloud iam service-accounts create med13-prod \
-  --description="MED13 Production environment"
+    # Grant service-specific permissions
+    SA="med13-${service}-${env}@YOUR_PROJECT.iam.gserviceaccount.com"
 
-# Grant necessary permissions to each service account
-for env in dev staging prod; do
-  SA="med13-${env}@YOUR_PROJECT.iam.gserviceaccount.com"
-
-  # Secret Manager access for API keys and authentication secrets
-  gcloud projects add-iam-policy-binding YOUR_PROJECT \
-    --member="serviceAccount:$SA" \
-    --role="roles/secretmanager.secretAccessor"
-
-  # Cloud Run invoker (for production service account)
-  if [ "$env" = "prod" ]; then
+    # All services need Secret Manager access
     gcloud projects add-iam-policy-binding YOUR_PROJECT \
       --member="serviceAccount:$SA" \
-      --role="roles/run.invoker"
-  fi
+      --role="roles/secretmanager.secretAccessor"
+
+    # API service needs Cloud SQL access
+    if [ "$service" = "api" ]; then
+      gcloud projects add-iam-policy-binding YOUR_PROJECT \
+        --member="serviceAccount:$SA" \
+        --role="roles/cloudsql.client"
+    fi
+
+    # UI services need Cloud Run invoker access
+    if [[ "$service" =~ ^(curation|admin)$ ]]; then
+      gcloud projects add-iam-policy-binding YOUR_PROJECT \
+        --member="serviceAccount:$SA" \
+        --role="roles/run.invoker"
+    fi
+  done
 done
 ```
 
-Each GitHub environment stores its own `GCP_SA_KEY` secret for secure authentication.
+### Secrets Organization Strategy
+
+```
+Secret Manager Structure:
+/projects/YOUR_PROJECT/secrets/
+├── med13-api-dev-clinvar-key
+├── med13-api-prod-database-password
+├── med13-curation-dev-oauth-secret
+├── med13-admin-staging-api-key
+└── med13-shared-dev-gcp-sa-key
+```
+
+**Benefits:**
+- ✅ **Service isolation**: Each service only accesses its own secrets
+- ✅ **Environment separation**: Dev/staging/prod secrets are independent
+- ✅ **Minimal permissions**: Principle of least privilege
+- ✅ **Audit trails**: Complete access logging for compliance
 
 ## Security Configuration
 
-### Authentication & Authorization
-- **Backend Authentication**: Required for curation interface
-- **OAuth2 Integration**: Google Cloud Identity Platform
-- **JWT Tokens**: For API authentication
-- **Role-Based Access**: Public read, curator write access
-- **Service Separation**: Separate Cloud Run services for public API and curation UI
+### Multi-Service Security Architecture
 
-### Network Security
-- **HTTPS Only**: Cloud Run enforces SSL
-- **Database Security**: SQLite file included in deployment (no external access)
-- **VPC Service Controls**: (Optional) For additional isolation
-- **Firewall Rules**: Restrictive ingress rules
+#### Authentication & Authorization
+- **Centralized Auth**: JWT-based authentication across all services
+- **Role-Based Access**: Hierarchical permissions (admin, researcher, curator)
+- **Service Tokens**: API-to-API authentication between services
+- **OAuth2 Integration**: Google Cloud Identity Platform for user auth
+- **Session Management**: Secure token handling with automatic expiration
+
+#### Network Security
+- **HTTPS Only**: Cloud Run enforces SSL/TLS for all services
+- **VPC Networks**: Isolated network per environment (dev/staging/prod)
+- **Cloud SQL Security**: Private IP connections, no public access
+- **Service Mesh**: Internal service communication via secure channels
+- **Firewall Rules**: Restrictive ingress/egress rules per service
+
+#### Data Protection
+- **Encryption at Rest**: Cloud SQL automatic encryption
+- **Encryption in Transit**: TLS 1.3 for all communications
+- **Secrets Management**: Google Secret Manager with audit trails
+- **Database Security**: Row-level security and query parameterization
+- **Backup Encryption**: Encrypted database backups with access controls
 
 ## Cost Optimization
 
-### Estimated Monthly Costs
-- **Cloud Run**: $0.0001/request (2M requests free)
-- **Database**: $0 (SQLite file included in deployment)
-- **Secret Manager**: $0.06/secret/month (~$2-3/month)
-- **Cloud Storage**: $0.02/GB/month (minimal for logs)
-- **Total**: $5-15/month for development/production
+### Multi-Service Cost Architecture
 
-### Scaling Strategy
-- **Cloud Run**: Automatic scaling (0-1000 instances)
-- **Database**: SQLite handles MED13 data volumes efficiently
-- **Storage**: Archive old data to Cloud Storage
+**Costs are distributed across independent services:**
+
+#### Compute Costs (Cloud Run)
+```
+Per Service Monthly Estimates:
+├── med13-api (FastAPI backend)
+│   ├── CPU: $15-50/month (depends on API load)
+│   ├── Memory: $20-70/month (512MB-2GB instances)
+│   └── Requests: $0-10/month (first 2M free)
+├── med13-curation (Dash UI)
+│   ├── CPU: $5-15/month (researcher usage patterns)
+│   ├── Memory: $10-30/month (UI-focused workload)
+│   └── Requests: $0-5/month (dashboard interactions)
+└── med13-admin (Next.js UI) - Planned
+    ├── CPU: $3-10/month (admin usage patterns)
+    ├── Memory: $8-20/month (React SPA)
+    └── Requests: $0-3/month (admin workflows)
+```
+
+#### Data Costs (Cloud SQL PostgreSQL)
+```
+Production Database Costs:
+├── Storage: $0.10/GB/month (~$50-100/month for 500GB-1TB)
+├── CPU: $20-50/month (depending on instance type)
+├── Backup: $0.08/GB/month (~$40/month for 500GB)
+└── Network: $0.01/GB egress (minimal for internal traffic)
+Total: $110-190/month
+```
+
+#### Additional Services
+```
+Supporting Infrastructure:
+├── Secret Manager: $0.06/secret/month (~$10/month for 15 secrets)
+├── Cloud Storage: $0.02/GB/month (~$5-10/month for backups)
+├── Cloud Load Balancing: $18.00/month (global load balancer)
+└── Cloud Monitoring: $0.01/GB ingested (~$20/month for logs)
+Total: $50-60/month
+```
+
+### Total Monthly Cost Estimates
+
+**Development Environment:** $50-100/month
+- Single Cloud Run instance for each service
+- Smaller Cloud SQL instance
+- Minimal monitoring
+
+**Production Environment:** $300-500/month
+- Multi-instance Cloud Run scaling
+- Production Cloud SQL instance
+- Full monitoring and logging
+- Load balancing and CDN
+
+### Cost Optimization Strategies
+
+#### Service-Level Optimization
+- **Instance Sizing**: Right-size CPU/memory per service workload
+- **Scaling Configuration**: Set appropriate min/max instances
+- **Traffic Patterns**: Optimize based on usage (admin vs researcher patterns)
+
+#### Database Optimization
+- **Connection Pooling**: Reuse connections to reduce overhead
+- **Query Optimization**: Index optimization and query performance
+- **Storage Tiers**: Use appropriate storage classes for backups
+
+#### Monitoring Optimization
+- **Log Sampling**: Sample logs in high-traffic scenarios
+- **Metrics Retention**: Configure appropriate retention periods
+- **Alert Optimization**: Tune alerting thresholds to reduce noise
 
 ## Monitoring & Observability
 
-### Cloud Run Metrics
-- Request count, latency, error rates
-- CPU/memory utilization
-- Instance count and scaling events
+### Multi-Service Monitoring Architecture
 
-### Database Monitoring
-- Connection count and query performance
-- Storage usage and backup status
-- Slow query logs
+**Comprehensive observability across all services:**
 
-### Logging
-- Application logs to Cloud Logging
-- Structured logging with request IDs
-- Error alerting via Cloud Monitoring
+#### Service-Level Metrics (Per Cloud Run Service)
+```
+med13-api (FastAPI Backend):
+├── HTTP Metrics: Request count, latency, error rates (4xx/5xx)
+├── Performance: CPU utilization, memory usage, instance scaling
+├── Business: API calls per endpoint, data source ingestion rates
+└── Errors: Application exceptions, database connection issues
+
+med13-curation (Dash UI):
+├── User Metrics: Page views, session duration, user interactions
+├── Performance: Load times, rendering performance, API call latency
+├── Errors: JavaScript errors, failed API requests
+└── Usage: Feature adoption, workflow completion rates
+
+med13-admin (Next.js UI):
+├── Admin Metrics: CRUD operation counts, bulk action performance
+├── Performance: Page load times, bundle sizes, API response times
+├── Security: Failed auth attempts, permission violations
+└── Business: Data source management operations, user admin actions
+```
+
+#### Database Monitoring (Cloud SQL)
+```
+PostgreSQL Metrics:
+├── Connection Pool: Active/idle connections, connection timeouts
+├── Query Performance: Slow queries, index usage, cache hit rates
+├── Storage: Table sizes, growth trends, backup status
+├── Replication: Lag times, sync status (if using read replicas)
+└── Health: Uptime, failover events, maintenance windows
+```
+
+#### Infrastructure Monitoring
+```
+Google Cloud Services:
+├── Load Balancer: Request distribution, backend health, SSL certs
+├── Cloud Storage: Bucket usage, access patterns, data transfer
+├── Secret Manager: Access patterns, rotation status
+└── VPC Network: Traffic patterns, security violations
+```
+
+### Observability Stack
+
+#### Logging Strategy
+```bash
+# Structured logging with service-specific contexts
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "service": "med13-api",
+  "level": "INFO",
+  "request_id": "abc-123-def",
+  "user_id": "user-456",
+  "operation": "create_data_source",
+  "duration_ms": 250,
+  "status": "success"
+}
+```
+
+#### Alerting Configuration
+```
+Critical Alerts:
+├── Service Down: Any service unavailable for >5 minutes
+├── High Error Rate: >5% of requests failing for >10 minutes
+├── Database Issues: Connection failures or slow queries
+└── Security: Failed auth attempts or unusual access patterns
+
+Performance Alerts:
+├── High Latency: API responses >2 seconds for >5 minutes
+├── High CPU/Memory: Service utilization >80% for >10 minutes
+└── Database Slow: Query response time >1 second for >5 minutes
+```
+
+#### Dashboards and Visualization
+```
+Custom Dashboards:
+├── Service Overview: All services health and performance
+├── API Analytics: Endpoint usage, error rates, performance
+├── User Experience: Page load times, error rates, feature usage
+├── Database Health: Connection pools, query performance, storage
+└── Security Monitoring: Auth failures, unusual access patterns
+```
 
 ## Setup Instructions
 
 ### Prerequisites
-1. Google Cloud Project with billing enabled
-2. GitHub repository with Actions enabled
-3. Python 3.12+ development environment
+1. **Google Cloud Project** with billing enabled
+2. **GitHub Repository** with Actions enabled
+3. **Python 3.12+** development environment
+4. **Node.js 18+** (for Next.js admin interface)
+5. **Docker** (for local development)
 
-### Initial Setup
+### Multi-Service Infrastructure Setup
+
+#### 1. Google Cloud Services Configuration
 ```bash
-# Enable required APIs
+# Enable required APIs for all services
 gcloud services enable run.googleapis.com
 gcloud services enable secretmanager.googleapis.com
+gcloud services enable sqladmin.googleapis.com
 gcloud services enable storage.googleapis.com
+gcloud services enable monitoring.googleapis.com
 
-# Create data retention buckets (optional - for data exports)
-gsutil mb -p YOUR_PROJECT -c standard gs://med13-data-sources
-gsutil lifecycle set retention-policy-90-days gs://med13-data-sources
-gsutil mb -p YOUR_PROJECT -c coldline gs://med13-data-archive
+# Create Cloud SQL PostgreSQL instance (production)
+gcloud sql instances create med13-prod \
+  --database-version=POSTGRES_15 \
+  --cpu=2 \
+  --memory=4GB \
+  --region=us-central1 \
+  --storage-size=100GB \
+  --storage-type=SSD
+
+# Create databases for each environment
+gcloud sql databases create med13_prod --instance=med13-prod
+gcloud sql databases create med13_staging --instance=med13-prod
 ```
 
-### Deployment
-1. Push code to GitHub main branch
-2. GitHub Actions automatically runs tests, security scans, and deploys to staging
-3. Create GitHub release to deploy to production
-4. Monitor deployments in Cloud Console > Cloud Run:
-   - `med13-resource-library` (public API)
-   - `med13-resource-library-staging` (staging API)
-   - `med13-curation` (curation UI)
+#### 2. Service Accounts Setup
+```bash
+# Run the service account creation script from Secrets Management section
+# This creates per-service, per-environment service accounts
+
+# Export service account keys to GitHub secrets
+# GCP_SA_KEY_API_PROD, GCP_SA_KEY_CURATION_PROD, etc.
+```
+
+#### 3. Storage Buckets Setup
+```bash
+# Create data retention buckets
+gsutil mb -p YOUR_PROJECT -c standard gs://med13-data-sources
+gsutil lifecycle set retention-policy-90-days gs://med13-data-sources
+
+gsutil mb -p YOUR_PROJECT -c coldline gs://med13-data-archive
+gsutil lifecycle set retention-policy-1-year gs://med13-data-archive
+
+# Set up CORS for frontend access (if needed)
+gsutil cors set cors-config.json gs://med13-data-sources
+```
+
+#### 4. Secrets Configuration
+```bash
+# Create secrets for each service (see Secrets Management section)
+# Example: API service secrets
+echo -n "your-clinvar-api-key" | \
+  gcloud secrets create med13-api-prod-clinvar-key \
+  --data-file=-
+
+# Set up IAM permissions for service accounts to access secrets
+```
+
+### Development Environment Setup
+
+#### Local Development with Docker Compose
+```yaml
+# docker-compose.yml (create this file)
+version: '3.8'
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgresql://user:pass@db:5432/med13_dev
+      - SECRET_KEY=dev-secret-key
+    depends_on:
+      - db
+    volumes:
+      - ./src:/app/src
+
+  curation:
+    build: .
+    ports:
+      - "8050:8050"
+    environment:
+      - API_BASE_URL=http://api:8080
+    depends_on:
+      - api
+
+  db:
+    image: postgres:15
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: med13_dev
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+#### Local Development Commands
+```bash
+# Start all services
+docker-compose up -d
+
+# Run database migrations
+docker-compose exec api alembic upgrade head
+
+# View logs
+docker-compose logs -f api
+docker-compose logs -f curation
+
+# Stop services
+docker-compose down
+```
+
+### Production Deployment
+
+#### Automated Deployment via GitHub Actions
+1. **Push to main branch**: Triggers staging deployment
+2. **Create GitHub release**: Triggers production deployment
+3. **Monitor deployments**: Check Cloud Run console for all services
+
+#### Manual Deployment (if needed)
+```bash
+# Deploy API service
+gcloud run deploy med13-api \
+  --source . \
+  --region=us-central1 \
+  --service-account=med13-api-prod@YOUR_PROJECT.iam.gserviceaccount.com \
+  --set-env-vars=DATABASE_URL=postgresql://...
+
+# Deploy curation service
+gcloud run deploy med13-curation \
+  --source . \
+  --region=us-central1 \
+  --service-account=med13-curation-prod@YOUR_PROJECT.iam.gserviceaccount.com
+
+# Deploy admin service (when ready)
+gcloud run deploy med13-admin \
+  --source src/web/.next \
+  --region=us-central1 \
+  --service-account=med13-admin-prod@YOUR_PROJECT.iam.gserviceaccount.com
+```
+
+#### Service URLs After Deployment
+- **API**: `https://med13-api-[hash]-uc.a.run.app`
+- **Curation**: `https://med13-curation-[hash]-uc.a.run.app`
+- **Admin**: `https://med13-admin-[hash]-uc.a.run.app` (future)
 
 ### Post-Deployment Configuration
-1. Set up custom domain (optional)
-2. Configure monitoring alerts
-3. Set up backup schedules
-4. Create additional environments (staging, dev)
+
+#### Domain Setup (Optional)
+```bash
+# Map custom domains to services
+gcloud run domain-mappings create \
+  --service=med13-api \
+  --domain=api.med13foundation.org
+
+gcloud run domain-mappings create \
+  --service=med13-curation \
+  --domain=curate.med13foundation.org
+
+gcloud run domain-mappings create \
+  --service=med13-admin \
+  --domain=admin.med13foundation.org
+```
+
+#### Monitoring Setup
+1. **Enable Cloud Monitoring** for all services
+2. **Set up alerts** for critical metrics
+3. **Configure dashboards** for service monitoring
+4. **Set up log exports** to BigQuery (optional)
+
+#### Additional Environments (Optional)
+```bash
+# Create staging environment
+gcloud run deploy med13-api-staging \
+  --source . \
+  --region=us-central1 \
+  --service-account=med13-api-staging@YOUR_PROJECT.iam.gserviceaccount.com
+
+# Create development environment
+gcloud run deploy med13-api-dev \
+  --source . \
+  --region=us-central1 \
+  --service-account=med13-api-dev@YOUR_PROJECT.iam.gserviceaccount.com \
+  --allow-unauthenticated  # Allow public access for development
+```
 
 ## Maintenance & Operations
 
-### Backup Strategy
-- **Database**: SQLite file backups via `make backup-db`
-- **Application**: Infrastructure as code in GitHub
-- **Secrets**: Versioned in Secret Manager
+### Multi-Service Maintenance Strategy
 
-### Update Process
-1. Make code changes
+#### Backup Strategy
+- **Database**: Automated PostgreSQL backups with point-in-time recovery
+- **Application**: Infrastructure as code in GitHub with version control
+- **Secrets**: Versioned in Google Secret Manager with audit trails
+- **Code**: Git-based version control with immutable releases
+
+#### Update Process (Per Service)
+```bash
+# Independent service updates
+1. Make code changes (service-specific)
 2. Push to feature branch
-3. Create pull request
-4. Automated testing runs
-5. Merge to main triggers deployment
+3. Create pull request with service label (api, curation, admin)
+4. Automated testing runs for affected services
+5. Merge triggers deployment of specific service(s)
+6. Monitor service health post-deployment
+```
+
+#### Service-Specific Rollbacks
+```bash
+# Rollback individual services independently
+gcloud run services update-traffic med13-api \
+  --to-tags rollback=true \
+  --tag-traffic rollback=100
+
+# Service remains available during rollback
+# Other services unaffected
+```
 
 ### Disaster Recovery
-- **Database**: Point-in-time recovery available
-- **Application**: Rollback via GitHub deployments
-- **Data**: Regular exports to Cloud Storage
+
+#### Service-Level Recovery
+- **API Service**: Database backups + cached responses during recovery
+- **UI Services**: Static fallbacks + service degradation
+- **Database**: Point-in-time recovery with minimal data loss
+- **Secrets**: Backup copies in secure storage
+
+#### Cross-Service Dependencies
+- **API Unavailable**: UI services show cached data/offline mode
+- **Database Issues**: API returns cached responses where possible
+- **UI Service Down**: Users redirected to alternative interfaces
 
 ## Future Considerations
 
@@ -637,39 +1110,44 @@ gsutil mb -p YOUR_PROJECT -c coldline gs://med13-data-archive
 - **File-based recovery**: Restore from SQLite backup files
 - **Version control**: Database schema tracked in code migrations
 
-## Infrastructure-as-Code Foundation
+---
 
-### Current Manual Setup (Terraform Migration Ready)
-Document all manual setup commands for future Infrastructure-as-Code conversion:
+## Infrastructure as Code Evolution
 
-```bash
-# Enable required APIs
-gcloud services enable run.googleapis.com secretmanager.googleapis.com
+### Current State: Manual + Scripted Setup
 
-# Create service accounts (optional - for enhanced security)
-gcloud iam service-accounts create med13-prod \
-  --description="MED13 Production service account"
+The infrastructure currently uses a hybrid approach:
+- **Manual Setup**: Initial GCP project configuration
+- **Scripted Automation**: Service account creation and permission grants
+- **IaC Ready**: Documented commands ready for Terraform migration
 
-# Grant Secret Manager access (if using secrets)
-gcloud projects add-iam-policy-binding YOUR_PROJECT \
-  --member="serviceAccount:med13-prod@YOUR_PROJECT.iam.gserviceaccount.com" \
-  --role="roles/secretmanager.secretAccessor"
+### Future: Full Infrastructure as Code
 
-# Deploy Cloud Run service (SQLite database included in deployment)
-gcloud run deploy med13-resource-library \
-  --source . \
-  --region=us-central1 \
-  --allow-unauthenticated=false \
-  --service-account med13-prod@YOUR_PROJECT.iam.gserviceaccount.com
+#### Terraform Migration Path
+```hcl
+# Future infrastructure modules
+├── modules/
+│   ├── cloud-run/     # Service deployment configurations
+│   ├── cloud-sql/     # Database instance management
+│   ├── networking/    # VPC and security configurations
+│   ├── monitoring/    # Alert and dashboard configurations
+│   └── secrets/       # Secret management automation
+│
+├── environments/
+│   ├── dev/          # Development environment config
+│   ├── staging/      # Staging environment config
+│   └── prod/         # Production environment config
+│
+└── main.tf           # Root configuration with remote state
 ```
 
-### Future IaC Options
-- **Terraform**: For comprehensive infrastructure management
-- **Pulumi**: For multi-cloud support and programming languages
-- **Google Cloud Deployment Manager**: For GCP-native solutions
+#### Benefits of IaC Migration
+- **Version Control**: Infrastructure changes tracked in Git
+- **Reproducibility**: Consistent environments across deployments
+- **Collaboration**: Code review for infrastructure changes
+- **Compliance**: Audit trail for infrastructure modifications
+- **Testing**: Automated testing of infrastructure changes
 
 ---
 
-
-
-*This infrastructure guide should be reviewed and updated as the application evolves and scaling requirements change.*
+*This infrastructure guide reflects the current Clean Architecture implementation with multi-service design. Regular updates will capture new services, scaling decisions, and infrastructure improvements as the MED13 platform evolves.*

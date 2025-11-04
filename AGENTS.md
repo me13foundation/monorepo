@@ -1,6 +1,85 @@
-# MED13 Resource Library - Agent Guidelines
+# MED13 Resource Library - AGENTS.md
 
-This document provides comprehensive guidance for AI agents working on the MED13 Resource Library, including our strong engineering architecture, type safety practices, and development standards.
+**A README for AI coding agents working on the MED13 Resource Library.**
+
+This document provides essential context and instructions for AI agents building on our biomedical data platform. Complementing the human-facing `README.md`, this file helps agents understand our Clean Architecture, domain-specific requirements, and development workflow.
+
+## 📋 Project Overview
+
+**MED13 Resource Library** is a curated biomedical data platform for MED13 genetic variants, phenotypes, and evidence. It implements Clean Architecture with:
+
+- **Domain**: MED13-specific business logic and validation rules
+- **Architecture**: FastAPI backend, Next.js admin interface, Dash researcher UI
+- **Tech Stack**: Python 3.12+, TypeScript, PostgreSQL, Clean Architecture patterns
+- **Purpose**: Provide researchers and administrators with reliable, type-safe biomedical data management
+
+**Key Characteristics:**
+- **Healthcare Domain**: Strict data integrity and privacy requirements
+- **Multi-Interface**: Separate admin/research user experiences
+- **Type Safety First**: 100% MyPy compliance, Pydantic validation
+- **Clean Architecture**: Domain-driven design with clear layer separation
+
+## 🤖 Agent-Specific Instructions
+
+**How AI agents should work with this codebase:**
+
+### Code Generation Guidelines
+- **Always use Clean Architecture layers**: Domain logic goes in `/domain`, UI logic in `/presentation`
+- **Maintain type safety**: Never use `Any`, always provide proper type annotations
+- **Follow biomedical domain rules**: Respect MED13-specific validation and business logic
+- **Use Pydantic models**: All data structures should be Pydantic BaseModel subclasses
+- **Implement proper error handling**: Use domain-specific exceptions and validation
+
+### File Organization Rules
+- **New features**: Follow existing module structure (`/domain`, `/application`, `/infrastructure`)
+- **API endpoints**: Add to `/routes` with proper FastAPI router patterns
+- **Database changes**: Create Alembic migrations in `/alembic/versions`
+- **UI components**: Place in appropriate presentation layer (`/presentation/dash` or future `/web`)
+
+### Testing Requirements
+- **Unit tests**: Required for all domain logic and services
+- **Integration tests**: Required for API endpoints and repository operations
+- **Type checking**: All code must pass MyPy strict mode
+- **Coverage**: Maintain >85% test coverage for business logic
+
+### Security Considerations
+- **Never commit PHI**: No protected health information in code or tests
+- **Input validation**: All user inputs validated through Pydantic models
+- **Authentication**: Use existing auth patterns for new endpoints
+- **Audit logging**: Log all data access and modifications
+
+## 🔧 Build & Development Commands
+
+**Essential commands for AI agents to set up and work with the codebase:**
+
+### Environment Setup
+```bash
+make setup-dev          # Create Python 3.12 venv + install dependencies
+source venv/bin/activate # Activate virtual environment
+```
+
+### Development Servers
+```bash
+make run-local          # Start FastAPI backend (port 8080)
+make run-dash           # Start Dash UI (port 8050)
+# Future: make run-web  # Start Next.js admin (port 3000)
+```
+
+### Quality Assurance
+```bash
+make all                # Full quality gate (format, lint, type-check, tests)
+make format            # Black + Ruff formatting
+make lint              # Ruff + Flake8 linting
+make type-check        # MyPy static analysis
+make test              # Pytest execution
+make test-cov          # Coverage reporting
+```
+
+### Database Operations
+```bash
+alembic revision --autogenerate -m "Add new table"  # Create migration
+alembic upgrade head                                 # Apply migrations
+```
 
 ## 🏗️ Strong Engineering Architecture
 
@@ -61,6 +140,186 @@ Phase 1-3 Complete: ✅
 ├── Presentation Layer (Dash UI with Bootstrap components)
 └── Quality Assurance (Type safety, testing, validation)
 ```
+
+## 📁 Monorepo Structure & Organization
+
+**MED13 uses a monorepo with clear service boundaries:**
+
+```
+med13-resource-library/
+├── src/                          # Shared Python backend
+│   ├── domain/                  # Business logic (shared)
+│   ├── application/             # Use cases (shared)
+│   ├── infrastructure/          # External adapters (shared)
+│   ├── presentation/            # UI implementations
+│   │   ├── dash/               # Researcher interface
+│   │   └── web/                # Future: Next.js admin
+│   └── routes/                  # API endpoints
+├── docs/                         # Documentation
+├── tests/                        # Backend tests
+├── node_js_migration_prd.md      # Next.js migration plan
+├── data_sources_plan.md          # Data sources specification
+└── Makefile                     # Build orchestration
+```
+
+**Service Boundaries:**
+- **FastAPI Backend** (`src/`): Core business logic, shared across UIs
+- **Dash UI** (`src/presentation/dash/`): Researcher curation workflows
+- **Next.js Admin** (Future: `src/web/`): Administrative management interface
+
+**Cross-Service Dependencies:**
+- All UIs consume the same FastAPI REST API
+- Shared TypeScript types generated from Pydantic models
+- Common domain entities and business rules
+
+## 🔄 Workflow & CI/CD Instructions
+
+### Commit Message Conventions
+**Use conventional commits for automated deployments:**
+```bash
+feat(api): add data source management endpoints
+fix(dash): resolve table sorting bug in curation UI
+docs: update API documentation
+ci: update deployment configuration
+```
+
+### Pull Request Workflow
+**Standard PR process for AI-generated changes:**
+1. **Branch naming**: `feature/`, `fix/`, `docs/`, `ci/`
+2. **PR title**: Follow conventional commit format
+3. **PR description**: Include what, why, and testing approach
+4. **Required checks**: `make all` must pass
+5. **Review**: At least one maintainer review required
+
+### CI/CD Pipeline
+**Automated quality gates:**
+```bash
+# Pre-commit (local)
+make all
+
+# CI Pipeline
+├── Code formatting (Black, Ruff)
+├── Linting (Ruff, Flake8, MyPy)
+├── Security scanning (Bandit, Safety)
+├── Testing (Pytest with coverage)
+└── Deployment (Cloud Run)
+```
+
+### Deployment Strategy
+**Multi-service independent deployments:**
+```bash
+# Backend deployment
+gcloud run deploy med13-api --source .
+
+# Dash UI deployment
+gcloud run deploy med13-curation --source .
+
+# Future: Next.js deployment
+gcloud run deploy med13-admin --source .
+```
+
+## 🧪 Testing Instructions
+
+**How AI agents should write and run tests:**
+
+### Test Frameworks & Structure
+- **Unit Tests**: `tests/unit/` - Domain logic, services, utilities
+- **Integration Tests**: `tests/integration/` - API endpoints, repositories, external services
+- **E2E Tests**: `tests/e2e/` - Complete user workflows
+- **Type Tests**: MyPy validation for all code
+
+### Test Execution
+```bash
+# Run specific test types
+make test              # All tests
+pytest tests/unit/     # Unit tests only
+pytest tests/integration/  # Integration tests only
+pytest tests/e2e/      # End-to-end tests
+
+# With coverage
+make test-cov          # Coverage report
+```
+
+### Test Writing Guidelines
+- **File naming**: `test_<feature>.py`
+- **Test isolation**: Each test independent, no shared state
+- **Mock external deps**: Use `tests/types/mocks.py` for repositories
+- **Type safety**: All test fixtures properly typed
+- **Coverage target**: >85% for business logic
+
+### Schema Validation Testing
+```python
+# Always test Pydantic models
+def test_data_source_validation():
+    # Test valid data
+    source = UserDataSource(
+        id=UUID(), owner_id=UUID(),
+        name="Test Source", source_type=SourceType.API
+    )
+    assert source.name == "Test Source"
+
+    # Test invalid data
+    with pytest.raises(ValidationError):
+        UserDataSource(name="")  # Empty name should fail
+```
+
+## 💅 Code Style & Conventions
+
+**Language and formatting standards for AI-generated code:**
+
+### Python Standards
+- **Version**: Python 3.12+ required
+- **Formatting**: Black with 88-character line length
+- **Linting**: Ruff + Flake8 (strict mode, no suppressions)
+- **Type Checking**: MyPy strict mode (no `Any` types)
+
+### Naming Conventions
+- **Modules**: `snake_case` (e.g., `data_source_service.py`)
+- **Classes**: `CamelCase` (e.g., `UserDataSource`, `SourceTemplate`)
+- **Functions/Methods**: `snake_case` (e.g., `create_source()`, `validate_config()`)
+- **Constants**: `UPPER_CASE` (e.g., `DEFAULT_TIMEOUT = 30`)
+- **Variables**: `snake_case` (e.g., `source_config`, `user_permissions`)
+
+### Import Organization
+```python
+# Standard library imports
+from typing import Dict, List, Optional
+from uuid import UUID
+
+# Third-party imports
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+# Local imports (absolute)
+from src.domain.entities.user_data_source import UserDataSource
+from src.application.services.source_management_service import SourceManagementService
+```
+
+### Docstring Standards
+```python
+def create_data_source(
+    self, request: CreateSourceRequest
+) -> UserDataSource:
+    """
+    Create a new data source with validation.
+
+    Args:
+        request: Validated creation request with all required fields
+
+    Returns:
+        The newly created UserDataSource entity
+
+    Raises:
+        ValueError: If source configuration is invalid
+        PermissionError: If user lacks creation permissions
+    """
+```
+
+### Domain-Specific Patterns
+- **Entity Creation**: Always validate through domain services, not direct constructors
+- **Error Handling**: Use domain-specific exceptions, not generic ones
+- **Validation**: All business rules enforced at domain layer
+- **Dependencies**: Use dependency injection, not direct instantiation
 
 ## 🛡️ Type Safety Excellence
 
@@ -201,16 +460,39 @@ make all                    # Complete quality gate
 
 ## 📚 Key Documentation References
 
+**Essential reading for AI agents:**
+
 - `docs/type_examples.md`: Comprehensive type safety patterns and examples
-- `docs/EngineeringArchitecturePlan.md`: Detailed architectural roadmap
+- `docs/EngineeringArchitecture.md`: Detailed architectural roadmap and phase plans
 - `data_sources_plan.md`: Complete Data Sources module specification
-- `docs/implementation_plan.md`: Technical implementation details
+- `docs/node_js_migration_prd.md`: Next.js admin interface migration plan
+- `docs/curator.md`: Researcher curation workflows and UI patterns
+- `docs/goal.md`: Project mission and success criteria
+- `docs/infra.md`: Infrastructure and deployment details
 
 ## 🎯 Development Philosophy
 
 **"Build systems that are maintainable, testable, and evolvable. Type safety is not optional—it's foundational. Clean architecture enables confident refactoring and feature development."**
 
+### Core Principles for AI Agents
 - **First Principles**: Strip problems to core truths, challenge assumptions
 - **Robust Solutions**: Always implement the most robust solution possible
-- **Long-term Focus**: Design for maintainability and evolution
+- **Long-term Focus**: Design for maintainability and evolution over short-term gains
 - **Quality First**: Never compromise on type safety or architectural principles
+
+### Healthcare Domain Considerations
+- **Patient Safety**: Medical data accuracy is critical - no shortcuts on validation
+- **Privacy First**: HIPAA/compliance requirements built into every feature
+- **Auditability**: Every data operation must be traceable and logged
+- **Reliability**: 99.9%+ uptime requirements for healthcare systems
+
+### AI Agent Guidelines
+- **Context Awareness**: Always consider MED13's biomedical domain constraints
+- **Type Safety**: Never use `Any` - proper typing prevents medical data errors
+- **Testing**: Healthcare software requires extensive validation
+- **Documentation**: Clear docs prevent medical misinterpretation
+- **Security**: Healthcare data demands fortress-level security practices
+
+---
+
+**This AGENTS.md serves as your comprehensive guide to building on the MED13 Resource Library. Follow these patterns to create reliable, type-safe, healthcare-grade software.** 🏥✨
