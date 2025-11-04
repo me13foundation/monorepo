@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any
+from contextlib import asynccontextmanager
+from typing import Dict, Any, AsyncGenerator
 
+from src.application.container import container
 from src.routes.health import router as health_router
 from src.routes.resources import router as resources_router
 from src.routes.genes import router as genes_router
@@ -12,9 +14,21 @@ from src.routes.search import router as search_router
 from src.routes.export import router as export_router
 from src.routes.dashboard import router as dashboard_router
 from src.routes.admin import router as admin_router
+from src.routes.auth import auth_router
+from src.routes.users import users_router
 from src.middleware.auth import AuthMiddleware
+from src.middleware.jwt_auth import JWTAuthMiddleware
 from src.middleware.rate_limit import EndpointRateLimitMiddleware
 from src.routes.curation import router as curation_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Application lifespan context manager."""
+    # Startup
+    yield
+    # Shutdown
+    await container.engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -32,6 +46,7 @@ def create_app() -> FastAPI:
             "name": "CC-BY 4.0",
             "url": "https://creativecommons.org/licenses/by/4.0/",
         },
+        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -49,8 +64,11 @@ def create_app() -> FastAPI:
         allow_credentials=True,
     )
 
-    # Add authentication middleware
+    # Add legacy API key authentication middleware (runs first)
     app.add_middleware(AuthMiddleware)
+
+    # Add JWT authentication middleware
+    app.add_middleware(JWTAuthMiddleware)
 
     # Add rate limiting middleware
     app.add_middleware(EndpointRateLimitMiddleware)
@@ -69,9 +87,11 @@ def create_app() -> FastAPI:
             "resources": "/resources/",
             "genes": "/genes/",
             "authentication": {
-                "type": "API Key",
-                "header": "X-API-Key",
-                "description": "Include API key in request headers for authentication",
+                "type": "JWT Bearer Token",
+                "header": "Authorization",
+                "format": "Bearer {token}",
+                "login_endpoint": "/auth/login",
+                "description": "Use JWT tokens obtained from /auth/login for API authentication",
             },
             "rate_limiting": {
                 "description": "Rate limiting applied based on client IP",
@@ -96,6 +116,10 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(admin_router)
     app.include_router(curation_router)
+
+    # Authentication routes
+    app.include_router(auth_router)
+    app.include_router(users_router)
 
     return app
 

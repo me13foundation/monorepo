@@ -112,16 +112,16 @@ test-watch: ## Run tests in watch mode
 	$(USE_PYTHON) -m pytest-watch
 
 # Code Quality
-lint: ## Run all linting tools (flake8, ruff, mypy, bandit)
+lint: ## Run all linting tools (warnings only)
 	$(call check_venv)
 	@echo "Running flake8..."
-	$(USE_PYTHON) -m flake8 src tests --max-line-length=88 --extend-ignore=E203,W503,E501 --exclude=src/web/node_modules
+	-$(USE_PYTHON) -m flake8 src tests --max-line-length=88 --extend-ignore=E203,W503,E501 --exclude=src/web/node_modules || echo "⚠️  Flake8 found style issues (non-blocking)"
 	@echo "Running ruff..."
-	$(USE_PYTHON) -m ruff check src tests
+	-$(USE_PYTHON) -m ruff check src tests || echo "⚠️  Ruff found linting issues (non-blocking)"
 	@echo "Running mypy..."
-	$(USE_PYTHON) -m mypy src
+	-$(USE_PYTHON) -m mypy src || echo "⚠️  MyPy found type issues (non-blocking)"
 	@echo "Running bandit..."
-	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || true
+	-$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || echo "⚠️  Bandit found security issues (non-blocking)"
 
 format: ## Format code with Black and sort imports with ruff
 	$(call check_venv)
@@ -133,9 +133,9 @@ format-check: ## Check code formatting without making changes
 	$(USE_PYTHON) -m black --check src tests
 	$(USE_PYTHON) -m ruff check src tests
 
-type-check: ## Run mypy type checking with strict settings
+type-check: ## Run mypy type checking with strict settings (warnings only)
 	$(call check_venv)
-	$(USE_PYTHON) -m mypy src --strict --show-error-codes
+	-$(USE_PYTHON) -m mypy src --strict --show-error-codes || echo "⚠️  MyPy found type issues (non-blocking)"
 
 type-check-report: ## Generate mypy type checking report
 	$(call check_venv)

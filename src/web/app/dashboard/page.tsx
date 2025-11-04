@@ -2,6 +2,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { useSession, signOut } from 'next-auth/react'
 import {
   Database,
   Users,
@@ -9,10 +11,25 @@ import {
   TrendingUp,
   Plus,
   Settings,
-  BarChart3
+  BarChart3,
+  LogOut,
+  User
 } from 'lucide-react'
 
 export default function DashboardPage() {
+  return (
+    <ProtectedRoute>
+      <DashboardContent />
+    </ProtectedRoute>
+  )
+}
+
+function DashboardContent() {
+  const { data: session } = useSession()
+
+  const handleSignOut = () => {
+    signOut({ callbackUrl: '/auth/login' })
+  }
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -22,10 +39,14 @@ export default function DashboardPage() {
             <div>
               <h1 className="text-4xl font-heading font-bold text-foreground">MED13 Admin Dashboard</h1>
               <p className="mt-2 text-base text-muted-foreground">
-                Manage data sources, users, and system monitoring
+                Welcome back, {session?.user?.full_name || session?.user?.email}
               </p>
             </div>
             <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <User className="h-4 w-4" />
+                <span>{session?.user?.role}</span>
+              </div>
               <ThemeToggle />
               <Button variant="outline" size="sm">
                 <Settings className="h-4 w-4 mr-2" />
@@ -34,6 +55,10 @@ export default function DashboardPage() {
               <Button size="sm">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Data Source
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
               </Button>
             </div>
           </div>
