@@ -326,12 +326,14 @@ async def update_data_source(
         update_request = UpdateSourceRequest(
             name=request.name,
             description=request.description,
-            configuration=SourceConfiguration(**request.config)
-            if request.config
-            else None,
-            ingestion_schedule=IngestionSchedule(**request.ingestion_schedule)
-            if request.ingestion_schedule
-            else None,
+            configuration=(
+                SourceConfiguration(**request.config) if request.config else None
+            ),
+            ingestion_schedule=(
+                IngestionSchedule(**request.ingestion_schedule)
+                if request.ingestion_schedule
+                else None
+            ),
         )
 
         # Update the data source

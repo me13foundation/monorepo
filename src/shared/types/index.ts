@@ -1,0 +1,12 @@
+// Shared Type Definitions for MED13 Resource Library
+// These types are used across FastAPI backend, Next.js admin, and Dash UI
+
+export * from './data-source'
+export * from './user'
+export * from './gene'
+export * from './variant'
+export * from './phenotype'
+export * from './evidence'
+export * from './publication'
+export * from './ingestion'
+export * from './common'

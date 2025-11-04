@@ -115,7 +115,7 @@ test-watch: ## Run tests in watch mode
 lint: ## Run all linting tools (flake8, ruff, mypy, bandit)
 	$(call check_venv)
 	@echo "Running flake8..."
-	$(USE_PYTHON) -m flake8 src tests --max-line-length=88 --extend-ignore=E203,W503,E501
+	$(USE_PYTHON) -m flake8 src tests --max-line-length=88 --extend-ignore=E203,W503,E501 --exclude=src/web/node_modules
 	@echo "Running ruff..."
 	$(USE_PYTHON) -m ruff check src tests
 	@echo "Running mypy..."
