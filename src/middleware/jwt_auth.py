@@ -4,10 +4,11 @@ JWT Authentication middleware for MED13 Resource Library.
 Provides FastAPI middleware for JWT token validation and user authentication.
 """
 
-from typing import Optional
-from fastapi import Request, status
+from typing import Optional, Callable, Awaitable
+from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 
 from ..application.container import container
 from ..application.services.authentication_service import (
@@ -25,10 +26,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: ASGIApp,
         exclude_paths: Optional[list[str]] = None,
         auth_service: Optional[AuthenticationService] = None,
-    ):
+    ) -> None:
         """
         Initialize JWT authentication middleware.
 
@@ -50,10 +51,15 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             "/auth/forgot-password",
             "/auth/reset-password",
             "/auth/verify-email",
+            "/auth/test",
+            "/auth/debug",
+            "/auth/routes",
         ]
         self.auth_service = auth_service
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process each request through JWT authentication middleware.
 

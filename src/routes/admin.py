@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from src.application.services.source_management_service import (
     SourceManagementService,
@@ -118,8 +118,7 @@ class DataSourceResponse(BaseModel):
     created_at: str
     updated_at: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DataSourceListResponse(BaseModel):

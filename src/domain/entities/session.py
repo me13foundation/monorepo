@@ -5,7 +5,7 @@ Manages user sessions, JWT token tracking, and session lifecycle.
 """
 
 from pydantic import BaseModel, Field, model_validator, ConfigDict
-from typing import Optional
+from typing import Optional, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -30,8 +30,8 @@ class UserSession(BaseModel):
     user_id: UUID
 
     # JWT tokens
-    session_token: str  # Access token
-    refresh_token: str
+    session_token: Optional[str] = None  # Access token
+    refresh_token: Optional[str] = None
 
     # Session metadata
     ip_address: Optional[str] = None
@@ -97,7 +97,10 @@ class UserSession(BaseModel):
         self.update_activity()
 
     def generate_device_fingerprint(
-        self, ip_address: str, user_agent: str, additional_data: Optional[dict] = None
+        self,
+        ip_address: str,
+        user_agent: str,
+        additional_data: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Generate a device fingerprint for session tracking."""
         import hashlib

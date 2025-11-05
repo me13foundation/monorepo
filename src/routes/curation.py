@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
-from src.infrastructure.dependency_injection import DependencyContainer
+from src.application.container import get_legacy_dependency_container
 from src.application.curation.repositories.review_repository import (
     SqlAlchemyReviewRepository,
 )
@@ -65,8 +65,10 @@ def _comment_service() -> CommentService:
 def _curation_detail_service(
     db: Session = Depends(get_session),
 ) -> CurationDetailService:
-    container = DependencyContainer(db)
-    return container.create_curation_detail_service()
+    # Get unified container with legacy support
+
+    container = get_legacy_dependency_container()
+    return container.create_curation_detail_service(db)
 
 
 @router.get("/queue", response_model=list[Dict[str, Any]])

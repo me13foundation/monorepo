@@ -15,7 +15,7 @@ from ...domain.repositories.session_repository import SessionRepository
 from ...infrastructure.security.jwt_provider import JWTProvider
 from ...infrastructure.security.password_hasher import PasswordHasher
 from ..dto.auth_requests import LoginRequest
-from ..dto.auth_responses import LoginResponse, TokenRefreshResponse
+from ..dto.auth_responses import LoginResponse, TokenRefreshResponse, UserPublic
 
 
 class AuthenticationError(Exception):
@@ -137,7 +137,7 @@ class AuthenticationService:
             access_token=access_token,
             refresh_token=refresh_token,
             expires_in=900,  # 15 minutes
-            user=user,
+            user=UserPublic.from_user(user),
         )
 
     async def refresh_token(self, refresh_token: str) -> TokenRefreshResponse:

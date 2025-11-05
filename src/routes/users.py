@@ -4,8 +4,9 @@ User management routes for MED13 Resource Library.
 Provides REST API endpoints for administrative user management operations.
 """
 
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import Any, Dict, Optional
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..application.container import container
 from ..application.services.user_management_service import (
@@ -15,17 +16,27 @@ from ..application.services.user_management_service import (
     UserNotFoundError,
 )
 from ..application.services.authorization_service import AuthorizationService
+from ..application.services.authentication_service import AuthenticationService
 from .auth import get_current_active_user
 from ..application.dto.auth_requests import CreateUserRequest, AdminUpdateUserRequest
 from ..application.dto.auth_responses import (
     UserProfileResponse,
     UserListResponse,
     UserStatisticsResponse,
+    UserPublic,
     GenericSuccessResponse,
     ErrorResponse,
     ValidationErrorResponse,
 )
 from ..domain.entities.user import User, UserRole, UserStatus
+
+# HTTP status codes
+HTTP_201_CREATED = 201
+HTTP_400_BAD_REQUEST = 400
+HTTP_403_FORBIDDEN = 403
+HTTP_404_NOT_FOUND = 404
+HTTP_409_CONFLICT = 409
+HTTP_500_INTERNAL_SERVER_ERROR = 500
 
 
 # Create router
@@ -47,7 +58,7 @@ users_router = APIRouter(
     response_model=UserProfileResponse,
     summary="Create user",
     description="Create a new user account (admin only)",
-    status_code=status.HTTP_201_CREATED,
+    status_code=HTTP_201_CREATED,
 )
 async def create_user(
     request: CreateUserRequest,
@@ -68,14 +79,14 @@ async def create_user(
             current_user.id, Permission("user:create")
         )
         user = await user_service.create_user(request, current_user.id)
-        return UserProfileResponse(user=user)
+        return UserProfileResponse(user=UserPublic.from_user(user))
     except UserAlreadyExistsError as e:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+        raise HTTPException(status_code=HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"User creation failed: {str(e)}",
         )
 
@@ -92,7 +103,7 @@ async def list_users(
         100, ge=1, le=1000, description="Maximum number of records to return"
     ),
     role: Optional[str] = Query(None, description="Filter by role"),
-    status: Optional[str] = Query(None, description="Filter by status"),
+    status_filter: Optional[str] = Query(None, description="Filter by status"),
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
         container.get_user_management_service
@@ -109,19 +120,19 @@ async def list_users(
                 user_role = UserRole(role.lower())
             except ValueError:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
+                    status_code=400,
                     detail=f"Invalid role: {role}",
                 )
 
         # Validate status parameter
         user_status = None
-        if status:
+        if status_filter:
             try:
-                user_status = UserStatus(status.lower())
+                user_status = UserStatus(status_filter.lower())
             except ValueError:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid status: {status}",
+                    status_code=400,
+                    detail=f"Invalid status: {status_filter}",
                 )
 
         response = await user_service.list_users(
@@ -131,7 +142,7 @@ async def list_users(
         return response
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to list users: {str(e)}",
         )
 
@@ -158,19 +169,17 @@ async def get_user(
             # Users can only see their own information
             if str(current_user.id) != user_id:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+                    status_code=HTTP_403_FORBIDDEN, detail="Access denied"
                 )
 
-        user = await user_service.get_user(user_id)
+        user = await user_service.get_user(UUID(user_id))
         if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-            )
+            raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
 
-        return UserProfileResponse(user=user)
+        return UserProfileResponse(user=UserPublic.from_user(user))
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get user: {str(e)}",
         )
 
@@ -200,17 +209,15 @@ async def update_user(
         await authz_service.require_permission(
             current_user.id, Permission("user:update")
         )
-        updated_user = await user_service.admin_update_user(user_id, request)
-        return UserProfileResponse(user=updated_user)
+        updated_user = await user_service.admin_update_user(UUID(user_id), request)
+        return UserProfileResponse(user=UserPublic.from_user(updated_user))
     except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=HTTP_400_BAD_REQUEST, detail=str(e))
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"User update failed: {str(e)}",
         )
 
@@ -243,19 +250,17 @@ async def delete_user(
         # Prevent users from deleting themselves
         if str(current_user.id) == user_id:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=HTTP_400_BAD_REQUEST,
                 detail="Cannot delete your own account",
             )
 
-        await user_service.delete_user(user_id)
+        await user_service.delete_user(UUID(user_id))
         return GenericSuccessResponse(message="User deleted successfully")
     except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"User deletion failed: {str(e)}",
         )
 
@@ -288,19 +293,17 @@ async def lock_user_account(
         # Prevent users from locking themselves
         if str(current_user.id) == user_id:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=HTTP_400_BAD_REQUEST,
                 detail="Cannot lock your own account",
             )
 
-        await user_service.lock_user_account(user_id)
+        await user_service.lock_user_account(UUID(user_id))
         return GenericSuccessResponse(message="User account locked successfully")
     except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Account lock failed: {str(e)}",
         )
 
@@ -329,15 +332,13 @@ async def unlock_user_account(
         await authz_service.require_permission(
             current_user.id, Permission("user:update")
         )
-        await user_service.unlock_user_account(user_id)
+        await user_service.unlock_user_account(UUID(user_id))
         return GenericSuccessResponse(message="User account unlocked successfully")
     except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
-        )
+        raise HTTPException(status_code=HTTP_404_NOT_FOUND, detail="User not found")
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Account unlock failed: {str(e)}",
         )
 
@@ -362,7 +363,7 @@ async def get_user_statistics(
         return stats
     except UserManagementError as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get user statistics: {str(e)}",
         )
 
@@ -377,8 +378,8 @@ async def get_user_statistics(
 )
 async def get_user_sessions(
     current_user: User = Depends(get_current_active_user),
-    auth_service=Depends(container.get_authentication_service),
-):
+    auth_service: AuthenticationService = Depends(container.get_authentication_service),
+) -> Dict[str, Any]:
     """
     Get all active sessions for the current user.
     """
@@ -387,7 +388,7 @@ async def get_user_sessions(
         return {"sessions": sessions, "count": len(sessions)}
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get sessions: {str(e)}",
         )
 
@@ -401,7 +402,7 @@ async def get_user_sessions(
 async def revoke_user_session(
     session_id: str,
     current_user: User = Depends(get_current_active_user),
-    auth_service=Depends(container.get_authentication_service),
+    auth_service: AuthenticationService = Depends(container.get_authentication_service),
 ) -> GenericSuccessResponse:
     """
     Revoke a specific user session.
@@ -415,11 +416,11 @@ async def revoke_user_session(
         return GenericSuccessResponse(message="Session revoked successfully")
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid session ID format"
+            status_code=HTTP_400_BAD_REQUEST, detail="Invalid session ID format"
         )
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to revoke session: {str(e)}",
         )
 
@@ -432,7 +433,7 @@ async def revoke_user_session(
 )
 async def revoke_all_user_sessions(
     current_user: User = Depends(get_current_active_user),
-    auth_service=Depends(container.get_authentication_service),
+    auth_service: AuthenticationService = Depends(container.get_authentication_service),
 ) -> GenericSuccessResponse:
     """
     Revoke all sessions for the current user.
@@ -444,6 +445,6 @@ async def revoke_all_user_sessions(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to revoke sessions: {str(e)}",
         )

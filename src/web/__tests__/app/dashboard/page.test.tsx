@@ -1,34 +1,74 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DashboardPage from '@/app/dashboard/page'
+import { SessionProvider } from '@/components/session-provider'
+import { ThemeProvider } from '@/components/theme-provider'
+
+// Mock NextAuth session
+const mockSession = {
+  user: {
+    id: 'test-user-id',
+    email: 'admin@med13.org',
+    name: 'Test Admin',
+    role: 'admin'
+  },
+  expires: '2025-12-31T00:00:00.000Z'
+}
+
+jest.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: mockSession,
+    status: 'authenticated'
+  }),
+  signOut: jest.fn()
+}))
+
+// Mock ProtectedRoute to render children directly
+jest.mock('@/components/auth/ProtectedRoute', () => ({
+  ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>
+}))
+
+// Test wrapper with providers
+const renderWithProviders = (component: React.ReactElement) => {
+  return render(
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="light"
+      enableSystem
+      disableTransitionOnChange
+    >
+      {component}
+    </ThemeProvider>
+  )
+}
 
 describe('DashboardPage', () => {
   it('renders the main dashboard heading', () => {
-    render(<DashboardPage />)
+    renderWithProviders(<DashboardPage />)
     const heading = screen.getByRole('heading', { level: 1 })
     expect(heading).toHaveTextContent('MED13 Admin Dashboard')
   })
 
   it('renders the dashboard subtitle', () => {
-    render(<DashboardPage />)
-    expect(screen.getByText('Manage data sources, users, and system monitoring')).toBeInTheDocument()
+    renderWithProviders(<DashboardPage />)
+    expect(screen.getByText('Welcome back, admin@med13.org')).toBeInTheDocument()
   })
 
   it('renders theme toggle button', () => {
-    render(<DashboardPage />)
+    renderWithProviders(<DashboardPage />)
     const themeButton = screen.getByRole('button', { name: /toggle theme/i })
     expect(themeButton).toBeInTheDocument()
   })
 
   it('renders action buttons', () => {
-    render(<DashboardPage />)
+    renderWithProviders(<DashboardPage />)
     expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /add data source/i })).toBeInTheDocument()
   })
 
   describe('Statistics Cards', () => {
     it('renders all metric cards', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('Data Sources')).toBeInTheDocument()
       expect(screen.getByText('Total Records')).toBeInTheDocument()
@@ -37,7 +77,7 @@ describe('DashboardPage', () => {
     })
 
     it('displays correct metric values', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('12')).toBeInTheDocument() // Data Sources
       expect(screen.getByText('1,234,567')).toBeInTheDocument() // Total Records
@@ -46,7 +86,7 @@ describe('DashboardPage', () => {
     })
 
     it('displays metric descriptions', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('8 active, 2 paused, 2 error')).toBeInTheDocument()
       expect(screen.getByText('+12% from last month')).toBeInTheDocument()
@@ -57,14 +97,14 @@ describe('DashboardPage', () => {
 
   describe('Data Sources Section', () => {
     it('renders data sources section', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('Recent Data Sources')).toBeInTheDocument()
       expect(screen.getByText('Latest data source configurations and status')).toBeInTheDocument()
     })
 
     it('renders sample data sources', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('ClinVar API')).toBeInTheDocument()
       expect(screen.getByText('HGMD Database')).toBeInTheDocument()
@@ -73,7 +113,7 @@ describe('DashboardPage', () => {
     })
 
     it('displays data source metadata', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('API • 2 hours ago')).toBeInTheDocument()
       expect(screen.getByText('Database • 1 day ago')).toBeInTheDocument()
@@ -82,7 +122,7 @@ describe('DashboardPage', () => {
     })
 
     it('shows status badges', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       const activeBadges = screen.getAllByText('active')
       expect(activeBadges).toHaveLength(2) // ClinVar and HGMD
@@ -94,14 +134,14 @@ describe('DashboardPage', () => {
 
   describe('System Activity Section', () => {
     it('renders system activity section', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('System Activity')).toBeInTheDocument()
       expect(screen.getByText('Recent system events and ingestion jobs')).toBeInTheDocument()
     })
 
     it('renders activity feed', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('Data ingestion completed')).toBeInTheDocument()
       expect(screen.getByText('Quality check failed')).toBeInTheDocument()
@@ -110,7 +150,7 @@ describe('DashboardPage', () => {
     })
 
     it('displays activity metadata', () => {
-      render(<DashboardPage />)
+      renderWithProviders(<DashboardPage />)
 
       expect(screen.getByText('ClinVar API • 2 hours ago')).toBeInTheDocument()
       expect(screen.getByText('OMIM CSV • 3 hours ago')).toBeInTheDocument()
@@ -120,7 +160,7 @@ describe('DashboardPage', () => {
   })
 
   it('has proper semantic structure', () => {
-    render(<DashboardPage />)
+    renderWithProviders(<DashboardPage />)
 
     // Check for header landmark
     expect(screen.getByRole('banner')).toBeInTheDocument()
@@ -136,7 +176,7 @@ describe('DashboardPage', () => {
   })
 
   it('applies proper CSS classes', () => {
-    render(<DashboardPage />)
+    renderWithProviders(<DashboardPage />)
 
     // Check main container
     const main = screen.getByRole('main')
@@ -148,7 +188,7 @@ describe('DashboardPage', () => {
   })
 
   it('is responsive with grid layouts', () => {
-    render(<DashboardPage />)
+    renderWithProviders(<DashboardPage />)
 
     // Check responsive grid classes
     const statsGrid = screen.getByText('Data Sources').closest('.grid')

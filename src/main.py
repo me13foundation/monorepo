@@ -3,8 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from typing import Dict, Any, AsyncGenerator
 
-from src.application.container import container
+from src.application.container import container, initialize_legacy_session
+from src.database.session import get_session
 from src.routes.health import router as health_router
+
+# Import models to ensure they're registered with SQLAlchemy
 from src.routes.resources import router as resources_router
 from src.routes.genes import router as genes_router
 from src.routes.variants import router as variants_router
@@ -26,8 +29,17 @@ from src.routes.curation import router as curation_router
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
     # Startup
+    # Initialize legacy session for backward compatibility
+    legacy_session = next(get_session())
+    try:
+        initialize_legacy_session(legacy_session)
+    except Exception:
+        legacy_session.close()
+        raise
+
     yield
     # Shutdown
+    legacy_session.close()
     await container.engine.dispose()
 
 

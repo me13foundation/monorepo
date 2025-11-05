@@ -84,18 +84,32 @@ class UserManagementService:
             UserAlreadyExistsError: If email or username already exists
             ValueError: If password doesn't meet requirements
         """
+        print(f"DEBUG: Starting register_user for {request.email}")
+
         # Check for existing users
-        if await self.user_repository.exists_by_email(request.email):
+        print("DEBUG: Checking for existing email")
+        email_exists = await self.user_repository.exists_by_email(request.email)
+        print(f"DEBUG: Email exists: {email_exists}")
+        if email_exists:
             raise UserAlreadyExistsError("User with this email already exists")
 
-        if await self.user_repository.exists_by_username(request.username):
+        print("DEBUG: Checking for existing username")
+        username_exists = await self.user_repository.exists_by_username(
+            request.username
+        )
+        print(f"DEBUG: Username exists: {username_exists}")
+        if username_exists:
             raise UserAlreadyExistsError("User with this username already exists")
 
         # Validate password strength
-        if not self.password_hasher.is_password_strong(request.password):
+        print("DEBUG: Validating password strength")
+        password_strong = self.password_hasher.is_password_strong(request.password)
+        print(f"DEBUG: Password strong: {password_strong}")
+        if not password_strong:
             raise ValueError("Password does not meet security requirements")
 
         # Create user
+        print("DEBUG: Creating user entity")
         user = User(
             email=request.email,
             username=request.username,
@@ -104,12 +118,19 @@ class UserManagementService:
             role=request.role,
             status=UserStatus.PENDING_VERIFICATION,
         )
+        print(f"DEBUG: User created: {user.id}")
 
         # Generate email verification token
+        print("DEBUG: Generating email verification token")
         user.generate_email_verification_token()
+        print(f"DEBUG: Token generated: {user.email_verification_token}")
 
         # Save user
+        print("DEBUG: Saving user to database")
+        print(f"DEBUG: User repository: {self.user_repository}")
+        print(f"DEBUG: User to save: {user}")
         created_user = await self.user_repository.create(user)
+        print(f"DEBUG: User saved: {created_user.id}")
 
         # TODO: Send verification email
         # await self.email_service.send_verification_email(created_user, user.email_verification_token)
@@ -308,7 +329,7 @@ class UserManagementService:
 
         # TODO: Implement proper token lookup in repository
         # For now, this is a placeholder implementation
-        users = await self.user_repository.list_all()
+        users = await self.user_repository.list_users(limit=1000)  # Get all users
         user = None
         for u in users:
             if (
@@ -350,10 +371,16 @@ class UserManagementService:
             EmailVerificationError: If token is invalid
         """
         # Find user with this token
-        # TODO: Implement proper token lookup
+        # TODO: Implement proper token lookup in repository
+        # For now, this is a placeholder implementation
+        users = await self.user_repository.list_users(limit=1000)  # Get all users
+        user = None
+        for u in users:
+            if u.email_verification_token == token:
+                user = u
+                break
 
-        user = None  # Placeholder
-        if not user or user.email_verification_token != token:
+        if not user:
             raise EmailVerificationError("Invalid verification token")
 
         # Verify email

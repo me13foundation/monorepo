@@ -2,6 +2,30 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DashboardPage from '@/app/dashboard/page'
 
+// Mock NextAuth session
+const mockSession = {
+  user: {
+    id: 'test-user-id',
+    email: 'admin@med13.org',
+    name: 'Test Admin',
+    role: 'admin'
+  },
+  expires: '2025-12-31T00:00:00.000Z'
+}
+
+jest.mock('next-auth/react', () => ({
+  useSession: () => ({
+    data: mockSession,
+    status: 'authenticated'
+  }),
+  signOut: jest.fn()
+}))
+
+// Mock ProtectedRoute to render children directly
+jest.mock('@/components/auth/ProtectedRoute', () => ({
+  ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>
+}))
+
 // Mock next-themes for integration testing
 jest.mock('next-themes', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,

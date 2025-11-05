@@ -106,13 +106,13 @@ class UserModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        server_default="NOW()",
+        default=datetime.utcnow,
         doc="Account creation timestamp",
     )
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        server_default="NOW()",
+        default=datetime.utcnow,
         onupdate=datetime.utcnow,
         doc="Last account update timestamp",
     )
@@ -122,14 +122,7 @@ class UserModel(Base):
         Index("idx_users_email_active", "email", "status"),
         Index("idx_users_role_status", "role", "status"),
         Index("idx_users_created_at", "created_at"),
-        # Partial index for active users (PostgreSQL specific)
-        Index(
-            "idx_users_active_only",
-            "id",
-            postgresql_where=(status == UserStatus.ACTIVE),
-        ),
         {
-            "schema": None,  # Use default schema
             "comment": "User accounts with authentication and authorization data",
         },
     )

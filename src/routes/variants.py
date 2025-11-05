@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
-from src.infrastructure.dependency_injection import DependencyContainer
+from src.application.container import get_legacy_dependency_container
 from src.routes.serializers import serialize_variant
 from src.models.api import (
     VariantResponse,
@@ -28,8 +28,10 @@ def get_variant_service(
     db: Session = Depends(get_session),
 ) -> "VariantApplicationService":
     """Dependency injection for variant application service."""
-    container = DependencyContainer(db)
-    return container.create_variant_application_service()
+    # Get unified container with legacy support
+
+    container = get_legacy_dependency_container()
+    return container.create_variant_application_service(db)
 
 
 @router.get(

@@ -4,7 +4,7 @@ Authorization service for MED13 Resource Library.
 Handles permission checking, role-based access control, and resource authorization.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 
 from ...domain.entities.user import User, UserRole
@@ -263,7 +263,7 @@ class AuthorizationService:
 
     async def get_accessible_resources(
         self, user_id: UUID, resource_type: str, action: str
-    ) -> dict:
+    ) -> Dict[str, Any]:
         """
         Get information about what resources user can access.
 
@@ -275,8 +275,12 @@ class AuthorizationService:
         Returns:
             Access information dictionary
         """
+        user = await self.user_repository.get_by_id(user_id)
+        if not user:
+            return {"has_access": False, "reason": "User not found"}
+
         has_access = await self.check_resource_access(
-            await self.user_repository.get_by_id(user_id),
+            user,
             resource_type,
             None,  # General access check
             action,
@@ -312,7 +316,7 @@ class AuthorizationService:
 
     # Administrative methods
 
-    async def get_role_capabilities(self, role: UserRole) -> dict:
+    async def get_role_capabilities(self, role: UserRole) -> Dict[str, Any]:
         """
         Get detailed information about a role's capabilities.
 
@@ -338,7 +342,7 @@ class AuthorizationService:
             "can_manage_equal_roles": False,  # Current policy
         }
 
-    async def get_system_permissions_summary(self) -> dict:
+    async def get_system_permissions_summary(self) -> Dict[str, Any]:
         """
         Get summary of all permissions in the system.
 
@@ -348,7 +352,7 @@ class AuthorizationService:
         all_permissions = Permission.__members__.values()
         roles = [r.value for r in UserRole]
 
-        role_summaries = {}
+        role_summaries: Dict[str, Dict[str, Any]] = {}
         for role in UserRole:
             permissions = RolePermissions.get_permissions_for_role(role)
             role_summaries[role.value] = {

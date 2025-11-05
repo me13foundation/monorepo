@@ -6,7 +6,7 @@ Provides secure JWT token creation, validation, and management.
 
 import jwt
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 from uuid import UUID
 
 
@@ -118,7 +118,7 @@ class JWTProvider:
             # Additional validation
             self._validate_payload(payload)
 
-            return payload
+            return cast(Dict[str, Any], payload)
 
         except jwt.ExpiredSignatureError:
             raise ValueError("Token has expired")

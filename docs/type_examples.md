@@ -16,7 +16,11 @@ This document demonstrates how to effectively use the comprehensive type safety 
 ### Basic Test Gene Creation
 
 ```python
-from tests.types.fixtures import create_test_gene, TEST_GENE_MED13
+from tests.test_types.fixtures import (
+    TEST_GENE_MED13,
+    TEST_GENE_TP53,
+    create_test_gene,
+)
 
 # Create a custom test gene
 test_gene = create_test_gene(
@@ -38,7 +42,8 @@ tp53_gene = TEST_GENE_TP53
 
 ```python
 import pytest
-from tests.types.fixtures import create_test_gene, create_mock_gene_service
+from tests.test_types.fixtures import create_test_gene
+from tests.test_types.mocks import create_mock_gene_service
 
 def test_gene_service_functionality() -> None:
     """Test gene service with typed fixtures."""
@@ -67,15 +72,15 @@ def test_gene_service_functionality() -> None:
 ### Creating Type-Safe Mock Repositories
 
 ```python
-from tests.types.mocks import MockGeneRepository
-from tests.types.fixtures import TEST_GENE_MED13, TEST_GENE_TP53
+from tests.test_types.mocks import MockGeneRepository
+from tests.test_types.fixtures import TEST_GENE_MED13, TEST_GENE_TP53
 
 # Create mock repository with test data
 test_genes = [TEST_GENE_MED13, TEST_GENE_TP53]
 mock_repo = MockGeneRepository(test_genes)
 
 # Use in domain service
-from src.services.domain.gene_domain_service import GeneDomainService
+from src.domain.services.gene_domain_service import GeneDomainService
 service = GeneDomainService(mock_repo)
 
 # Mock tracks all calls for verification
@@ -86,7 +91,8 @@ mock_repo.get_gene_by_symbol.assert_called_once_with("MED13")
 ### Factory Functions for Mock Services
 
 ```python
-from tests.types.mocks import create_mock_gene_service, create_mock_variant_service
+from tests.test_types.fixtures import TEST_GENE_MED13, TEST_VARIANT_PATHOGENIC
+from tests.test_types.mocks import create_mock_gene_service, create_mock_variant_service
 
 def test_gene_variant_relationship() -> None:
     """Test relationship between genes and variants."""
@@ -138,7 +144,7 @@ def validate_clinvar_response(response_data: Dict[str, Any]) -> None:
 ### Runtime Type Safety for External APIs
 
 ```python
-from src.types.external_apis import ClinVarSearchResponse, ClinVarVariantResponse
+from src.type_definitions.external_apis import ClinVarSearchResponse, ClinVarVariantResponse
 from typing import cast
 
 def process_clinvar_search_response(raw_response: Dict[str, Any]) -> List[str]:
@@ -161,9 +167,10 @@ def process_clinvar_search_response(raw_response: Dict[str, Any]) -> List[str]:
 ### Testing Derived Properties Calculation
 
 ```python
-from src.services.domain.gene_domain_service import GeneDomainService
+from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.entities.gene import Gene
-from tests.types.fixtures import TEST_GENE_MED13
+from tests.test_types.fixtures import TEST_GENE_MED13
+from tests.test_types.mocks import create_mock_gene_service
 
 def test_gene_derived_properties() -> None:
     """Test calculation of gene-derived properties."""
@@ -196,7 +203,9 @@ def test_gene_derived_properties() -> None:
 ### Type-Safe Update Operations
 
 ```python
-from src.types.common import GeneUpdate
+from src.type_definitions.common import GeneUpdate
+from tests.test_types.fixtures import TEST_GENE_MED13
+from tests.test_types.mocks import create_mock_gene_service
 
 def test_gene_update_with_type_safety() -> None:
     """Test gene updates using type-safe update structures."""
@@ -224,7 +233,7 @@ def test_gene_update_with_type_safety() -> None:
 
 ```python
 from src.infrastructure.ingest.clinvar_ingestor import ClinVarIngestor
-from src.types.external_apis import ClinVarSearchResponse, ClinVarVariantResponse
+from src.type_definitions.external_apis import ClinVarSearchResponse, ClinVarVariantResponse
 
 class TypedClinVarIngestor(ClinVarIngestor):
     """ClinVar ingestor with enhanced type safety."""
@@ -255,7 +264,7 @@ class TypedClinVarIngestor(ClinVarIngestor):
 ### Error Handling with Type Safety
 
 ```python
-from src.types.external_apis import APIResponseValidationResult, ValidationIssue
+from src.type_definitions.external_apis import APIResponseValidationResult, ValidationIssue
 
 def handle_api_validation_errors(validation: APIResponseValidationResult) -> None:
     """Handle API validation errors with detailed reporting."""
@@ -286,8 +295,8 @@ def handle_api_validation_errors(validation: APIResponseValidationResult) -> Non
 
 ```python
 from src.infrastructure.publishing.zenodo.client import ZenodoClient
-from src.types.external_apis import ZenodoMetadata, ZenodoDepositResponse
-from tests.types.fixtures import create_test_publication
+from src.type_definitions.external_apis import ZenodoMetadata, ZenodoDepositResponse
+from tests.test_types.fixtures import create_test_publication
 
 async def publish_research_package() -> str:
     """Publish research package with type safety."""
@@ -323,7 +332,7 @@ async def publish_research_package() -> str:
 
 ```python
 from src.infrastructure.publishing.versioning.release_manager import ReleaseManager
-from src.types.external_apis import ZenodoMetadata
+from src.type_definitions.external_apis import ZenodoMetadata
 
 async def create_typed_release() -> str:
     """Create a release with comprehensive type safety."""

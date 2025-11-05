@@ -147,8 +147,9 @@ security-audit: ## Run comprehensive security audit (pip-audit, safety, bandit)
 	$(USE_PIP) install pip-audit --quiet || true
 	pip-audit --format json | tee pip-audit-results.json || true
 	@echo "Running safety..."
-	$(USE_PIP) install safety --quiet || true
-	safety check --output json | tee safety-results.json || true
+	@echo "⚠️  Safety CLI now requires authentication. Using pip-audit for vulnerability scanning instead."
+	@echo "   To enable Safety CLI in the future, set SAFETY_API_KEY environment variable."
+	# SAFETY_API_KEY="" safety --stage development scan --save-as json safety-results.json --use-server-matching || true
 	@echo "Running bandit..."
 	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || true
 
@@ -164,7 +165,7 @@ run-dash: ## Run the Dash curation interface locally
 	$(USE_PYTHON) -c "from src.dash_app import app; app.run(host='0.0.0.0', port=8050, debug=True)"
 
 run-web: ## Run the Next.js admin interface locally
-	cd src/web && npm run dev
+	cd src/web && NEXTAUTH_SECRET=med13-resource-library-nextauth-secret-key-for-development-2024-secure-random-string NEXTAUTH_URL=http://localhost:3001 NEXT_PUBLIC_API_URL=http://localhost:8080 npm run dev
 
 stop-local: ## Stop the local FastAPI backend
 	@echo "Stopping FastAPI backend..."

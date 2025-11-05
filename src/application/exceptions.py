@@ -182,14 +182,16 @@ def create_error_response(
     }
 
     # Handle custom exceptions with error codes
-    if hasattr(exc, "error_code"):
-        error_response["code"] = exc.error_code
-        error_response["detail"] = str(exc.detail)
+    custom_code = getattr(exc, "error_code", None)
+    if custom_code is not None:
+        error_response["code"] = str(custom_code)
+        error_detail = getattr(exc, "detail", exc)
+        error_response["detail"] = str(error_detail)
 
     # Handle HTTPExceptions
     elif isinstance(exc, HTTPException):
         error_response["error"] = "Request error"
-        error_response["detail"] = exc.detail
+        error_response["detail"] = getattr(exc, "detail", str(exc))
 
     # Handle validation errors
     elif hasattr(exc, "errors"):

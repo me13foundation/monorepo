@@ -4,9 +4,25 @@ Password hashing utilities for MED13 Resource Library.
 Provides secure password hashing with truncation prevention and strength validation.
 """
 
-from passlib.context import CryptContext
-from passlib.pwd import genword
+from typing import Dict, Any, List, TypedDict, cast
+import bcrypt
+import hashlib
+import secrets
+import string
 import re
+
+
+class PasswordAnalysis(TypedDict):
+    """Type definition for password complexity analysis."""
+
+    length: int
+    has_lowercase: bool
+    has_uppercase: bool
+    has_digit: bool
+    has_special: bool
+    is_strong: bool
+    score: int
+    issues: List[str]
 
 
 class PasswordHasher:
@@ -20,17 +36,7 @@ class PasswordHasher:
     - Secure random password generation
     """
 
-    def __init__(self):
-        # Use bcrypt with automatic pre-hashing for long passwords
-        self.pwd_context = CryptContext(
-            schemes=["bcrypt"],
-            deprecated="auto",
-            bcrypt__rounds=12,  # Strong hashing
-            # CRITICAL: Enable automatic pre-hashing
-            bcrypt__ident="2b",  # Use latest bcrypt version
-            truncate_error=True,  # Raise error if truncation would occur
-        )
-
+    def __init__(self) -> None:
         # Password policy configuration
         self.min_length = 8
         self.max_length = 128  # Reasonable limit to prevent DoS
@@ -54,10 +60,24 @@ class PasswordHasher:
         self._validate_password_policy(plain_password)
 
         try:
-            # passlib automatically handles long passwords:
-            # - If > 72 bytes: Pre-hashes with SHA256, then bcrypts the hash
-            # - This prevents truncation while maintaining security
-            return self.pwd_context.hash(plain_password)
+            # Handle long passwords by pre-hashing to prevent truncation
+            password_to_hash = plain_password
+            if len(plain_password.encode("utf-8")) > 72:
+                # Pre-hash long passwords with SHA256
+                password_to_hash = hashlib.sha256(
+                    plain_password.encode("utf-8")
+                ).hexdigest()
+
+            # Ensure password is not longer than 72 bytes (bcrypt limit)
+            password_bytes = password_to_hash.encode("utf-8")
+            if len(password_bytes) > 72:
+                password_to_hash = password_bytes[:72].decode("utf-8", errors="ignore")
+
+            # Hash with bcrypt (12 rounds)
+            salt = bcrypt.gensalt(rounds=12)
+            hashed_bytes = bcrypt.hashpw(password_to_hash.encode("utf-8"), salt)
+            return hashed_bytes.decode("utf-8")
+
         except Exception as e:
             raise ValueError(f"Password hashing failed: {str(e)}")
 
@@ -79,8 +99,24 @@ class PasswordHasher:
             return False
 
         try:
-            # passlib handles the pre-hashing automatically during verification
-            return self.pwd_context.verify(plain_password, hashed_password)
+            # Handle verification with pre-hashed passwords
+            password_to_verify = plain_password
+            if len(plain_password.encode("utf-8")) > 72:
+                # Pre-hash long passwords with SHA256 for verification
+                password_to_verify = hashlib.sha256(
+                    plain_password.encode("utf-8")
+                ).hexdigest()
+
+            # Ensure password is not longer than 72 bytes (bcrypt limit)
+            password_bytes = password_to_verify.encode("utf-8")
+            if len(password_bytes) > 72:
+                password_to_verify = password_bytes[:72].decode(
+                    "utf-8", errors="ignore"
+                )
+
+            return bcrypt.checkpw(
+                password_to_verify.encode("utf-8"), hashed_password.encode("utf-8")
+            )
         except Exception:
             # Any exception during verification means invalid
             return False
@@ -117,12 +153,11 @@ class PasswordHasher:
         if length < self.min_length or length > self.max_length:
             length = 16  # Default fallback
 
-        return genword(
-            length=length,
-            charset="ascii_72",  # Safe ASCII characters including symbols
-        )
+        # Generate password with mix of character types
+        chars = string.ascii_letters + string.digits + string.punctuation
+        return "".join(secrets.choice(chars) for _ in range(length))
 
-    def get_hash_info(self, hashed_password: str) -> dict:
+    def get_hash_info(self, hashed_password: str) -> Dict[str, Any]:
         """
         Get information about a password hash.
 
@@ -133,11 +168,20 @@ class PasswordHasher:
             Dictionary with hash information or error details
         """
         try:
-            return {
-                "scheme": self.pwd_context.identify(hashed_password),
-                "needs_update": self.pwd_context.needs_update(hashed_password),
-                "is_valid": True,
-            }
+            # Check if it's a valid bcrypt hash
+            if hashed_password.startswith("$2b$") or hashed_password.startswith("$2a$"):
+                return {
+                    "scheme": "bcrypt",
+                    "needs_update": False,  # Could implement version checking
+                    "is_valid": True,
+                }
+            else:
+                return {
+                    "scheme": "unknown",
+                    "needs_update": False,
+                    "is_valid": False,
+                    "error": "Not a bcrypt hash",
+                }
         except Exception as e:
             return {
                 "scheme": None,
@@ -180,7 +224,7 @@ class PasswordHasher:
         # - Dictionary word checks
         # - Personal information checks
 
-    def check_password_complexity(self, password: str) -> dict:
+    def check_password_complexity(self, password: str) -> Dict[str, Any]:
         """
         Detailed password complexity analysis.
 
@@ -190,7 +234,7 @@ class PasswordHasher:
         Returns:
             Dictionary with complexity metrics
         """
-        analysis = {
+        analysis: PasswordAnalysis = {
             "length": len(password),
             "has_lowercase": bool(re.search(r"[a-z]", password)),
             "has_uppercase": bool(re.search(r"[A-Z]", password)),
@@ -250,4 +294,4 @@ class PasswordHasher:
         # Strength determination
         analysis["is_strong"] = analysis["score"] >= 4 and len(analysis["issues"]) == 0
 
-        return analysis
+        return cast(Dict[str, Any], analysis)

@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
-from src.infrastructure.dependency_injection import DependencyContainer
+from src.application.container import get_legacy_dependency_container
 from src.application.search.search_service import SearchEntity
 
 if TYPE_CHECKING:
@@ -20,8 +20,10 @@ router = APIRouter(prefix="/search", tags=["search"])
 
 def get_search_service(db: Session = Depends(get_session)) -> "UnifiedSearchService":
     """Dependency injection for unified search service."""
-    container = DependencyContainer(db)
-    return container.create_unified_search_service()
+    # Get unified container with legacy support
+
+    container = get_legacy_dependency_container()
+    return container.create_unified_search_service(db)
 
 
 @router.post("/", summary="Unified search across all entities")

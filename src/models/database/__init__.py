@@ -9,6 +9,7 @@ from .evidence import EvidenceModel, EvidenceLevel, EvidenceType
 from .publication import PublicationModel, PublicationType
 from .audit import AuditLog
 from .review import ReviewRecord
+from .user import UserModel
 
 # Data Sources module models
 from .user_data_source import (
@@ -45,6 +46,7 @@ __all__ = [
     "EvidenceType",
     "PublicationModel",
     "PublicationType",
+    "UserModel",
     # Data Sources models
     "UserDataSourceModel",
     "SourceTemplateModel",

@@ -2,7 +2,7 @@
 Response Data Transfer Objects for authentication operations.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 from ...domain.entities.user import User, UserRole, UserStatus
@@ -46,8 +46,8 @@ class LoginResponse(BaseModel):
     expires_in: int  # seconds
     user: UserPublic
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -66,6 +66,7 @@ class LoginResponse(BaseModel):
                 },
             }
         }
+    )
 
 
 class TokenRefreshResponse(BaseModel):
@@ -76,8 +77,8 @@ class TokenRefreshResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
@@ -85,6 +86,7 @@ class TokenRefreshResponse(BaseModel):
                 "expires_in": 900,
             }
         }
+    )
 
 
 class UserProfileResponse(BaseModel):
@@ -92,8 +94,8 @@ class UserProfileResponse(BaseModel):
 
     user: UserPublic
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "user": {
                     "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -108,6 +110,7 @@ class UserProfileResponse(BaseModel):
                 }
             }
         }
+    )
 
 
 class UserListResponse(BaseModel):
@@ -118,8 +121,8 @@ class UserListResponse(BaseModel):
     skip: int
     limit: int
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "users": [
                     {
@@ -139,6 +142,7 @@ class UserListResponse(BaseModel):
                 "limit": 10,
             }
         }
+    )
 
 
 class UserStatisticsResponse(BaseModel):
@@ -153,8 +157,8 @@ class UserStatisticsResponse(BaseModel):
     recent_registrations: int  # Last 30 days
     recent_logins: int  # Last 7 days
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "total_users": 150,
                 "active_users": 120,
@@ -166,6 +170,7 @@ class UserStatisticsResponse(BaseModel):
                 "recent_logins": 45,
             }
         }
+    )
 
 
 class PasswordResetResponse(BaseModel):
@@ -174,13 +179,14 @@ class PasswordResetResponse(BaseModel):
     message: str
     email: str
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "message": "Password reset email sent",
                 "email": "user@example.com",
             }
         }
+    )
 
 
 class GenericSuccessResponse(BaseModel):
@@ -188,8 +194,9 @@ class GenericSuccessResponse(BaseModel):
 
     message: str
 
-    class Config:
-        json_schema_extra = {"example": {"message": "Operation completed successfully"}}
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"message": "Operation completed successfully"}}
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -199,14 +206,15 @@ class ErrorResponse(BaseModel):
     detail: Optional[str] = None
     code: Optional[str] = None
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "Authentication failed",
                 "detail": "Invalid email or password",
                 "code": "AUTH_INVALID_CREDENTIALS",
             }
         }
+    )
 
 
 class ValidationErrorResponse(BaseModel):
@@ -215,8 +223,8 @@ class ValidationErrorResponse(BaseModel):
     error: str
     detail: dict[str, list[str]]
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "error": "Validation failed",
                 "detail": {
@@ -225,3 +233,4 @@ class ValidationErrorResponse(BaseModel):
                 },
             }
         }
+    )

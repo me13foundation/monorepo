@@ -5,26 +5,29 @@ Provides streaming data export capabilities in multiple formats.
 """
 
 import gzip
-from typing import Any, Dict, Generator, Optional, Union, TYPE_CHECKING
+from typing import Any, Dict, Generator, Optional, Union
 from fastapi import APIRouter, HTTPException, Query, Depends
 from fastapi.responses import StreamingResponse
 
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
-from src.infrastructure.dependency_injection import DependencyContainer
-from src.application.export.export_service import ExportFormat, CompressionFormat
-
-if TYPE_CHECKING:
-    from src.application.export.export_service import BulkExportService
+from src.application.container import get_legacy_dependency_container
+from src.application.export.export_service import (
+    ExportFormat,
+    CompressionFormat,
+    BulkExportService,
+)
 
 router = APIRouter(prefix="/export", tags=["export"])
 
 
-def get_export_service(db: Session = Depends(get_session)) -> "BulkExportService":
+def get_export_service(db: Session = Depends(get_session)) -> BulkExportService:
     """Dependency injection for bulk export service."""
-    container = DependencyContainer(db)
-    return container.create_bulk_export_service()
+    # Get unified container with legacy support
+
+    container = get_legacy_dependency_container()
+    return container.create_export_service(db)
 
 
 @router.get("/{entity_type}")

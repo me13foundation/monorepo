@@ -186,9 +186,10 @@ class User(BaseModel):
 
     def can_reset_password(self, token: str) -> bool:
         """Check if password reset token is valid."""
+        if not self.password_reset_token or not self.password_reset_expires:
+            return False
         return (
             self.password_reset_token == token
-            and self.password_reset_expires
             and self.password_reset_expires > datetime.now(timezone.utc)
         )
 
