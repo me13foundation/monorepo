@@ -6,9 +6,10 @@ into consistent formats for cross-referencing and deduplication.
 """
 
 import re
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class GeneIdentifierType(Enum):
@@ -31,10 +32,10 @@ class NormalizedGene:
 
     primary_id: str
     id_type: GeneIdentifierType
-    symbol: Optional[str]
-    name: Optional[str]
-    synonyms: List[str]
-    cross_references: Dict[str, List[str]]
+    symbol: str | None
+    name: str | None
+    synonyms: list[str]
+    cross_references: dict[str, list[str]]
     source: str
     confidence_score: float
 
@@ -49,7 +50,7 @@ class GeneNormalizer:
 
     def __init__(self) -> None:
         # Common gene symbol normalization patterns
-        self.symbol_patterns: List[Tuple[str, Callable[[re.Match[str]], str]]] = [
+        self.symbol_patterns: list[tuple[str, Callable[[re.Match[str]], str]]] = [
             (r"^([A-Z][A-Z0-9-]+)$", lambda m: m.group(1).upper()),
             (r"^([a-z][a-z0-9-]+)$", lambda m: m.group(1).upper()),
         ]
@@ -63,11 +64,13 @@ class GeneNormalizer:
         }
 
         # Cache for normalized genes
-        self.normalized_cache: Dict[str, NormalizedGene] = {}
+        self.normalized_cache: dict[str, NormalizedGene] = {}
 
     def normalize(
-        self, raw_gene_data: Dict[str, Any], source: str = "unknown"
-    ) -> Optional[NormalizedGene]:
+        self,
+        raw_gene_data: dict[str, Any],
+        source: str = "unknown",
+    ) -> NormalizedGene | None:
         """
         Normalize gene data from various sources.
 
@@ -82,18 +85,18 @@ class GeneNormalizer:
             # Extract gene information based on source
             if source.lower() == "clinvar":
                 return self._normalize_clinvar_gene(raw_gene_data)
-            elif source.lower() == "uniprot":
+            if source.lower() == "uniprot":
                 return self._normalize_uniprot_gene(raw_gene_data)
-            else:
-                return self._normalize_generic_gene(raw_gene_data, source)
+            return self._normalize_generic_gene(raw_gene_data, source)
 
         except Exception as e:
             print(f"Error normalizing gene data from {source}: {e}")
             return None
 
     def _normalize_clinvar_gene(
-        self, gene_data: Dict[str, Any]
-    ) -> Optional[NormalizedGene]:
+        self,
+        gene_data: dict[str, Any],
+    ) -> NormalizedGene | None:
         """Normalize gene data from ClinVar."""
         symbol = gene_data.get("gene_symbol") or gene_data.get("symbol")
         gene_id = gene_data.get("gene_id") or gene_data.get("id")
@@ -130,8 +133,9 @@ class GeneNormalizer:
         return normalized
 
     def _normalize_uniprot_gene(
-        self, gene_data: Dict[str, Any]
-    ) -> Optional[NormalizedGene]:
+        self,
+        gene_data: dict[str, Any],
+    ) -> NormalizedGene | None:
         """Normalize gene data from UniProt."""
         gene_name_data = gene_data.get("geneName", {})
         symbol = gene_name_data.get("value")
@@ -163,8 +167,10 @@ class GeneNormalizer:
         return normalized
 
     def _normalize_generic_gene(
-        self, gene_data: Dict[str, Any], source: str
-    ) -> Optional[NormalizedGene]:
+        self,
+        gene_data: dict[str, Any],
+        source: str,
+    ) -> NormalizedGene | None:
         """Normalize gene data from generic sources."""
         # Try to extract common fields
         symbol = gene_data.get("symbol") or gene_data.get("name")
@@ -212,7 +218,7 @@ class GeneNormalizer:
         # Default: uppercase
         return symbol.strip().upper()
 
-    def merge_gene_data(self, genes: List[NormalizedGene]) -> NormalizedGene:
+    def merge_gene_data(self, genes: list[NormalizedGene]) -> NormalizedGene:
         """
         Merge multiple gene records for the same gene.
 
@@ -232,7 +238,7 @@ class GeneNormalizer:
         base_gene = max(genes, key=lambda g: g.confidence_score)
 
         # Merge cross-references
-        merged_refs: Dict[str, List[str]] = {}
+        merged_refs: dict[str, list[str]] = {}
         for gene in genes:
             for ref_type, ref_ids in gene.cross_references.items():
                 if ref_type not in merged_refs:
@@ -258,11 +264,12 @@ class GeneNormalizer:
             cross_references=merged_refs,
             source="merged",
             confidence_score=min(
-                1.0, base_gene.confidence_score + 0.1
+                1.0,
+                base_gene.confidence_score + 0.1,
             ),  # Slight boost for merged data
         )
 
-    def validate_normalized_gene(self, gene: NormalizedGene) -> List[str]:
+    def validate_normalized_gene(self, gene: NormalizedGene) -> list[str]:
         """
         Validate normalized gene data.
 
@@ -290,7 +297,7 @@ class GeneNormalizer:
 
         return errors
 
-    def get_normalized_gene(self, gene_id: str) -> Optional[NormalizedGene]:
+    def get_normalized_gene(self, gene_id: str) -> NormalizedGene | None:
         """
         Retrieve a cached normalized gene by ID.
 
@@ -302,7 +309,7 @@ class GeneNormalizer:
         """
         return self.normalized_cache.get(gene_id)
 
-    def find_gene_by_symbol(self, symbol: str) -> Optional[NormalizedGene]:
+    def find_gene_by_symbol(self, symbol: str) -> NormalizedGene | None:
         """
         Find a normalized gene by symbol.
 

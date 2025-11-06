@@ -6,11 +6,18 @@ Fetches scientific literature and publication data from PubMed.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, List, Optional
-from defusedxml import ElementTree as ET
-from xml.etree.ElementTree import Element
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
+
+from defusedxml import ElementTree
 
 from .base_ingestor import BaseIngestor
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from xml.etree.ElementTree import Element  # nosec B405
+
+# Relevance threshold constant
+RELEVANCE_THRESHOLD: int = 5
 
 
 class PubMedIngestor(BaseIngestor):
@@ -31,8 +38,10 @@ class PubMedIngestor(BaseIngestor):
         )
 
     async def fetch_data(
-        self, query: str = "MED13", **kwargs: Any
-    ) -> List[Dict[str, Any]]:
+        self,
+        query: str = "MED13",
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
         """
         Fetch PubMed data for specified search query.
 
@@ -49,7 +58,7 @@ class PubMedIngestor(BaseIngestor):
             return []
 
         # Step 2: Fetch detailed records in batches
-        all_records: List[Dict[str, Any]] = []
+        all_records: list[dict[str, Any]] = []
         batch_size = 50  # PubMed API limit
 
         for i in range(0, len(article_ids), batch_size):
@@ -62,7 +71,7 @@ class PubMedIngestor(BaseIngestor):
 
         return all_records
 
-    async def _search_publications(self, query: str, **kwargs: Any) -> List[str]:
+    async def _search_publications(self, query: str, **kwargs: Any) -> list[str]:
         """
         Search PubMed for publications matching the query.
 
@@ -105,8 +114,9 @@ class PubMedIngestor(BaseIngestor):
         return [str(aid) for aid in id_list]
 
     async def _fetch_article_details(
-        self, article_ids: List[str]
-    ) -> List[Dict[str, Any]]:
+        self,
+        article_ids: list[str],
+    ) -> list[dict[str, Any]]:
         """
         Fetch detailed PubMed records for given article IDs.
 
@@ -142,12 +152,12 @@ class PubMedIngestor(BaseIngestor):
                     "pubmed_ids": article_ids,
                     "source": "pubmed",
                     "fetched_at": response.headers.get("date", ""),
-                }
+                },
             )
 
         return records
 
-    def _parse_pubmed_xml(self, xml_content: str) -> List[Dict[str, Any]]:
+    def _parse_pubmed_xml(self, xml_content: str) -> list[dict[str, Any]]:
         """
         Parse PubMed XML response into structured data.
 
@@ -158,8 +168,8 @@ class PubMedIngestor(BaseIngestor):
             List of parsed article records
         """
         try:
-            root = ET.fromstring(xml_content)
-            records: List[Dict[str, Any]] = []
+            root = ElementTree.fromstring(xml_content)
+            records: list[dict[str, Any]] = []
 
             # PubMed XML structure: MedlineCitation elements
             for citation in root.findall(".//MedlineCitation"):
@@ -167,17 +177,18 @@ class PubMedIngestor(BaseIngestor):
                 if record:
                     records.append(record)
 
-            return records
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             # Return error record for debugging
             return [
                 {
                     "parsing_error": str(e),
                     "raw_xml": xml_content[:1000],  # First 1000 chars for debugging
-                }
+                },
             ]
+        else:
+            return records
 
-    def _parse_single_citation(self, citation: Element) -> Optional[Dict[str, Any]]:
+    def _parse_single_citation(self, citation: Element) -> dict[str, Any] | None:
         """
         Parse a single MedlineCitation element.
 
@@ -212,19 +223,20 @@ class PubMedIngestor(BaseIngestor):
             # Extract MED13-specific information
             record["med13_relevance"] = self._assess_med13_relevance(record)
 
+        except Exception:  # noqa: BLE001
+            return None
+        else:
             return record
 
-        except Exception:
-            return None
-
-    def _extract_text(self, element: Element, xpath: str) -> Optional[str]:
+    def _extract_text(self, element: Element, xpath: str) -> str | None:
         """Extract text content from XML element."""
         elem = element.find(xpath)
         return elem.text.strip() if elem is not None and elem.text else None
 
     def _extract_journal_info(
-        self, citation: Element
-    ) -> Optional[Dict[str, Optional[str]]]:
+        self,
+        citation: Element,
+    ) -> dict[str, str | None] | None:
         """Extract journal information."""
         journal_elem = citation.find(".//Journal")
         if journal_elem is None:
@@ -236,16 +248,17 @@ class PubMedIngestor(BaseIngestor):
             "issn": self._extract_text(journal_elem, ".//ISSN"),
         }
 
-    def _extract_authors(self, citation: Element) -> List[Dict[str, Optional[str]]]:
+    def _extract_authors(self, citation: Element) -> list[dict[str, str | None]]:
         """Extract author information."""
-        authors: List[Dict[str, Optional[str]]] = []
+        authors: list[dict[str, str | None]] = []
         for author_elem in citation.findall(".//Author"):
             author = {
                 "last_name": self._extract_text(author_elem, ".//LastName"),
                 "first_name": self._extract_text(author_elem, ".//ForeName"),
                 "initials": self._extract_text(author_elem, ".//Initials"),
                 "affiliation": self._extract_text(
-                    author_elem, ".//AffiliationInfo/Affiliation"
+                    author_elem,
+                    ".//AffiliationInfo/Affiliation",
                 ),
             }
             if author["last_name"]:  # Only include if we have at least a last name
@@ -253,7 +266,7 @@ class PubMedIngestor(BaseIngestor):
 
         return authors
 
-    def _extract_publication_date(self, citation: Element) -> Optional[str]:
+    def _extract_publication_date(self, citation: Element) -> str | None:
         """Extract publication date."""
         # Try different date fields in order of preference
         date_fields = [
@@ -279,23 +292,23 @@ class PubMedIngestor(BaseIngestor):
 
         return None
 
-    def _extract_publication_types(self, citation: Element) -> List[str]:
+    def _extract_publication_types(self, citation: Element) -> list[str]:
         """Extract publication types."""
-        types: List[str] = []
-        for type_elem in citation.findall(".//PublicationType"):
-            if type_elem.text:
-                types.append(type_elem.text.strip())
-        return types
+        return [
+            type_elem.text.strip()
+            for type_elem in citation.findall(".//PublicationType")
+            if type_elem.text
+        ]
 
-    def _extract_keywords(self, citation: Element) -> List[str]:
+    def _extract_keywords(self, citation: Element) -> list[str]:
         """Extract keywords."""
-        keywords: List[str] = []
-        for kw_elem in citation.findall(".//Keyword"):
-            if kw_elem.text:
-                keywords.append(kw_elem.text.strip())
-        return keywords
+        return [
+            kw_elem.text.strip()
+            for kw_elem in citation.findall(".//Keyword")
+            if kw_elem.text
+        ]
 
-    def _extract_doi(self, citation: Element) -> Optional[str]:
+    def _extract_doi(self, citation: Element) -> str | None:
         """Extract DOI if available."""
         # DOI is typically in ArticleId elements
         for id_elem in citation.findall(".//ArticleId"):
@@ -304,7 +317,7 @@ class PubMedIngestor(BaseIngestor):
                 return id_elem.text.strip()
         return None
 
-    def _extract_pmc_id(self, citation: Element) -> Optional[str]:
+    def _extract_pmc_id(self, citation: Element) -> str | None:
         """Extract PMC ID if available."""
         for id_elem in citation.findall(".//ArticleId"):
             id_type = id_elem.get("IdType")
@@ -312,7 +325,7 @@ class PubMedIngestor(BaseIngestor):
                 return id_elem.text.strip()
         return None
 
-    def _assess_med13_relevance(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def _assess_med13_relevance(self, record: dict[str, Any]) -> dict[str, Any]:
         """
         Assess how relevant this publication is to MED13 research.
 
@@ -348,10 +361,10 @@ class PubMedIngestor(BaseIngestor):
         return {
             "score": relevance_score,
             "reasons": reasons,
-            "is_relevant": relevance_score >= 5,
+            "is_relevant": relevance_score >= RELEVANCE_THRESHOLD,
         }
 
-    async def fetch_med13_publications(self, **kwargs: Any) -> List[Dict[str, Any]]:
+    async def fetch_med13_publications(self, **kwargs: Any) -> list[dict[str, Any]]:
         """
         Convenience method to fetch MED13-related publications.
 
@@ -364,17 +377,17 @@ class PubMedIngestor(BaseIngestor):
         records = await self.fetch_data("MED13", **kwargs)
 
         # Filter for highly relevant publications
-        relevant_records = [
+        return [
             record
             for record in records
             if record.get("med13_relevance", {}).get("is_relevant", False)
         ]
 
-        return relevant_records
-
     async def fetch_recent_publications(
-        self, days_back: int = 365, **kwargs: Any
-    ) -> List[Dict[str, Any]]:
+        self,
+        days_back: int = 365,
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
         """
         Fetch recent publications related to MED13.
 
@@ -386,9 +399,7 @@ class PubMedIngestor(BaseIngestor):
             List of recent publication records
         """
         # Calculate date range
-        from datetime import datetime, timedelta
-
-        end_date = datetime.now()
+        end_date = datetime.now(UTC)
         start_date = end_date - timedelta(days=days_back)
 
         kwargs["mindate"] = start_date.strftime("%Y/%m/%d")

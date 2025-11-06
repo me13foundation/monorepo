@@ -7,15 +7,15 @@ providing monitoring and tracking capabilities for data source ingestion.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 from uuid import UUID
 
 from src.domain.entities.ingestion_job import (
+    IngestionError,
     IngestionJob,
     IngestionStatus,
     IngestionTrigger,
     JobMetrics,
-    IngestionError,
 )
 
 
@@ -38,10 +38,9 @@ class IngestionJobRepository(ABC):
         Returns:
             The saved IngestionJob with any generated fields populated
         """
-        pass
 
     @abstractmethod
-    def find_by_id(self, job_id: UUID) -> Optional[IngestionJob]:
+    def find_by_id(self, job_id: UUID) -> IngestionJob | None:
         """
         Find an ingestion job by its ID.
 
@@ -51,12 +50,14 @@ class IngestionJobRepository(ABC):
         Returns:
             The IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def find_by_source(
-        self, source_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[IngestionJob]:
+        self,
+        source_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[IngestionJob]:
         """
         Find all ingestion jobs for a specific data source.
 
@@ -68,12 +69,14 @@ class IngestionJobRepository(ABC):
         Returns:
             List of IngestionJob entities for the source
         """
-        pass
 
     @abstractmethod
     def find_by_trigger(
-        self, trigger: IngestionTrigger, skip: int = 0, limit: int = 50
-    ) -> List[IngestionJob]:
+        self,
+        trigger: IngestionTrigger,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[IngestionJob]:
         """
         Find all ingestion jobs triggered by a specific method.
 
@@ -85,12 +88,14 @@ class IngestionJobRepository(ABC):
         Returns:
             List of IngestionJob entities with the specified trigger
         """
-        pass
 
     @abstractmethod
     def find_by_status(
-        self, status: IngestionStatus, skip: int = 0, limit: int = 50
-    ) -> List[IngestionJob]:
+        self,
+        status: IngestionStatus,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[IngestionJob]:
         """
         Find all ingestion jobs with a specific status.
 
@@ -102,10 +107,9 @@ class IngestionJobRepository(ABC):
         Returns:
             List of IngestionJob entities with the specified status
         """
-        pass
 
     @abstractmethod
-    def find_running_jobs(self, skip: int = 0, limit: int = 50) -> List[IngestionJob]:
+    def find_running_jobs(self, skip: int = 0, limit: int = 50) -> list[IngestionJob]:
         """
         Find all currently running ingestion jobs.
 
@@ -116,12 +120,14 @@ class IngestionJobRepository(ABC):
         Returns:
             List of running IngestionJob entities
         """
-        pass
 
     @abstractmethod
     def find_failed_jobs(
-        self, since: Optional[datetime] = None, skip: int = 0, limit: int = 50
-    ) -> List[IngestionJob]:
+        self,
+        since: datetime | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[IngestionJob]:
         """
         Find all failed ingestion jobs, optionally since a specific time.
 
@@ -133,12 +139,14 @@ class IngestionJobRepository(ABC):
         Returns:
             List of failed IngestionJob entities
         """
-        pass
 
     @abstractmethod
     def find_recent_jobs(
-        self, hours: int = 24, skip: int = 0, limit: int = 50
-    ) -> List[IngestionJob]:
+        self,
+        hours: int = 24,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[IngestionJob]:
         """
         Find ingestion jobs from the last N hours.
 
@@ -150,12 +158,14 @@ class IngestionJobRepository(ABC):
         Returns:
             List of recent IngestionJob entities
         """
-        pass
 
     @abstractmethod
     def find_by_triggered_by(
-        self, user_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[IngestionJob]:
+        self,
+        user_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[IngestionJob]:
         """
         Find all ingestion jobs triggered by a specific user.
 
@@ -167,12 +177,13 @@ class IngestionJobRepository(ABC):
         Returns:
             List of IngestionJob entities triggered by the user
         """
-        pass
 
     @abstractmethod
     def update_status(
-        self, job_id: UUID, status: IngestionStatus
-    ) -> Optional[IngestionJob]:
+        self,
+        job_id: UUID,
+        status: IngestionStatus,
+    ) -> IngestionJob | None:
         """
         Update the status of an ingestion job.
 
@@ -183,12 +194,13 @@ class IngestionJobRepository(ABC):
         Returns:
             The updated IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def update_metrics(
-        self, job_id: UUID, metrics: JobMetrics
-    ) -> Optional[IngestionJob]:
+        self,
+        job_id: UUID,
+        metrics: JobMetrics,
+    ) -> IngestionJob | None:
         """
         Update the metrics of an ingestion job.
 
@@ -199,10 +211,9 @@ class IngestionJobRepository(ABC):
         Returns:
             The updated IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def add_error(self, job_id: UUID, error: IngestionError) -> Optional[IngestionJob]:
+    def add_error(self, job_id: UUID, error: IngestionError) -> IngestionJob | None:
         """
         Add an error to an ingestion job.
 
@@ -213,10 +224,9 @@ class IngestionJobRepository(ABC):
         Returns:
             The updated IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def start_job(self, job_id: UUID) -> Optional[IngestionJob]:
+    def start_job(self, job_id: UUID) -> IngestionJob | None:
         """
         Mark a job as started.
 
@@ -226,10 +236,9 @@ class IngestionJobRepository(ABC):
         Returns:
             The updated IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def complete_job(self, job_id: UUID, metrics: JobMetrics) -> Optional[IngestionJob]:
+    def complete_job(self, job_id: UUID, metrics: JobMetrics) -> IngestionJob | None:
         """
         Mark a job as completed with final metrics.
 
@@ -240,10 +249,9 @@ class IngestionJobRepository(ABC):
         Returns:
             The updated IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def fail_job(self, job_id: UUID, error: IngestionError) -> Optional[IngestionJob]:
+    def fail_job(self, job_id: UUID, error: IngestionError) -> IngestionJob | None:
         """
         Mark a job as failed with an error.
 
@@ -254,10 +262,9 @@ class IngestionJobRepository(ABC):
         Returns:
             The updated IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def cancel_job(self, job_id: UUID) -> Optional[IngestionJob]:
+    def cancel_job(self, job_id: UUID) -> IngestionJob | None:
         """
         Mark a job as cancelled.
 
@@ -267,7 +274,6 @@ class IngestionJobRepository(ABC):
         Returns:
             The updated IngestionJob if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def delete_old_jobs(self, days: int = 90) -> int:
@@ -280,7 +286,6 @@ class IngestionJobRepository(ABC):
         Returns:
             Number of jobs deleted
         """
-        pass
 
     @abstractmethod
     def count_by_source(self, source_id: UUID) -> int:
@@ -293,7 +298,6 @@ class IngestionJobRepository(ABC):
         Returns:
             The count of jobs for the source
         """
-        pass
 
     @abstractmethod
     def count_by_status(self, status: IngestionStatus) -> int:
@@ -306,7 +310,6 @@ class IngestionJobRepository(ABC):
         Returns:
             The count of jobs with the specified status
         """
-        pass
 
     @abstractmethod
     def count_by_trigger(self, trigger: IngestionTrigger) -> int:
@@ -319,7 +322,6 @@ class IngestionJobRepository(ABC):
         Returns:
             The count of jobs with the specified trigger
         """
-        pass
 
     @abstractmethod
     def exists(self, job_id: UUID) -> bool:
@@ -332,10 +334,9 @@ class IngestionJobRepository(ABC):
         Returns:
             True if exists, False otherwise
         """
-        pass
 
     @abstractmethod
-    def get_job_statistics(self, source_id: Optional[UUID] = None) -> Dict[str, Any]:
+    def get_job_statistics(self, source_id: UUID | None = None) -> dict[str, Any]:
         """
         Get statistics about ingestion jobs, optionally for a specific source.
 
@@ -345,12 +346,12 @@ class IngestionJobRepository(ABC):
         Returns:
             Dictionary with various statistics
         """
-        pass
 
     @abstractmethod
     def get_recent_failures(
-        self, limit: int = 10
-    ) -> List[Tuple[IngestionJob, IngestionError]]:
+        self,
+        limit: int = 10,
+    ) -> list[tuple[IngestionJob, IngestionError]]:
         """
         Get the most recent failed jobs with their primary error.
 
@@ -360,4 +361,3 @@ class IngestionJobRepository(ABC):
         Returns:
             List of tuples containing (job, primary_error)
         """
-        pass

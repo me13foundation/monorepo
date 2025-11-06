@@ -3,10 +3,11 @@ Value object for data provenance and lineage tracking.
 Immutable objects that track the origin and history of MED13 data.
 """
 
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DataSource(str, Enum):
@@ -32,38 +33,44 @@ class Provenance(BaseModel):
 
     # Source information
     source: DataSource = Field(..., description="Original data source")
-    source_version: Optional[str] = Field(None, description="Version of source data")
-    source_url: Optional[str] = Field(None, description="URL where data was retrieved")
+    source_version: str | None = Field(None, description="Version of source data")
+    source_url: str | None = Field(None, description="URL where data was retrieved")
 
     # Acquisition metadata
     acquired_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When data was acquired",
     )
     acquired_by: str = Field(..., description="System/user that acquired the data")
 
     # Processing history
     processing_steps: list[str] = Field(
-        default_factory=list, description="Sequence of processing steps applied"
+        default_factory=list,
+        description="Sequence of processing steps applied",
     )
 
     # Quality and validation
-    quality_score: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Data quality score (0-1)"
+    quality_score: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Data quality score (0-1)",
     )
     validation_status: str = Field(
-        default="pending", description="Current validation status"
+        default="pending",
+        description="Current validation status",
     )
 
     # Additional metadata
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional source-specific metadata"
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional source-specific metadata",
     )
 
     def add_processing_step(self, step: str) -> "Provenance":
         """Create new Provenance with additional processing step."""
         return self.model_copy(
-            update={"processing_steps": self.processing_steps + [step]}
+            update={"processing_steps": [*self.processing_steps, step]},
         )
 
     def update_quality_score(self, score: float) -> "Provenance":

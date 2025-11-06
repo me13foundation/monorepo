@@ -1,0 +1,31 @@
+{
+  "recommendations": [
+    // Python formatting and linting (matches pre-commit hooks)
+    "ms-python.python",
+    "ms-python.black-formatter",
+    "charliermarsh.ruff",
+
+    // TypeScript/JavaScript for Next.js frontend
+    "ms-vscode.vscode-typescript-next",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+
+    // Tailwind CSS
+    "bradlc.vscode-tailwindcss",
+
+    // General development
+    "ms-vscode.vscode-json",
+    "redhat.vscode-yaml",
+    "ms-vscode.vscode-markdown",
+
+    // Testing
+    "ms-vscode.test-adapter-converter",
+
+    // Git
+    "eamodio.gitlens"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.flake8",
+    "ms-python.pylint"
+  ]
+}

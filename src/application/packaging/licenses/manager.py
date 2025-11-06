@@ -2,9 +2,10 @@
 License compliance checking for MED13 Resource Library packages.
 """
 
-from typing import Dict, Any, List, Optional, cast
 from enum import Enum
 from pathlib import Path
+from typing import Any, ClassVar, cast
+
 import yaml  # type: ignore[import-untyped]
 
 
@@ -33,7 +34,7 @@ class LicenseManager:
     """Manage license compliance and checking."""
 
     # License compatibility matrix
-    COMPATIBILITY_MATRIX: Dict[str, List[str]] = {
+    COMPATIBILITY_MATRIX: ClassVar[dict[str, list[str]]] = {
         "CC-BY-4.0": ["CC-BY-4.0", "CC0-1.0", "MIT", "Apache-2.0"],
         "CC0-1.0": ["CC-BY-4.0", "CC0-1.0", "MIT", "Apache-2.0"],
         "MIT": ["CC-BY-4.0", "CC0-1.0", "MIT", "Apache-2.0"],
@@ -43,7 +44,8 @@ class LicenseManager:
 
     @staticmethod
     def check_compatibility(
-        source_license: str, target_license: str
+        source_license: str,
+        target_license: str,
     ) -> LicenseCompatibility:
         """
         Check compatibility between two licenses.
@@ -65,7 +67,8 @@ class LicenseManager:
             return LicenseCompatibility.COMPATIBLE
 
         compatible_licenses = LicenseManager.COMPATIBILITY_MATRIX.get(
-            source_license, []
+            source_license,
+            [],
         )
 
         if target_license in compatible_licenses:
@@ -74,7 +77,7 @@ class LicenseManager:
         return LicenseCompatibility.INCOMPATIBLE
 
     @staticmethod
-    def validate_license(license_id: str) -> Dict[str, Any]:
+    def validate_license(license_id: str) -> dict[str, Any]:
         """
         Validate license identifier.
 
@@ -106,8 +109,9 @@ class LicenseManager:
 
     @staticmethod
     def generate_manifest(
-        licenses: List[Dict[str, Any]], output_path: Optional[Path] = None
-    ) -> Dict[str, Any]:
+        licenses: list[dict[str, Any]],
+        output_path: Path | None = None,
+    ) -> dict[str, Any]:
         """
         Generate license manifest.
 
@@ -119,7 +123,7 @@ class LicenseManager:
             License manifest dictionary
         """
         package_license = "CC-BY-4.0"
-        manifest: Dict[str, Any] = {
+        manifest: dict[str, Any] = {
             "package_license": package_license,
             "sources": licenses,
             "compliance": {
@@ -132,29 +136,30 @@ class LicenseManager:
         for license_info in licenses:
             source_license = license_info.get("license", "unknown")
             compatibility = LicenseManager.check_compatibility(
-                source_license, package_license
+                source_license,
+                package_license,
             )
 
             if compatibility == LicenseCompatibility.INCOMPATIBLE:
                 compliance = manifest["compliance"]
-                issues_list = cast(List[str], compliance.setdefault("issues", []))
+                issues_list = cast("list[str]", compliance.setdefault("issues", []))
                 compliance["status"] = "non-compliant"
                 issues_list.append(
                     f"Incompatible license: {source_license} "
-                    f"from {license_info.get('source', 'unknown')}"
+                    f"from {license_info.get('source', 'unknown')}",
                 )
 
         # Write to file if path provided
         if output_path:
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(output_path, "w", encoding="utf-8") as f:
+            with output_path.open("w", encoding="utf-8") as f:
                 yaml.dump(manifest, f, default_flow_style=False)
 
         return manifest
 
     @staticmethod
-    def get_license_info(license_id: str) -> Dict[str, Any]:
+    def get_license_info(license_id: str) -> dict[str, Any]:
         """
         Get license information.
 

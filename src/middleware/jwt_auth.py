@@ -4,16 +4,17 @@ JWT Authentication middleware for MED13 Resource Library.
 Provides FastAPI middleware for JWT token validation and user authentication.
 """
 
-from typing import Optional, Callable, Awaitable
+from collections.abc import Awaitable, Callable
+
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from ..application.container import container
-from ..application.services.authentication_service import (
-    AuthenticationService,
+from src.application.container import container
+from src.application.services.authentication_service import (
     AuthenticationError,
+    AuthenticationService,
 )
 
 
@@ -27,8 +28,8 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app: ASGIApp,
-        exclude_paths: Optional[list[str]] = None,
-        auth_service: Optional[AuthenticationService] = None,
+        exclude_paths: list[str] | None = None,
+        auth_service: AuthenticationService | None = None,
     ) -> None:
         """
         Initialize JWT authentication middleware.
@@ -58,7 +59,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         self.auth_service = auth_service
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """
         Process each request through JWT authentication middleware.
@@ -127,8 +130,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             )
 
         # Continue with request
-        response = await call_next(request)
-        return response
+        return await call_next(request)
 
     def _should_skip_auth(self, path: str) -> bool:
         """
@@ -145,13 +147,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return True
 
         # Check path prefixes (for dynamic routes)
-        for exclude_path in self.exclude_paths:
-            if path.startswith(exclude_path):
-                return True
+        return any(path.startswith(exclude_path) for exclude_path in self.exclude_paths)
 
-        return False
-
-    def _extract_token(self, request: Request) -> Optional[str]:
+    def _extract_token(self, request: Request) -> str | None:
         """
         Extract JWT token from request.
 

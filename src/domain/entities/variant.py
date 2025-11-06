@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import re
-from typing import Optional
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import ClassVar
 
 from src.domain.value_objects.identifiers import GeneIdentifier, VariantIdentifier
 
@@ -15,13 +15,14 @@ class VariantType:
     STRUCTURAL = "structural"
     UNKNOWN = "unknown"
 
-    _VALID_TYPES = {SNV, INDEL, CNV, STRUCTURAL, UNKNOWN}
+    _VALID_TYPES: ClassVar[set[str]] = {SNV, INDEL, CNV, STRUCTURAL, UNKNOWN}
 
     @classmethod
     def validate(cls, value: str) -> str:
         normalized = value or cls.UNKNOWN
         if normalized not in cls._VALID_TYPES:
-            raise ValueError(f"Unsupported variant_type '{value}'")
+            msg = f"Unsupported variant_type '{value}'"
+            raise ValueError(msg)
         return normalized
 
 
@@ -34,7 +35,7 @@ class ClinicalSignificance:
     CONFLICTING = "conflicting"
     NOT_PROVIDED = "not_provided"
 
-    _VALID_SIGNIFICANCE = {
+    _VALID_SIGNIFICANCE: ClassVar[set[str]] = {
         PATHOGENIC,
         LIKELY_PATHOGENIC,
         UNCERTAIN_SIGNIFICANCE,
@@ -48,7 +49,8 @@ class ClinicalSignificance:
     def validate(cls, value: str) -> str:
         normalized = value or cls.NOT_PROVIDED
         if normalized not in cls._VALID_SIGNIFICANCE:
-            raise ValueError(f"Unsupported clinical_significance '{value}'")
+            msg = f"Unsupported clinical_significance '{value}'"
+            raise ValueError(msg)
         return normalized
 
 
@@ -58,15 +60,15 @@ CHROMOSOME_PATTERN = re.compile(r"^(chr)?[0-9XYM]+$", re.IGNORECASE)
 @dataclass
 class VariantSummary:
     variant_id: str
-    clinvar_id: Optional[str]
+    clinvar_id: str | None
     chromosome: str
     position: int
-    clinical_significance: Optional[str]
+    clinical_significance: str | None
 
 
 @dataclass
 class EvidenceSummary:
-    evidence_id: Optional[int]
+    evidence_id: int | None
     evidence_level: str
     evidence_type: str
     description: str
@@ -82,67 +84,75 @@ class Variant:
     alternate_allele: str
     variant_type: str = VariantType.UNKNOWN
     clinical_significance: str = ClinicalSignificance.NOT_PROVIDED
-    gene_identifier: Optional[GeneIdentifier] = None
-    gene_database_id: Optional[int] = None
-    hgvs_genomic: Optional[str] = None
-    hgvs_protein: Optional[str] = None
-    hgvs_cdna: Optional[str] = None
-    condition: Optional[str] = None
-    review_status: Optional[str] = None
-    allele_frequency: Optional[float] = None
-    gnomad_af: Optional[float] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    id: Optional[int] = None
+    gene_identifier: GeneIdentifier | None = None
+    gene_database_id: int | None = None
+    hgvs_genomic: str | None = None
+    hgvs_protein: str | None = None
+    hgvs_cdna: str | None = None
+    condition: str | None = None
+    review_status: str | None = None
+    allele_frequency: float | None = None
+    gnomad_af: float | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    id: int | None = None
     evidence_count: int = 0
     evidence: list[EvidenceSummary] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
         self.variant_type = VariantType.validate(self.variant_type)
         self.clinical_significance = ClinicalSignificance.validate(
-            self.clinical_significance
+            self.clinical_significance,
         )
         self.chromosome = self._normalize_chromosome(self.chromosome)
 
         if self.position < 1:
-            raise ValueError("position must be >= 1")
+            msg = "position must be >= 1"
+            raise ValueError(msg)
         if not self.reference_allele:
-            raise ValueError("reference_allele cannot be empty")
+            msg = "reference_allele cannot be empty"
+            raise ValueError(msg)
         if not self.alternate_allele:
-            raise ValueError("alternate_allele cannot be empty")
+            msg = "alternate_allele cannot be empty"
+            raise ValueError(msg)
         if self.allele_frequency is not None and not (
             0.0 <= self.allele_frequency <= 1.0
         ):
-            raise ValueError("allele_frequency must be between 0.0 and 1.0")
+            msg = "allele_frequency must be between 0.0 and 1.0"
+            raise ValueError(msg)
         if self.gnomad_af is not None and not (0.0 <= self.gnomad_af <= 1.0):
-            raise ValueError("gnomad_af must be between 0.0 and 1.0")
+            msg = "gnomad_af must be between 0.0 and 1.0"
+            raise ValueError(msg)
 
     @classmethod
-    def create(
+    def create(  # noqa: PLR0913 - explicit factory arguments for clarity
         cls,
         chromosome: str,
         position: int,
         reference_allele: str,
         alternate_allele: str,
         *,
-        variant_id: Optional[str] = None,
-        clinvar_id: Optional[str] = None,
-        gene_identifier: Optional[GeneIdentifier] = None,
-        gene_database_id: Optional[int] = None,
+        variant_id: str | None = None,
+        clinvar_id: str | None = None,
+        gene_identifier: GeneIdentifier | None = None,
+        gene_database_id: int | None = None,
         variant_type: str = VariantType.UNKNOWN,
         clinical_significance: str = ClinicalSignificance.NOT_PROVIDED,
-        hgvs_genomic: Optional[str] = None,
-        hgvs_protein: Optional[str] = None,
-        hgvs_cdna: Optional[str] = None,
-        condition: Optional[str] = None,
-        review_status: Optional[str] = None,
-        allele_frequency: Optional[float] = None,
-        gnomad_af: Optional[float] = None,
+        hgvs_genomic: str | None = None,
+        hgvs_protein: str | None = None,
+        hgvs_cdna: str | None = None,
+        condition: str | None = None,
+        review_status: str | None = None,
+        allele_frequency: float | None = None,
+        gnomad_af: float | None = None,
     ) -> Variant:
         identifier = VariantIdentifier(
             variant_id=variant_id
             or cls._compose_variant_id(
-                chromosome, position, reference_allele, alternate_allele
+                chromosome,
+                position,
+                reference_allele,
+                alternate_allele,
             ),
             clinvar_id=clinvar_id,
         )
@@ -170,36 +180,36 @@ class Variant:
         return self.identifier.variant_id
 
     @property
-    def clinvar_id(self) -> Optional[str]:
+    def clinvar_id(self) -> str | None:
         return self.identifier.clinvar_id
 
     @property
-    def gene_symbol(self) -> Optional[str]:
+    def gene_symbol(self) -> str | None:
         return self.gene_identifier.symbol if self.gene_identifier else None
 
     @property
-    def gene_public_id(self) -> Optional[str]:
+    def gene_public_id(self) -> str | None:
         return self.gene_identifier.gene_id if self.gene_identifier else None
 
     def update_classification(
         self,
         *,
-        variant_type: Optional[str] = None,
-        clinical_significance: Optional[str] = None,
+        variant_type: str | None = None,
+        clinical_significance: str | None = None,
     ) -> None:
         if variant_type is not None:
             self.variant_type = VariantType.validate(variant_type)
         if clinical_significance is not None:
             self.clinical_significance = ClinicalSignificance.validate(
-                clinical_significance
+                clinical_significance,
             )
         self._touch()
 
     def update_gene_reference(
         self,
         *,
-        gene_identifier: Optional[GeneIdentifier] = None,
-        gene_database_id: Optional[int] = None,
+        gene_identifier: GeneIdentifier | None = None,
+        gene_database_id: int | None = None,
     ) -> None:
         if gene_identifier is not None:
             self.gene_identifier = gene_identifier
@@ -210,8 +220,8 @@ class Variant:
     def mark_review_status(
         self,
         *,
-        review_status: Optional[str] = None,
-        condition: Optional[str] = None,
+        review_status: str | None = None,
+        condition: str | None = None,
     ) -> None:
         if review_status is not None:
             self.review_status = review_status
@@ -222,16 +232,18 @@ class Variant:
     def update_frequencies(
         self,
         *,
-        allele_frequency: Optional[float] = None,
-        gnomad_af: Optional[float] = None,
+        allele_frequency: float | None = None,
+        gnomad_af: float | None = None,
     ) -> None:
         if allele_frequency is not None:
             if not (0.0 <= allele_frequency <= 1.0):
-                raise ValueError("allele_frequency must be between 0.0 and 1.0")
+                msg = "allele_frequency must be between 0.0 and 1.0"
+                raise ValueError(msg)
             self.allele_frequency = allele_frequency
         if gnomad_af is not None:
             if not (0.0 <= gnomad_af <= 1.0):
-                raise ValueError("gnomad_af must be between 0.0 and 1.0")
+                msg = "gnomad_af must be between 0.0 and 1.0"
+                raise ValueError(msg)
             self.gnomad_af = gnomad_af
         self._touch()
 
@@ -250,11 +262,14 @@ class Variant:
         self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     @staticmethod
     def _compose_variant_id(
-        chromosome: str, position: int, reference_allele: str, alternate_allele: str
+        chromosome: str,
+        position: int,
+        reference_allele: str,
+        alternate_allele: str,
     ) -> str:
         return f"{chromosome}:{position}:{reference_allele}>{alternate_allele}"
 
@@ -262,16 +277,17 @@ class Variant:
     def _normalize_chromosome(chromosome: str) -> str:
         value = chromosome.strip()
         if not CHROMOSOME_PATTERN.fullmatch(value):
-            raise ValueError("chromosome must match pattern chr<id>")
+            msg = "chromosome must match pattern chr<id>"
+            raise ValueError(msg)
         if not value.lower().startswith("chr"):
             value = f"chr{value}"
         return value.upper()
 
 
 __all__ = [
+    "ClinicalSignificance",
+    "EvidenceSummary",
     "Variant",
     "VariantSummary",
-    "EvidenceSummary",
     "VariantType",
-    "ClinicalSignificance",
 ]

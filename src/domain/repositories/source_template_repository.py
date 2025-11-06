@@ -6,7 +6,7 @@ enabling users to discover and use pre-configured source configurations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
 from src.domain.entities.source_template import (
@@ -35,10 +35,9 @@ class SourceTemplateRepository(ABC):
         Returns:
             The saved SourceTemplate with any generated fields populated
         """
-        pass
 
     @abstractmethod
-    def find_by_id(self, template_id: UUID) -> Optional[SourceTemplate]:
+    def find_by_id(self, template_id: UUID) -> SourceTemplate | None:
         """
         Find a source template by its ID.
 
@@ -48,12 +47,14 @@ class SourceTemplateRepository(ABC):
         Returns:
             The SourceTemplate if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def find_by_creator(
-        self, creator_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        creator_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Find all templates created by a specific user.
 
@@ -65,12 +66,13 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of SourceTemplate entities created by the user
         """
-        pass
 
     @abstractmethod
     def find_public_templates(
-        self, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Find all public templates available for use.
 
@@ -81,12 +83,14 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of public SourceTemplate entities
         """
-        pass
 
     @abstractmethod
     def find_by_category(
-        self, category: TemplateCategory, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        category: TemplateCategory,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Find templates by category.
 
@@ -98,12 +102,14 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of SourceTemplate entities in the specified category
         """
-        pass
 
     @abstractmethod
     def find_by_source_type(
-        self, source_type: SourceType, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        source_type: SourceType,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Find templates for a specific source type.
 
@@ -115,12 +121,13 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of SourceTemplate entities for the specified source type
         """
-        pass
 
     @abstractmethod
     def find_approved_templates(
-        self, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Find all approved templates.
 
@@ -131,12 +138,14 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of approved SourceTemplate entities
         """
-        pass
 
     @abstractmethod
     def find_by_tag(
-        self, tag: str, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        tag: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Find templates that have a specific tag.
 
@@ -148,12 +157,14 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of SourceTemplate entities with the specified tag
         """
-        pass
 
     @abstractmethod
     def search_by_name(
-        self, query: str, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        query: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Search templates by name using fuzzy matching.
 
@@ -165,12 +176,14 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of SourceTemplate entities matching the search
         """
-        pass
 
     @abstractmethod
     def find_available_for_user(
-        self, user_id: Optional[UUID] = None, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        user_id: UUID | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Find templates available for a specific user (public + their own).
 
@@ -182,10 +195,9 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of SourceTemplate entities available to the user
         """
-        pass
 
     @abstractmethod
-    def increment_usage(self, template_id: UUID) -> Optional[SourceTemplate]:
+    def increment_usage(self, template_id: UUID) -> SourceTemplate | None:
         """
         Increment the usage count for a template.
 
@@ -195,12 +207,13 @@ class SourceTemplateRepository(ABC):
         Returns:
             The updated SourceTemplate if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def update_success_rate(
-        self, template_id: UUID, success_rate: float
-    ) -> Optional[SourceTemplate]:
+        self,
+        template_id: UUID,
+        success_rate: float,
+    ) -> SourceTemplate | None:
         """
         Update the success rate for a template.
 
@@ -211,10 +224,9 @@ class SourceTemplateRepository(ABC):
         Returns:
             The updated SourceTemplate if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def approve_template(self, template_id: UUID) -> Optional[SourceTemplate]:
+    def approve_template(self, template_id: UUID) -> SourceTemplate | None:
         """
         Approve a template for general use.
 
@@ -224,10 +236,9 @@ class SourceTemplateRepository(ABC):
         Returns:
             The updated SourceTemplate if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def make_public(self, template_id: UUID) -> Optional[SourceTemplate]:
+    def make_public(self, template_id: UUID) -> SourceTemplate | None:
         """
         Make a template publicly available.
 
@@ -237,7 +248,6 @@ class SourceTemplateRepository(ABC):
         Returns:
             The updated SourceTemplate if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def delete(self, template_id: UUID) -> bool:
@@ -250,7 +260,6 @@ class SourceTemplateRepository(ABC):
         Returns:
             True if deleted, False if not found
         """
-        pass
 
     @abstractmethod
     def count_by_creator(self, creator_id: UUID) -> int:
@@ -263,7 +272,6 @@ class SourceTemplateRepository(ABC):
         Returns:
             The count of templates created by the user
         """
-        pass
 
     @abstractmethod
     def count_by_category(self, category: TemplateCategory) -> int:
@@ -276,7 +284,6 @@ class SourceTemplateRepository(ABC):
         Returns:
             The count of templates in the specified category
         """
-        pass
 
     @abstractmethod
     def count_public_templates(self) -> int:
@@ -286,7 +293,6 @@ class SourceTemplateRepository(ABC):
         Returns:
             The count of public templates
         """
-        pass
 
     @abstractmethod
     def exists(self, template_id: UUID) -> bool:
@@ -299,10 +305,9 @@ class SourceTemplateRepository(ABC):
         Returns:
             True if exists, False otherwise
         """
-        pass
 
     @abstractmethod
-    def get_popular_templates(self, limit: int = 10) -> List[SourceTemplate]:
+    def get_popular_templates(self, limit: int = 10) -> list[SourceTemplate]:
         """
         Get the most popular templates by usage count.
 
@@ -312,14 +317,12 @@ class SourceTemplateRepository(ABC):
         Returns:
             List of most popular SourceTemplate entities
         """
-        pass
 
     @abstractmethod
-    def get_template_statistics(self) -> Dict[str, Any]:
+    def get_template_statistics(self) -> dict[str, Any]:
         """
         Get overall statistics about templates.
 
         Returns:
             Dictionary with various statistics
         """
-        pass

@@ -10,8 +10,8 @@ from src.services.domain.phenotype_service import PhenotypeService
 def session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    db_session = SessionLocal()
+    session_local = sessionmaker(bind=engine)
+    db_session = session_local()
     try:
         yield db_session
     finally:

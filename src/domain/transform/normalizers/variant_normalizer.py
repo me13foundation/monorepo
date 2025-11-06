@@ -6,9 +6,9 @@ Standardizes genetic variant identifiers from different sources and formats
 """
 
 import re
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class VariantIdentifierType(Enum):
@@ -28,9 +28,9 @@ class GenomicLocation:
     """Normalized genomic location."""
 
     chromosome: str
-    position: Optional[int]
-    reference_allele: Optional[str]
-    alternate_allele: Optional[str]
+    position: int | None
+    reference_allele: str | None
+    alternate_allele: str | None
     assembly: str = "GRCh38"
 
 
@@ -40,11 +40,11 @@ class NormalizedVariant:
 
     primary_id: str
     id_type: VariantIdentifierType
-    genomic_location: Optional[GenomicLocation]
-    hgvs_notations: Dict[str, str]  # c., p., g. notations
-    clinical_significance: Optional[str]
-    gene_symbol: Optional[str]
-    cross_references: Dict[str, List[str]]
+    genomic_location: GenomicLocation | None
+    hgvs_notations: dict[str, str]  # c., p., g. notations
+    clinical_significance: str | None
+    gene_symbol: str | None
+    cross_references: dict[str, list[str]]
     source: str
     confidence_score: float
 
@@ -72,11 +72,13 @@ class VariantNormalizer:
         self.dbsnp_pattern = re.compile(r"^rs\d+$")
 
         # Cache for normalized variants
-        self.normalized_cache: Dict[str, NormalizedVariant] = {}
+        self.normalized_cache: dict[str, NormalizedVariant] = {}
 
     def normalize(
-        self, raw_variant_data: Dict[str, Any], source: str = "unknown"
-    ) -> Optional[NormalizedVariant]:
+        self,
+        raw_variant_data: dict[str, Any],
+        source: str = "unknown",
+    ) -> NormalizedVariant | None:
         """
         Normalize variant data from various sources.
 
@@ -90,16 +92,16 @@ class VariantNormalizer:
         try:
             if source.lower() == "clinvar":
                 return self._normalize_clinvar_variant(raw_variant_data)
-            else:
-                return self._normalize_generic_variant(raw_variant_data, source)
+            return self._normalize_generic_variant(raw_variant_data, source)
 
         except Exception as e:
             print(f"Error normalizing variant data from {source}: {e}")
             return None
 
     def _normalize_clinvar_variant(
-        self, variant_data: Dict[str, Any]
-    ) -> Optional[NormalizedVariant]:
+        self,
+        variant_data: dict[str, Any],
+    ) -> NormalizedVariant | None:
         """Normalize variant data from ClinVar."""
         clinvar_id = variant_data.get("clinvar_id")
         variant_id = variant_data.get("variant_id")
@@ -159,8 +161,10 @@ class VariantNormalizer:
         return normalized
 
     def _normalize_generic_variant(
-        self, variant_data: Dict[str, Any], source: str
-    ) -> Optional[NormalizedVariant]:
+        self,
+        variant_data: dict[str, Any],
+        source: str,
+    ) -> NormalizedVariant | None:
         """Normalize variant data from generic sources."""
         # Try to identify the variant type and extract information
         variant_id = (
@@ -200,20 +204,20 @@ class VariantNormalizer:
         """Identify the type of variant identifier."""
         if self.clinvar_pattern.match(variant_id):
             return VariantIdentifierType.CLINVAR_VCV
-        elif self.dbsnp_pattern.match(variant_id):
+        if self.dbsnp_pattern.match(variant_id):
             return VariantIdentifierType.DBSNP_RS
-        elif self.hgvs_patterns["c"].match(variant_id):
+        if self.hgvs_patterns["c"].match(variant_id):
             return VariantIdentifierType.HGVS_C
-        elif self.hgvs_patterns["p"].match(variant_id):
+        if self.hgvs_patterns["p"].match(variant_id):
             return VariantIdentifierType.HGVS_P
-        elif self.hgvs_patterns["g"].match(variant_id):
+        if self.hgvs_patterns["g"].match(variant_id):
             return VariantIdentifierType.HGVS_G
-        else:
-            return VariantIdentifierType.OTHER
+        return VariantIdentifierType.OTHER
 
     def _extract_genomic_location(
-        self, variant_data: Dict[str, Any]
-    ) -> Optional[GenomicLocation]:
+        self,
+        variant_data: dict[str, Any],
+    ) -> GenomicLocation | None:
         """Extract genomic location information."""
         chromosome = variant_data.get("chromosome")
         position = variant_data.get("start_position") or variant_data.get("position")
@@ -237,7 +241,7 @@ class VariantNormalizer:
             assembly=assembly,
         )
 
-    def _extract_hgvs_notations(self, variant_data: Dict[str, Any]) -> Dict[str, str]:
+    def _extract_hgvs_notations(self, variant_data: dict[str, Any]) -> dict[str, str]:
         """Extract HGVS notations from variant data."""
         hgvs_notations = {}
 
@@ -284,7 +288,8 @@ class VariantNormalizer:
         return standardized
 
     def merge_variant_data(
-        self, variants: List[NormalizedVariant]
+        self,
+        variants: list[NormalizedVariant],
     ) -> NormalizedVariant:
         """
         Merge multiple variant records for the same variant.
@@ -305,7 +310,7 @@ class VariantNormalizer:
         base_variant = max(variants, key=lambda v: v.confidence_score)
 
         # Merge cross-references
-        merged_refs: Dict[str, List[str]] = {}
+        merged_refs: dict[str, list[str]] = {}
         for variant in variants:
             for ref_type, ref_ids in variant.cross_references.items():
                 if ref_type not in merged_refs:
@@ -333,7 +338,7 @@ class VariantNormalizer:
             confidence_score=min(1.0, base_variant.confidence_score + 0.1),
         )
 
-    def validate_normalized_variant(self, variant: NormalizedVariant) -> List[str]:
+    def validate_normalized_variant(self, variant: NormalizedVariant) -> list[str]:
         """
         Validate normalized variant data.
 
@@ -372,7 +377,7 @@ class VariantNormalizer:
 
         return errors
 
-    def get_normalized_variant(self, variant_id: str) -> Optional[NormalizedVariant]:
+    def get_normalized_variant(self, variant_id: str) -> NormalizedVariant | None:
         """
         Retrieve a cached normalized variant by ID.
 

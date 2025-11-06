@@ -1,19 +1,17 @@
-from typing import List
+import dash_bootstrap_components as dbc
 
 from dash import dcc
-import dash_bootstrap_components as dbc
 from dash.dcc import Dropdown
-
 from src.presentation.dash.components.sidebar import create_sidebar
 
 DropdownOption = Dropdown.Options
 
-THEME_OPTIONS: List[DropdownOption] = [
+THEME_OPTIONS: list[DropdownOption] = [
     {"label": "Light", "value": "light"},
     {"label": "Dark", "value": "dark"},
 ]
 
-LANGUAGE_OPTIONS: List[DropdownOption] = [
+LANGUAGE_OPTIONS: list[DropdownOption] = [
     {"label": "English", "value": "en"},
     {"label": "Spanish", "value": "es"},
     {"label": "French", "value": "fr"},
@@ -41,7 +39,7 @@ def create_settings_page() -> dbc.Container:
                                                             dbc.Col(
                                                                 [
                                                                     dbc.Label(
-                                                                        "API Endpoint"
+                                                                        "API Endpoint",
                                                                     ),
                                                                     dbc.Input(
                                                                         id="api-endpoint",
@@ -55,7 +53,7 @@ def create_settings_page() -> dbc.Container:
                                                             dbc.Col(
                                                                 [
                                                                     dbc.Label(
-                                                                        "API Key"
+                                                                        "API Key",
                                                                     ),
                                                                     dbc.Input(
                                                                         id="api-key",
@@ -74,7 +72,7 @@ def create_settings_page() -> dbc.Container:
                                                             dbc.Col(
                                                                 [
                                                                     dbc.Label(
-                                                                        "Refresh Interval (seconds)"
+                                                                        "Refresh Interval (seconds)",
                                                                     ),
                                                                     dbc.Input(
                                                                         id="refresh-interval",
@@ -89,7 +87,7 @@ def create_settings_page() -> dbc.Container:
                                                             dbc.Col(
                                                                 [
                                                                     dbc.Label(
-                                                                        "Page Size"
+                                                                        "Page Size",
                                                                     ),
                                                                     dbc.Input(
                                                                         id="page-size",
@@ -108,7 +106,7 @@ def create_settings_page() -> dbc.Container:
                                                                         id="save-settings-btn",
                                                                         color="primary",
                                                                         className="mt-4",
-                                                                    )
+                                                                    ),
                                                                 ],
                                                                 width=4,
                                                             ),
@@ -131,7 +129,7 @@ def create_settings_page() -> dbc.Container:
                                                             dbc.Col(
                                                                 [
                                                                     dbc.Label(
-                                                                        "Language"
+                                                                        "Language",
                                                                     ),
                                                                     dcc.Dropdown(
                                                                         id="language-selector",
@@ -141,19 +139,19 @@ def create_settings_page() -> dbc.Container:
                                                                 ],
                                                                 width=4,
                                                             ),
-                                                        ]
+                                                        ],
                                                     ),
-                                                ]
-                                            )
-                                        ]
+                                                ],
+                                            ),
+                                        ],
                                     ),
-                                ]
-                            )
+                                ],
+                            ),
                         ],
                         width=9,
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         fluid=True,
     )

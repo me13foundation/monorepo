@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .error_reporting import ErrorReporter, ErrorSummary
 from .metrics import MetricsCollector
@@ -14,17 +14,17 @@ from .metrics import MetricsCollector
 @dataclass
 class DashboardConfig:
     refresh_interval_seconds: int = 120
-    display_metrics: Optional[List[str]] = None
+    display_metrics: list[str] | None = None
 
 
 @dataclass
 class DashboardData:
     timestamp: datetime
     system_health: float
-    quality_metrics: Dict[str, Any]
+    quality_metrics: dict[str, Any]
     error_summary: ErrorSummary
-    performance_metrics: Dict[str, Any]
-    alerts: List[Dict[str, Any]]
+    performance_metrics: dict[str, Any]
+    alerts: list[dict[str, Any]]
 
 
 class ValidationDashboard:
@@ -34,13 +34,13 @@ class ValidationDashboard:
         self,
         error_reporter: ErrorReporter,
         metrics_collector: MetricsCollector,
-        config: Optional[DashboardConfig] = None,
+        config: DashboardConfig | None = None,
     ) -> None:
         self._error_reporter = error_reporter
         self._metrics = metrics_collector
         self._config = config or DashboardConfig()
-        self._cached: Optional[DashboardData] = None
-        self._last_refresh: Optional[datetime] = None
+        self._cached: DashboardData | None = None
+        self._last_refresh: datetime | None = None
 
     def get_dashboard_data(self, force_refresh: bool = False) -> DashboardData:
         now = datetime.now(UTC)
@@ -58,7 +58,7 @@ class ValidationDashboard:
 
         return self._cached  # type: ignore[return-value]
 
-    def generate_report(self, format: str = "json") -> str:
+    def generate_report(self, output_format: str = "json") -> str:
         data = self.get_dashboard_data(force_refresh=True)
         payload = {
             "generated_at": data.timestamp.isoformat(),
@@ -80,13 +80,12 @@ class ValidationDashboard:
             ],
         }
 
-        if format.lower() == "json":
+        if output_format.lower() == "json":
             return json.dumps(payload, indent=2)
-        if format.lower() == "html":
-            return """<html><body><h1>Validation Dashboard</h1><pre>{}</pre></body></html>""".format(
-                json.dumps(payload, indent=2)
-            )
-        raise ValueError(f"Unsupported report format: {format}")
+        if output_format.lower() == "html":
+            return f"""<html><body><h1>Validation Dashboard</h1><pre>{json.dumps(payload, indent=2)}</pre></body></html>"""
+        msg = f"Unsupported report format: {output_format}"
+        raise ValueError(msg)
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -98,7 +97,7 @@ class ValidationDashboard:
         throughput_summary = self._metrics.get_metric_summary("pipeline.throughput")
         execution_summary = self._metrics.get_metric_summary("pipeline.execution_time")
 
-        quality_metrics: Dict[str, Any] = {}
+        quality_metrics: dict[str, Any] = {}
         if quality_summary:
             quality_metrics["quality_score"] = {
                 "average": quality_summary.average,
@@ -106,7 +105,7 @@ class ValidationDashboard:
                 "max": quality_summary.maximum,
             }
 
-        performance_metrics: Dict[str, Any] = {}
+        performance_metrics: dict[str, Any] = {}
         if throughput_summary:
             performance_metrics[
                 "throughput_items_per_second"

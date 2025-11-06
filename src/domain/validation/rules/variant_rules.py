@@ -9,7 +9,8 @@ generated code.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Optional
+from collections.abc import Iterable
+from typing import Any, ClassVar
 
 from .base_rules import (
     ValidationLevel,
@@ -18,19 +19,19 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = Dict[str, Any]
+IssueDict = dict[str, Any]
 
 
 class VariantValidationRules:
     """Validation utilities for genetic variants."""
 
-    _HGVS_PATTERNS = {
+    _HGVS_PATTERNS: ClassVar[dict[str, re.Pattern[str]]] = {
         "c": re.compile(r"^c\.\d+[ACGT>]*$"),
         "p": re.compile(r"^p\.[A-Z][a-z]{2}\d+[A-Z][a-z]{2}$"),
         "g": re.compile(r"^g\.\d+[ACGT>]*$"),
     }
 
-    _VALID_CLINICAL_SIG = {
+    _VALID_CLINICAL_SIG: ClassVar[set[str]] = {
         "pathogenic",
         "likely pathogenic",
         "uncertain significance",
@@ -40,12 +41,13 @@ class VariantValidationRules:
 
     @staticmethod
     def validate_hgvs_notation_comprehensive(
-        _hgvs_notation: Any, notation_type: str
+        _hgvs_notation: Any,
+        notation_type: str,
     ) -> ValidationRule:
         pattern = VariantValidationRules._HGVS_PATTERNS.get(notation_type)
 
         def validator(value: Any) -> ValidationOutcome:
-            notation: Optional[str] = None
+            notation: str | None = None
             if isinstance(value, dict):
                 raw_value = value.get(notation_type)
                 if isinstance(raw_value, str):
@@ -79,7 +81,8 @@ class VariantValidationRules:
 
     @staticmethod
     def validate_clinical_significance_comprehensive(
-        _clinical_sig: Any, field: str = "clinical_significance"
+        _clinical_sig: Any,
+        field: str = "clinical_significance",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if value in (None, ""):
@@ -110,7 +113,8 @@ class VariantValidationRules:
 
     @staticmethod
     def validate_population_frequencies(
-        _frequencies: Any, field: str = "population_frequencies"
+        _frequencies: Any,
+        field: str = "population_frequencies",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if value in (None, {}):
@@ -164,8 +168,8 @@ class VariantValidationRules:
         )
 
     @staticmethod
-    def validate_variant_comprehensively(variant: Dict[str, Any]) -> List[IssueDict]:
-        issues: List[IssueDict] = []
+    def validate_variant_comprehensively(variant: dict[str, Any]) -> list[IssueDict]:
+        issues: list[IssueDict] = []
 
         for rule in VariantValidationRules.get_all_rules():
             is_valid, message, suggestion = rule.validator(variant.get(rule.field))
@@ -177,7 +181,7 @@ class VariantValidationRules:
                         "message": message,
                         "suggestion": suggestion,
                         "severity": rule.severity.name.lower(),
-                    }
+                    },
                 )
 
         if not variant.get("variation_name"):
@@ -187,7 +191,7 @@ class VariantValidationRules:
                     "variation_name_required",
                     "Variation name is required",
                     ValidationSeverity.ERROR,
-                )
+                ),
             )
 
         return issues
@@ -198,7 +202,7 @@ class VariantValidationRules:
         rule: str,
         message: str,
         severity: ValidationSeverity,
-        suggestion: Optional[str] = None,
+        suggestion: str | None = None,
     ) -> IssueDict:
         return {
             "field": field,

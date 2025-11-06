@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING
 
 from src.domain.entities.variant import (
     ClinicalSignificance,
@@ -9,9 +9,13 @@ from src.domain.entities.variant import (
     VariantType,
 )
 from src.domain.value_objects.identifiers import GeneIdentifier, VariantIdentifier
-from src.models.database.evidence import EvidenceModel
-from src.models.database.gene import GeneModel
 from src.models.database.variant import VariantModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
+    from src.models.database.evidence import EvidenceModel
+    from src.models.database.gene import GeneModel
 
 
 class VariantMapper:
@@ -62,10 +66,14 @@ class VariantMapper:
         return variant
 
     @staticmethod
-    def to_model(entity: Variant, model: Optional[VariantModel] = None) -> VariantModel:
+    def to_model(
+        entity: Variant,
+        model: VariantModel | None = None,
+    ) -> VariantModel:
         target = model or VariantModel()
         if entity.gene_database_id is None:
-            raise ValueError("Variant entity requires gene_database_id for persistence")
+            message = "Variant entity requires gene_database_id for persistence"
+            raise ValueError(message)
 
         target.gene_id = entity.gene_database_id
         target.variant_id = entity.variant_id
@@ -94,7 +102,7 @@ class VariantMapper:
         return [VariantMapper.to_domain(model) for model in models]
 
     @staticmethod
-    def _build_gene_identifier(gene: Optional[GeneModel]) -> Optional[GeneIdentifier]:
+    def _build_gene_identifier(gene: GeneModel | None) -> GeneIdentifier | None:
         if gene is None:
             return None
         return GeneIdentifier(

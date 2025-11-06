@@ -5,18 +5,18 @@ Provides comprehensive validation, quality scoring, and improvement
 suggestions for data sources in the MED13 Resource Library.
 """
 
-from typing import Any, Dict, List, Tuple
 import statistics
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from pydantic import BaseModel
 
 from src.domain.entities.user_data_source import (
-    UserDataSource,
     SourceConfiguration,
+    UserDataSource,
 )
-from src.domain.services.file_upload_service import DataRecord
 from src.domain.services.api_source_service import APIRequestResult
+from src.domain.services.file_upload_service import DataRecord
 
 
 class QualityScore(BaseModel):
@@ -28,16 +28,16 @@ class QualityScore(BaseModel):
     timeliness: float
     validity: float
 
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
 
 
 class QualityReport(BaseModel):
     """Comprehensive quality report."""
 
     score: QualityScore
-    issues: List[str] = []
-    recommendations: List[str] = []
-    metrics: Dict[str, Any] = {}
+    issues: list[str] = []
+    recommendations: list[str] = []
+    metrics: dict[str, Any] = {}
     assessed_at: datetime
 
 
@@ -58,9 +58,13 @@ class QualityAssuranceService:
             "timeliness": 0.7,  # 70% timely
             "validity": 0.95,  # 95% valid
         }
+        self.stale_timeliness_threshold = 0.5
+        self.min_sample_size = 100
 
     def assess_file_upload_quality(
-        self, records: List[DataRecord], configuration: SourceConfiguration
+        self,
+        records: list[DataRecord],
+        configuration: SourceConfiguration,
     ) -> QualityReport:
         """
         Assess quality of uploaded file data.
@@ -83,12 +87,19 @@ class QualityAssuranceService:
 
         # Calculate overall score
         overall = self._calculate_overall_score(
-            completeness, consistency, validity, timeliness
+            completeness,
+            consistency,
+            validity,
+            timeliness,
         )
 
         # Generate issues and recommendations
         issues, recommendations = self._analyze_issues_and_recommendations(
-            records, completeness, consistency, validity, timeliness
+            records,
+            completeness,
+            consistency,
+            validity,
+            timeliness,
         )
 
         # Additional metrics
@@ -118,11 +129,13 @@ class QualityAssuranceService:
             issues=issues,
             recommendations=recommendations,
             metrics=metrics,
-            assessed_at=datetime.now(timezone.utc),
+            assessed_at=datetime.now(UTC),
         )
 
     def assess_api_quality(
-        self, result: APIRequestResult, configuration: SourceConfiguration
+        self,
+        result: APIRequestResult,
+        configuration: SourceConfiguration,
     ) -> QualityReport:
         """
         Assess quality of API response data.
@@ -147,11 +160,18 @@ class QualityAssuranceService:
         timeliness = self._calculate_timeliness_api(result)
 
         overall = self._calculate_overall_score(
-            completeness, consistency, validity, timeliness
+            completeness,
+            consistency,
+            validity,
+            timeliness,
         )
 
         issues, recommendations = self._analyze_issues_and_recommendations(
-            records, completeness, consistency, validity, timeliness
+            records,
+            completeness,
+            consistency,
+            validity,
+            timeliness,
         )
 
         # API-specific metrics
@@ -169,7 +189,7 @@ class QualityAssuranceService:
                     "columns": self._extract_columns(records),
                     "data_types": self._infer_data_types(records),
                     "duplicate_count": self._count_duplicates(records),
-                }
+                },
             )
 
         return QualityReport(
@@ -183,13 +203,13 @@ class QualityAssuranceService:
                     "api_performance": {
                         "response_time_ms": result.response_time_ms,
                         "status_code": result.status_code,
-                    }
+                    },
                 },
             ),
             issues=issues,
             recommendations=recommendations,
             metrics=metrics,
-            assessed_at=datetime.now(timezone.utc),
+            assessed_at=datetime.now(UTC),
         )
 
     def assess_source_health(self, source: UserDataSource) -> QualityReport:
@@ -211,7 +231,10 @@ class QualityAssuranceService:
         validity = metrics.overall_score or 0.0
 
         overall = self._calculate_overall_score(
-            completeness, consistency, validity, timeliness
+            completeness,
+            consistency,
+            validity,
+            timeliness,
         )
 
         issues = []
@@ -226,7 +249,7 @@ class QualityAssuranceService:
             issues.append("Source is in error state")
             recommendations.append("Review and fix configuration issues")
 
-        if timeliness < 0.5:
+        if timeliness < self.stale_timeliness_threshold:
             issues.append("Source data may be outdated")
             recommendations.append("Schedule more frequent updates")
 
@@ -251,10 +274,10 @@ class QualityAssuranceService:
                     metrics.last_assessed.isoformat() if metrics.last_assessed else None
                 ),
             },
-            assessed_at=datetime.now(timezone.utc),
+            assessed_at=datetime.now(UTC),
         )
 
-    def _calculate_completeness(self, records: List[DataRecord]) -> float:
+    def _calculate_completeness(self, records: list[DataRecord]) -> float:
         """Calculate data completeness score."""
         if not records:
             return 0.0
@@ -263,14 +286,14 @@ class QualityAssuranceService:
         filled_fields = 0
 
         for record in records:
-            for field, value in record.data.items():
+            for value in record.data.values():
                 total_fields += 1
                 if value is not None and str(value).strip():
                     filled_fields += 1
 
         return filled_fields / total_fields if total_fields > 0 else 0.0
 
-    def _calculate_consistency(self, records: List[DataRecord]) -> float:
+    def _calculate_consistency(self, records: list[DataRecord]) -> float:
         """Calculate data consistency score."""
         if not records:
             return 0.0
@@ -292,7 +315,9 @@ class QualityAssuranceService:
         return statistics.mean(consistency_scores) if consistency_scores else 1.0
 
     def _calculate_validity(
-        self, records: List[DataRecord], configuration: SourceConfiguration
+        self,
+        records: list[DataRecord],
+        _configuration: SourceConfiguration,
     ) -> float:
         """Calculate data validity score."""
         if not records:
@@ -303,21 +328,23 @@ class QualityAssuranceService:
 
         return valid_records / total_records
 
-    def _calculate_timeliness_file(self, records: List[DataRecord]) -> float:
+    def _calculate_timeliness_file(self, _records: list[DataRecord]) -> float:
         """Calculate timeliness for file data (always current)."""
         return 1.0  # File data is current when uploaded
 
     def _calculate_timeliness_api(self, result: APIRequestResult) -> float:
         """Calculate timeliness for API data."""
         # Based on response time - faster is better
-        if result.response_time_ms < 100:
+        fast_ms = 100
+        ok_ms = 1000
+        slow_ms = 5000
+        if result.response_time_ms < fast_ms:
             return 1.0
-        elif result.response_time_ms < 1000:
+        if result.response_time_ms < ok_ms:
             return 0.8
-        elif result.response_time_ms < 5000:
+        if result.response_time_ms < slow_ms:
             return 0.6
-        else:
-            return 0.3
+        return 0.3
 
     def _calculate_source_timeliness(self, source: UserDataSource) -> float:
         """Calculate timeliness based on source metadata."""
@@ -325,7 +352,7 @@ class QualityAssuranceService:
             return 0.0
 
         hours_since_ingestion = (
-            datetime.now(timezone.utc) - source.last_ingested_at
+            datetime.now(UTC) - source.last_ingested_at
         ).total_seconds() / 3600
 
         # Freshness based on expected update frequency
@@ -342,12 +369,11 @@ class QualityAssuranceService:
 
             if hours_since_ingestion <= expected_hours:
                 return 1.0
-            elif hours_since_ingestion <= expected_hours * 2:
+            if hours_since_ingestion <= expected_hours * 2:
                 return 0.7
-            elif hours_since_ingestion <= expected_hours * 4:
+            if hours_since_ingestion <= expected_hours * 4:
                 return 0.4
-            else:
-                return 0.1
+            return 0.1
 
         return 0.5  # Unknown schedule
 
@@ -375,12 +401,12 @@ class QualityAssuranceService:
 
     def _analyze_issues_and_recommendations(
         self,
-        records: List[DataRecord],
+        records: list[DataRecord],
         completeness: float,
         consistency: float,
         validity: float,
         timeliness: float,
-    ) -> Tuple[List[str], List[str]]:
+    ) -> tuple[list[str], list[str]]:
         """Analyze issues and generate recommendations."""
         issues = []
         recommendations = []
@@ -412,7 +438,7 @@ class QualityAssuranceService:
             recommendations.append("Optimize data retrieval performance")
 
         # General recommendations
-        if len(records) < 100:
+        if len(records) < self.min_sample_size:
             recommendations.append("Consider collecting more data samples")
 
         duplicates = self._count_duplicates(records)
@@ -422,14 +448,14 @@ class QualityAssuranceService:
 
         return issues, recommendations
 
-    def _extract_columns(self, records: List[DataRecord]) -> List[str]:
+    def _extract_columns(self, records: list[DataRecord]) -> list[str]:
         """Extract column names from records."""
         columns: set[str] = set()
         for record in records:
             columns.update(record.data.keys())
-        return sorted(list(columns))
+        return sorted(columns)
 
-    def _infer_data_types(self, records: List[DataRecord]) -> Dict[str, str]:
+    def _infer_data_types(self, records: list[DataRecord]) -> dict[str, str]:
         """Infer data types for columns."""
         if not records:
             return {}
@@ -459,7 +485,7 @@ class QualityAssuranceService:
 
         return types
 
-    def _count_duplicates(self, records: List[DataRecord]) -> int:
+    def _count_duplicates(self, records: list[DataRecord]) -> int:
         """Count duplicate records."""
         seen = set()
         duplicates = 0
@@ -474,7 +500,7 @@ class QualityAssuranceService:
 
         return duplicates
 
-    def _calculate_null_stats(self, records: List[DataRecord]) -> Dict[str, float]:
+    def _calculate_null_stats(self, records: list[DataRecord]) -> dict[str, float]:
         """Calculate null value statistics per column."""
         if not records:
             return {}
@@ -495,7 +521,7 @@ class QualityAssuranceService:
 
         return stats
 
-    def _api_data_to_records(self, data: Any) -> List[DataRecord]:
+    def _api_data_to_records(self, data: Any) -> list[DataRecord]:
         """Convert API response data to DataRecord format."""
         records = []
 
@@ -518,12 +544,13 @@ class QualityAssuranceService:
         return records
 
     def _get_completeness_breakdown(
-        self, records: List[DataRecord]
-    ) -> Dict[str, float]:
+        self,
+        records: list[DataRecord],
+    ) -> dict[str, float]:
         """Get completeness breakdown by column."""
         return self._calculate_null_stats(records)
 
-    def _get_consistency_checks(self, records: List[DataRecord]) -> Dict[str, Any]:
+    def _get_consistency_checks(self, records: list[DataRecord]) -> dict[str, Any]:
         """Get consistency check results."""
         types = self._infer_data_types(records)
         return {
@@ -533,9 +560,9 @@ class QualityAssuranceService:
             ],
         }
 
-    def _get_validity_errors(self, records: List[DataRecord]) -> Dict[str, int]:
+    def _get_validity_errors(self, records: list[DataRecord]) -> dict[str, int]:
         """Get breakdown of validation errors."""
-        error_counts: Dict[str, int] = {}
+        error_counts: dict[str, int] = {}
         for record in records:
             for error in record.validation_errors:
                 error_counts[error] = error_counts.get(error, 0) + 1
@@ -554,10 +581,10 @@ class QualityAssuranceService:
             issues=["No data to analyze"],
             recommendations=["Upload data for quality assessment"],
             metrics={},
-            assessed_at=datetime.now(timezone.utc),
+            assessed_at=datetime.now(UTC),
         )
 
-    def _create_failure_report(self, errors: List[str]) -> QualityReport:
+    def _create_failure_report(self, errors: list[str]) -> QualityReport:
         """Create a quality report for failed operations."""
         return QualityReport(
             score=QualityScore(
@@ -570,5 +597,5 @@ class QualityAssuranceService:
             issues=errors,
             recommendations=["Fix configuration issues and retry"],
             metrics={},
-            assessed_at=datetime.now(timezone.utc),
+            assessed_at=datetime.now(UTC),
         )

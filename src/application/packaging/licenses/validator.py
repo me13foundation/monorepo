@@ -2,10 +2,12 @@
 License validation utilities.
 """
 
-from typing import Dict, Any, List
 from pathlib import Path
+from typing import Any
 
-from .manager import LicenseManager, LicenseCompatibility
+import yaml  # type: ignore[import-untyped]
+
+from .manager import LicenseCompatibility, LicenseManager
 
 
 class LicenseValidator:
@@ -20,7 +22,7 @@ class LicenseValidator:
         """
         self.package_license = package_license
 
-    def validate_sources(self, source_licenses: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def validate_sources(self, source_licenses: list[dict[str, Any]]) -> dict[str, Any]:
         """
         Validate source licenses against package license.
 
@@ -38,7 +40,8 @@ class LicenseValidator:
             source_name = source_info.get("source", "unknown")
 
             compatibility = LicenseManager.check_compatibility(
-                source_license, self.package_license
+                source_license,
+                self.package_license,
             )
 
             if compatibility == LicenseCompatibility.MISSING:
@@ -47,7 +50,7 @@ class LicenseValidator:
             elif compatibility == LicenseCompatibility.INCOMPATIBLE:
                 issues.append(
                     f"Incompatible license '{source_license}' "
-                    f"from source '{source_name}'"
+                    f"from source '{source_name}'",
                 )
 
         return {
@@ -56,7 +59,7 @@ class LicenseValidator:
             "warnings": warnings,
         }
 
-    def validate_manifest(self, manifest_path: Path) -> Dict[str, Any]:
+    def validate_manifest(self, manifest_path: Path) -> dict[str, Any]:
         """
         Validate license manifest file.
 
@@ -74,9 +77,7 @@ class LicenseValidator:
             }
 
         try:
-            import yaml  # type: ignore[import-untyped]
-
-            with open(manifest_path, "r", encoding="utf-8") as f:
+            with manifest_path.open(encoding="utf-8") as f:
                 manifest = yaml.safe_load(f)
 
             if "package_license" not in manifest:
@@ -96,9 +97,9 @@ class LicenseValidator:
             # Validate sources
             return self.validate_sources(manifest["sources"])
 
-        except Exception as e:
+        except (OSError, ValueError, yaml.YAMLError) as exc:
             return {
                 "valid": False,
-                "issues": [f"Error reading manifest: {e}"],
+                "issues": [f"Error reading manifest: {exc}"],
                 "warnings": [],
             }

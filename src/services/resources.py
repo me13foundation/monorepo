@@ -11,5 +11,5 @@ def list_resources() -> Sequence[Resource]:
             title="MED13 Syndrome Foundation",
             url="https://med13foundation.org",
             summary="Central information hub for the MED13 Foundation.",
-        )
+        ),
     ]

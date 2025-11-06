@@ -4,23 +4,34 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, ClassVar
 
 
 @dataclass
 class SyntheticDataset:
-    data: List[Dict[str, Any]]
+    data: list[dict[str, Any]]
 
 
 class TestDataGenerator:
+    __test__: ClassVar[bool] = False
+
     def __init__(self, seed: int | None = None) -> None:
-        self._random = random.Random(seed)
+        # Use a deterministic PRNG when a seed is provided; otherwise prefer
+        # SystemRandom for better randomness in ad-hoc generation.
+        self._random: random.Random
+        if seed is None:
+            self._random = (
+                random.SystemRandom()
+            )  # nosec B311 - test utility, not crypto
+        else:
+            # Deterministic PRNG for tests only; not used for security.
+            self._random = random.Random(seed)  # noqa: S311  # nosec B311
 
     def generate_gene_dataset(self, count: int, quality: str) -> SyntheticDataset:
-        records: List[Dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
         for index in range(count):
             if quality == "poor":
-                record: Dict[str, Any] = {
+                record: dict[str, Any] = {
                     "symbol": f"gene{index}",  # lower-case to trigger validation error
                     "source": "test",
                     "confidence_score": -0.5,
@@ -41,7 +52,5 @@ class TestDataGenerator:
 
         return SyntheticDataset(data=records)
 
-
-setattr(TestDataGenerator, "__test__", False)
 
 __all__ = ["SyntheticDataset", "TestDataGenerator"]

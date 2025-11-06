@@ -5,12 +5,12 @@ Validates data format compliance, data types, and basic structural
 requirements according to defined schemas and patterns.
 """
 
-from typing import Dict, List, Any
+import re
 from dataclasses import dataclass
 from enum import Enum
-import re
+from typing import Any
 
-from ..rules.base_rules import ValidationResult, ValidationIssue, ValidationSeverity
+from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
 
 class ValidationFormat(Enum):
@@ -44,7 +44,7 @@ class SyntacticValidator:
                     rule="hgvs_format",
                     message="HGVS notation must be a non-empty string",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
             return ValidationResult(is_valid=False, issues=issues)
 
@@ -58,13 +58,15 @@ class SyntacticValidator:
                     rule="hgvs_format",
                     message="Invalid HGVS notation format",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_identifier_format(
-        self, identifier: str, id_type: str
+        self,
+        identifier: str,
+        id_type: str,
     ) -> ValidationResult:
         """Validate identifier format based on type."""
         issues = []
@@ -77,7 +79,7 @@ class SyntacticValidator:
                     rule=f"{id_type}_format",
                     message=f"{id_type} identifier must be a non-empty string",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
             return ValidationResult(is_valid=False, issues=issues)
 
@@ -98,13 +100,15 @@ class SyntacticValidator:
                     rule=f"{id_type}_format",
                     message=f"Invalid {id_type} identifier format",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_data_types(
-        self, data: Dict[str, Any], schema: Dict[str, type]
+        self,
+        data: dict[str, Any],
+        schema: dict[str, type],
     ) -> ValidationResult:
         """Validate data types against schema."""
         issues = []
@@ -120,13 +124,15 @@ class SyntacticValidator:
                             rule="data_type",
                             message=f"Field {field} must be of type {expected_type.__name__}",
                             severity=ValidationSeverity.ERROR,
-                        )
+                        ),
                     )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_json_structure(
-        self, data: Dict[str, Any], required_fields: List[str]
+        self,
+        data: dict[str, Any],
+        required_fields: list[str],
     ) -> ValidationResult:
         """Validate JSON structure has required fields."""
         issues = []
@@ -140,7 +146,7 @@ class SyntacticValidator:
                         rule="required_field",
                         message=f"Required field '{field}' is missing",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)

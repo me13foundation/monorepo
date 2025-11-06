@@ -5,10 +5,12 @@ Database representation of reusable data source templates with
 relationships and constraints for the Data Sources module.
 """
 
-from typing import Optional, List, Dict, Any, TYPE_CHECKING
-from sqlalchemy import String, Text, Integer, Float, Boolean, JSON, Enum as SQLEnum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import JSON, Boolean, Float, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
@@ -70,29 +72,45 @@ class SourceTemplateModel(Base):
 
     # Template definition
     source_type: Mapped[SourceTypeEnum] = mapped_column(
-        SourceTypeEnum, nullable=False, index=True
+        SourceTypeEnum,
+        nullable=False,
+        index=True,
     )
-    schema_definition: Mapped[Dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default=dict
+    schema_definition: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
     )
-    validation_rules: Mapped[List[Dict[str, Any]]] = mapped_column(
-        JSON, nullable=False, default=list
+    validation_rules: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
     )
 
     # UI configuration
-    ui_config: Mapped[Dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default=dict
+    ui_config: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
     )
 
     # Governance
     is_public: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, index=True
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
     )
     is_approved: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, index=True
+        Boolean,
+        nullable=False,
+        default=False,
+        index=True,
     )
     approval_required: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=True
+        Boolean,
+        nullable=False,
+        default=True,
     )
 
     # Usage statistics
@@ -100,18 +118,21 @@ class SourceTemplateModel(Base):
     success_rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
 
     # Timestamps
-    approved_at: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    approved_at: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     # Metadata
-    tags: Mapped[List[str]] = mapped_column(JSON, nullable=False, default=list)
+    tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
     compatibility_version: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="1.0"
+        String(20),
+        nullable=False,
+        default="1.0",
     )
 
     # Relationships
-    sources: Mapped[List["UserDataSourceModel"]] = relationship(
-        "UserDataSourceModel", back_populates="template"
+    sources: Mapped[list["UserDataSourceModel"]] = relationship(
+        "UserDataSourceModel",
+        back_populates="template",
     )
 
     def __repr__(self) -> str:

@@ -6,11 +6,11 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any
 
-from .base import Repository
-from ..entities.variant import Variant, VariantSummary
-from ...type_definitions.common import VariantUpdate
+from src.domain.entities.variant import Variant, VariantSummary
+from src.domain.repositories.base import Repository
+from src.type_definitions.common import VariantUpdate
 
 
 class VariantRepository(Repository[Variant, int]):
@@ -22,43 +22,41 @@ class VariantRepository(Repository[Variant, int]):
     """
 
     @abstractmethod
-    def find_by_variant_id(self, variant_id: str) -> Optional[Variant]:
+    def find_by_variant_id(self, variant_id: str) -> Variant | None:
         """Find a variant by its variant_id."""
-        pass
 
     @abstractmethod
-    def find_by_clinvar_id(self, clinvar_id: str) -> Optional[Variant]:
+    def find_by_clinvar_id(self, clinvar_id: str) -> Variant | None:
         """Find a variant by its ClinVar ID."""
-        pass
 
     @abstractmethod
-    def find_by_gene(self, gene_id: int, limit: Optional[int] = None) -> List[Variant]:
+    def find_by_gene(self, gene_id: int, limit: int | None = None) -> list[Variant]:
         """Find variants associated with a gene."""
-        pass
 
     @abstractmethod
     def find_by_chromosome_position(
-        self, chromosome: str, position: int
-    ) -> List[Variant]:
+        self,
+        chromosome: str,
+        position: int,
+    ) -> list[Variant]:
         """Find variants at a specific genomic position."""
-        pass
 
     @abstractmethod
     def find_by_clinical_significance(
-        self, significance: str, limit: Optional[int] = None
-    ) -> List[Variant]:
+        self,
+        significance: str,
+        limit: int | None = None,
+    ) -> list[Variant]:
         """Find variants by clinical significance."""
-        pass
 
     @abstractmethod
     def search_variants(
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Variant]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Variant]:
         """Search variants with optional filters."""
-        pass
 
     @abstractmethod
     def paginate_variants(
@@ -67,30 +65,25 @@ class VariantRepository(Repository[Variant, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Variant], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Variant], int]:
         """Retrieve paginated variants with optional filters."""
-        pass
 
     @abstractmethod
-    def get_variant_summaries_by_gene(self, gene_id: int) -> List[VariantSummary]:
+    def get_variant_summaries_by_gene(self, gene_id: int) -> list[VariantSummary]:
         """Get variant summaries for a gene."""
-        pass
 
     @abstractmethod
     def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about variants in the repository."""
-        pass
 
     @abstractmethod
-    def find_by_gene_symbol(self, gene_symbol: str) -> List[Variant]:
+    def find_by_gene_symbol(self, gene_symbol: str) -> list[Variant]:
         """Find variants associated with a gene symbol."""
-        pass
 
     @abstractmethod
     def update_variant(self, variant_id: int, updates: VariantUpdate) -> Variant:
         """Update a variant with type-safe update parameters."""
-        pass
 
 
 __all__ = ["VariantRepository"]

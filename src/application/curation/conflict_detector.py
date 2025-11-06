@@ -7,14 +7,17 @@ front-end can render without embedding business logic in Dash callbacks.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Iterable, List, Sequence
+from typing import TYPE_CHECKING
 
 from src.application.curation.dto import ConflictSummaryDTO
-from src.domain.entities.evidence import Evidence
-from src.domain.entities.variant import Variant
-from src.domain.services.evidence_domain_service import EvidenceDomainService
-from src.domain.services.variant_domain_service import VariantDomainService
+
+if TYPE_CHECKING:
+    from src.domain.entities.evidence import Evidence
+    from src.domain.entities.variant import Variant
+    from src.domain.services.evidence_domain_service import EvidenceDomainService
+    from src.domain.services.variant_domain_service import VariantDomainService
 
 
 @dataclass
@@ -29,8 +32,10 @@ class ConflictDetector:
     evidence_domain_service: EvidenceDomainService
 
     def summarize_conflicts(
-        self, variant: Variant, evidence: Sequence[Evidence]
-    ) -> List[ConflictSummaryDTO]:
+        self,
+        variant: Variant,
+        evidence: Sequence[Evidence],
+    ) -> list[ConflictSummaryDTO]:
         """
         Produce conflict summaries for a variant and its evidence set.
 
@@ -41,14 +46,17 @@ class ConflictDetector:
         Returns:
             List of structured conflict summaries
         """
-        if not evidence:
+        evidence_seq = evidence if isinstance(evidence, Sequence) else tuple(evidence)
+
+        if not evidence_seq:
             return []
 
         summaries: list[ConflictSummaryDTO] = []
 
         # Variant-level heuristics (string descriptions) → normalize
         variant_conflicts = self.variant_domain_service.detect_evidence_conflicts(
-            variant, list(evidence)
+            variant,
+            list(evidence_seq),
         )
         summaries.extend(
             ConflictSummaryDTO(
@@ -61,16 +69,14 @@ class ConflictDetector:
 
         # Evidence-level structured conflicts
         evidence_conflicts = self.evidence_domain_service.detect_evidence_conflicts(
-            list(evidence)
+            list(evidence_seq),
         )
         for conflict in evidence_conflicts:
             conflict_type = conflict.get("type", "evidence_conflict")
             description = conflict.get("description", "Conflict detected")
             severity = conflict.get("severity", "medium")
 
-            evidence_ids: Iterable[int] = (
-                conflict.get("evidence_ids", []) if conflict else []
-            )
+            evidence_ids = conflict.get("evidence_ids", []) if conflict else []
 
             summaries.append(
                 ConflictSummaryDTO(
@@ -80,7 +86,7 @@ class ConflictDetector:
                     evidence_ids=tuple(
                         int(eid) for eid in evidence_ids if eid is not None
                     ),
-                )
+                ),
             )
 
         # De-duplicate identical conflicts while preserving severity ordering
@@ -103,7 +109,7 @@ class ConflictDetector:
                     severity=summary.severity,
                     message=summary.message,
                     evidence_ids=tuple(
-                        sorted(set(existing.evidence_ids + summary.evidence_ids))
+                        sorted(set(existing.evidence_ids + summary.evidence_ids)),
                     ),
                 )
             else:
@@ -112,7 +118,7 @@ class ConflictDetector:
                     severity=existing.severity,
                     message=existing.message,
                     evidence_ids=tuple(
-                        sorted(set(existing.evidence_ids + summary.evidence_ids))
+                        sorted(set(existing.evidence_ids + summary.evidence_ids)),
                     ),
                 )
 

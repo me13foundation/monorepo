@@ -4,7 +4,8 @@ Validation helpers for relationships between genes, variants, and phenotypes.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from collections.abc import Iterable
+from typing import Any
 
 from .base_rules import (
     ValidationLevel,
@@ -13,7 +14,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = Dict[str, Any]
+IssueDict = dict[str, Any]
 
 
 class RelationshipValidationRules:
@@ -21,7 +22,10 @@ class RelationshipValidationRules:
 
     @staticmethod
     def validate_genotype_phenotype_plausibility(
-        _gene: Any, _variant: Any, _phenotype: Any, field: str = "relationship"
+        _gene: Any,
+        _variant: Any,
+        _phenotype: Any,
+        field: str = "relationship",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if not isinstance(value, dict):
@@ -59,60 +63,57 @@ class RelationshipValidationRules:
     @staticmethod
     def validate_evidence_strength_and_consistency(
         _placeholder: Any,
-        _confidence_threshold: Optional[float] = None,
-        _evidence_level: Optional[str] = None,
+        _confidence_threshold: float | None = None,
+        _evidence_level: str | None = None,
         field: str = "evidence",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
+            valid = True
+            message = ""
+            suggestion: str | None = None
+
             if value in (None, {}):
-                return (
-                    False,
-                    "Evidence is required to support the relationship",
-                    "Provide at least one evidence record",
-                )
-            if not isinstance(value, dict):
-                return (
-                    False,
-                    "Evidence payload must be a mapping",
-                    "Provide evidence information as a dictionary",
-                )
+                valid = False
+                message = "Evidence is required to support the relationship"
+                suggestion = "Provide at least one evidence record"
+            elif not isinstance(value, dict):
+                valid = False
+                message = "Evidence payload must be a mapping"
+                suggestion = "Provide evidence information as a dictionary"
+            else:
+                sources = value.get("evidence_sources", [])
+                if valid and (
+                    not isinstance(sources, list)
+                    or not all(isinstance(source, str) for source in sources)
+                ):
+                    valid = False
+                    message = "Evidence sources must be provided as a list of strings"
+                    suggestion = "Provide textual evidence sources"
+                elif valid and len(sources) == 0:
+                    valid = False
+                    message = "At least one evidence source is required"
+                    suggestion = "Include literature or database sources supporting the relationship"
 
-            sources = value.get("evidence_sources", [])
-            if not isinstance(sources, list) or not all(
-                isinstance(source, str) for source in sources
-            ):
-                return (
-                    False,
-                    "Evidence sources must be provided as a list of strings",
-                    "Provide textual evidence sources",
-                )
-            if len(sources) == 0:
-                return (
-                    False,
-                    "At least one evidence source is required",
-                    "Include literature or database sources supporting the relationship",
-                )
+                confidence = value.get("confidence_score")
+                if (
+                    valid
+                    and confidence is not None
+                    and (
+                        not isinstance(confidence, (int, float))
+                        or not 0 <= float(confidence) <= 1
+                    )
+                ):
+                    valid = False
+                    message = "Confidence score must be between 0 and 1"
+                    suggestion = "Provide a normalised confidence score"
 
-            confidence = value.get("confidence_score")
-            if confidence is not None and (
-                not isinstance(confidence, (int, float))
-                or not 0 <= float(confidence) <= 1
-            ):
-                return (
-                    False,
-                    "Confidence score must be between 0 and 1",
-                    "Provide a normalised confidence score",
-                )
+                level = value.get("evidence_level")
+                if valid and level is not None and not isinstance(level, str):
+                    valid = False
+                    message = "Evidence level must be a string"
+                    suggestion = "Provide a descriptive evidence level (e.g. reviewed, predicted)"
 
-            level = value.get("evidence_level")
-            if level is not None and not isinstance(level, str):
-                return (
-                    False,
-                    "Evidence level must be a string",
-                    "Provide a descriptive evidence level (e.g. reviewed, predicted)",
-                )
-
-            return True, "", None
+            return valid, message, suggestion
 
         return ValidationRule(
             field=field,
@@ -125,70 +126,86 @@ class RelationshipValidationRules:
     @staticmethod
     def validate_statistical_significance(
         _placeholder: Any,
-        _minimum_sample_size: Optional[int] = None,
-        _minimum_effect_size: Optional[float] = None,
-        _confidence_interval_bounds: Optional[Tuple[float, float]] = None,
+        _minimum_sample_size: int | None = None,
+        _minimum_effect_size: float | None = None,
+        _confidence_interval_bounds: tuple[float, float] | None = None,
         field: str = "statistics",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if value is None:
                 return True, "", None
+
+            valid = True
+            message = ""
+            suggestion: str | None = None
+
             if not isinstance(value, dict):
-                return (
-                    False,
-                    "Statistical metrics must be a mapping",
-                    "Provide statistical data as a dictionary",
-                )
-
-            p_value = value.get("p_value")
-            if p_value is not None and (
-                not isinstance(p_value, (int, float)) or not 0 <= float(p_value) <= 1
-            ):
-                return (
-                    False,
-                    "p-value must be between 0 and 1",
-                    "Provide a valid p-value",
-                )
-
-            sample_size = value.get("sample_size")
-            if sample_size is not None and (
-                not isinstance(sample_size, int) or sample_size < 10
-            ):
-                return (
-                    False,
-                    "Sample size must be an integer of at least 10",
-                    "Provide the number of observations supporting the relationship",
-                )
-
-            effect_size = value.get("effect_size")
-            if effect_size is not None and not isinstance(effect_size, (int, float)):
-                return (
-                    False,
-                    "Effect size must be numeric",
-                    "Provide a numeric effect size estimate",
-                )
-
-            ci = value.get("confidence_interval")
-            if ci is not None:
+                valid = False
+                message = "Statistical metrics must be a mapping"
+                suggestion = "Provide statistical data as a dictionary"
+            else:
+                p_value = value.get("p_value")
                 if (
-                    not isinstance(ci, (tuple, list))
-                    or len(ci) != 2
-                    or not all(isinstance(bound, (int, float)) for bound in ci)
-                ):
-                    return (
-                        False,
-                        "Confidence interval must be a two-element numeric tuple",
-                        "Provide (lower, upper) confidence interval bounds",
+                    valid
+                    and p_value is not None
+                    and (
+                        not isinstance(p_value, (int, float))
+                        or not 0 <= float(p_value) <= 1
                     )
-                lower, upper = float(ci[0]), float(ci[1])
-                if lower > upper:
-                    return (
-                        False,
-                        "Confidence interval lower bound exceeds upper bound",
-                        "Ensure the interval is ordered as (lower, upper)",
+                ):
+                    valid = False
+                    message = "p-value must be between 0 and 1"
+                    suggestion = "Provide a valid p-value"
+
+                sample_size = value.get("sample_size")
+                if (
+                    valid
+                    and sample_size is not None
+                    and (not isinstance(sample_size, int) or sample_size < 10)
+                ):
+                    valid = False
+                    message = "Sample size must be an integer of at least 10"
+                    suggestion = (
+                        "Provide the number of observations supporting the relationship"
                     )
 
-            return True, "", None
+                effect_size = value.get("effect_size")
+                if (
+                    valid
+                    and effect_size is not None
+                    and not isinstance(
+                        effect_size,
+                        (int, float),
+                    )
+                ):
+                    valid = False
+                    message = "Effect size must be numeric"
+                    suggestion = "Provide a numeric effect size estimate"
+
+                ci = value.get("confidence_interval")
+                if valid and ci is not None:
+                    if (
+                        not isinstance(ci, (tuple, list))
+                        or len(ci) != 2
+                        or not all(isinstance(bound, (int, float)) for bound in ci)
+                    ):
+                        valid = False
+                        message = (
+                            "Confidence interval must be a two-element numeric tuple"
+                        )
+                        suggestion = "Provide (lower, upper) confidence interval bounds"
+                    else:
+                        lower, upper = float(ci[0]), float(ci[1])
+                        if lower > upper:
+                            valid = False
+                            message = (
+                                "Confidence interval lower bound exceeds upper bound"
+                            )
+                            suggestion = (
+                                "Ensure the interval is ordered as (lower, upper)"
+                            )
+
+            return valid, message, suggestion
 
         return ValidationRule(
             field=field,
@@ -206,7 +223,9 @@ class RelationshipValidationRules:
     def get_all_rules() -> Iterable[ValidationRule]:
         return (
             RelationshipValidationRules.validate_genotype_phenotype_plausibility(
-                {}, {}, {}
+                {},
+                {},
+                {},
             ),
             RelationshipValidationRules.validate_evidence_strength_and_consistency([]),
             RelationshipValidationRules.validate_statistical_significance({}),
@@ -214,9 +233,9 @@ class RelationshipValidationRules:
 
     @staticmethod
     def validate_relationship_comprehensively(
-        relationship: Dict[str, Any],
-    ) -> List[IssueDict]:
-        issues: List[IssueDict] = []
+        relationship: dict[str, Any],
+    ) -> list[IssueDict]:
+        issues: list[IssueDict] = []
 
         for rule in RelationshipValidationRules.get_all_rules():
             value = (
@@ -233,7 +252,7 @@ class RelationshipValidationRules:
                         "message": message,
                         "suggestion": suggestion,
                         "severity": rule.severity.name.lower(),
-                    }
+                    },
                 )
 
         return issues

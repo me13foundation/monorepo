@@ -4,18 +4,21 @@ SQLAlchemy implementation of UserRepository for MED13 Resource Library.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
-from typing import List, Optional
-from uuid import UUID
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import and_, delete, desc, func, select, update
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ...domain.entities.user import User, UserRole, UserStatus
-from ...domain.repositories.user_repository import UserRepository
-from ...models.database.user import UserModel
+from src.domain.entities.user import User, UserRole, UserStatus
+from src.domain.repositories.user_repository import UserRepository
+from src.models.database.user import UserModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import AsyncIterator
+    from uuid import UUID
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SqlAlchemyUserRepository(UserRepository):
@@ -26,7 +29,7 @@ class SqlAlchemyUserRepository(UserRepository):
     SQLAlchemy models mapped to domain entities.
     """
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(self, session_factory: Any) -> None:
         """
         Initialize repository with session factory.
 
@@ -42,18 +45,18 @@ class SqlAlchemyUserRepository(UserRepository):
             yield session
 
     @staticmethod
-    def _to_domain(model: Optional[UserModel]) -> Optional[User]:
+    def _to_domain(model: UserModel | None) -> User | None:
         """Convert a SQLAlchemy model to a domain entity."""
         if model is None:
             return None
         return User.model_validate(model)
 
     @staticmethod
-    def _to_domain_list(models: List[UserModel]) -> List[User]:
+    def _to_domain_list(models: list[UserModel]) -> list[User]:
         """Convert a list of SQLAlchemy models to domain entities."""
         return [User.model_validate(user_model) for user_model in models]
 
-    async def get_by_id(self, user_id: UUID) -> Optional[User]:
+    async def get_by_id(self, user_id: UUID) -> User | None:
         """Get user by ID."""
         async with self._session() as session:
             stmt = select(UserModel).where(UserModel.id == user_id)
@@ -61,7 +64,7 @@ class SqlAlchemyUserRepository(UserRepository):
             model = result.scalar_one_or_none()
             return self._to_domain(model)
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    async def get_by_email(self, email: str) -> User | None:
         """Get user by email address."""
         async with self._session() as session:
             stmt = select(UserModel).where(UserModel.email == email)
@@ -69,7 +72,7 @@ class SqlAlchemyUserRepository(UserRepository):
             model = result.scalar_one_or_none()
             return self._to_domain(model)
 
-    async def get_by_username(self, username: str) -> Optional[User]:
+    async def get_by_username(self, username: str) -> User | None:
         """Get user by username."""
         async with self._session() as session:
             stmt = select(UserModel).where(UserModel.username == username)
@@ -80,7 +83,7 @@ class SqlAlchemyUserRepository(UserRepository):
     async def create(self, user: User) -> User:
         """Create a new user."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             data = user.model_dump(mode="python")
             data.setdefault("created_at", now)
             data.setdefault("updated_at", now)
@@ -96,12 +99,13 @@ class SqlAlchemyUserRepository(UserRepository):
         async with self._session() as session:
             db_user = await session.get(UserModel, user.id)
             if db_user is None:
-                raise ValueError(f"User with id {user.id} not found")
+                message = f"User with id {user.id} not found"
+                raise ValueError(message)
 
             data = user.model_dump(mode="python")
             data.pop("id", None)
             data.pop("created_at", None)
-            data["updated_at"] = datetime.now(timezone.utc)
+            data["updated_at"] = datetime.now(UTC)
 
             for field, value in data.items():
                 setattr(db_user, field, value)
@@ -137,9 +141,9 @@ class SqlAlchemyUserRepository(UserRepository):
         self,
         skip: int = 0,
         limit: int = 100,
-        role: Optional[str] = None,
-        status: Optional[UserStatus] = None,
-    ) -> List[User]:
+        role: str | None = None,
+        status: UserStatus | None = None,
+    ) -> list[User]:
         """List users with optional filtering."""
         async with self._session() as session:
             stmt = select(UserModel)
@@ -156,7 +160,9 @@ class SqlAlchemyUserRepository(UserRepository):
             return self._to_domain_list(models)
 
     async def count_users(
-        self, role: Optional[str] = None, status: Optional[UserStatus] = None
+        self,
+        role: str | None = None,
+        status: UserStatus | None = None,
     ) -> int:
         """Count users with optional filtering."""
         async with self._session() as session:
@@ -183,7 +189,7 @@ class SqlAlchemyUserRepository(UserRepository):
     async def update_last_login(self, user_id: UUID) -> None:
         """Update user's last login timestamp."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 update(UserModel)
                 .where(UserModel.id == user_id)
@@ -203,7 +209,7 @@ class SqlAlchemyUserRepository(UserRepository):
                 return 0
 
             new_attempts = current_attempts + 1
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
 
             update_stmt = (
                 update(UserModel)
@@ -218,7 +224,7 @@ class SqlAlchemyUserRepository(UserRepository):
     async def reset_login_attempts(self, user_id: UUID) -> None:
         """Reset login attempts counter."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 update(UserModel)
                 .where(UserModel.id == user_id)
@@ -236,7 +242,7 @@ class SqlAlchemyUserRepository(UserRepository):
                 .values(
                     locked_until=locked_until,
                     status=UserStatus.SUSPENDED,
-                    updated_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(UTC),
                 )
             )
             await session.execute(stmt)
@@ -245,7 +251,7 @@ class SqlAlchemyUserRepository(UserRepository):
     async def unlock_account(self, user_id: UUID) -> None:
         """Unlock user account."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 update(UserModel)
                 .where(UserModel.id == user_id)
@@ -259,7 +265,7 @@ class SqlAlchemyUserRepository(UserRepository):
             await session.execute(stmt)
             await session.commit()
 
-    async def get_recent_logins(self, limit: int = 10) -> List[User]:
+    async def get_recent_logins(self, limit: int = 10) -> list[User]:
         """Get users with most recent login activity."""
         async with self._session() as session:
             stmt = (
@@ -268,7 +274,7 @@ class SqlAlchemyUserRepository(UserRepository):
                     and_(
                         UserModel.last_login.is_not(None),
                         UserModel.status == UserStatus.ACTIVE,
-                    )
+                    ),
                 )
                 .order_by(desc(UserModel.last_login))
                 .limit(limit)
@@ -277,7 +283,7 @@ class SqlAlchemyUserRepository(UserRepository):
             models = list(result.scalars().all())
             return self._to_domain_list(models)
 
-    async def get_users_pending_verification(self) -> List[User]:
+    async def get_users_pending_verification(self) -> list[User]:
         """Get users pending email verification."""
         async with self._session() as session:
             stmt = (
@@ -286,7 +292,7 @@ class SqlAlchemyUserRepository(UserRepository):
                     and_(
                         UserModel.status == UserStatus.PENDING_VERIFICATION,
                         UserModel.email_verification_token.is_not(None),
-                    )
+                    ),
                 )
                 .order_by(UserModel.created_at)
             )
@@ -294,7 +300,7 @@ class SqlAlchemyUserRepository(UserRepository):
             models = list(result.scalars().all())
             return self._to_domain_list(models)
 
-    async def get_users_by_role(self, role: UserRole) -> List[User]:
+    async def get_users_by_role(self, role: UserRole) -> list[User]:
         """Get all users with specific role."""
         async with self._session() as session:
             stmt = select(UserModel).where(UserModel.role == role)

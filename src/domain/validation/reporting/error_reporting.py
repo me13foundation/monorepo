@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..rules.base_rules import ValidationSeverity
 
@@ -33,32 +33,32 @@ class ErrorReport:
     priority: ErrorPriority
     severity: ValidationSeverity
     entity_type: str
-    entity_id: Optional[str]
+    entity_id: str | None
     field: str
     rule: str
     message: str
-    suggestion: Optional[str]
-    context: Dict[str, Any]
+    suggestion: str | None
+    context: dict[str, Any]
     timestamp: datetime
     source: str
     resolved: bool = False
-    resolution_notes: Optional[str] = None
+    resolution_notes: str | None = None
 
 
 @dataclass
 class ErrorSummary:
     total_errors: int
-    by_category: Dict[str, int]
-    by_priority: Dict[str, int]
-    by_severity: Dict[str, int]
-    critical_issues: List[ErrorReport] = field(default_factory=list)
+    by_category: dict[str, int]
+    by_priority: dict[str, int]
+    by_severity: dict[str, int]
+    critical_issues: list[ErrorReport] = field(default_factory=list)
 
 
 class ErrorReporter:
     """Minimal error reporter with typed summaries."""
 
     def __init__(self) -> None:
-        self._errors: List[ErrorReport] = []
+        self._errors: list[ErrorReport] = []
         self._counter = 0
 
     # ------------------------------------------------------------------ #
@@ -68,13 +68,13 @@ class ErrorReporter:
     def add_error(
         self,
         entity_type: str,
-        entity_id: Optional[str],
+        entity_id: str | None,
         field: str,
         rule: str,
         message: str,
         severity: ValidationSeverity = ValidationSeverity.ERROR,
-        suggestion: Optional[str] = None,
-        context: Optional[Dict[str, Any]] = None,
+        suggestion: str | None = None,
+        context: dict[str, Any] | None = None,
         source: str = "validation",
     ) -> ErrorReport:
         report = ErrorReport(
@@ -95,7 +95,7 @@ class ErrorReporter:
         self._errors.append(report)
         return report
 
-    def resolve_error(self, error_id: str, notes: Optional[str] = None) -> None:
+    def resolve_error(self, error_id: str, notes: str | None = None) -> None:
         for report in self._errors:
             if report.error_id == error_id:
                 report.resolved = True
@@ -118,10 +118,10 @@ class ErrorReporter:
             if err.timestamp >= cutoff and (include_resolved or not err.resolved)
         ]
 
-        by_category: Dict[str, int] = {}
-        by_priority: Dict[str, int] = {}
-        by_severity: Dict[str, int] = {}
-        critical: List[ErrorReport] = []
+        by_category: dict[str, int] = {}
+        by_priority: dict[str, int] = {}
+        by_severity: dict[str, int] = {}
+        critical: list[ErrorReport] = []
 
         for err in filtered:
             by_category.setdefault(err.category.value, 0)
@@ -145,7 +145,7 @@ class ErrorReporter:
             critical_issues=critical,
         )
 
-    def get_error_trends(self, time_range_hours: int = 24) -> List[Dict[str, Any]]:
+    def get_error_trends(self, time_range_hours: int = 24) -> list[dict[str, Any]]:
         summary = self.get_error_summary(time_range_hours=time_range_hours)
         return [
             {"category": category, "count": count}
@@ -196,6 +196,6 @@ __all__ = [
     "ErrorCategory",
     "ErrorPriority",
     "ErrorReport",
-    "ErrorSummary",
     "ErrorReporter",
+    "ErrorSummary",
 ]

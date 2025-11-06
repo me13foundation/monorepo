@@ -7,18 +7,15 @@ callbacks and components can rely on precise typing instead of raw dicts.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from typing import (
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
+    NotRequired,
     SupportsFloat,
     SupportsInt,
     TypeVar,
 )
 
-from typing_extensions import NotRequired, TypedDict
+from typing_extensions import TypedDict
 
 
 class SettingsState(TypedDict):
@@ -40,62 +37,62 @@ class ReviewQueueItem(TypedDict, total=False):
     entity_id: str
     status: str
     priority: str
-    quality_score: Optional[float]
+    quality_score: float | None
     issues: int
-    last_updated: Optional[str]
-    confidence_score: NotRequired[Optional[float]]
+    last_updated: str | None
+    confidence_score: NotRequired[float | None]
     phenotype_badges: NotRequired[Sequence[str]]
     summary: NotRequired[str]
 
 
 class HGVSInfo(TypedDict, total=False):
-    genomic: Optional[str]
-    protein: Optional[str]
-    cdna: Optional[str]
+    genomic: str | None
+    protein: str | None
+    cdna: str | None
 
 
 class VariantDetail(TypedDict, total=False):
-    id: Optional[int]
+    id: int | None
     variant_id: str
-    clinvar_id: Optional[str]
-    gene_symbol: Optional[str]
+    clinvar_id: str | None
+    gene_symbol: str | None
     chromosome: str
     position: int
     clinical_significance: str
     variant_type: str
-    allele_frequency: Optional[float]
-    gnomad_af: Optional[float]
+    allele_frequency: float | None
+    gnomad_af: float | None
     hgvs: HGVSInfo
-    condition: Optional[str]
-    review_status: Optional[str]
-    created_at: Optional[str]
-    updated_at: Optional[str]
+    condition: str | None
+    review_status: str | None
+    created_at: str | None
+    updated_at: str | None
 
 
 class PhenotypeSnapshot(TypedDict, total=False):
-    id: Optional[int]
+    id: int | None
     hpo_id: str
     name: str
-    category: Optional[str]
-    definition: Optional[str]
+    category: str | None
+    definition: str | None
     synonyms: Sequence[str]
-    frequency: Optional[str]
+    frequency: str | None
 
 
 class EvidenceSnapshot(TypedDict, total=False):
-    id: Optional[int]
+    id: int | None
     evidence_level: str
     evidence_type: str
     description: str
-    confidence_score: Optional[float]
-    clinical_significance: Optional[str]
-    source: Optional[str]
-    summary: Optional[str]
-    publication_id: Optional[int]
-    phenotype_id: Optional[int]
-    variant_id: Optional[int]
+    confidence_score: float | None
+    clinical_significance: str | None
+    source: str | None
+    summary: str | None
+    publication_id: int | None
+    phenotype_id: int | None
+    variant_id: int | None
     reviewed: bool
-    reviewer_notes: Optional[str]
+    reviewer_notes: str | None
 
 
 class ConflictSummary(TypedDict, total=False):
@@ -103,7 +100,7 @@ class ConflictSummary(TypedDict, total=False):
     severity: str
     message: str
     evidence_ids: Sequence[int]
-    suggested_action: Optional[str]
+    suggested_action: str | None
 
 
 class ProvenanceInfo(TypedDict, total=False):
@@ -111,8 +108,8 @@ class ProvenanceInfo(TypedDict, total=False):
 
 
 class AuditInfo(TypedDict, total=False):
-    last_updated_by: Optional[str]
-    last_updated_at: Optional[str]
+    last_updated_by: str | None
+    last_updated_at: str | None
     pending_actions: Sequence[str]
     total_annotations: int
 
@@ -122,8 +119,8 @@ class CuratedRecordDetail(TypedDict, total=False):
     phenotypes: Sequence[PhenotypeSnapshot]
     evidence: Sequence[EvidenceSnapshot]
     conflicts: Sequence[ConflictSummary]
-    provenance: Optional[ProvenanceInfo]
-    audit: Optional[AuditInfo]
+    provenance: ProvenanceInfo | None
+    audit: AuditInfo | None
 
 
 TQueueMapping = TypeVar("TQueueMapping", bound=Mapping[str, object])
@@ -132,14 +129,14 @@ TDetailMapping = TypeVar("TDetailMapping", bound=Mapping[str, object])
 
 def coerce_queue_items(
     raw_items: Iterable[TQueueMapping],
-) -> List[ReviewQueueItem]:
+) -> list[ReviewQueueItem]:
     """
     Convert raw queue payloads into typed queue items.
 
     Raises:
         ValueError: if required keys are missing or types mismatch.
     """
-    items: List[ReviewQueueItem] = []
+    items: list[ReviewQueueItem] = []
     for raw in raw_items:
         try:
             item = ReviewQueueItem(
@@ -266,7 +263,7 @@ def coerce_curated_detail(payload: TDetailMapping) -> CuratedRecordDetail:
     )
 
 
-def _maybe_float(value: object) -> Optional[float]:
+def _maybe_float(value: object) -> float | None:
     if value is None:
         return None
     if isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -284,7 +281,7 @@ def _maybe_float(value: object) -> Optional[float]:
     return None
 
 
-def _maybe_int(value: object) -> Optional[int]:
+def _maybe_int(value: object) -> int | None:
     if value is None:
         return None
     if isinstance(value, bool):
@@ -304,7 +301,7 @@ def _maybe_int(value: object) -> Optional[int]:
     return None
 
 
-def _maybe_str(value: object) -> Optional[str]:
+def _maybe_str(value: object) -> str | None:
     return str(value) if value is not None else None
 
 

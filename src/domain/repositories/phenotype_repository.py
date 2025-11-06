@@ -6,11 +6,11 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from .base import Repository
-from ..entities.phenotype import Phenotype
-from ...type_definitions.common import PhenotypeUpdate
+from src.domain.entities.phenotype import Phenotype
+from src.domain.repositories.base import Repository
+from src.type_definitions.common import PhenotypeUpdate
 
 
 class PhenotypeRepository(Repository[Phenotype, int]):
@@ -22,39 +22,33 @@ class PhenotypeRepository(Repository[Phenotype, int]):
     """
 
     @abstractmethod
-    def find_by_hpo_id(self, hpo_id: str) -> Optional[Phenotype]:
+    def find_by_hpo_id(self, hpo_id: str) -> Phenotype | None:
         """Find a phenotype by its HPO ID."""
-        pass
 
     @abstractmethod
-    def find_by_name(self, name: str, fuzzy: bool = False) -> List[Phenotype]:
+    def find_by_name(self, name: str, *, fuzzy: bool = False) -> list[Phenotype]:
         """Find phenotypes by name (exact or fuzzy match)."""
-        pass
 
     @abstractmethod
-    def find_by_gene_associations(self, gene_id: int) -> List[Phenotype]:
+    def find_by_gene_associations(self, gene_id: int) -> list[Phenotype]:
         """Find phenotypes associated with a gene."""
-        pass
 
     @abstractmethod
-    def find_by_variant_associations(self, variant_id: int) -> List[Phenotype]:
+    def find_by_variant_associations(self, variant_id: int) -> list[Phenotype]:
         """Find phenotypes associated with a variant."""
-        pass
 
     @abstractmethod
-    def find_by_category(self, category: str) -> List[Phenotype]:
+    def find_by_category(self, category: str) -> list[Phenotype]:
         """Find phenotypes by category."""
-        pass
 
     @abstractmethod
     def search_phenotypes(
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Phenotype]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Phenotype]:
         """Search phenotypes with optional filters."""
-        pass
 
     @abstractmethod
     def paginate_phenotypes(
@@ -63,27 +57,25 @@ class PhenotypeRepository(Repository[Phenotype, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Phenotype], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Phenotype], int]:
         """Retrieve paginated phenotypes with optional filters."""
-        pass
 
     @abstractmethod
     def get_phenotype_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about phenotypes in the repository."""
-        pass
 
     @abstractmethod
-    def find_by_ontology_term(self, term_id: str) -> Optional[Phenotype]:
+    def find_by_ontology_term(self, term_id: str) -> Phenotype | None:
         """Find a phenotype by ontology term ID."""
-        pass
 
     @abstractmethod
     def update_phenotype(
-        self, phenotype_id: int, updates: PhenotypeUpdate
+        self,
+        phenotype_id: int,
+        updates: PhenotypeUpdate,
     ) -> Phenotype:
         """Update a phenotype with type-safe update parameters."""
-        pass
 
 
 __all__ = ["PhenotypeRepository"]

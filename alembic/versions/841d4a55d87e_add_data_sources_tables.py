@@ -5,17 +5,23 @@ Revises: add_curation_tables_20251102
 Create Date: 2025-11-02 23:04:35.809964
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import sqlalchemy as sa
 
+from alembic import op
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
 revision: str = "841d4a55d87e"
-down_revision: Union[str, Sequence[str], None] = "add_curation_tables_20251102"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "add_curation_tables_20251102"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -101,7 +107,10 @@ def upgrade() -> None:
         sa.Column("version", sa.String(20), nullable=False),
         sa.Column("compatibility_version", sa.String(20), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.Column(
             "updated_at",
@@ -115,15 +124,21 @@ def upgrade() -> None:
 
     # Create indexes for source_templates
     op.create_index(
-        "ix_source_templates_created_by", "source_templates", ["created_by"]
+        "ix_source_templates_created_by",
+        "source_templates",
+        ["created_by"],
     )
     op.create_index("ix_source_templates_category", "source_templates", ["category"])
     op.create_index(
-        "ix_source_templates_source_type", "source_templates", ["source_type"]
+        "ix_source_templates_source_type",
+        "source_templates",
+        ["source_type"],
     )
     op.create_index("ix_source_templates_is_public", "source_templates", ["is_public"])
     op.create_index(
-        "ix_source_templates_is_approved", "source_templates", ["is_approved"]
+        "ix_source_templates_is_approved",
+        "source_templates",
+        ["is_approved"],
     )
 
     # Create user_data_sources table
@@ -143,7 +158,10 @@ def upgrade() -> None:
         sa.Column("tags", sa.JSON(), nullable=False),
         sa.Column("version", sa.String(20), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.Column(
             "updated_at",
@@ -154,18 +172,24 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(
-            ["template_id"], ["source_templates.id"], ondelete="SET NULL"
+            ["template_id"],
+            ["source_templates.id"],
+            ondelete="SET NULL",
         ),
     )
 
     # Create indexes for user_data_sources
     op.create_index("ix_user_data_sources_owner_id", "user_data_sources", ["owner_id"])
     op.create_index(
-        "ix_user_data_sources_source_type", "user_data_sources", ["source_type"]
+        "ix_user_data_sources_source_type",
+        "user_data_sources",
+        ["source_type"],
     )
     op.create_index("ix_user_data_sources_status", "user_data_sources", ["status"])
     op.create_index(
-        "ix_user_data_sources_template_id", "user_data_sources", ["template_id"]
+        "ix_user_data_sources_template_id",
+        "user_data_sources",
+        ["template_id"],
     )
 
     # Create ingestion_jobs table
@@ -185,7 +209,10 @@ def upgrade() -> None:
         sa.Column("metadata", sa.JSON(), nullable=False),
         sa.Column("source_config_snapshot", sa.JSON(), nullable=False),
         sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.func.now(), nullable=False
+            "created_at",
+            sa.DateTime(),
+            server_default=sa.func.now(),
+            nullable=False,
         ),
         sa.Column(
             "updated_at",
@@ -196,17 +223,23 @@ def upgrade() -> None:
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.ForeignKeyConstraint(
-            ["source_id"], ["user_data_sources.id"], ondelete="CASCADE"
+            ["source_id"],
+            ["user_data_sources.id"],
+            ondelete="CASCADE",
         ),
     )
 
     # Create indexes for ingestion_jobs
     op.create_index("ix_ingestion_jobs_source_id", "ingestion_jobs", ["source_id"])
     op.create_index(
-        "ix_ingestion_jobs_triggered_by", "ingestion_jobs", ["triggered_by"]
+        "ix_ingestion_jobs_triggered_by",
+        "ingestion_jobs",
+        ["triggered_by"],
     )
     op.create_index(
-        "ix_ingestion_jobs_triggered_at", "ingestion_jobs", ["triggered_at"]
+        "ix_ingestion_jobs_triggered_at",
+        "ingestion_jobs",
+        ["triggered_at"],
     )
     op.create_index("ix_ingestion_jobs_status", "ingestion_jobs", ["status"])
 

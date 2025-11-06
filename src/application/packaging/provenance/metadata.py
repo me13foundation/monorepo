@@ -7,11 +7,12 @@ licensing details, and FAIR compliance annotations.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-from typing import Dict, List, Any, Optional, cast
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
 
-from src.models.value_objects.provenance import Provenance
+if TYPE_CHECKING:
+    from src.models.value_objects.provenance import Provenance
 
 
 @dataclass
@@ -21,43 +22,43 @@ class DatasetMetadata:
     # Core metadata
     title: str
     description: str
-    creators: List[Dict[str, Any]] = field(default_factory=list)
-    contributors: List[Dict[str, Any]] = field(default_factory=list)
-    keywords: List[str] = field(default_factory=list)
+    creators: list[dict[str, Any]] = field(default_factory=list)
+    contributors: list[dict[str, Any]] = field(default_factory=list)
+    keywords: list[str] = field(default_factory=list)
 
     # Temporal metadata
-    date_created: Optional[datetime] = None
-    date_modified: Optional[datetime] = None
-    date_published: Optional[datetime] = None
-    temporal_coverage: Optional[Dict[str, Any]] = None
+    date_created: datetime | None = None
+    date_modified: datetime | None = None
+    date_published: datetime | None = None
+    temporal_coverage: dict[str, Any] | None = None
 
     # Spatial metadata
-    spatial_coverage: Optional[Dict[str, Any]] = None
+    spatial_coverage: dict[str, Any] | None = None
 
     # Licensing and rights
-    license_url: Optional[str] = None
-    rights_statement: Optional[str] = None
+    license_url: str | None = None
+    rights_statement: str | None = None
     access_rights: str = "public"
 
     # FAIR metadata
-    conforms_to: List[str] = field(
+    conforms_to: list[str] = field(
         default_factory=lambda: [
             "https://w3id.org/ro/crate/1.1",
             "https://www.go-fair.org/fair-principles/",
-        ]
+        ],
     )
 
     # Technical metadata
-    encoding_format: Optional[str] = None
-    compression_format: Optional[str] = None
-    byte_size: Optional[int] = None
+    encoding_format: str | None = None
+    compression_format: str | None = None
+    byte_size: int | None = None
 
     # Provenance metadata
-    provenance: Optional[Provenance] = None
+    provenance: Provenance | None = None
 
-    def to_ro_crate_metadata(self) -> Dict[str, Any]:
+    def to_ro_crate_metadata(self) -> dict[str, Any]:
         """Convert to RO-Crate metadata format."""
-        metadata: Dict[str, Any] = {
+        metadata: dict[str, Any] = {
             "@context": ["https://w3id.org/ro/crate/1.1/context", {"@base": None}],
             "@graph": [
                 {
@@ -86,7 +87,7 @@ class DatasetMetadata:
             ],
         }
 
-        graph_nodes = cast(List[Dict[str, Any]], metadata["@graph"])
+        graph_nodes = cast("list[dict[str, Any]]", metadata["@graph"])
 
         # Add creators
         if self.creators:
@@ -139,18 +140,21 @@ class MetadataEnricher:
     """Service for enriching dataset metadata."""
 
     def __init__(self) -> None:
-        self.templates: Dict[str, DatasetMetadata] = {}
+        self.templates: dict[str, DatasetMetadata] = {}
 
     def create_base_metadata(
         self,
         title: str,
         description: str,
-        creators: List[Dict[str, Any]],
+        creators: list[dict[str, Any]],
         **kwargs: Any,
     ) -> DatasetMetadata:
         """Create base metadata with standard FAIR fields."""
         metadata = DatasetMetadata(
-            title=title, description=description, creators=creators, **kwargs
+            title=title,
+            description=description,
+            creators=creators,
+            **kwargs,
         )
 
         # Add FAIR compliance info
@@ -161,8 +165,8 @@ class MetadataEnricher:
     def enrich_for_publication(
         self,
         metadata: DatasetMetadata,
-        doi: Optional[str] = None,
-        publication_date: Optional[datetime] = None,
+        doi: str | None = None,
+        publication_date: datetime | None = None,
     ) -> DatasetMetadata:
         """Enrich metadata for publication."""
         metadata.date_published = publication_date or datetime.now(UTC)
@@ -174,7 +178,7 @@ class MetadataEnricher:
 
         return metadata
 
-    def validate_metadata_completeness(self, metadata: DatasetMetadata) -> List[str]:
+    def validate_metadata_completeness(self, metadata: DatasetMetadata) -> list[str]:
         """Validate that metadata meets minimum completeness requirements."""
         issues = []
 

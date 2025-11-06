@@ -4,10 +4,13 @@ JWT token provider for MED13 Resource Library.
 Provides secure JWT token creation, validation, and management.
 """
 
-import jwt
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, cast
+import secrets
+import string
+from datetime import UTC, datetime, timedelta
+from typing import Any, cast
 from uuid import UUID
+
+import jwt
 
 
 class JWTProvider:
@@ -21,6 +24,8 @@ class JWTProvider:
     - Access and refresh token support
     """
 
+    MIN_SECRET_LEN: int = 32
+
     def __init__(self, secret_key: str, algorithm: str = "HS256"):
         """
         Initialize JWT provider.
@@ -33,11 +38,17 @@ class JWTProvider:
         self.algorithm = algorithm
 
         # Validate secret key strength
-        if not secret_key or len(secret_key) < 32:
-            raise ValueError("JWT secret key must be at least 32 characters long")
+        if not secret_key or len(secret_key) < self.MIN_SECRET_LEN:
+            message = (
+                f"JWT secret key must be at least {self.MIN_SECRET_LEN} characters long"
+            )
+            raise ValueError(message)
 
     def create_access_token(
-        self, user_id: UUID, role: str, expires_delta: Optional[timedelta] = None
+        self,
+        user_id: UUID,
+        role: str,
+        expires_delta: timedelta | None = None,
     ) -> str:
         """
         Create a JWT access token.
@@ -53,21 +64,23 @@ class JWTProvider:
         if expires_delta is None:
             expires_delta = timedelta(minutes=15)  # Short-lived access tokens
 
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
 
         to_encode = {
             "sub": str(user_id),
             "role": role,
             "type": "access",
             "exp": expire,
-            "iat": datetime.utcnow(),
+            "iat": datetime.now(UTC),
             "iss": "med13-resource-library",
         }
 
         return self._encode_token(to_encode)
 
     def create_refresh_token(
-        self, user_id: UUID, expires_delta: Optional[timedelta] = None
+        self,
+        user_id: UUID,
+        expires_delta: timedelta | None = None,
     ) -> str:
         """
         Create a JWT refresh token.
@@ -82,19 +95,19 @@ class JWTProvider:
         if expires_delta is None:
             expires_delta = timedelta(days=7)  # Long-lived refresh tokens
 
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
 
         to_encode = {
             "sub": str(user_id),
             "type": "refresh",
             "exp": expire,
-            "iat": datetime.utcnow(),
+            "iat": datetime.now(UTC),
             "iss": "med13-resource-library",
         }
 
         return self._encode_token(to_encode)
 
-    def decode_token(self, token: str) -> Dict[str, Any]:
+    def decode_token(self, token: str) -> dict[str, Any]:
         """
         Decode and validate a JWT token.
 
@@ -118,16 +131,20 @@ class JWTProvider:
             # Additional validation
             self._validate_payload(payload)
 
-            return cast(Dict[str, Any], payload)
+            return cast("dict[str, Any]", payload)
 
-        except jwt.ExpiredSignatureError:
-            raise ValueError("Token has expired")
-        except jwt.InvalidTokenError as e:
-            raise ValueError(f"Invalid token: {str(e)}")
-        except jwt.InvalidIssuerError:
-            raise ValueError("Invalid token issuer")
-        except Exception as e:
-            raise ValueError(f"Token validation failed: {str(e)}")
+        except jwt.ExpiredSignatureError as exc:
+            message = "Token has expired"
+            raise ValueError(message) from exc
+        except jwt.InvalidTokenError as exc:
+            message = f"Invalid token: {exc!s}"
+            raise ValueError(message) from exc
+        except jwt.InvalidIssuerError as exc:
+            message = "Invalid token issuer"
+            raise ValueError(message) from exc
+        except Exception as exc:
+            message = f"Token validation failed: {exc!s}"
+            raise ValueError(message) from exc
 
     def get_token_expiration(self, token: str) -> datetime:
         """
@@ -145,15 +162,16 @@ class JWTProvider:
         try:
             # Decode without verification to get expiration
             payload = jwt.decode(token, options={"verify_signature": False})
+        except Exception as exc:
+            message = f"Cannot parse token expiration: {exc!s}"
+            raise ValueError(message) from exc
 
-            exp_timestamp = payload.get("exp")
-            if not exp_timestamp:
-                raise ValueError("Token has no expiration")
+        exp_timestamp = payload.get("exp")
+        if not exp_timestamp:
+            message = "Token has no expiration"
+            raise ValueError(message)
 
-            return datetime.fromtimestamp(exp_timestamp)
-
-        except Exception as e:
-            raise ValueError(f"Cannot parse token expiration: {str(e)}")
+        return datetime.fromtimestamp(exp_timestamp, tz=UTC)
 
     def is_token_expired(self, token: str) -> bool:
         """
@@ -167,11 +185,11 @@ class JWTProvider:
         """
         try:
             expiration = self.get_token_expiration(token)
-            return datetime.utcnow() > expiration
+            return datetime.now(UTC) > expiration
         except ValueError:
             return True  # Treat unparseable tokens as expired
 
-    def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
+    def refresh_access_token(self, refresh_token: str) -> dict[str, Any]:
         """
         Create new access token from valid refresh token.
 
@@ -188,7 +206,8 @@ class JWTProvider:
         payload = self.decode_token(refresh_token)
 
         if payload.get("type") != "refresh":
-            raise ValueError("Invalid token type")
+            message = "Invalid token type"
+            raise ValueError(message)
 
         user_id = UUID(payload["sub"])
         role = payload.get("role", "viewer")  # Default role if not in refresh token
@@ -206,7 +225,7 @@ class JWTProvider:
             "role": role,
         }
 
-    def _encode_token(self, payload: Dict[str, Any]) -> str:
+    def _encode_token(self, payload: dict[str, Any]) -> str:
         """
         Encode payload into JWT token.
 
@@ -218,10 +237,11 @@ class JWTProvider:
         """
         try:
             return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
-        except Exception as e:
-            raise ValueError(f"Token encoding failed: {str(e)}")
+        except Exception as exc:
+            message = f"Token encoding failed: {exc!s}"
+            raise ValueError(message) from exc
 
-    def _validate_payload(self, payload: Dict[str, Any]) -> None:
+    def _validate_payload(self, payload: dict[str, Any]) -> None:
         """
         Validate decoded token payload.
 
@@ -235,21 +255,25 @@ class JWTProvider:
 
         for field in required_fields:
             if field not in payload:
-                raise ValueError(f"Token missing required field: {field}")
+                message = f"Token missing required field: {field}"
+                raise ValueError(message)
 
         # Validate subject (user ID)
         try:
             UUID(payload["sub"])
-        except (ValueError, TypeError):
-            raise ValueError("Invalid user ID in token")
+        except (ValueError, TypeError) as exc:
+            message = "Invalid user ID in token"
+            raise ValueError(message) from exc
 
         # Validate token type
         if payload["type"] not in ["access", "refresh"]:
-            raise ValueError("Invalid token type")
+            message = "Invalid token type"
+            raise ValueError(message)
 
         # Validate issuer
         if payload["iss"] != "med13-resource-library":
-            raise ValueError("Invalid token issuer")
+            message = "Invalid token issuer"
+            raise ValueError(message)
 
         # Additional security checks can be added here
         # - Check if user still exists and is active
@@ -267,8 +291,5 @@ class JWTProvider:
         Returns:
             Secure random string
         """
-        import secrets
-        import string
-
         alphabet = string.ascii_letters + string.digits + string.punctuation
         return "".join(secrets.choice(alphabet) for _ in range(length))

@@ -6,9 +6,10 @@ Implements token bucket algorithm for rate limiting based on client IP.
 
 import time
 from collections import defaultdict
-from typing import Any, Awaitable, Callable, DefaultDict, Dict, List, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from fastapi import Request, HTTPException, status
+from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -54,18 +55,21 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app: Callable[..., Any],
-        exclude_paths: Optional[List[str]] = None,
+        exclude_paths: list[str] | None = None,
     ) -> None:
         super().__init__(app)
-        self.exclude_paths: List[str] = exclude_paths or ["/health/"]
-        self.buckets: DefaultDict[str, TokenBucket] = defaultdict(
+        self.exclude_paths: list[str] = exclude_paths or ["/health/"]
+        self.buckets: defaultdict[str, TokenBucket] = defaultdict(
             lambda: TokenBucket(
-                capacity=100, refill_rate=10
-            )  # 100 requests, 10 per second
+                capacity=100,
+                refill_rate=10,
+            ),  # 100 requests, 10 per second
         )
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Process each request through rate limiting middleware."""
 
@@ -97,7 +101,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         response.headers["X-RateLimit-Limit"] = str(bucket.capacity)
         response.headers["X-RateLimit-Reset"] = str(
-            int(bucket.last_refill + bucket.capacity / bucket.refill_rate)
+            int(bucket.last_refill + bucket.capacity / bucket.refill_rate),
         )
 
         return response
@@ -116,8 +120,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return real_ip
 
         # Fall back to direct client IP
-        client_host = getattr(request.client, "host", "unknown")
-        return client_host
+        return getattr(request.client, "host", "unknown")
 
 
 class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
@@ -127,23 +130,25 @@ class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
         # Different limits for different endpoints
-        self.endpoint_limits: Dict[str, DefaultDict[str, TokenBucket]] = {
+        self.endpoint_limits: dict[str, defaultdict[str, TokenBucket]] = {
             "GET": defaultdict(
-                lambda: TokenBucket(capacity=200, refill_rate=20)
+                lambda: TokenBucket(capacity=200, refill_rate=20),
             ),  # 200 req, 20/sec
             "POST": defaultdict(
-                lambda: TokenBucket(capacity=50, refill_rate=5)
+                lambda: TokenBucket(capacity=50, refill_rate=5),
             ),  # 50 req, 5/sec
             "PUT": defaultdict(
-                lambda: TokenBucket(capacity=50, refill_rate=5)
+                lambda: TokenBucket(capacity=50, refill_rate=5),
             ),  # 50 req, 5/sec
             "DELETE": defaultdict(
-                lambda: TokenBucket(capacity=20, refill_rate=2)
+                lambda: TokenBucket(capacity=20, refill_rate=2),
             ),  # 20 req, 2/sec
         }
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Apply different rate limits based on HTTP method."""
 

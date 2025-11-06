@@ -1,28 +1,29 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy.orm import Session
-
-from src.domain.entities.variant import (
-    ClinicalSignificance,
-    Variant,
-    VariantSummary,
-)
+from src.domain.entities.variant import ClinicalSignificance, VariantSummary
 from src.domain.repositories.variant_repository import (
     VariantRepository as VariantRepositoryInterface,
 )
-from src.type_definitions.common import VariantUpdate
-from src.domain.repositories.base import QuerySpecification
 from src.infrastructure.mappers.variant_mapper import VariantMapper
 from src.repositories.variant_repository import VariantRepository
-from src.models.database.variant import ClinicalSignificance as DbClinicalSignificance
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from sqlalchemy.orm import Session
+
+    from src.domain.entities.variant import Variant
+    from src.domain.repositories.base import QuerySpecification
+    from src.models.database.variant import (
+        ClinicalSignificance as DbClinicalSignificance,
+    )
+    from src.type_definitions.common import VariantUpdate
 
 
 class SqlAlchemyVariantRepository(VariantRepositoryInterface):
     """Domain-facing repository adapter for variants backed by SQLAlchemy."""
 
-    def __init__(self, session: Optional[Session] = None) -> None:
+    def __init__(self, session: Session | None = None) -> None:
         self._session = session
         self._repository = VariantRepository(session)
 
@@ -31,7 +32,7 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         persisted = self._repository.create(model)
         return VariantMapper.to_domain(persisted)
 
-    def get_by_id(self, variant_id: int) -> Optional[Variant]:
+    def get_by_id(self, variant_id: int) -> Variant | None:
         model = self._repository.get_by_id(variant_id)
         return VariantMapper.to_domain(model) if model else None
 
@@ -39,56 +40,63 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         model = self._repository.get_by_id_or_fail(variant_id)
         return VariantMapper.to_domain(model)
 
-    def find_by_variant_id(self, variant_id: str) -> Optional[Variant]:
+    def find_by_variant_id(self, variant_id: str) -> Variant | None:
         model = self._repository.find_by_variant_id(variant_id)
         return VariantMapper.to_domain(model) if model else None
 
-    def find_by_clinvar_id(self, clinvar_id: str) -> Optional[Variant]:
+    def find_by_clinvar_id(self, clinvar_id: str) -> Variant | None:
         model = self._repository.find_by_clinvar_id(clinvar_id)
         return VariantMapper.to_domain(model) if model else None
 
-    def find_by_gene(self, gene_id: int, limit: Optional[int] = None) -> List[Variant]:
+    def find_by_gene(self, gene_id: int, limit: int | None = None) -> list[Variant]:
         models = self._repository.find_by_gene(gene_id, limit=limit)
         return VariantMapper.to_domain_sequence(models)
 
     def find_by_genomic_location(
-        self, chromosome: str, start_pos: int, end_pos: int
-    ) -> List[Variant]:
+        self,
+        chromosome: str,
+        start_pos: int,
+        end_pos: int,
+    ) -> list[Variant]:
         models = self._repository.find_by_genomic_location(
-            chromosome, start_pos, end_pos
+            chromosome,
+            start_pos,
+            end_pos,
         )
         return VariantMapper.to_domain_sequence(models)
 
     def find_by_clinical_significance(
-        self, significance: str, limit: Optional[int] = None
-    ) -> List[Variant]:
+        self,
+        significance: str,
+        limit: int | None = None,
+    ) -> list[Variant]:
         normalized = ClinicalSignificance.validate(significance)
-        db_significance = cast(DbClinicalSignificance, normalized)
+        db_significance = cast("DbClinicalSignificance", normalized)
         models = self._repository.find_by_clinical_significance(db_significance, limit)
         return VariantMapper.to_domain_sequence(models)
 
-    def find_pathogenic_variants(self, limit: Optional[int] = None) -> List[Variant]:
+    def find_pathogenic_variants(self, limit: int | None = None) -> list[Variant]:
         models = self._repository.find_pathogenic_variants(limit)
         return VariantMapper.to_domain_sequence(models)
 
-    def find_with_evidence(self, variant_id: int) -> Optional[Variant]:
+    def find_with_evidence(self, variant_id: int) -> Variant | None:
         model = self._repository.find_with_evidence(variant_id)
         return VariantMapper.to_domain(model) if model else None
 
-    def update(self, variant_id: int, updates: Dict[str, Any]) -> Variant:
+    def update(self, variant_id: int, updates: dict[str, Any]) -> Variant:
         model = self._repository.update(variant_id, updates)
         return VariantMapper.to_domain(model)
 
     def delete(self, variant_id: int) -> bool:
         return self._repository.delete(variant_id)
 
-    def get_variant_statistics(self) -> Dict[str, int | float | bool | str | None]:
+    def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
         raw_stats = self._repository.get_variant_statistics()
-        typed_stats: Dict[str, int | float | bool | str | None] = {}
-        for key, value in raw_stats.items():
-            if isinstance(value, (int, float, bool, str)) or value is None:
-                typed_stats[key] = value
-        return typed_stats
+        return {
+            key: value
+            for key, value in raw_stats.items()
+            if isinstance(value, (int, float, bool, str)) or value is None
+        }
 
     def count(self) -> int:
         return self._repository.count()
@@ -98,42 +106,46 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         return self._repository.exists(variant_id)
 
     def find_all(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
-    ) -> List[Variant]:
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[Variant]:
         models = self._repository.find_all(limit=limit, offset=offset)
         return VariantMapper.to_domain_sequence(models)
 
     def find_by_chromosome_position(
-        self, chromosome: str, position: int
-    ) -> List[Variant]:
+        self,
+        chromosome: str,
+        position: int,
+    ) -> list[Variant]:
         models = self._repository.find_by_genomic_location(
-            chromosome, position, position
+            chromosome,
+            position,
+            position,
         )
         return VariantMapper.to_domain_sequence(models)
 
-    def find_by_criteria(self, spec: QuerySpecification) -> List[Variant]:
+    def find_by_criteria(self, spec: QuerySpecification) -> list[Variant]:
         # Simplified implementation - would need more complex query building
         models = self._repository.find_all(limit=spec.limit, offset=spec.offset)
         return VariantMapper.to_domain_sequence(models)
 
-    def find_by_gene_symbol(self, gene_symbol: str) -> List[Variant]:
+    def find_by_gene_symbol(self, gene_symbol: str) -> list[Variant]:
         models = self._repository.find_by_gene_symbol(gene_symbol)
         return VariantMapper.to_domain_sequence(models)
 
-    def get_variant_summaries_by_gene(self, gene_id: int) -> List[VariantSummary]:
+    def get_variant_summaries_by_gene(self, gene_id: int) -> list[VariantSummary]:
         models = self._repository.find_by_gene(gene_id)
-        summaries: List[VariantSummary] = []
-        for model in models:
-            summaries.append(
-                VariantSummary(
-                    variant_id=model.variant_id,
-                    clinvar_id=model.clinvar_id,
-                    chromosome=model.chromosome,
-                    position=model.position,
-                    clinical_significance=model.clinical_significance,
-                )
+        return [
+            VariantSummary(
+                variant_id=model.variant_id,
+                clinvar_id=model.clinvar_id,
+                chromosome=model.chromosome,
+                position=model.position,
+                clinical_significance=model.clinical_significance,
             )
-        return summaries
+            for model in models
+        ]
 
     def paginate_variants(
         self,
@@ -141,9 +153,16 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Variant], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Variant], int]:
         # Simplified implementation
+        # Parameters retained for API compatibility
+        if sort_by:
+            _ = sort_by
+        if sort_order:
+            _ = sort_order
+        if filters:
+            _ = filters
         offset = (page - 1) * per_page
         models = self._repository.find_all(limit=per_page, offset=offset)
         total = self._repository.count()
@@ -153,9 +172,13 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Variant]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Variant]:
         # Simplified implementation
+        if query:
+            _ = query
+        if filters:
+            _ = filters
         models = self._repository.find_all(limit=limit)
         return VariantMapper.to_domain_sequence(models)
 

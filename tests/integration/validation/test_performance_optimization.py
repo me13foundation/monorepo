@@ -5,20 +5,21 @@ Tests caching, parallel processing, and selective validation
 optimizations for performance improvements.
 """
 
-import pytest
 import asyncio
 import time
 
-from src.domain.validation.rules.base_rules import ValidationRuleEngine
-from src.domain.validation.optimization.caching import ValidationCache, CacheConfig
+import pytest
+
+from src.domain.validation.optimization.caching import CacheConfig, ValidationCache
 from src.domain.validation.optimization.parallel_processing import (
-    ParallelValidator,
     ParallelConfig,
+    ParallelValidator,
 )
 from src.domain.validation.optimization.selective_validation import (
-    SelectiveValidator,
     SelectionStrategy,
+    SelectiveValidator,
 )
+from src.domain.validation.rules.base_rules import ValidationRuleEngine
 from src.domain.validation.testing.performance_benchmark import PerformanceBenchmark
 from src.domain.validation.testing.test_data_generator import TestDataGenerator
 
@@ -136,14 +137,15 @@ class TestParallelProcessingOptimization:
         # Test parallel validation
         start_time = time.time()
         parallel_results = await self.parallel_validator.validate_batch_parallel(
-            "gene", gene_dataset.data
+            "gene",
+            gene_dataset.data,
         )
         parallel_time = time.time() - start_time
 
         # Verify results are equivalent
         assert len(sequential_results) == len(parallel_results)
 
-        for seq, par in zip(sequential_results, parallel_results):
+        for seq, par in zip(sequential_results, parallel_results, strict=False):
             assert seq.is_valid == par.is_valid
             assert abs(seq.score - par.score) < 0.01  # Allow small differences
 
@@ -158,7 +160,8 @@ class TestParallelProcessingOptimization:
         small_data = [{"symbol": "TP53", "source": "test"}]
 
         result = await self.parallel_validator.validate_with_adaptive_parallelism(
-            "gene", small_data
+            "gene",
+            small_data,
         )
         assert len(result) == 1
 
@@ -167,7 +170,8 @@ class TestParallelProcessingOptimization:
         large_dataset = data_generator.generate_gene_dataset(50, "good")
 
         results = await self.parallel_validator.validate_with_adaptive_parallelism(
-            "gene", large_dataset.data
+            "gene",
+            large_dataset.data,
         )
         assert len(results) == 50
 
@@ -198,13 +202,15 @@ class TestSelectiveValidationOptimization:
         """Set up test fixtures."""
         self.rule_engine = ValidationRuleEngine()
         self.selective_validator = SelectiveValidator(
-            self.rule_engine, SelectionStrategy.ADAPTIVE
+            self.rule_engine,
+            SelectionStrategy.ADAPTIVE,
         )
 
     def test_confidence_based_selection(self):
         """Test confidence-based rule selection."""
         validator = SelectiveValidator(
-            self.rule_engine, SelectionStrategy.CONFIDENCE_BASED
+            self.rule_engine,
+            SelectionStrategy.CONFIDENCE_BASED,
         )
 
         # High confidence data
@@ -244,7 +250,7 @@ class TestSelectiveValidationOptimization:
             entity_types=["gene"],
             required_rules=["hgnc_nomenclature"],
             skip_conditions=[
-                {"field": "source", "operator": "equals", "value": "low_quality"}
+                {"field": "source", "operator": "equals", "value": "low_quality"},
             ],
         )
 
@@ -279,7 +285,10 @@ class TestPerformanceBenchmarking:
         test_data = [{"symbol": "TP53", "source": "test"}]
 
         result = self.benchmark.benchmark_validation_rule(
-            "gene", "hgnc_nomenclature", test_data, 5
+            "gene",
+            "hgnc_nomenclature",
+            test_data,
+            5,
         )
 
         assert result.benchmark_name == "gene_hgnc_nomenclature_benchmark"
@@ -303,7 +312,9 @@ class TestPerformanceBenchmarking:
         batch_sizes = [10, 25]
 
         results = self.benchmark.benchmark_batch_processing(
-            "gene", batch_sizes, test_data
+            "gene",
+            batch_sizes,
+            test_data,
         )
 
         assert len(results) == len(batch_sizes)
@@ -338,7 +349,9 @@ class TestPerformanceBenchmarking:
         throughput = [10.0, 6.67, 8.33, 5.56, 9.09]
 
         metrics = self.benchmark._calculate_performance_metrics(
-            execution_times, memory_usage, throughput
+            execution_times,
+            memory_usage,
+            throughput,
         )
 
         assert abs(metrics.avg_execution_time - 0.132) < 0.01  # Approximate mean
@@ -376,7 +389,8 @@ class TestOptimizationIntegration:
         # First run - should cache results
         async def first_run():
             results = await self.parallel_validator.validate_batch_parallel(
-                "gene", gene_dataset.data
+                "gene",
+                gene_dataset.data,
             )
             # Cache results
             for i, result in enumerate(results):
@@ -388,7 +402,8 @@ class TestOptimizationIntegration:
         # Second run - should use cache where possible
         async def second_run():
             results = await self.parallel_validator.validate_batch_parallel(
-                "gene", gene_dataset.data
+                "gene",
+                gene_dataset.data,
             )
             return results
 
@@ -397,7 +412,7 @@ class TestOptimizationIntegration:
         # Results should be consistent
         assert len(first_results) == len(second_results)
 
-        for fr, sr in zip(first_results, second_results):
+        for fr, sr in zip(first_results, second_results, strict=False):
             assert fr.is_valid == sr.is_valid
             assert abs(fr.score - sr.score) < 0.01
 
@@ -433,7 +448,8 @@ class TestOptimizationIntegration:
             for entity in large_dataset.data:
                 # Apply selective validation first
                 selective_result = self.selective_validator.validate_selectively(
-                    "gene", entity
+                    "gene",
+                    entity,
                 )
 
                 # If not skipped by selective validation, it would go through

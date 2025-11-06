@@ -1,8 +1,5 @@
-from typing import Dict
-
-
 # Centralized color palette for the Dash UI
-COLORS: Dict[str, str] = {
+COLORS: dict[str, str] = {
     "primary": "#007bff",
     "secondary": "#6c757d",
     "success": "#28a745",

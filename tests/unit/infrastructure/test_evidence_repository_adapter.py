@@ -71,7 +71,7 @@ def seed_related_records(session):
 
 def test_evidence_repository_maps_domain(test_session):
     variant_model, phenotype_model, publication_model = seed_related_records(
-        test_session
+        test_session,
     )
     repository = SqlAlchemyEvidenceRepository(test_session)
 
@@ -89,7 +89,7 @@ def test_evidence_repository_maps_domain(test_session):
             hpo_term=phenotype_model.hpo_term,
         ),
         publication_identifier=PublicationIdentifier(
-            pubmed_id=publication_model.pubmed_id
+            pubmed_id=publication_model.pubmed_id,
         ),
     )
 

@@ -4,13 +4,14 @@ Unified Search API routes for MED13 Resource Library.
 Provides cross-entity search capabilities with relevance scoring.
 """
 
-from typing import Optional, List, Dict, Any, TYPE_CHECKING
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import TYPE_CHECKING, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from src.database.session import get_session
 from src.application.container import get_legacy_dependency_container
 from src.application.search.search_service import SearchEntity
+from src.database.session import get_session
 
 if TYPE_CHECKING:
     from src.application.search.search_service import UnifiedSearchService
@@ -29,12 +30,14 @@ def get_search_service(db: Session = Depends(get_session)) -> "UnifiedSearchServ
 @router.post("/", summary="Unified search across all entities")
 async def unified_search(
     query: str = Query(..., min_length=1, max_length=200, description="Search query"),
-    entity_types: Optional[List[SearchEntity]] = Query(
-        None, description="Entity types to search (defaults to all)"
+    entity_types: list[SearchEntity]
+    | None = Query(
+        None,
+        description="Entity types to search (defaults to all)",
     ),
     limit: int = Query(20, ge=1, le=100, description="Maximum results per entity type"),
     service: "UnifiedSearchService" = Depends(get_search_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Perform unified search across genes, variants, phenotypes, and evidence.
 
@@ -49,17 +52,20 @@ async def unified_search(
 
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {e!s}")
 
 
 @router.get("/suggest", summary="Search suggestions")
 async def search_suggestions(
     query: str = Query(
-        ..., min_length=1, max_length=50, description="Partial search query"
+        ...,
+        min_length=1,
+        max_length=50,
+        description="Partial search query",
     ),
     limit: int = Query(10, ge=1, le=20, description="Maximum suggestions"),
     service: "UnifiedSearchService" = Depends(get_search_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get search suggestions based on partial query input.
 
@@ -82,14 +88,15 @@ async def search_suggestions(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to get suggestions: {str(e)}"
+            status_code=500,
+            detail=f"Failed to get suggestions: {e!s}",
         )
 
 
 @router.get("/stats", summary="Search statistics")
 async def search_statistics(
     service: "UnifiedSearchService" = Depends(get_search_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get statistics about searchable entities in the system.
 
@@ -117,5 +124,6 @@ async def search_statistics(
         return stats
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to get search statistics: {str(e)}"
+            status_code=500,
+            detail=f"Failed to get search statistics: {e!s}",
         )

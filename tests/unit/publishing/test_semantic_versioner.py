@@ -14,7 +14,7 @@ class TestSemanticVersioner:
     def test_parse_version(self):
         """Test parsing version string."""
         major, minor, patch, prerelease, build = SemanticVersioner.parse_version(
-            "1.2.3"
+            "1.2.3",
         )
         assert major == 1
         assert minor == 2
@@ -24,8 +24,8 @@ class TestSemanticVersioner:
 
     def test_parse_version_with_prerelease(self):
         """Test parsing version with prerelease."""
-        major, minor, patch, prerelease, build = SemanticVersioner.parse_version(
-            "1.2.3-beta.1"
+        major, minor, patch, prerelease, _build = SemanticVersioner.parse_version(
+            "1.2.3-beta.1",
         )
         assert major == 1
         assert minor == 2
@@ -34,8 +34,8 @@ class TestSemanticVersioner:
 
     def test_parse_version_with_build(self):
         """Test parsing version with build metadata."""
-        major, minor, patch, prerelease, build = SemanticVersioner.parse_version(
-            "1.2.3+build.123"
+        _major, _minor, _patch, _prerelease, build = SemanticVersioner.parse_version(
+            "1.2.3+build.123",
         )
         assert build == "build.123"
 

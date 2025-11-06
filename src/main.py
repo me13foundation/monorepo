@@ -1,32 +1,34 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Any
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from typing import Dict, Any, AsyncGenerator
 
 from src.application.container import container, initialize_legacy_session
 from src.database.session import get_session
-from src.routes.health import router as health_router
-
-# Import models to ensure they're registered with SQLAlchemy
-from src.routes.resources import router as resources_router
-from src.routes.genes import router as genes_router
-from src.routes.variants import router as variants_router
-from src.routes.phenotypes import router as phenotypes_router
-from src.routes.evidence import router as evidence_router
-from src.routes.search import router as search_router
-from src.routes.export import router as export_router
-from src.routes.dashboard import router as dashboard_router
-from src.routes.admin import router as admin_router
-from src.routes.auth import auth_router
-from src.routes.users import users_router
 from src.middleware.auth import AuthMiddleware
 from src.middleware.jwt_auth import JWTAuthMiddleware
 from src.middleware.rate_limit import EndpointRateLimitMiddleware
+from src.routes.admin import router as admin_router
+from src.routes.auth import auth_router
 from src.routes.curation import router as curation_router
+from src.routes.dashboard import router as dashboard_router
+from src.routes.evidence import router as evidence_router
+from src.routes.export import router as export_router
+from src.routes.genes import router as genes_router
+from src.routes.health import router as health_router
+from src.routes.phenotypes import router as phenotypes_router
+
+# Import models to ensure they're registered with SQLAlchemy
+from src.routes.resources import router as resources_router
+from src.routes.search import router as search_router
+from src.routes.users import users_router
+from src.routes.variants import router as variants_router
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
     # Startup
     # Initialize legacy session for backward compatibility
@@ -87,7 +89,7 @@ def create_app() -> FastAPI:
 
     # Root endpoint
     @app.get("/", summary="Welcome to MED13 Resource Library", tags=["info"])
-    async def root() -> Dict[str, Any]:
+    async def root() -> dict[str, Any]:
         """Welcome endpoint with API information."""
         return {
             "message": "Welcome to the MED13 Resource Library API",

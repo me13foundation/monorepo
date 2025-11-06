@@ -1,7 +1,8 @@
+from collections.abc import Generator
+
 import pytest
-from typing import Generator
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.models.database import (
     Base,
@@ -18,8 +19,8 @@ def session() -> Generator[Session, None, None]:
     """Create an in-memory SQLite session for testing."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    db_session = SessionLocal()
+    session_local = sessionmaker(bind=engine)
+    db_session = session_local()
     try:
         yield db_session
     finally:

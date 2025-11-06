@@ -4,53 +4,58 @@ Provides common database operations following repository pattern.
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, List, Optional, Any, Dict, Type, Protocol
-from sqlalchemy import select, update, delete, func
-from sqlalchemy.orm import Session, DeclarativeBase
+from typing import Any, Generic, Protocol, TypeVar
+
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError, NoResultFound
+from sqlalchemy.orm import DeclarativeBase, Session
 
 from src.database.session import get_session
 
 T = TypeVar("T", bound=DeclarativeBase)  # Model type
-ID = TypeVar("ID", contravariant=True)  # ID type (contravariant for protocol)
+ID_contra = TypeVar("ID_contra", contravariant=True)  # ID type (contravariant)
 
 
-class RepositoryProtocol(Protocol[T, ID]):
+class RepositoryProtocol(Protocol[T, ID_contra]):
     """Protocol defining the repository interface."""
 
     @property
-    def model_class(self) -> Type[T]:
+    def model_class(self) -> type[T]:
         ...
 
-    def get_by_id(self, id: ID) -> Optional[T]:
+    def get_by_id(self, id: ID_contra) -> T | None:
         ...
 
-    def get_by_id_or_fail(self, id: ID) -> T:
+    def get_by_id_or_fail(self, id: ID_contra) -> T:
         ...
 
     def find_all(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
-    ) -> List[T]:
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[T]:
         ...
 
     def find_by_criteria(
-        self, criteria: Dict[str, Any], limit: Optional[int] = None
-    ) -> List[T]:
+        self,
+        criteria: dict[str, Any],
+        limit: int | None = None,
+    ) -> list[T]:
         ...
 
     def create(self, entity: T) -> T:
         ...
 
-    def update(self, id: ID, updates: Dict[str, Any]) -> T:
+    def update(self, id: ID_contra, updates: dict[str, Any]) -> T:
         ...
 
-    def delete(self, id: ID) -> bool:
+    def delete(self, id: ID_contra) -> bool:
         ...
 
     def count(self) -> int:
         ...
 
-    def exists(self, id: ID) -> bool:
+    def exists(self, id: ID_contra) -> bool:
         ...
 
     def save(self) -> None:
@@ -63,22 +68,16 @@ class RepositoryProtocol(Protocol[T, ID]):
 class RepositoryError(Exception):
     """Base exception for repository operations."""
 
-    pass
-
 
 class NotFoundError(RepositoryError):
     """Raised when an entity is not found."""
-
-    pass
 
 
 class DuplicateError(RepositoryError):
     """Raised when attempting to create a duplicate entity."""
 
-    pass
 
-
-class BaseRepository(Generic[T, ID], ABC):
+class BaseRepository(ABC, Generic[T, ID_contra]):
     """
     Base repository class providing common CRUD operations.
 
@@ -86,15 +85,14 @@ class BaseRepository(Generic[T, ID], ABC):
     and provides implementations for common database operations.
     """
 
-    def __init__(self, session: Optional[Session] = None):
+    def __init__(self, session: Session | None = None):
         """Initialize repository with optional session."""
         self._session = session
 
     @property
     @abstractmethod
-    def model_class(self) -> Type[T]:
+    def model_class(self) -> type[T]:
         """Return the SQLAlchemy model class for this repository."""
-        pass
 
     @property
     def session(self) -> Session:
@@ -104,28 +102,27 @@ class BaseRepository(Generic[T, ID], ABC):
             self._session = next(get_session())
         return self._session
 
-    def get_by_id(self, id: ID) -> Optional[T]:
+    def get_by_id(self, entity_id: ID_contra) -> T | None:
         """
         Retrieve an entity by its primary key.
 
         Args:
-            id: Primary key value
+            entity_id: Primary key value
 
         Returns:
             Entity instance or None if not found
         """
         stmt = select(self.model_class).where(
-            self.model_class.id == id  # type: ignore[attr-defined]
+            self.model_class.id == entity_id,  # type: ignore[attr-defined]
         )
-        result = self.session.execute(stmt).scalar_one_or_none()
-        return result
+        return self.session.execute(stmt).scalar_one_or_none()
 
-    def get_by_id_or_fail(self, id: ID) -> T:
+    def get_by_id_or_fail(self, entity_id: ID_contra) -> T:
         """
         Retrieve an entity by its primary key, raising NotFoundError if not found.
 
         Args:
-            id: Primary key value
+            entity_id: Primary key value
 
         Returns:
             Entity instance
@@ -133,14 +130,17 @@ class BaseRepository(Generic[T, ID], ABC):
         Raises:
             NotFoundError: If entity is not found
         """
-        entity = self.get_by_id(id)
+        entity = self.get_by_id(entity_id)
         if entity is None:
-            raise NotFoundError(f"{self.model_class.__name__} with id {id} not found")
+            message = f"{self.model_class.__name__} with id {entity_id} not found"
+            raise NotFoundError(message)
         return entity
 
     def find_all(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
-    ) -> List[T]:
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[T]:
         """
         Retrieve all entities with optional pagination.
 
@@ -159,8 +159,10 @@ class BaseRepository(Generic[T, ID], ABC):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_criteria(
-        self, criteria: Dict[str, Any], limit: Optional[int] = None
-    ) -> List[T]:
+        self,
+        criteria: dict[str, Any],
+        limit: int | None = None,
+    ) -> list[T]:
         """
         Find entities matching the given criteria.
 
@@ -201,15 +203,15 @@ class BaseRepository(Generic[T, ID], ABC):
         except IntegrityError as e:
             self.session.rollback()
             raise DuplicateError(
-                f"Duplicate {self.model_class.__name__}: {str(e)}"
+                f"Duplicate {self.model_class.__name__}: {e!s}",
             ) from e
 
-    def update(self, id: ID, updates: Dict[str, Any]) -> T:
+    def update(self, entity_id: ID_contra, updates: dict[str, Any]) -> T:
         """
         Update an existing entity.
 
         Args:
-            id: Primary key of entity to update
+            entity_id: Primary key of entity to update
             updates: Dictionary of field names to new values
 
         Returns:
@@ -220,7 +222,7 @@ class BaseRepository(Generic[T, ID], ABC):
         """
         stmt = (
             update(self.model_class)
-            .where(self.model_class.id == id)  # type: ignore[attr-defined]
+            .where(self.model_class.id == entity_id)  # type: ignore[attr-defined]
             .values(**updates)
             .returning(self.model_class)
         )
@@ -229,26 +231,27 @@ class BaseRepository(Generic[T, ID], ABC):
             result = self.session.execute(stmt).scalar_one()
             self.session.flush()
             return result
-        except NoResultFound:
-            raise NotFoundError(f"{self.model_class.__name__} with id {id} not found")
+        except NoResultFound as err:
+            message = f"{self.model_class.__name__} with id {entity_id} not found"
+            raise NotFoundError(message) from err
 
-    def delete(self, id: ID) -> bool:
+    def delete(self, entity_id: ID_contra) -> bool:
         """
         Delete an entity by its primary key.
 
         Args:
-            id: Primary key of entity to delete
+            entity_id: Primary key of entity to delete
 
         Returns:
             True if entity was deleted, False if not found
         """
         stmt = delete(self.model_class).where(
-            self.model_class.id == id  # type: ignore[attr-defined]
+            self.model_class.id == entity_id,  # type: ignore[attr-defined]
         )
         result = self.session.execute(stmt)
         self.session.flush()
         return bool(
-            result.rowcount and result.rowcount > 0  # type: ignore[attr-defined]
+            result.rowcount and result.rowcount > 0,  # type: ignore[attr-defined]
         )
 
     def count(self) -> int:
@@ -261,12 +264,12 @@ class BaseRepository(Generic[T, ID], ABC):
         stmt = select(func.count()).select_from(self.model_class)
         return self.session.execute(stmt).scalar_one()
 
-    def exists(self, id: ID) -> bool:
+    def exists(self, entity_id: ID_contra) -> bool:
         """
         Check if an entity with the given ID exists.
 
         Args:
-            id: Primary key to check
+            entity_id: Primary key to check
 
         Returns:
             True if entity exists, False otherwise
@@ -274,10 +277,9 @@ class BaseRepository(Generic[T, ID], ABC):
         stmt = (
             select(func.count())
             .select_from(self.model_class)
-            .where(self.model_class.id == id)  # type: ignore[attr-defined]
+            .where(self.model_class.id == entity_id)  # type: ignore[attr-defined]
         )
-        count = self.session.execute(stmt).scalar_one()
-        return count > 0
+        return self.session.execute(stmt).scalar_one() > 0
 
     def save(self) -> None:
         """Commit current transaction."""

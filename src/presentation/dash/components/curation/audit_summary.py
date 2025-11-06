@@ -4,22 +4,24 @@ Audit summary component for curator detail view.
 
 from __future__ import annotations
 
-from typing import Optional, cast
+from typing import TYPE_CHECKING, cast
 
 import dash_bootstrap_components as dbc
+
 from dash import html
-from dash.development.base_component import Component
 
-from src.presentation.dash.types import AuditInfo
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from dash.development.base_component import Component
+    from src.presentation.dash.types import AuditInfo
 
 
-def render_audit_summary(audit: Optional[AuditInfo]) -> Component:
+def render_audit_summary(audit: AuditInfo | None) -> Component:
     """
     Render audit metadata for the selected entity.
     """
     if audit is None:
         return cast(
-            Component,
+            "Component",
             dbc.Alert(
                 [
                     html.I(className="fas fa-clipboard-list me-2"),
@@ -35,7 +37,8 @@ def render_audit_summary(audit: Optional[AuditInfo]) -> Component:
             _meta_row("Last Updated", audit.get("last_updated_at") or "Unknown"),
             _meta_row("Updated By", audit.get("last_updated_by") or "Unassigned"),
             _meta_row(
-                "Annotations Logged", str(audit.get("total_annotations", 0) or 0)
+                "Annotations Logged",
+                str(audit.get("total_annotations", 0) or 0),
             ),
         ],
         className="mb-3",
@@ -57,7 +60,7 @@ def render_audit_summary(audit: Optional[AuditInfo]) -> Component:
     )
 
     return cast(
-        Component,
+        "Component",
         html.Div(
             [
                 html.H5("Audit Timeline"),
@@ -66,16 +69,16 @@ def render_audit_summary(audit: Optional[AuditInfo]) -> Component:
                     [
                         html.Small("Pending Actions", className="text-muted d-block"),
                         action_badges,
-                    ]
+                    ],
                 ),
-            ]
+            ],
         ),
     )
 
 
 def _meta_row(label: str, value: str) -> Component:
     return cast(
-        Component,
+        "Component",
         html.Div(
             [
                 html.Span(label, className="text-muted d-block small"),

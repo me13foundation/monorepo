@@ -4,13 +4,17 @@ Conflict Resolution Component for MED13 Curation Dashboard.
 Provides interactive tools for resolving evidence conflicts and clinical disagreements.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
-from dash import html, dcc
 import dash_bootstrap_components as dbc
 
+from dash import dcc, html
 
-def create_conflict_resolution_panel(variant_data: Dict[str, Any]) -> dbc.Card:
+# Minimum records required to consider conflicts
+MIN_CONFLICT_RECORDS: int = 2
+
+
+def create_conflict_resolution_panel(variant_data: dict[str, Any]) -> dbc.Card:
     """
     Create a conflict resolution panel for handling evidence disagreements.
 
@@ -21,7 +25,7 @@ def create_conflict_resolution_panel(variant_data: Dict[str, Any]) -> dbc.Card:
         Bootstrap Card containing conflict resolution interface
     """
     evidence_records = variant_data.get("evidence_records", [])
-    conflicts: List[Dict[str, Any]] = _detect_evidence_conflicts(evidence_records)
+    conflicts: list[dict[str, Any]] = _detect_evidence_conflicts(evidence_records)
 
     if not conflicts:
         return dbc.Card(
@@ -35,10 +39,10 @@ def create_conflict_resolution_panel(variant_data: Dict[str, Any]) -> dbc.Card:
                                 "No evidence conflicts detected for this variant.",
                             ],
                             color="success",
-                        )
-                    ]
+                        ),
+                    ],
                 ),
-            ]
+            ],
         )
 
     return dbc.Card(
@@ -47,9 +51,11 @@ def create_conflict_resolution_panel(variant_data: Dict[str, Any]) -> dbc.Card:
                 [
                     html.H5("Conflict Resolution", className="mb-0"),
                     dbc.Badge(
-                        f"{len(conflicts)} Conflicts", color="warning", className="ms-2"
+                        f"{len(conflicts)} Conflicts",
+                        color="warning",
+                        className="ms-2",
                     ),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
@@ -59,106 +65,118 @@ def create_conflict_resolution_panel(variant_data: Dict[str, Any]) -> dbc.Card:
                     _create_conflict_resolvers(conflicts),
                     # Resolution actions
                     _create_resolution_actions(),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
 def _detect_evidence_conflicts(
-    evidence_records: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    evidence_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """
     Detect conflicts in evidence records with detailed conflict information.
 
     Returns list of conflict objects with resolution options.
     """
-    conflicts: List[Dict[str, Any]] = []
+    if not evidence_records or len(evidence_records) < MIN_CONFLICT_RECORDS:
+        return []
 
-    if not evidence_records or len(evidence_records) < 2:
-        return conflicts
-
-    # Clinical significance conflict
-    significances: Dict[str, List[int]] = {}
-    for i, ev in enumerate(evidence_records):
-        sig = ev.get("clinical_significance")
-        if sig:
-            if sig not in significances:
-                significances[sig] = []
-            significances[sig].append(i)
-
-    if len(significances) > 1:
-        conflict_options = []
-        for sig, indices in significances.items():
-            conflict_options.append(
-                {
-                    "value": f"sig_{sig}",
-                    "label": f"Accept {sig.title()} (from {len(indices)} source{'s' if len(indices) > 1 else ''})",
-                    "significance": sig,
-                    "count": len(indices),
-                    "indices": indices,
-                }
-            )
-
-        conflicts.append(
-            {
-                "id": "clinical_significance",
-                "type": "clinical_significance",
-                "title": "Clinical Significance Conflict",
-                "description": f'Multiple significance classifications detected: {", ".join(significances.keys())}',
-                "severity": "high",
-                "options": conflict_options,
-                "recommended": _get_recommended_significance(
-                    significances, evidence_records
-                ),
-            }
-        )
-
-    # Evidence level conflict
-    levels: Dict[str, List[int]] = {}
-    for i, ev in enumerate(evidence_records):
-        level = ev.get("evidence_level")
-        if level:
-            if level not in levels:
-                levels[level] = []
-            levels[level].append(i)
-
-    if len(levels) > 1:
-        level_hierarchy = {"limited": 1, "supporting": 2, "strong": 3, "definitive": 4}
-        sorted_levels = sorted(
-            levels.keys(), key=lambda x: level_hierarchy.get(x, 0), reverse=True
-        )
-
-        conflict_options = []
-        for level in sorted_levels:
-            indices = levels[level]
-            conflict_options.append(
-                {
-                    "value": f"level_{level}",
-                    "label": f"Accept {level.title()} (from {len(indices)} source{'s' if len(indices) > 1 else ''})",
-                    "level": level,
-                    "count": len(indices),
-                    "indices": indices,
-                }
-            )
-
-        conflicts.append(
-            {
-                "id": "evidence_level",
-                "type": "evidence_level",
-                "title": "Evidence Level Conflict",
-                "description": f'Conflicting evidence strength levels: {", ".join(sorted_levels)}',
-                "severity": "medium",
-                "options": conflict_options,
-                "recommended": sorted_levels[0],  # Highest level
-            }
-        )
-
+    conflicts: list[dict[str, Any]] = []
+    conflicts.extend(_detect_clinical_significance_conflicts(evidence_records))
+    conflicts.extend(_detect_level_conflicts(evidence_records))
     return conflicts
 
 
+def _detect_clinical_significance_conflicts(
+    evidence_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Detect conflicting clinical significance across evidence records."""
+    significances: dict[str, list[int]] = {}
+    for idx, ev in enumerate(evidence_records):
+        sig = ev.get("clinical_significance")
+        if sig:
+            indices = significances.setdefault(sig, [])
+            indices.append(idx)
+
+    if len(significances) <= 1:
+        return []
+
+    conflict_options = [
+        {
+            "value": f"sig_{sig}",
+            "label": f"Accept {sig.title()} (from {len(indices)} source{'s' if len(indices) > 1 else ''})",
+            "significance": sig,
+            "count": len(indices),
+            "indices": indices,
+        }
+        for sig, indices in significances.items()
+    ]
+
+    return [
+        {
+            "id": "clinical_significance",
+            "type": "clinical_significance",
+            "title": "Clinical Significance Conflict",
+            "description": f"Multiple significance classifications detected: {', '.join(significances.keys())}",
+            "severity": "high",
+            "options": conflict_options,
+            "recommended": _get_recommended_significance(
+                significances,
+                evidence_records,
+            ),
+        },
+    ]
+
+
+def _detect_level_conflicts(
+    evidence_records: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Detect conflicting evidence levels across records."""
+    levels: dict[str, list[int]] = {}
+    for idx, ev in enumerate(evidence_records):
+        level = ev.get("evidence_level")
+        if level:
+            indices = levels.setdefault(level, [])
+            indices.append(idx)
+
+    if len(levels) <= 1:
+        return []
+
+    level_hierarchy = {"limited": 1, "supporting": 2, "strong": 3, "definitive": 4}
+    sorted_levels = sorted(
+        levels.keys(),
+        key=lambda x: level_hierarchy.get(x, 0),
+        reverse=True,
+    )
+
+    conflict_options = [
+        {
+            "value": f"level_{level}",
+            "label": f"Accept {level.title()} (from {len(levels[level])} source{'s' if len(levels[level]) > 1 else ''})",
+            "level": level,
+            "count": len(levels[level]),
+            "indices": levels[level],
+        }
+        for level in sorted_levels
+    ]
+
+    return [
+        {
+            "id": "evidence_level",
+            "type": "evidence_level",
+            "title": "Evidence Level Conflict",
+            "description": f"Conflicting evidence strength levels: {', '.join(sorted_levels)}",
+            "severity": "medium",
+            "options": conflict_options,
+            "recommended": sorted_levels[0],  # Highest level
+        },
+    ]
+
+
 def _get_recommended_significance(
-    significances: Dict[str, List[int]], evidence_records: List[Dict[str, Any]]
+    significances: dict[str, list[int]],
+    evidence_records: list[dict[str, Any]],
 ) -> str:
     """Get recommended clinical significance based on evidence strength."""
     # Simple logic: prefer significance from highest evidence level
@@ -175,18 +193,19 @@ def _get_recommended_significance(
                 best_level = level_value
                 best_sig = sig
 
-    return best_sig or list(significances.keys())[0]
+    return best_sig or next(iter(significances))
 
 
-def _create_conflict_timeline(conflicts: List[Dict[str, Any]]) -> html.Div:
+def _create_conflict_timeline(conflicts: list[dict[str, Any]]) -> html.Div:
     """Create a visual timeline of conflicts and their detection."""
     if not conflicts:
         return html.Div()
 
     timeline_items = []
-    for i, conflict in enumerate(conflicts):
+    for conflict in conflicts:
         severity_color = {"high": "danger", "medium": "warning", "low": "info"}.get(
-            conflict["severity"], "info"
+            conflict["severity"],
+            "info",
         )
 
         timeline_items.append(
@@ -209,7 +228,7 @@ def _create_conflict_timeline(conflicts: List[Dict[str, Any]]) -> html.Div:
                     ),
                 ],
                 className="mb-2",
-            )
+            ),
         )
 
     return html.Div(
@@ -221,7 +240,7 @@ def _create_conflict_timeline(conflicts: List[Dict[str, Any]]) -> html.Div:
     )
 
 
-def _create_conflict_resolvers(conflicts: List[Dict[str, Any]]) -> html.Div:
+def _create_conflict_resolvers(conflicts: list[dict[str, Any]]) -> html.Div:
     """Create individual conflict resolution interfaces."""
     resolvers = []
 
@@ -236,7 +255,7 @@ def _create_conflict_resolvers(conflicts: List[Dict[str, Any]]) -> html.Div:
                             color="info",
                             className="ms-2",
                         ),
-                    ]
+                    ],
                 ),
                 dbc.CardBody(
                     [
@@ -280,13 +299,13 @@ def _create_conflict_resolvers(conflicts: List[Dict[str, Any]]) -> html.Div:
                                             id=f"apply-resolution-{conflict['id']}",
                                             color="primary",
                                             className="mt-4",
-                                        )
+                                        ),
                                     ],
                                     width=6,
                                 ),
-                            ]
+                            ],
                         ),
-                    ]
+                    ],
                 ),
             ],
             className="mb-3",
@@ -316,7 +335,7 @@ def _create_resolution_actions() -> dbc.Card:
                                         id="save-all-resolutions",
                                         color="success",
                                         className="w-100",
-                                    )
+                                    ),
                                 ],
                                 width=6,
                             ),
@@ -330,7 +349,7 @@ def _create_resolution_actions() -> dbc.Card:
                                         id="reset-resolutions",
                                         color="secondary",
                                         className="w-100",
-                                    )
+                                    ),
                                 ],
                                 width=6,
                             ),
@@ -349,7 +368,7 @@ def _create_resolution_actions() -> dbc.Card:
                                         id="flag-for-review",
                                         color="warning",
                                         className="w-100",
-                                    )
+                                    ),
                                 ],
                                 width=6,
                             ),
@@ -363,19 +382,19 @@ def _create_resolution_actions() -> dbc.Card:
                                         id="request-evidence",
                                         color="info",
                                         className="w-100",
-                                    )
+                                    ),
                                 ],
                                 width=6,
                             ),
-                        ]
+                        ],
                     ),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
-def create_quick_conflict_resolver(conflict: Dict[str, Any]) -> dbc.Modal:
+def create_quick_conflict_resolver(conflict: dict[str, Any]) -> dbc.Modal:
     """
     Create a quick modal resolver for individual conflicts.
 
@@ -399,7 +418,7 @@ def create_quick_conflict_resolver(conflict: Dict[str, Any]) -> dbc.Modal:
                         }.get(conflict["severity"], "info"),
                         className="ms-2",
                     ),
-                ]
+                ],
             ),
             dbc.ModalBody(
                 [
@@ -417,7 +436,7 @@ def create_quick_conflict_resolver(conflict: Dict[str, Any]) -> dbc.Modal:
                         placeholder="Why this resolution?",
                         rows=2,
                     ),
-                ]
+                ],
             ),
             dbc.ModalFooter(
                 [
@@ -431,7 +450,7 @@ def create_quick_conflict_resolver(conflict: Dict[str, Any]) -> dbc.Modal:
                         id=f"confirm-resolution-{conflict['id']}",
                         color="primary",
                     ),
-                ]
+                ],
             ),
         ],
         id=f"conflict-modal-{conflict['id']}",
@@ -440,9 +459,9 @@ def create_quick_conflict_resolver(conflict: Dict[str, Any]) -> dbc.Modal:
 
 
 __all__ = [
+    "_create_conflict_resolvers",
+    "_create_conflict_timeline",
+    "_detect_evidence_conflicts",
     "create_conflict_resolution_panel",
     "create_quick_conflict_resolver",
-    "_detect_evidence_conflicts",
-    "_create_conflict_timeline",
-    "_create_conflict_resolvers",
 ]

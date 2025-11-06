@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any
 
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 
@@ -17,14 +18,18 @@ class ParallelConfig:
 
 class ParallelValidator:
     def __init__(
-        self, rule_engine: ValidationRuleEngine, config: Optional[ParallelConfig] = None
+        self,
+        rule_engine: ValidationRuleEngine,
+        config: ParallelConfig | None = None,
     ) -> None:
         self.rule_engine = rule_engine
         self.config = config or ParallelConfig()
 
     async def validate_batch_parallel(
-        self, entity_type: str, payload: Sequence[Dict[str, Any]]
-    ) -> List[ValidationResult]:
+        self,
+        entity_type: str,
+        payload: Sequence[dict[str, Any]],
+    ) -> list[ValidationResult]:
         if not payload:
             return []
 
@@ -36,21 +41,25 @@ class ParallelValidator:
             for chunk in chunks
         ]
         results = await asyncio.gather(*tasks)
-        flattened: List[ValidationResult] = []
+        flattened: list[ValidationResult] = []
         for batch in results:
             flattened.extend(batch)
         return flattened
 
     async def validate_with_adaptive_parallelism(
-        self, entity_type: str, payload: Sequence[Dict[str, Any]]
-    ) -> List[ValidationResult]:
+        self,
+        entity_type: str,
+        payload: Sequence[dict[str, Any]],
+    ) -> list[ValidationResult]:
         if len(payload) <= self.config.chunk_size:
             return self.rule_engine.validate_batch(entity_type, list(payload))
         return await self.validate_batch_parallel(entity_type, payload)
 
     def _chunk_payload(
-        self, payload: Sequence[Dict[str, Any]], chunk_size: int
-    ) -> Iterable[Sequence[Dict[str, Any]]]:
+        self,
+        payload: Sequence[dict[str, Any]],
+        chunk_size: int,
+    ) -> Iterable[Sequence[dict[str, Any]]]:
         for index in range(0, len(payload), chunk_size):
             yield payload[index : index + chunk_size]
 

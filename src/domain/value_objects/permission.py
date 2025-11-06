@@ -5,8 +5,8 @@ Defines permissions, roles, and access control rules using domain-driven design.
 """
 
 from enum import Enum
-from typing import List, Dict
-from ..entities.user import UserRole
+
+from src.domain.entities.user import UserRole
 
 
 class Permission(str, Enum):
@@ -46,7 +46,7 @@ class RolePermissions:
     """
 
     @staticmethod
-    def get_permissions_for_role(role: UserRole) -> List[Permission]:
+    def get_permissions_for_role(role: UserRole) -> list[Permission]:
         """
         Get all permissions for a given role.
 
@@ -56,7 +56,7 @@ class RolePermissions:
         Returns:
             List of permissions assigned to the role
         """
-        role_permissions: Dict[UserRole, List[Permission]] = {
+        role_permissions: dict[UserRole, list[Permission]] = {
             UserRole.ADMIN: [
                 # User management
                 Permission.USER_CREATE,
@@ -93,14 +93,14 @@ class RolePermissions:
             ],
             UserRole.VIEWER: [
                 # Read-only access
-                Permission.DATASOURCE_READ
+                Permission.DATASOURCE_READ,
             ],
         }
 
         return role_permissions.get(role, [])
 
     @staticmethod
-    def get_role_hierarchy() -> Dict[UserRole, int]:
+    def get_role_hierarchy() -> dict[UserRole, int]:
         """
         Get role hierarchy levels for precedence checking.
 
@@ -137,9 +137,9 @@ class RolePermissions:
         return hierarchy[manager_role] > hierarchy[target_role]
 
     @staticmethod
-    def get_all_permissions() -> List[Permission]:
+    def get_all_permissions() -> list[Permission]:
         """Get all available permissions in the system."""
-        return [permission for permission in Permission]
+        return list(Permission)
 
     @staticmethod
     def validate_permission_hierarchy() -> bool:
@@ -151,13 +151,14 @@ class RolePermissions:
         """
         # Ensure admin has all permissions
         admin_permissions = set(
-            RolePermissions.get_permissions_for_role(UserRole.ADMIN)
+            RolePermissions.get_permissions_for_role(UserRole.ADMIN),
         )
         all_permissions = set(RolePermissions.get_all_permissions())
 
         if admin_permissions != all_permissions:
             missing = all_permissions - admin_permissions
-            raise ValueError(f"Admin role missing permissions: {missing}")
+            message = f"Admin role missing permissions: {missing}"
+            raise ValueError(message)
 
         # Ensure role hierarchy is maintained
         roles_by_level = sorted(
@@ -168,7 +169,7 @@ class RolePermissions:
             key=lambda x: x[0],
         )
 
-        for i, (level, role) in enumerate(roles_by_level[:-1]):
+        for i, (_level, role) in enumerate(roles_by_level[:-1]):
             current_permissions = set(RolePermissions.get_permissions_for_role(role))
             next_role = roles_by_level[i + 1][1]
             next_permissions = set(RolePermissions.get_permissions_for_role(next_role))
@@ -176,9 +177,8 @@ class RolePermissions:
             # Higher roles should have at least as many permissions
             if not next_permissions.issuperset(current_permissions):
                 missing = current_permissions - next_permissions
-                raise ValueError(
-                    f"Role {next_role} missing permissions from {role}: {missing}"
-                )
+                message = f"Role {next_role} missing permissions from {role}: {missing}"
+                raise ValueError(message)
 
         return True
 
@@ -190,7 +190,8 @@ class PermissionChecker:
 
     @staticmethod
     def has_permission(
-        user_permissions: List[Permission], required_permission: Permission
+        user_permissions: list[Permission],
+        required_permission: Permission,
     ) -> bool:
         """
         Check if user has a specific permission.
@@ -206,7 +207,8 @@ class PermissionChecker:
 
     @staticmethod
     def has_any_permission(
-        user_permissions: List[Permission], required_permissions: List[Permission]
+        user_permissions: list[Permission],
+        required_permissions: list[Permission],
     ) -> bool:
         """
         Check if user has any of the required permissions.
@@ -222,7 +224,8 @@ class PermissionChecker:
 
     @staticmethod
     def has_all_permissions(
-        user_permissions: List[Permission], required_permissions: List[Permission]
+        user_permissions: list[Permission],
+        required_permissions: list[Permission],
     ) -> bool:
         """
         Check if user has all required permissions.
@@ -238,8 +241,9 @@ class PermissionChecker:
 
     @staticmethod
     def get_missing_permissions(
-        user_permissions: List[Permission], required_permissions: List[Permission]
-    ) -> List[Permission]:
+        user_permissions: list[Permission],
+        required_permissions: list[Permission],
+    ) -> list[Permission]:
         """
         Get permissions the user is missing.
 

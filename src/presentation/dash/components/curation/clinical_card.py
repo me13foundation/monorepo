@@ -7,19 +7,27 @@ queued review items.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 import dash_bootstrap_components as dbc
-from dash import html
-from dash.development.base_component import Component
 
-from src.presentation.dash.types import ReviewQueueItem
+from dash import html
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
+    from dash.development.base_component import Component
+    from src.presentation.dash.types import ReviewQueueItem
+
+# Quality thresholds
+HIGH_QUALITY_THRESHOLD: float = 0.8
+MEDIUM_QUALITY_THRESHOLD: float = 0.6
 
 
 def create_enhanced_filters() -> Component:
     """Return advanced filter controls for the review queue."""
     return cast(
-        Component,
+        "Component",
         dbc.Accordion(
             [
                 dbc.AccordionItem(
@@ -92,7 +100,7 @@ def create_enhanced_filters() -> Component:
                         ),
                     ],
                     title="Advanced Clinical Filters",
-                )
+                ),
             ],
             always_open=False,
             flush=True,
@@ -110,7 +118,7 @@ def create_clinical_card_grid(items: Sequence[ReviewQueueItem]) -> Component:
     """
     if not items:
         return cast(
-            Component,
+            "Component",
             dbc.Alert(
                 [
                     html.I(className="fas fa-search me-2"),
@@ -124,19 +132,19 @@ def create_clinical_card_grid(items: Sequence[ReviewQueueItem]) -> Component:
     columns: list[Component] = []
     for item in items:
         columns.append(
-            cast(Component, dbc.Col(_create_single_card(item), width=12, xl=6))
+            cast("Component", dbc.Col(_create_single_card(item), width=12, xl=6)),
         )
 
-    return cast(Component, dbc.Row(columns, className="g-3", id="clinical-card-row"))
+    return cast("Component", dbc.Row(columns, className="g-3", id="clinical-card-row"))
 
 
 def _create_single_card(item: ReviewQueueItem) -> Component:
     """Create a single review card for a queue item."""
     priority_badge = _priority_badge(item["priority"])
     issues_badge: Component = cast(
-        Component,
+        "Component",
         dbc.Badge(
-            f'{item["issues"]} issues',
+            f"{item['issues']} issues",
             color="warning",
             className="ms-2",
         ),
@@ -165,7 +173,7 @@ def _create_single_card(item: ReviewQueueItem) -> Component:
                 ),
             ],
             className="g-0 align-items-center",
-        )
+        ),
     )
 
     body = dbc.CardBody(
@@ -188,9 +196,9 @@ def _create_single_card(item: ReviewQueueItem) -> Component:
                         f"Updated: {item.get('last_updated', 'unknown')}",
                         className="text-muted",
                     ),
-                ]
-            )
-        ]
+                ],
+            ),
+        ],
     )
 
     footer = dbc.CardFooter(
@@ -205,11 +213,12 @@ def _create_single_card(item: ReviewQueueItem) -> Component:
             size="sm",
             n_clicks=0,
             className="w-100",
-        )
+        ),
     )
 
     return cast(
-        Component, dbc.Card([header, body, footer], className="h-100 shadow-sm")
+        "Component",
+        dbc.Card([header, body, footer], className="h-100 shadow-sm"),
     )
 
 
@@ -221,16 +230,17 @@ def _priority_badge(priority: str) -> Component:
         "low": "secondary",
     }
     color = color_map.get(normalized, "primary")
-    return cast(Component, dbc.Badge(priority.title(), color=color))
+    return cast("Component", dbc.Badge(priority.title(), color=color))
 
 
 def _quality_badge(quality_score: object) -> Component:
     if quality_score is None:
         return cast(
-            Component, dbc.Badge("No Q/S", color="light", className="text-muted")
+            "Component",
+            dbc.Badge("No Q/S", color="light", className="text-muted"),
         )
 
-    score: Optional[float]
+    score: float | None
     if isinstance(quality_score, (int, float)) and not isinstance(quality_score, bool):
         score = float(quality_score)
     elif isinstance(quality_score, str):
@@ -243,16 +253,20 @@ def _quality_badge(quality_score: object) -> Component:
 
     if score is None:
         return cast(
-            Component, dbc.Badge("Q/S ?", color="light", className="text-muted")
+            "Component",
+            dbc.Badge("Q/S ?", color="light", className="text-muted"),
         )
 
-    if score >= 0.8:
+    if score >= HIGH_QUALITY_THRESHOLD:
         color = "success"
-    elif score >= 0.6:
+    elif score >= MEDIUM_QUALITY_THRESHOLD:
         color = "warning"
     else:
         color = "danger"
-    return cast(Component, dbc.Badge(f"Q/S {score:.2f}", color=color, className="ms-2"))
+    return cast(
+        "Component",
+        dbc.Badge(f"Q/S {score:.2f}", color=color, className="ms-2"),
+    )
 
 
 def get_clinical_significance_color(significance: str) -> str:

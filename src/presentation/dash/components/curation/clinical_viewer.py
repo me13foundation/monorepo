@@ -4,17 +4,21 @@ Clinical viewer component rendering variant and phenotype context.
 
 from __future__ import annotations
 
-from typing import Optional, Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 import dash_bootstrap_components as dbc
-from dash import html
-from dash.development.base_component import Component
 
-from src.presentation.dash.types import PhenotypeSnapshot, VariantDetail
+from dash import html
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
+    from dash.development.base_component import Component
+    from src.presentation.dash.types import PhenotypeSnapshot, VariantDetail
 
 
 def render_clinical_viewer(
-    variant: Optional[VariantDetail],
+    variant: VariantDetail | None,
     phenotypes: Sequence[PhenotypeSnapshot],
 ) -> Component:
     """
@@ -26,7 +30,7 @@ def render_clinical_viewer(
     """
     if variant is None:
         return cast(
-            Component,
+            "Component",
             dbc.Alert(
                 [
                     html.I(className="fas fa-info-circle me-2"),
@@ -53,7 +57,8 @@ def render_clinical_viewer(
         ),
         _detail_row("Variant Type", variant["variant_type"].replace("_", " ").title()),
         _detail_row(
-            "Allele Frequency", _format_frequency(variant.get("allele_frequency"))
+            "Allele Frequency",
+            _format_frequency(variant.get("allele_frequency")),
         ),
         _detail_row("gnomAD AF", _format_frequency(variant.get("gnomad_af"))),
         _detail_row("HGVS (Genomic)", hgvs.get("genomic", "—")),
@@ -66,7 +71,7 @@ def render_clinical_viewer(
 
     if phenotypes:
         phenotype_badges: Component = cast(
-            Component,
+            "Component",
             dbc.Stack(
                 [
                     dbc.Badge(
@@ -83,12 +88,12 @@ def render_clinical_viewer(
         )
     else:
         phenotype_badges = cast(
-            Component,
+            "Component",
             html.Small("No phenotypes linked.", className="text-muted"),
         )
 
     return cast(
-        Component,
+        "Component",
         dbc.Row(
             [
                 dbc.Col(
@@ -113,7 +118,7 @@ def render_clinical_viewer(
 
 def _detail_row(label: str, value: object) -> Component:
     return cast(
-        Component,
+        "Component",
         html.Div(
             [
                 html.Span(label, className="text-muted d-block small"),
@@ -124,7 +129,7 @@ def _detail_row(label: str, value: object) -> Component:
     )
 
 
-def _format_frequency(value: Optional[float]) -> str:
+def _format_frequency(value: float | None) -> str:
     if value is None:
         return "—"
     return f"{value:.4f}"

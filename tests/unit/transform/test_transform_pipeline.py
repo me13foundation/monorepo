@@ -2,39 +2,38 @@
 Unit tests for data transformation pipeline components.
 """
 
-import pytest
 from unittest.mock import Mock, patch
 
-from src.domain.transform.parsers.clinvar_parser import ClinVarParser, ClinVarVariant
-from src.domain.transform.parsers.pubmed_parser import PubMedParser, PubMedPublication
-
-from src.domain.transform.normalizers.gene_normalizer import (
-    GeneNormalizer,
-    NormalizedGene,
-    GeneIdentifierType,
-)
-from src.domain.transform.normalizers.variant_normalizer import (
-    VariantNormalizer,
-    NormalizedVariant,
-)
+import pytest
 
 from src.domain.transform.mappers.gene_variant_mapper import (
-    GeneVariantMapper,
     GeneVariantLink,
+    GeneVariantMapper,
 )
-
+from src.domain.transform.normalizers.gene_normalizer import (
+    GeneIdentifierType,
+    GeneNormalizer,
+    NormalizedGene,
+)
+from src.domain.transform.normalizers.variant_normalizer import (
+    NormalizedVariant,
+    VariantNormalizer,
+)
+from src.domain.transform.parsers.clinvar_parser import ClinVarParser, ClinVarVariant
+from src.domain.transform.parsers.pubmed_parser import PubMedParser, PubMedPublication
 from src.domain.transform.transformers.etl_transformer import ETLTransformer
 from src.domain.transform.transformers.transformation_pipeline import (
-    TransformationPipeline,
     PipelineConfig,
     PipelineMode,
+    TransformationPipeline,
 )
-
 from src.domain.validation.rules.base_rules import (
     DataQualityValidator,
     ValidationLevel,
     ValidationSeverity,
 )
+
+MIN_SCORE_THRESHOLD = 0.8
 
 
 class TestClinVarParser:
@@ -77,10 +76,10 @@ class TestClinVarParser:
             variant_id="702748",
             variation_name="NM_020822.3(KCNT1):c.335-5C>T",
             variant_type=ClinVarParser()._parse_variant_type(
-                "single nucleotide variant"
+                "single nucleotide variant",
             ),
             clinical_significance=ClinVarParser()._parse_clinical_significance(
-                "Pathogenic"
+                "Pathogenic",
             ),
             gene_symbol="KCNT1",
             gene_id="57582",
@@ -278,7 +277,10 @@ class TestGeneVariantMapper:
             gene_id="KCNT1",
             variant_id="4282399",
             relationship_type=self.mapper._determine_relationship_type(
-                999000, 1001000, 1000000, Mock()
+                999000,
+                1001000,
+                1000000,
+                Mock(),
             ),
             confidence_score=0.8,
             evidence_sources=["clinvar"],
@@ -303,7 +305,7 @@ class TestDataQualityValidator:
         result = self.validator.validate_entity("gene", gene_data)
 
         assert result.is_valid
-        assert result.score > 0.8
+        assert result.score > MIN_SCORE_THRESHOLD
         assert len(result.issues) == 0
 
     def test_validate_invalid_gene(self):
@@ -356,22 +358,27 @@ class TestETLTransformer:
         self.transformer = ETLTransformer()
 
     @patch(
-        "src.domain.transform.transformers.etl_transformer.ETLTransformer._parse_all_sources"
+        "src.domain.transform.transformers.etl_transformer.ETLTransformer._parse_all_sources",
     )
     @patch(
-        "src.domain.transform.transformers.etl_transformer.ETLTransformer._normalize_all_entities"
+        "src.domain.transform.transformers.etl_transformer.ETLTransformer._normalize_all_entities",
     )
     @patch(
-        "src.domain.transform.transformers.etl_transformer.ETLTransformer._create_cross_references"
+        "src.domain.transform.transformers.etl_transformer.ETLTransformer._create_cross_references",
     )
     @patch(
-        "src.domain.transform.transformers.etl_transformer.ETLTransformer._validate_transformed_data"
+        "src.domain.transform.transformers.etl_transformer.ETLTransformer._validate_transformed_data",
     )
     @patch(
-        "src.domain.transform.transformers.etl_transformer.ETLTransformer._export_transformed_data"
+        "src.domain.transform.transformers.etl_transformer.ETLTransformer._export_transformed_data",
     )
     async def test_transform_all_sources(
-        self, mock_export, mock_validate, mock_cross_ref, mock_normalize, mock_parse
+        self,
+        mock_export,
+        mock_validate,
+        mock_cross_ref,
+        mock_normalize,
+        mock_parse,
     ):
         """Test full ETL transformation pipeline."""
         # Setup mocks
@@ -463,7 +470,7 @@ class TestTransformationIntegration:
             PipelineConfig(
                 mode=PipelineMode.SEQUENTIAL,
                 enable_validation=False,  # Skip for faster testing
-            )
+            ),
         )
 
     async def test_end_to_end_transformation(self):
@@ -486,7 +493,7 @@ class TestTransformationIntegration:
 </ClassifiedRecord>
 </VariationArchive>
 </ClinVarResult-Set>""",
-                }
+                },
             ],
             "pubmed": [
                 {
@@ -504,7 +511,7 @@ class TestTransformationIntegration:
 </AuthorList>
 </MedlineCitation>
 </PubmedArticle>""",
-                }
+                },
             ],
             "hpo": [
                 {
@@ -512,19 +519,19 @@ class TestTransformationIntegration:
                     "name": "Test phenotype",
                     "definition": "A test phenotype.",
                     "format": "sample",
-                }
+                },
             ],
             "uniprot": [
                 {
                     "primaryAccession": "P12345",
                     "uniProtkbId": "TEST_HUMAN",
                     "proteinDescription": {
-                        "recommendedName": {"fullName": {"value": "Test protein"}}
+                        "recommendedName": {"fullName": {"value": "Test protein"}},
                     },
                     "genes": [{"geneName": {"value": "TESTGENE"}}],
                     "organism": {"scientificName": "Homo sapiens", "taxonId": "9606"},
                     "sequence": {"length": 100, "mass": 11000},
-                }
+                },
             ],
         }
 

@@ -3,16 +3,18 @@ Evidence repository for MED13 Resource Library.
 Data access layer for evidence entities linking variants and phenotypes.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from sqlalchemy import and_, or_, select
 
-from .base import BaseRepository
 from src.models.database import (
     EvidenceLevel,
     EvidenceModel,
     EvidenceType,
     VariantModel,
 )
+
+from .base import BaseRepository
 
 
 class EvidenceRepository(BaseRepository[EvidenceModel, int]):
@@ -28,8 +30,10 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return EvidenceModel
 
     def find_by_variant(
-        self, variant_id: int, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+        self,
+        variant_id: int,
+        limit: int | None = None,
+    ) -> list[EvidenceModel]:
         """
         Find all evidence for a specific variant.
 
@@ -46,8 +50,10 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_phenotype(
-        self, phenotype_id: int, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+        self,
+        phenotype_id: int,
+        limit: int | None = None,
+    ) -> list[EvidenceModel]:
         """
         Find all evidence for a specific phenotype.
 
@@ -64,8 +70,10 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_variant_and_phenotype(
-        self, variant_id: int, phenotype_id: int
-    ) -> List[EvidenceModel]:
+        self,
+        variant_id: int,
+        phenotype_id: int,
+    ) -> list[EvidenceModel]:
         """
         Find evidence linking a specific variant and phenotype.
 
@@ -80,13 +88,15 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
             and_(
                 EvidenceModel.variant_id == variant_id,
                 EvidenceModel.phenotype_id == phenotype_id,
-            )
+            ),
         )
         return list(self.session.execute(stmt).scalars())
 
     def find_by_publication(
-        self, publication_id: int, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+        self,
+        publication_id: int,
+        limit: int | None = None,
+    ) -> list[EvidenceModel]:
         """
         Find all evidence from a specific publication.
 
@@ -98,13 +108,13 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
             List of EvidenceModel instances from the publication
         """
         stmt = select(EvidenceModel).where(
-            EvidenceModel.publication_id == publication_id
+            EvidenceModel.publication_id == publication_id,
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
-    def find_by_gene(self, gene_id: int) -> List[EvidenceModel]:
+    def find_by_gene(self, gene_id: int) -> list[EvidenceModel]:
         """
         Find evidence associated with variants belonging to a specific gene.
 
@@ -122,8 +132,10 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_evidence_level(
-        self, level: EvidenceLevel, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+        self,
+        level: EvidenceLevel,
+        limit: int | None = None,
+    ) -> list[EvidenceModel]:
         """
         Find evidence with specific confidence level.
 
@@ -140,8 +152,10 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_evidence_type(
-        self, evidence_type: EvidenceType, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+        self,
+        evidence_type: EvidenceType,
+        limit: int | None = None,
+    ) -> list[EvidenceModel]:
         """
         Find evidence of specific type.
 
@@ -158,8 +172,10 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_confidence_score(
-        self, min_score: float, max_score: float
-    ) -> List[EvidenceModel]:
+        self,
+        min_score: float,
+        max_score: float,
+    ) -> list[EvidenceModel]:
         """
         Find evidence within a confidence score range.
 
@@ -177,8 +193,9 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_high_confidence_evidence(
-        self, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+        self,
+        limit: int | None = None,
+    ) -> list[EvidenceModel]:
         """
         Find evidence with high confidence (Definitive or Strong).
 
@@ -192,15 +209,16 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
             or_(
                 EvidenceModel.evidence_level == EvidenceLevel.DEFINITIVE,
                 EvidenceModel.evidence_level == EvidenceLevel.STRONG,
-            )
+            ),
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
     def find_peer_reviewed_evidence(
-        self, limit: Optional[int] = None
-    ) -> List[EvidenceModel]:
+        self,
+        limit: int | None = None,
+    ) -> list[EvidenceModel]:
         """
         Find evidence from peer-reviewed sources.
 
@@ -211,13 +229,13 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
             List of peer-reviewed EvidenceModel instances
         """
         stmt = select(EvidenceModel).where(
-            EvidenceModel.peer_reviewed  # type: ignore[attr-defined]
+            EvidenceModel.peer_reviewed,  # type: ignore[attr-defined]
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
-    def get_evidence_statistics(self) -> Dict[str, Any]:
+    def get_evidence_statistics(self) -> dict[str, Any]:
         """
         Get statistics about evidence in the database.
 
@@ -234,7 +252,7 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
             "peer_reviewed_evidence": peer_reviewed,
         }
 
-    def find_by_source(self, source: str) -> List[EvidenceModel]:
+    def find_by_source(self, source: str) -> list[EvidenceModel]:
         """
         Placeholder for evidence source lookup.
 
@@ -244,8 +262,11 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
         return []
 
     def find_relationship_evidence(
-        self, variant_id: int, phenotype_id: int, min_confidence: float = 0.0
-    ) -> List[EvidenceModel]:
+        self,
+        variant_id: int,
+        phenotype_id: int,
+        min_confidence: float = 0.0,
+    ) -> list[EvidenceModel]:
         """
         Find evidence supporting the relationship between a variant and phenotype.
 
@@ -262,6 +283,6 @@ class EvidenceRepository(BaseRepository[EvidenceModel, int]):
                 EvidenceModel.variant_id == variant_id,
                 EvidenceModel.phenotype_id == phenotype_id,
                 EvidenceModel.confidence_score >= min_confidence,
-            )
+            ),
         )
         return list(self.session.execute(stmt).scalars())

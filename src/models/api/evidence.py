@@ -4,10 +4,11 @@ Evidence API schemas for MED13 Resource Library.
 Pydantic models for evidence-related API requests and responses.
 """
 
-from datetime import datetime, date
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from datetime import date, datetime
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EvidenceLevel(str, Enum):
@@ -48,42 +49,54 @@ class EvidenceCreate(BaseModel):
 
     # Evidence content
     description: str = Field(..., description="Evidence description")
-    summary: Optional[str] = Field(None, description="Brief summary")
+    summary: str | None = Field(None, description="Brief summary")
 
     # Classification
     evidence_level: EvidenceLevel = Field(
-        default=EvidenceLevel.SUPPORTING, description="Evidence level"
+        default=EvidenceLevel.SUPPORTING,
+        description="Evidence level",
     )
     evidence_type: EvidenceType = Field(
-        default=EvidenceType.LITERATURE_REVIEW, description="Evidence type"
+        default=EvidenceType.LITERATURE_REVIEW,
+        description="Evidence type",
     )
 
     # Optional publication
-    publication_id: Optional[str] = Field(
-        None, description="Associated publication identifier"
+    publication_id: str | None = Field(
+        None,
+        description="Associated publication identifier",
     )
 
     # Confidence and scoring
     confidence_score: float = Field(
-        default=0.5, ge=0, le=1, description="Confidence score (0-1)"
+        default=0.5,
+        ge=0,
+        le=1,
+        description="Confidence score (0-1)",
     )
-    quality_score: Optional[int] = Field(
-        None, ge=1, le=10, description="Quality score (1-10)"
+    quality_score: int | None = Field(
+        None,
+        ge=1,
+        le=10,
+        description="Quality score (1-10)",
     )
 
     # Study details
-    sample_size: Optional[int] = Field(None, ge=1, description="Sample size")
-    study_type: Optional[str] = Field(None, max_length=100, description="Study type")
-    statistical_significance: Optional[str] = Field(
-        None, max_length=50, description="Statistical significance"
+    sample_size: int | None = Field(None, ge=1, description="Sample size")
+    study_type: str | None = Field(None, max_length=100, description="Study type")
+    statistical_significance: str | None = Field(
+        None,
+        max_length=50,
+        description="Statistical significance",
     )
 
     # Review information
     reviewed: bool = Field(
-        default=False, description="Whether evidence has been reviewed"
+        default=False,
+        description="Whether evidence has been reviewed",
     )
-    review_date: Optional[date] = Field(None, description="Review date")
-    reviewer_notes: Optional[str] = Field(None, description="Reviewer notes")
+    review_date: date | None = Field(None, description="Review date")
+    reviewer_notes: str | None = Field(None, description="Reviewer notes")
 
 
 class EvidenceUpdate(BaseModel):
@@ -96,29 +109,29 @@ class EvidenceUpdate(BaseModel):
     model_config = ConfigDict(strict=True)
 
     # Updatable content
-    description: Optional[str] = None
-    summary: Optional[str] = None
+    description: str | None = None
+    summary: str | None = None
 
     # Classification
-    evidence_level: Optional[EvidenceLevel] = None
-    evidence_type: Optional[EvidenceType] = None
+    evidence_level: EvidenceLevel | None = None
+    evidence_type: EvidenceType | None = None
 
     # Publication
-    publication_id: Optional[str] = None
+    publication_id: str | None = None
 
     # Confidence and scoring
-    confidence_score: Optional[float] = Field(None, ge=0, le=1)
-    quality_score: Optional[int] = Field(None, ge=1, le=10)
+    confidence_score: float | None = Field(None, ge=0, le=1)
+    quality_score: int | None = Field(None, ge=1, le=10)
 
     # Study details
-    sample_size: Optional[int] = Field(None, ge=1)
-    study_type: Optional[str] = Field(None, max_length=100)
-    statistical_significance: Optional[str] = Field(None, max_length=50)
+    sample_size: int | None = Field(None, ge=1)
+    study_type: str | None = Field(None, max_length=100)
+    statistical_significance: str | None = Field(None, max_length=50)
 
     # Review information
-    reviewed: Optional[bool] = None
-    review_date: Optional[date] = None
-    reviewer_notes: Optional[str] = None
+    reviewed: bool | None = None
+    review_date: date | None = None
+    reviewer_notes: str | None = None
 
 
 class EvidenceResponse(BaseModel):
@@ -136,13 +149,14 @@ class EvidenceResponse(BaseModel):
     # Relationships
     variant_id: str = Field(..., description="Associated variant identifier")
     phenotype_id: str = Field(..., description="Associated phenotype HPO ID")
-    publication_id: Optional[str] = Field(
-        None, description="Associated publication identifier"
+    publication_id: str | None = Field(
+        None,
+        description="Associated publication identifier",
     )
 
     # Evidence content
     description: str = Field(..., description="Evidence description")
-    summary: Optional[str] = Field(None, description="Brief summary")
+    summary: str | None = Field(None, description="Brief summary")
 
     # Classification
     evidence_level: EvidenceLevel = Field(..., description="Evidence level")
@@ -150,33 +164,38 @@ class EvidenceResponse(BaseModel):
 
     # Confidence and scoring
     confidence_score: float = Field(..., description="Confidence score (0-1)")
-    quality_score: Optional[int] = Field(
-        None, ge=1, le=10, description="Quality score (1-10)"
+    quality_score: int | None = Field(
+        None,
+        ge=1,
+        le=10,
+        description="Quality score (1-10)",
     )
 
     # Study details
-    sample_size: Optional[int] = Field(None, description="Sample size")
-    study_type: Optional[str] = Field(None, description="Study type")
-    statistical_significance: Optional[str] = Field(
-        None, description="Statistical significance"
+    sample_size: int | None = Field(None, description="Sample size")
+    study_type: str | None = Field(None, description="Study type")
+    statistical_significance: str | None = Field(
+        None,
+        description="Statistical significance",
     )
 
     # Review information
     reviewed: bool = Field(..., description="Whether evidence has been reviewed")
-    review_date: Optional[date] = Field(None, description="Review date")
-    reviewer_notes: Optional[str] = Field(None, description="Reviewer notes")
+    review_date: date | None = Field(None, description="Review date")
+    reviewer_notes: str | None = Field(None, description="Reviewer notes")
 
     # Metadata
     created_at: datetime = Field(..., description="Record creation timestamp")
     updated_at: datetime = Field(..., description="Last update timestamp")
 
     # Optional relationships (included based on query parameters)
-    variant: Optional[Dict[str, Any]] = Field(None, description="Variant details")
-    phenotype: Optional[Dict[str, Any]] = Field(None, description="Phenotype details")
-    publication: Optional[Dict[str, Any]] = Field(
-        None, description="Publication details"
+    variant: dict[str, Any] | None = Field(None, description="Variant details")
+    phenotype: dict[str, Any] | None = Field(None, description="Phenotype details")
+    publication: dict[str, Any] | None = Field(
+        None,
+        description="Publication details",
     )
 
 
 # Type aliases for API documentation
-EvidenceList = List[EvidenceResponse]
+EvidenceList = list[EvidenceResponse]

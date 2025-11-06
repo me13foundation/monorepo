@@ -7,7 +7,6 @@ that can be used across different test suites.
 
 from datetime import UTC, datetime
 
-
 # Gene fixtures
 GENE_MED13 = {
     "gene_id": "MED13",
@@ -128,7 +127,7 @@ PUBLICATION_TP53_CANCER = {
             "last_name": "Johnson",
             "first_name": "Robert",
             "affiliation": "Cancer Institute",
-        }
+        },
     ],
     "journal": "New England Journal of Medicine",
     "publication_date": "2020-05-20",

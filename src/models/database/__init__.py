@@ -1,61 +1,67 @@
 # MED13 Resource Library - SQLAlchemy Database Models
 # Strongly typed database entities with relationships and constraints
 
-from .base import Base
-from .gene import GeneModel, GeneType
-from .variant import VariantModel, VariantType, ClinicalSignificance
-from .phenotype import PhenotypeModel, PhenotypeCategory
-from .evidence import EvidenceModel, EvidenceLevel, EvidenceType
-from .publication import PublicationModel, PublicationType
 from .audit import AuditLog
+from .base import Base
+from .evidence import EvidenceLevel, EvidenceModel, EvidenceType
+from .gene import GeneModel, GeneType
+from .ingestion_job import (
+    IngestionJobModel,
+)
+from .ingestion_job import (
+    IngestionStatusEnum as IngestionStatus,
+)
+from .ingestion_job import (
+    IngestionTriggerEnum as IngestionTrigger,
+)
+from .phenotype import PhenotypeCategory, PhenotypeModel
+from .publication import PublicationModel, PublicationType
 from .review import ReviewRecord
+from .source_template import (
+    SourceTemplateModel,
+    SourceTypeEnum,
+)
+from .source_template import (
+    TemplateCategoryEnum as TemplateCategory,
+)
 from .user import UserModel
+from .user_data_source import (
+    SourceStatusEnum as SourceStatus,
+)
+from .user_data_source import (
+    SourceTypeEnum as SourceType,
+)
 
 # Data Sources module models
 from .user_data_source import (
     UserDataSourceModel,
-    SourceTypeEnum as SourceType,
-    SourceStatusEnum as SourceStatus,
 )
-from .source_template import (
-    SourceTemplateModel,
-    TemplateCategoryEnum as TemplateCategory,
-    SourceTypeEnum,
-)
-from .ingestion_job import (
-    IngestionJobModel,
-    IngestionStatusEnum as IngestionStatus,
-    IngestionTriggerEnum as IngestionTrigger,
-)
+from .variant import ClinicalSignificance, VariantModel, VariantType
 
 __all__ = [
-    # Base infrastructure
-    "Base",
     "AuditLog",
-    "ReviewRecord",
-    # Core domain models
+    "Base",
+    "ClinicalSignificance",
+    "EvidenceLevel",
+    "EvidenceModel",
+    "EvidenceType",
     "GeneModel",
     "GeneType",
-    "VariantModel",
-    "VariantType",
-    "ClinicalSignificance",
-    "PhenotypeModel",
-    "PhenotypeCategory",
-    "EvidenceModel",
-    "EvidenceLevel",
-    "EvidenceType",
-    "PublicationModel",
-    "PublicationType",
-    "UserModel",
-    # Data Sources models
-    "UserDataSourceModel",
-    "SourceTemplateModel",
     "IngestionJobModel",
-    # Enums
-    "SourceType",
-    "SourceStatus",
-    "TemplateCategory",
-    "SourceTypeEnum",
     "IngestionStatus",
     "IngestionTrigger",
+    "PhenotypeCategory",
+    "PhenotypeModel",
+    "PublicationModel",
+    "PublicationType",
+    "ReviewRecord",
+    "SourceStatus",
+    "SourceTemplateModel",
+    "SourceType",
+    "SourceTypeEnum",
+    "TemplateCategory",
+    "UserDataSourceModel",
+    "UserModel",
+    "VariantModel",
+    "VariantType",
 ]

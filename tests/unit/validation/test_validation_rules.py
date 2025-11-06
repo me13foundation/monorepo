@@ -7,10 +7,10 @@ and proper error handling.
 
 from src.domain.validation.rules.base_rules import ValidationRuleEngine
 from src.domain.validation.rules.gene_rules import GeneValidationRules
-from src.domain.validation.rules.variant_rules import VariantValidationRules
 from src.domain.validation.rules.phenotype_rules import PhenotypeValidationRules
 from src.domain.validation.rules.publication_rules import PublicationValidationRules
 from src.domain.validation.rules.relationship_rules import RelationshipValidationRules
+from src.domain.validation.rules.variant_rules import VariantValidationRules
 
 
 class TestGeneValidationRules:
@@ -21,10 +21,10 @@ class TestGeneValidationRules:
         rule = GeneValidationRules.validate_hgnc_nomenclature("symbol")
 
         # Valid symbol
-        is_valid, message, suggestion = rule.validator("TP53")
+        is_valid, _message, _suggestion = rule.validator("TP53")
         assert is_valid
-        assert message == ""
-        assert suggestion is None
+        assert _message == ""
+        assert _suggestion is None
 
     def test_hgnc_nomenclature_invalid(self):
         """Test invalid HGNC nomenclature."""
@@ -40,7 +40,7 @@ class TestGeneValidationRules:
         ]
 
         for invalid_symbol, expected_message in test_cases:
-            is_valid, message, suggestion = rule.validator(invalid_symbol)
+            is_valid, message, _suggestion = rule.validator(invalid_symbol)
             assert not is_valid
             assert expected_message in message
 
@@ -51,7 +51,7 @@ class TestGeneValidationRules:
         # Valid IDs
         valid_ids = ["HGNC:12345", "HGNC:99999"]
         for hgnc_id in valid_ids:
-            is_valid, message, suggestion = rule.validator(hgnc_id)
+            is_valid, _message, _suggestion = rule.validator(hgnc_id)
             assert is_valid
 
     def test_hgnc_id_format_invalid(self):
@@ -61,7 +61,7 @@ class TestGeneValidationRules:
         # Invalid IDs
         invalid_ids = ["HGC:12345", "HGNC:abc", "HGNC:123abc", "12345"]
         for invalid_id in invalid_ids:
-            is_valid, message, suggestion = rule.validator(invalid_id)
+            is_valid, message, _suggestion = rule.validator(invalid_id)
             assert not is_valid
             assert "format" in message.lower()
 
@@ -70,7 +70,7 @@ class TestGeneValidationRules:
         rule = GeneValidationRules.validate_cross_reference_consistency({})
 
         # Empty cross-references (should pass)
-        is_valid, message, suggestion = rule.validator({})
+        is_valid, _message, _suggestion = rule.validator({})
         assert is_valid
 
         # Inconsistent cross-references
@@ -78,7 +78,7 @@ class TestGeneValidationRules:
             "SYMBOL": ["TP53", "TP53", "P53"],  # Multiple symbols
             "HGNC": ["HGNC:11998"],  # Single HGNC ID
         }
-        is_valid, message, suggestion = rule.validator(inconsistent_xrefs)
+        is_valid, _message, _suggestion = rule.validator(inconsistent_xrefs)
         assert not is_valid
 
     def test_genomic_coordinates_validation(self):
@@ -87,7 +87,7 @@ class TestGeneValidationRules:
 
         # Valid coordinates
         valid_coords = {"chromosome": "1", "start_position": 1000, "end_position": 2000}
-        is_valid, message, suggestion = rule.validator(valid_coords)
+        is_valid, _message, _suggestion = rule.validator(valid_coords)
         assert is_valid
 
         # Invalid coordinates
@@ -110,7 +110,7 @@ class TestGeneValidationRules:
         ]
 
         for coords in invalid_coords:
-            is_valid, message, suggestion = rule.validator(coords)
+            is_valid, _message, _suggestion = rule.validator(coords)
             assert not is_valid
 
     def test_gene_comprehensive_validation(self):
@@ -152,13 +152,13 @@ class TestVariantValidationRules:
         rule = VariantValidationRules.validate_hgvs_notation_comprehensive("", "c")
 
         # Valid c. notation
-        is_valid, message, suggestion = rule.validator("c.123A>G")
+        is_valid, _message, _suggestion = rule.validator("c.123A>G")
         assert is_valid
 
         # Invalid notations
         invalid_notations = ["", "invalid_notation", "c.?", "c.()"]
         for notation in invalid_notations:
-            is_valid, message, suggestion = rule.validator(notation)
+            is_valid, _message, _suggestion = rule.validator(notation)
             assert not is_valid
 
     def test_clinical_significance_validation(self):
@@ -173,15 +173,15 @@ class TestVariantValidationRules:
             "Benign",
         ]
         for term in valid_terms:
-            is_valid, message, suggestion = rule.validator(term)
+            is_valid, _message, _suggestion = rule.validator(term)
             assert is_valid
 
         # Invalid significance
-        is_valid, message, suggestion = rule.validator("Invalid significance")
+        is_valid, _message, _suggestion = rule.validator("Invalid significance")
         assert not is_valid
 
         # Conflicting terms
-        is_valid, message, suggestion = rule.validator("Pathogenic and Benign")
+        is_valid, _message, _suggestion = rule.validator("Pathogenic and Benign")
         assert not is_valid
 
     def test_population_frequencies_validation(self):
@@ -190,7 +190,7 @@ class TestVariantValidationRules:
 
         # Valid frequencies
         valid_freqs = {"AFR": 0.1, "EUR": 0.05, "ASN": 0.02}
-        is_valid, message, suggestion = rule.validator(valid_freqs)
+        is_valid, _message, _suggestion = rule.validator(valid_freqs)
         assert is_valid
 
         # Invalid frequencies
@@ -201,7 +201,7 @@ class TestVariantValidationRules:
         ]
 
         for freqs in invalid_freqs:
-            is_valid, message, suggestion = rule.validator(freqs)
+            is_valid, _message, _suggestion = rule.validator(freqs)
             assert not is_valid
 
     def test_variant_comprehensive_validation(self):
@@ -230,7 +230,7 @@ class TestVariantValidationRules:
         }
 
         issues = VariantValidationRules.validate_variant_comprehensively(
-            invalid_variant
+            invalid_variant,
         )
         error_issues = [i for i in issues if i.get("severity") == "error"]
         assert len(error_issues) > 0
@@ -246,13 +246,13 @@ class TestPhenotypeValidationRules:
         # Valid HPO IDs
         valid_ids = ["HP:0000001", "HP:9999999"]
         for hpo_id in valid_ids:
-            is_valid, message, suggestion = rule.validator(hpo_id)
+            is_valid, _message, _suggestion = rule.validator(hpo_id)
             assert is_valid
 
         # Invalid HPO IDs
         invalid_ids = ["HP:123", "HP:ABCDEFG", "HP:12345678", "HPO:0000001"]
         for invalid_id in invalid_ids:
-            is_valid, message, suggestion = rule.validator(invalid_id)
+            is_valid, _message, _suggestion = rule.validator(invalid_id)
             assert not is_valid
 
     def test_phenotype_name_consistency(self):
@@ -261,12 +261,12 @@ class TestPhenotypeValidationRules:
 
         # Consistent name/ID
         consistent_data = {"name": "Intellectual disability", "hpo_id": "HP:0001249"}
-        is_valid, message, suggestion = rule.validator(consistent_data)
+        is_valid, _message, _suggestion = rule.validator(consistent_data)
         assert is_valid
 
         # Inconsistent name/ID
         inconsistent_data = {"name": "Invalid phenotype", "hpo_id": "HP:0001249"}
-        is_valid, message, suggestion = rule.validator(inconsistent_data)
+        is_valid, _message, _suggestion = rule.validator(inconsistent_data)
         # This might pass or fail depending on implementation - just check it runs
         assert isinstance(is_valid, bool)
 
@@ -281,7 +281,7 @@ class TestPhenotypeValidationRules:
         }
 
         issues = PhenotypeValidationRules.validate_phenotype_comprehensively(
-            valid_phenotype
+            valid_phenotype,
         )
         error_issues = [i for i in issues if i.get("severity") == "error"]
         assert len(error_issues) == 0
@@ -294,7 +294,7 @@ class TestPhenotypeValidationRules:
         }
 
         issues = PhenotypeValidationRules.validate_phenotype_comprehensively(
-            invalid_phenotype
+            invalid_phenotype,
         )
         error_issues = [i for i in issues if i.get("severity") == "error"]
         assert len(error_issues) > 0
@@ -310,13 +310,13 @@ class TestPublicationValidationRules:
         # Valid DOIs
         valid_dois = ["10.1038/nature12345", "10.1101/2023.01.01.123456"]
         for doi in valid_dois:
-            is_valid, message, suggestion = rule.validator(doi)
+            is_valid, _message, _suggestion = rule.validator(doi)
             assert is_valid
 
         # Invalid DOIs
         invalid_dois = ["invalid_doi", "doi:10.1038/nature12345", "10.1038", ""]
         for invalid_doi in invalid_dois:
-            is_valid, message, suggestion = rule.validator(invalid_doi)
+            is_valid, _message, _suggestion = rule.validator(invalid_doi)
             assert not is_valid
 
     def test_author_information_validation(self):
@@ -328,7 +328,7 @@ class TestPublicationValidationRules:
             {"name": "John Smith", "affiliation": "Test University"},
             {"name": "Jane Doe", "affiliation": "Research Institute"},
         ]
-        is_valid, message, suggestion = rule.validator(valid_authors)
+        is_valid, _message, _suggestion = rule.validator(valid_authors)
         assert is_valid
 
         # Invalid authors
@@ -339,7 +339,7 @@ class TestPublicationValidationRules:
         ]
 
         for authors in invalid_authors:
-            is_valid, message, suggestion = rule.validator(authors)
+            is_valid, _message, _suggestion = rule.validator(authors)
             assert not is_valid
 
     def test_publication_comprehensive_validation(self):
@@ -356,7 +356,7 @@ class TestPublicationValidationRules:
         }
 
         issues = PublicationValidationRules.validate_publication_comprehensively(
-            valid_publication
+            valid_publication,
         )
         error_issues = [i for i in issues if i.get("severity") == "error"]
         assert len(error_issues) == 0
@@ -369,7 +369,7 @@ class TestPublicationValidationRules:
         }
 
         issues = PublicationValidationRules.validate_publication_comprehensively(
-            invalid_publication
+            invalid_publication,
         )
         error_issues = [i for i in issues if i.get("severity") == "error"]
         assert len(error_issues) > 0
@@ -381,7 +381,9 @@ class TestRelationshipValidationRules:
     def test_genotype_phenotype_plausibility(self):
         """Test genotype-phenotype plausibility validation."""
         rule = RelationshipValidationRules.validate_genotype_phenotype_plausibility(
-            {}, {}, {}
+            {},
+            {},
+            {},
         )
 
         # This is a complex rule that may need mocking for full testing
@@ -392,14 +394,16 @@ class TestRelationshipValidationRules:
             "phenotype": {"name": "Cancer"},
         }
 
-        is_valid, message, suggestion = rule.validator(relationship_data)
+        is_valid, _message, _suggestion = rule.validator(relationship_data)
         # Result depends on implementation - just check it runs
         assert isinstance(is_valid, bool)
 
     def test_evidence_strength_validation(self):
         """Test evidence strength validation."""
         rule = RelationshipValidationRules.validate_evidence_strength_and_consistency(
-            [], 0.0, ""
+            [],
+            0.0,
+            "",
         )
 
         # High confidence with good evidence
@@ -408,7 +412,7 @@ class TestRelationshipValidationRules:
             "confidence_score": 0.9,
             "evidence_level": "reviewed",
         }
-        is_valid, message, suggestion = rule.validator(strong_evidence)
+        is_valid, _message, _suggestion = rule.validator(strong_evidence)
         assert is_valid
 
         # Low confidence with poor evidence
@@ -417,13 +421,16 @@ class TestRelationshipValidationRules:
             "confidence_score": 0.1,
             "evidence_level": "predicted",
         }
-        is_valid, message, suggestion = rule.validator(weak_evidence)
+        is_valid, _message, _suggestion = rule.validator(weak_evidence)
         # May or may not be valid depending on thresholds
 
     def test_statistical_significance_validation(self):
         """Test statistical significance validation."""
         rule = RelationshipValidationRules.validate_statistical_significance(
-            1.0, 0, 0.0, (0.0, 0.0)
+            1.0,
+            0,
+            0.0,
+            (0.0, 0.0),
         )
 
         # Valid statistical data
@@ -433,7 +440,7 @@ class TestRelationshipValidationRules:
             "effect_size": 0.5,
             "confidence_interval": (0.3, 0.7),
         }
-        is_valid, message, suggestion = rule.validator(valid_stats)
+        is_valid, _message, _suggestion = rule.validator(valid_stats)
         assert is_valid
 
         # Invalid statistical data
@@ -444,7 +451,7 @@ class TestRelationshipValidationRules:
         ]
 
         for stats in invalid_stats:
-            is_valid, message, suggestion = rule.validator(stats)
+            is_valid, _message, _suggestion = rule.validator(stats)
             assert not is_valid
 
 
@@ -481,6 +488,7 @@ class TestValidationRuleEngine:
 
     def test_validate_batch(self):
         """Test batch validation."""
+        expected_results = 3
         genes = [
             {"symbol": "TP53", "source": "test"},
             {"symbol": "BRCA1", "source": "test"},
@@ -488,7 +496,7 @@ class TestValidationRuleEngine:
         ]
 
         results = self.engine.validate_batch("gene", genes)
-        assert len(results) == 3
+        assert len(results) == expected_results
         assert results[0].is_valid  # TP53 should be valid
         assert results[1].is_valid  # BRCA1 should be valid
         assert not results[2].is_valid  # Empty symbol should be invalid
@@ -509,7 +517,9 @@ class TestValidationRuleEngine:
         gene_data = {"symbol": "TP53", "source": "test"}
         result_all = self.engine.validate_entity("gene", gene_data)
         result_selected = self.engine.validate_entity(
-            "gene", gene_data, ["hgnc_nomenclature"]
+            "gene",
+            gene_data,
+            ["hgnc_nomenclature"],
         )
 
         # Results should be different when different rules are applied

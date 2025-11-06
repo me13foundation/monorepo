@@ -3,11 +3,13 @@ Gene repository for MED13 Resource Library.
 Data access layer for gene entities with specialized queries.
 """
 
-from typing import List, Optional, Dict, Any, Tuple
-from sqlalchemy import select, or_, func, asc, desc
+from typing import Any
+
+from sqlalchemy import asc, desc, func, or_, select
+
+from src.models.database import GeneModel
 
 from .base import BaseRepository, NotFoundError
-from src.models.database import GeneModel
 
 
 class GeneRepository(BaseRepository[GeneModel, int]):
@@ -22,7 +24,7 @@ class GeneRepository(BaseRepository[GeneModel, int]):
     def model_class(self) -> type[GeneModel]:
         return GeneModel
 
-    def find_by_symbol(self, symbol: str) -> Optional[GeneModel]:
+    def find_by_symbol(self, symbol: str) -> GeneModel | None:
         """
         Find a gene by its symbol (case-insensitive).
 
@@ -35,7 +37,7 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         stmt = select(GeneModel).where(GeneModel.symbol.ilike(symbol.upper()))
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def find_by_gene_id(self, gene_id: str) -> Optional[GeneModel]:
+    def find_by_gene_id(self, gene_id: str) -> GeneModel | None:
         """
         Find a gene by its gene_id.
 
@@ -48,7 +50,7 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         stmt = select(GeneModel).where(GeneModel.gene_id == gene_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def find_by_external_id(self, external_id: str) -> Optional[GeneModel]:
+    def find_by_external_id(self, external_id: str) -> GeneModel | None:
         """
         Find a gene by any external identifier (Ensembl, NCBI, UniProt).
 
@@ -68,7 +70,7 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         stmt = select(GeneModel).where(or_(*conditions))
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def search_by_name_or_symbol(self, query: str, limit: int = 10) -> List[GeneModel]:
+    def search_by_name_or_symbol(self, query: str, limit: int = 10) -> list[GeneModel]:
         """
         Search genes by name or symbol containing the query string.
 
@@ -86,7 +88,7 @@ class GeneRepository(BaseRepository[GeneModel, int]):
                 or_(
                     GeneModel.symbol.ilike(search_pattern),
                     GeneModel.name.ilike(search_pattern),
-                )
+                ),
             )
             .limit(limit)
         )
@@ -98,8 +100,8 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        search: Optional[str] = None,
-    ) -> Tuple[List[GeneModel], int]:
+        search: str | None = None,
+    ) -> tuple[list[GeneModel], int]:
         """
         Retrieve paginated genes with optional search and sorting.
 
@@ -144,7 +146,7 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         total = self.session.execute(count_stmt).scalar_one()
         return items, int(total)
 
-    def find_with_variants(self, gene_id: int) -> Optional[GeneModel]:
+    def find_with_variants(self, gene_id: int) -> GeneModel | None:
         """
         Find a gene with its associated variants loaded.
 
@@ -157,7 +159,7 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         stmt = select(GeneModel).where(GeneModel.id == gene_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def get_gene_statistics(self) -> Dict[str, Any]:
+    def get_gene_statistics(self) -> dict[str, Any]:
         """
         Get statistics about genes in the database.
 
@@ -188,7 +190,8 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         """
         gene = self.find_by_symbol(symbol)
         if gene is None:
-            raise NotFoundError(f"Gene with symbol '{symbol}' not found")
+            message = f"Gene with symbol '{symbol}' not found"
+            raise NotFoundError(message)
         return gene
 
     def find_by_gene_id_or_fail(self, gene_id: str) -> GeneModel:
@@ -206,5 +209,6 @@ class GeneRepository(BaseRepository[GeneModel, int]):
         """
         gene = self.find_by_gene_id(gene_id)
         if gene is None:
-            raise NotFoundError(f"Gene with gene_id '{gene_id}' not found")
+            message = f"Gene with gene_id '{gene_id}' not found"
+            raise NotFoundError(message)
         return gene

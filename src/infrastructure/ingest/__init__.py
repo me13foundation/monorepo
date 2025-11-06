@@ -3,20 +3,20 @@ Data ingestion infrastructure for MED13 Resource Library.
 Provides API clients, rate limiting, and data acquisition capabilities.
 """
 
-from .base_ingestor import BaseIngestor, IngestionResult, IngestionError
+from .base_ingestor import BaseIngestor, IngestionError, IngestionResult
 from .clinvar_ingestor import ClinVarIngestor
-from .pubmed_ingestor import PubMedIngestor
-from .hpo_ingestor import HPOIngestor
-from .uniprot_ingestor import UniProtIngestor
 from .coordinator import IngestionCoordinator
+from .hpo_ingestor import HPOIngestor
+from .pubmed_ingestor import PubMedIngestor
+from .uniprot_ingestor import UniProtIngestor
 
 __all__ = [
     "BaseIngestor",
-    "IngestionResult",
-    "IngestionError",
     "ClinVarIngestor",
-    "PubMedIngestor",
     "HPOIngestor",
-    "UniProtIngestor",
     "IngestionCoordinator",
+    "IngestionError",
+    "IngestionResult",
+    "PubMedIngestor",
+    "UniProtIngestor",
 ]

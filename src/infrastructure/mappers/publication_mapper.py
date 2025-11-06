@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
-from datetime import date
-from typing import Optional, Sequence, Tuple, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from src.domain.entities.publication import Publication, PublicationType
 from src.domain.value_objects.identifiers import PublicationIdentifier
 from src.models.database.publication import PublicationModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+    from datetime import date
 
 
 class PublicationMapper:
@@ -32,7 +35,7 @@ class PublicationMapper:
             volume=model.volume,
             issue=model.issue,
             pages=model.pages,
-            publication_date=cast(Optional[date], model.publication_date),
+            publication_date=cast("date | None", model.publication_date),
             abstract=model.abstract,
             keywords=keywords,
             citation_count=model.citation_count or 0,
@@ -48,7 +51,8 @@ class PublicationMapper:
 
     @staticmethod
     def to_model(
-        entity: Publication, model: Optional[PublicationModel] = None
+        entity: Publication,
+        model: PublicationModel | None = None,
     ) -> PublicationModel:
         target = model or PublicationModel()
         target.pubmed_id = entity.identifier.pubmed_id
@@ -62,7 +66,7 @@ class PublicationMapper:
         target.volume = entity.volume
         target.issue = entity.issue
         target.pages = entity.pages
-        setattr(target, "publication_date", entity.publication_date)
+        target.publication_date = cast("Any", entity.publication_date)
         target.abstract = entity.abstract
         target.keywords = PublicationMapper._serialize_keywords(entity.keywords)
         target.citation_count = entity.citation_count
@@ -82,7 +86,7 @@ class PublicationMapper:
         return [PublicationMapper.to_domain(model) for model in models]
 
     @staticmethod
-    def _parse_people(raw: str) -> Tuple[str, ...]:
+    def _parse_people(raw: str) -> tuple[str, ...]:
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, list):
@@ -94,11 +98,11 @@ class PublicationMapper:
         return tuple(name.strip() for name in raw.split(",") if name.strip())
 
     @staticmethod
-    def _serialize_people(people: Tuple[str, ...]) -> str:
+    def _serialize_people(people: tuple[str, ...]) -> str:
         return json.dumps(list(people))
 
     @staticmethod
-    def _parse_keywords(raw: Optional[str]) -> Tuple[str, ...]:
+    def _parse_keywords(raw: str | None) -> tuple[str, ...]:
         if not raw:
             return ()
         try:
@@ -114,7 +118,7 @@ class PublicationMapper:
         )
 
     @staticmethod
-    def _serialize_keywords(keywords: Tuple[str, ...]) -> Optional[str]:
+    def _serialize_keywords(keywords: tuple[str, ...]) -> str | None:
         if not keywords:
             return None
         return json.dumps(list(keywords))

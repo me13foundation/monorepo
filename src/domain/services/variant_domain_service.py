@@ -5,11 +5,12 @@ Encapsulates variant-specific business rules, validations, and logic
 without infrastructure dependencies.
 """
 
-from typing import Any, Dict, List, Optional
+from collections import Counter
+from typing import Any
 
-from .base import DomainService
-from ..entities.variant import Variant, VariantType
-from ...type_definitions.domain import VariantDerivedProperties
+from src.domain.entities.variant import Variant, VariantType
+from src.domain.services.base import DomainService
+from src.type_definitions.domain import VariantDerivedProperties
 
 
 class VariantDomainService(DomainService):
@@ -21,8 +22,11 @@ class VariantDomainService(DomainService):
     """
 
     def validate_business_rules(
-        self, entity: Variant, operation: str, context: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        self,
+        entity: Variant,
+        _operation: str,
+        _context: dict[str, Any] | None = None,
+    ) -> list[str]:
         """
         Validate variant business rules.
 
@@ -45,13 +49,13 @@ class VariantDomainService(DomainService):
             errors.append("Reference and alternate alleles are required")
 
         # Frequency validation
-        if entity.allele_frequency is not None:
-            if not (0.0 <= entity.allele_frequency <= 1.0):
-                errors.append("Allele frequency must be between 0.0 and 1.0")
+        if entity.allele_frequency is not None and not (
+            0.0 <= entity.allele_frequency <= 1.0
+        ):
+            errors.append("Allele frequency must be between 0.0 and 1.0")
 
-        if entity.gnomad_af is not None:
-            if not (0.0 <= entity.gnomad_af <= 1.0):
-                errors.append("gnomAD frequency must be between 0.0 and 1.0")
+        if entity.gnomad_af is not None and not (0.0 <= entity.gnomad_af <= 1.0):
+            errors.append("gnomAD frequency must be between 0.0 and 1.0")
 
         # HGVS validation (basic)
         if entity.hgvs_genomic and not self._is_valid_hgvs(entity.hgvs_genomic):
@@ -79,7 +83,8 @@ class VariantDomainService(DomainService):
             and entity.variant_type == VariantType.UNKNOWN
         ):
             entity.variant_type = self._infer_variant_type(
-                entity.reference_allele, entity.alternate_allele
+                entity.reference_allele,
+                entity.alternate_allele,
             )
 
         # Normalize chromosome format
@@ -87,7 +92,7 @@ class VariantDomainService(DomainService):
 
         return entity
 
-    def calculate_derived_properties(self, entity: Variant) -> Dict[str, Any]:
+    def calculate_derived_properties(self, entity: Variant) -> dict[str, Any]:
         """
         Calculate derived properties for a variant.
 
@@ -99,7 +104,7 @@ class VariantDomainService(DomainService):
         """
         # Check if variant has population frequency data
         raw_frequencies = [entity.allele_frequency, entity.gnomad_af]
-        population_frequencies: List[float] = [
+        population_frequencies: list[float] = [
             freq for freq in raw_frequencies if freq is not None
         ]
         has_population_data = bool(population_frequencies)
@@ -109,7 +114,7 @@ class VariantDomainService(DomainService):
         average_population_frequency = None
         if has_population_data:
             average_population_frequency = sum(population_frequencies) / len(
-                population_frequencies
+                population_frequencies,
             )
 
         # Determine functional impact (simplified - based on variant type)
@@ -126,7 +131,7 @@ class VariantDomainService(DomainService):
         significance_consistency_score = 0.5  # Default neutral score
         if entity.evidence:
             significance_consistency_score = self._calculate_significance_consistency(
-                entity.evidence
+                entity.evidence,
             )
 
         # Create typed result for internal type safety
@@ -143,7 +148,9 @@ class VariantDomainService(DomainService):
         return result.__dict__
 
     def assess_clinical_significance_confidence(
-        self, variant: Variant, evidence_list: List[Any]
+        self,
+        _variant: Variant,
+        evidence_list: list[Any],
     ) -> float:
         """
         Assess confidence in clinical significance based on evidence.
@@ -166,15 +173,17 @@ class VariantDomainService(DomainService):
 
         # Clinical significance consistency factor
         significance_consistency = self._calculate_significance_consistency(
-            evidence_list
+            evidence_list,
         )
         consistency_factor = significance_consistency * 0.2
 
         return min(base_confidence + evidence_factor + consistency_factor, 1.0)
 
     def detect_evidence_conflicts(
-        self, variant: Variant, evidence_list: List[Any]
-    ) -> List[str]:
+        self,
+        _variant: Variant,
+        evidence_list: list[Any],
+    ) -> list[str]:
         """
         Detect conflicting evidence for a variant.
 
@@ -185,9 +194,10 @@ class VariantDomainService(DomainService):
         Returns:
             List of conflict descriptions
         """
-        conflicts: List[str] = []
+        conflicts: list[str] = []
 
-        if len(evidence_list) < 2:
+        evidence_conflict_min = 2
+        if len(evidence_list) < evidence_conflict_min:
             return conflicts
 
         significances = [
@@ -202,7 +212,7 @@ class VariantDomainService(DomainService):
 
         if pathogenic_count > 0 and benign_count > 0:
             conflicts.append(
-                f"Conflicting clinical significance: {pathogenic_count} pathogenic vs {benign_count} benign"
+                f"Conflicting clinical significance: {pathogenic_count} pathogenic vs {benign_count} benign",
             )
 
         # Check frequency discrepancies
@@ -213,7 +223,8 @@ class VariantDomainService(DomainService):
         ]
         if len(frequencies) > 1:
             freq_range = max(frequencies) - min(frequencies)
-            if freq_range > 0.01:  # More than 1% difference
+            freq_discrepancy_threshold = 0.01
+            if freq_range > freq_discrepancy_threshold:  # More than 1% difference
                 conflicts.append(f"Large frequency discrepancy: {freq_range:.4f}")
 
         return conflicts
@@ -232,24 +243,23 @@ class VariantDomainService(DomainService):
             return hgvs
 
         # Basic normalization - in reality this would be much more complex
-        normalized = hgvs.strip()
-
-        # Ensure consistent formatting for common patterns
-        # This is a simplified implementation
-        return normalized
+        # Ensure consistent formatting for common patterns (simplified)
+        return hgvs.strip()
 
     def _is_rare_variant(self, variant: Variant) -> bool:
         """Determine if a variant is considered rare."""
         # Use the lower frequency for assessment
         frequency = variant.allele_frequency
-        if variant.gnomad_af is not None:
-            if frequency is None or variant.gnomad_af < frequency:
-                frequency = variant.gnomad_af
+        if variant.gnomad_af is not None and (
+            frequency is None or variant.gnomad_af < frequency
+        ):
+            frequency = variant.gnomad_af
 
         if frequency is None:
             return False  # Unknown frequency
 
-        return frequency < 0.01  # Less than 1%
+        rare_variant_threshold = 0.01
+        return frequency < rare_variant_threshold  # Less than 1%
 
     def _calculate_complexity_score(self, variant: Variant) -> float:
         """Calculate variant complexity score."""
@@ -277,16 +287,15 @@ class VariantDomainService(DomainService):
 
         if "pathogenic" in significance:
             return "high"
-        elif "likely_pathogenic" in significance:
+        if "likely_pathogenic" in significance:
             return "medium"
-        elif "uncertain" in significance:
+        if "uncertain" in significance:
             return "unknown"
-        elif "likely_benign" in significance:
+        if "likely_benign" in significance:
             return "low"
-        elif "benign" in significance:
+        if "benign" in significance:
             return "very_low"
-        else:
-            return "unknown"
+        return "unknown"
 
     def _check_frequency_discrepancy(self, variant: Variant) -> bool:
         """Check for discrepancies between reported and population frequencies."""
@@ -294,24 +303,24 @@ class VariantDomainService(DomainService):
             return False
 
         # Flag if difference is more than 5%
-        return abs(variant.allele_frequency - variant.gnomad_af) > 0.05
+        mismatch_threshold = 0.05
+        return abs(variant.allele_frequency - variant.gnomad_af) > mismatch_threshold
 
-    def _calculate_significance_consistency(self, evidence_list: List[Any]) -> float:
+    def _calculate_significance_consistency(self, evidence_list: list[Any]) -> float:
         """Calculate consistency of clinical significance across evidence."""
         if not evidence_list:
             return 0.0
 
-        significances = []
-        for ev in evidence_list:
-            if hasattr(ev, "clinical_significance") and ev.clinical_significance:
-                significances.append(ev.clinical_significance.lower())
+        significances = [
+            ev.clinical_significance.lower()
+            for ev in evidence_list
+            if hasattr(ev, "clinical_significance") and ev.clinical_significance
+        ]
 
         if not significances:
             return 0.0
 
         # Count most common significance
-        from collections import Counter
-
         most_common = Counter(significances).most_common(1)[0][1]
 
         return most_common / len(significances)

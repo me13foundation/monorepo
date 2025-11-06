@@ -4,15 +4,16 @@ Annotation Panel Component for MED13 Curation Dashboard.
 Provides expert annotation interface with audit trail and rationale capture.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from dash import html, dcc
 import dash_bootstrap_components as dbc
+
+from dash import dcc, html
 
 
 def create_annotation_panel(
-    variant_data: Dict[str, Any],
-    existing_annotations: Optional[List[Dict[str, Any]]] = None,
+    variant_data: dict[str, Any],
+    existing_annotations: list[dict[str, Any]] | None = None,
 ) -> dbc.Card:
     """
     Create an annotation panel for expert comments and curation rationale.
@@ -36,7 +37,7 @@ def create_annotation_panel(
                         color="info",
                         className="ms-2",
                     ),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
@@ -46,13 +47,13 @@ def create_annotation_panel(
                     _create_annotation_history(existing_annotations),
                     # Audit trail
                     _create_audit_trail(variant_data),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
-def _create_quick_annotation_form(variant_data: Dict[str, Any]) -> html.Div:
+def _create_quick_annotation_form(variant_data: dict[str, Any]) -> html.Div:
     """Create a quick annotation form for adding expert notes."""
     variant_id = variant_data.get("variant_id", "Unknown")
 
@@ -157,7 +158,7 @@ def _create_quick_annotation_form(variant_data: Dict[str, Any]) -> html.Div:
                                 id="add-annotation-btn",
                                 color="primary",
                                 className="w-100 mt-4",
-                            )
+                            ),
                         ],
                         width=4,
                     ),
@@ -165,11 +166,11 @@ def _create_quick_annotation_form(variant_data: Dict[str, Any]) -> html.Div:
                 className="mb-4",
             ),
             html.Hr(),
-        ]
+        ],
     )
 
 
-def _create_annotation_history(annotations: List[Dict[str, Any]]) -> html.Div:
+def _create_annotation_history(annotations: list[dict[str, Any]]) -> html.Div:
     """Create the annotation history timeline."""
     if not annotations:
         return html.Div(
@@ -179,12 +180,14 @@ def _create_annotation_history(annotations: List[Dict[str, Any]]) -> html.Div:
                     "No annotations yet. Add the first expert note above.",
                     className="text-muted",
                 ),
-            ]
+            ],
         )
 
     # Sort annotations by timestamp (most recent first)
     sorted_annotations = sorted(
-        annotations, key=lambda x: x.get("timestamp", ""), reverse=True
+        annotations,
+        key=lambda x: x.get("timestamp", ""),
+        reverse=True,
     )
 
     annotation_cards = []
@@ -219,12 +222,13 @@ def _create_annotation_history(annotations: List[Dict[str, Any]]) -> html.Div:
                                         dbc.Badge(
                                             annotation_type.replace("_", " ").title(),
                                             color=type_colors.get(
-                                                annotation_type, "secondary"
+                                                annotation_type,
+                                                "secondary",
                                             ),
                                             className="me-2",
                                         ),
                                         html.I(
-                                            className=f"{priority_icons.get(priority, 'fas fa-comment')} me-2"
+                                            className=f"{priority_icons.get(priority, 'fas fa-comment')} me-2",
                                         ),
                                         html.Small(
                                             f"Priority: {priority.title()}",
@@ -246,9 +250,9 @@ def _create_annotation_history(annotations: List[Dict[str, Any]]) -> html.Div:
                                     ],
                                     width=4,
                                 ),
-                            ]
-                        )
-                    ]
+                            ],
+                        ),
+                    ],
                 ),
                 dbc.CardBody(
                     [
@@ -261,7 +265,7 @@ def _create_annotation_history(annotations: List[Dict[str, Any]]) -> html.Div:
                                         annotation.get("references", "None"),
                                         className="font-monospace",
                                     ),
-                                ]
+                                ],
                             )
                             if annotation.get("references")
                             else None
@@ -270,17 +274,18 @@ def _create_annotation_history(annotations: List[Dict[str, Any]]) -> html.Div:
                             html.Div(
                                 [
                                     html.Small(
-                                        "Confidence Override: ", className="text-muted"
+                                        "Confidence Override: ",
+                                        className="text-muted",
                                     ),
                                     html.Small(
-                                        f"{annotation.get('confidence_override', 'N/A')}"
+                                        f"{annotation.get('confidence_override', 'N/A')}",
                                     ),
-                                ]
+                                ],
                             )
                             if annotation.get("confidence_override")
                             else None
                         ),
-                    ]
+                    ],
                 ),
             ],
             className="mb-3",
@@ -289,14 +294,14 @@ def _create_annotation_history(annotations: List[Dict[str, Any]]) -> html.Div:
         annotation_cards.append(annotation_card)
 
     return html.Div(
-        [html.H6("Annotation History", className="mb-3"), html.Div(annotation_cards)]
+        [html.H6("Annotation History", className="mb-3"), html.Div(annotation_cards)],
     )
 
 
-def _create_audit_trail(variant_data: Dict[str, Any]) -> html.Div:
+def _create_audit_trail(variant_data: dict[str, Any]) -> html.Div:
     """Create an audit trail showing all curation actions."""
     # Mock audit trail - in real implementation, this would come from database
-    audit_events: List[Dict[str, Any]] = [
+    audit_events: list[dict[str, Any]] = [
         {
             "timestamp": "2024-01-15 14:30:00",
             "action": "Variant Reviewed",
@@ -325,7 +330,9 @@ def _create_audit_trail(variant_data: Dict[str, Any]) -> html.Div:
         status_badge = None
         if event["status_change"]:
             status_badge = dbc.Badge(
-                event["status_change"], color="info", className="ms-2"
+                event["status_change"],
+                color="info",
+                className="ms-2",
             )
 
         audit_item = dbc.Row(
@@ -336,10 +343,11 @@ def _create_audit_trail(variant_data: Dict[str, Any]) -> html.Div:
                             [
                                 html.Strong(event["action"]),
                                 html.Small(
-                                    f" by {event['user']}", className="text-muted ms-2"
+                                    f" by {event['user']}",
+                                    className="text-muted ms-2",
                                 ),
                                 status_badge,
-                            ]
+                            ],
                         ),
                         html.P(event["details"], className="text-muted mb-0 small"),
                     ],
@@ -348,8 +356,9 @@ def _create_audit_trail(variant_data: Dict[str, Any]) -> html.Div:
                 dbc.Col(
                     [
                         html.Small(
-                            event["timestamp"], className="text-muted text-end d-block"
-                        )
+                            event["timestamp"],
+                            className="text-muted text-end d-block",
+                        ),
                     ],
                     width=2,
                 ),
@@ -363,7 +372,7 @@ def _create_audit_trail(variant_data: Dict[str, Any]) -> html.Div:
         [
             html.H6("Audit Trail", className="mb-3"),
             html.Div(audit_items, className="audit-timeline"),
-        ]
+        ],
     )
 
 
@@ -443,15 +452,15 @@ def create_quick_decision_rationale() -> dbc.Modal:
                                 ],
                                 width=6,
                             ),
-                        ]
+                        ],
                     ),
-                ]
+                ],
             ),
             dbc.ModalFooter(
                 [
                     dbc.Button("Cancel", id="cancel-decision", color="secondary"),
                     dbc.Button("Save Decision", id="save-decision", color="primary"),
-                ]
+                ],
             ),
         ],
         id="decision-rationale-modal",
@@ -459,7 +468,7 @@ def create_quick_decision_rationale() -> dbc.Modal:
     )
 
 
-def create_annotation_templates() -> Dict[str, str]:
+def create_annotation_templates() -> dict[str, str]:
     """Return common annotation templates for quick use."""
     return {
         "pathogenic_confirmation": "This variant meets ACMG/AMP criteria for pathogenicity based on {evidence_type} evidence showing {phenotype} association with {confidence}% confidence.",
@@ -471,10 +480,10 @@ def create_annotation_templates() -> Dict[str, str]:
 
 
 __all__ = [
-    "create_annotation_panel",
-    "create_quick_decision_rationale",
-    "create_annotation_templates",
-    "_create_quick_annotation_form",
     "_create_annotation_history",
     "_create_audit_trail",
+    "_create_quick_annotation_form",
+    "create_annotation_panel",
+    "create_annotation_templates",
+    "create_quick_decision_rationale",
 ]

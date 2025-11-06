@@ -2,11 +2,10 @@
 Email notification service for releases.
 """
 
-from typing import List, Optional
 import logging
 import smtplib
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
 logger = logging.getLogger(__name__)
 
@@ -14,13 +13,14 @@ logger = logging.getLogger(__name__)
 class EmailService:
     """Service for sending email notifications."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         smtp_host: str,
         smtp_port: int = 587,
-        smtp_user: Optional[str] = None,
-        smtp_password: Optional[str] = None,
-        from_email: Optional[str] = None,
+        smtp_user: str | None = None,
+        smtp_password: str | None = None,
+        from_email: str | None = None,
+        *,
         use_tls: bool = True,
     ):
         """
@@ -43,10 +43,10 @@ class EmailService:
 
     def send_notification(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         subject: str,
         body: str,
-        html_body: Optional[str] = None,
+        html_body: str | None = None,
     ) -> bool:
         """
         Send email notification.
@@ -85,19 +85,19 @@ class EmailService:
 
                 server.send_message(msg)
 
-            logger.info(f"Email sent successfully to {to_emails}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to send email: {e}")
+        except Exception:
+            logger.exception("Failed to send email")
             return False
+        else:
+            logger.info("Email sent successfully to %s", to_emails)
+            return True
 
     def send_release_notification(
         self,
-        to_emails: List[str],
+        to_emails: list[str],
         version: str,
         doi: str,
-        release_notes: Optional[str] = None,
+        release_notes: str | None = None,
     ) -> bool:
         """
         Send release notification email.

@@ -5,7 +5,8 @@ Validation helpers for phenotype metadata.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from .base_rules import (
     ValidationLevel,
@@ -14,7 +15,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = Dict[str, Any]
+IssueDict = dict[str, Any]
 
 
 class PhenotypeValidationRules:
@@ -24,11 +25,13 @@ class PhenotypeValidationRules:
 
     @staticmethod
     def validate_hpo_term_format(
-        _placeholder: Any, field: str = "hpo_id"
+        _placeholder: Any,
+        field: str = "hpo_id",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if not isinstance(
-                value, str
+                value,
+                str,
             ) or not PhenotypeValidationRules._HPO_PATTERN.fullmatch(value):
                 return (
                     False,
@@ -47,7 +50,8 @@ class PhenotypeValidationRules:
 
     @staticmethod
     def validate_phenotype_name_consistency(
-        _config: Any, field: str = "metadata"
+        _config: Any,
+        field: str = "metadata",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if value is None:
@@ -68,7 +72,8 @@ class PhenotypeValidationRules:
                     "Provide a human readable phenotype name",
                 )
             if not isinstance(
-                hpo_id, str
+                hpo_id,
+                str,
             ) or not PhenotypeValidationRules._HPO_PATTERN.fullmatch(hpo_id):
                 return (
                     False,
@@ -98,9 +103,9 @@ class PhenotypeValidationRules:
 
     @staticmethod
     def validate_phenotype_comprehensively(
-        phenotype: Dict[str, Any],
-    ) -> List[IssueDict]:
-        issues: List[IssueDict] = []
+        phenotype: dict[str, Any],
+    ) -> list[IssueDict]:
+        issues: list[IssueDict] = []
 
         for rule in PhenotypeValidationRules.get_all_rules():
             value = phenotype if rule.field == "metadata" else phenotype.get(rule.field)
@@ -115,7 +120,7 @@ class PhenotypeValidationRules:
                         "message": message,
                         "suggestion": suggestion,
                         "severity": rule.severity.name.lower(),
-                    }
+                    },
                 )
 
         if not phenotype.get("definition"):
@@ -125,7 +130,7 @@ class PhenotypeValidationRules:
                     rule="definition_required",
                     message="Phenotype definition is recommended",
                     severity=ValidationSeverity.INFO,
-                )
+                ),
             )
 
         return issues
@@ -137,7 +142,7 @@ class PhenotypeValidationRules:
         rule: str,
         message: str,
         severity: ValidationSeverity,
-        suggestion: Optional[str] = None,
+        suggestion: str | None = None,
     ) -> IssueDict:
         return {
             "field": field,

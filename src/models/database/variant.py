@@ -3,15 +3,17 @@ Variant SQLAlchemy model for MED13 Resource Library.
 Database representation of genetic variants with clinical significance.
 """
 
-from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import String, Integer, ForeignKey, Float, Enum as SQLEnum
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
-    from .gene import GeneModel
     from .evidence import EvidenceModel
+    from .gene import GeneModel
 
 
 class VariantType(SQLEnum):
@@ -51,15 +53,23 @@ class VariantModel(Base):
 
     # Foreign key to gene
     gene_id: Mapped[int] = mapped_column(
-        ForeignKey("genes.id", ondelete="CASCADE"), nullable=False, index=True
+        ForeignKey("genes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     # Variant identifiers
     variant_id: Mapped[str] = mapped_column(
-        String(100), unique=True, nullable=False, index=True
+        String(100),
+        unique=True,
+        nullable=False,
+        index=True,
     )
-    clinvar_id: Mapped[Optional[str]] = mapped_column(
-        String(20), unique=True, nullable=True, index=True
+    clinvar_id: Mapped[str | None] = mapped_column(
+        String(20),
+        unique=True,
+        nullable=True,
+        index=True,
     )
 
     # Genomic coordinates
@@ -69,30 +79,32 @@ class VariantModel(Base):
     alternate_allele: Mapped[str] = mapped_column(String(1000), nullable=False)
 
     # HGVS notation
-    hgvs_genomic: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    hgvs_protein: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    hgvs_cdna: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    hgvs_genomic: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    hgvs_protein: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    hgvs_cdna: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     # Classification
     variant_type: Mapped[str] = mapped_column(
-        String(20), default="unknown", nullable=False
+        String(20),
+        default="unknown",
+        nullable=False,
     )
     clinical_significance: Mapped[str] = mapped_column(
-        String(50), default="not_provided", nullable=False
+        String(50),
+        default="not_provided",
+        nullable=False,
     )
 
     # Clinical information
-    condition: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    review_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    condition: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    review_status: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Population frequency data
-    allele_frequency: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    gnomad_af: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    allele_frequency: Mapped[float | None] = mapped_column(Float, nullable=True)
+    gnomad_af: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Relationships
     gene: Mapped["GeneModel"] = relationship(back_populates="variants")
-    evidence: Mapped[List["EvidenceModel"]] = relationship(back_populates="variant")
+    evidence: Mapped[list["EvidenceModel"]] = relationship(back_populates="variant")
 
-    __table_args__ = {
-        "sqlite_autoincrement": True,
-    }
+    __table_args__ = {"sqlite_autoincrement": True}  # noqa: RUF012

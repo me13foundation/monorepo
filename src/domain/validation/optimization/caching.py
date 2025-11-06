@@ -6,7 +6,7 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from ..rules.base_rules import ValidationResult
 
@@ -18,10 +18,10 @@ class CacheConfig:
 
 
 class ValidationCache:
-    def __init__(self, config: Optional[CacheConfig] = None) -> None:
+    def __init__(self, config: CacheConfig | None = None) -> None:
         self._config = config or CacheConfig()
-        self._store: Dict[str, Tuple[datetime, object]] = {}
-        self._stats: Dict[str, int] = {"hits": 0, "misses": 0}
+        self._store: dict[str, tuple[datetime, object]] = {}
+        self._stats: dict[str, int] = {"hits": 0, "misses": 0}
 
     # ------------------------------------------------------------------ #
     # Public API
@@ -31,7 +31,7 @@ class ValidationCache:
         self._evict_if_needed()
         self._store[key] = (datetime.now(UTC), value)
 
-    def get(self, key: str) -> Optional[object]:
+    def get(self, key: str) -> object | None:
         entry = self._store.get(key)
         if entry is None:
             self._stats["misses"] += 1
@@ -46,24 +46,29 @@ class ValidationCache:
         self._stats["hits"] += 1
         return value
 
-    def get_cache_key(self, entity_type: str, payload: Dict[str, Any]) -> str:
+    def get_cache_key(self, entity_type: str, payload: dict[str, Any]) -> str:
         serialised = json.dumps([entity_type, payload], sort_keys=True)
         return hashlib.sha256(serialised.encode("utf-8")).hexdigest()
 
     def cache_validation_result(
-        self, entity_type: str, payload: Dict[str, Any], result: ValidationResult
+        self,
+        entity_type: str,
+        payload: dict[str, Any],
+        result: ValidationResult,
     ) -> None:
         key = self.get_cache_key(entity_type, payload)
         self.put(key, result)
 
     def get_cached_validation_result(
-        self, entity_type: str, payload: Dict[str, Any]
-    ) -> Optional[ValidationResult]:
+        self,
+        entity_type: str,
+        payload: dict[str, Any],
+    ) -> ValidationResult | None:
         key = self.get_cache_key(entity_type, payload)
         cached = self.get(key)
         return cached if isinstance(cached, ValidationResult) else None
 
-    def get_cache_stats(self) -> Dict[str, float]:
+    def get_cache_stats(self) -> dict[str, float]:
         total_entries = len(self._store)
         hits = self._stats["hits"]
         misses = self._stats["misses"]

@@ -7,9 +7,11 @@ including parallel processing, error recovery, and progress tracking.
 
 import asyncio
 import logging
-from typing import Dict, List, Any, Optional, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 from .etl_transformer import ETLTransformer
 
@@ -32,7 +34,7 @@ class PipelineConfig:
     enable_validation: bool = True
     enable_metrics: bool = True
     error_recovery: bool = True
-    progress_callback: Optional[Callable[[str, float], None]] = None
+    progress_callback: Callable[[str, float], None] | None = None
 
 
 @dataclass
@@ -40,11 +42,11 @@ class PipelineResult:
     """Result of pipeline execution."""
 
     success: bool
-    transformed_data: Dict[str, Any]
-    metrics: Dict[str, Any]
-    errors: List[str]
+    transformed_data: dict[str, Any]
+    metrics: dict[str, Any]
+    errors: list[str]
     execution_time: float
-    stages_completed: List[str]
+    stages_completed: list[str]
 
     def __contains__(self, key: str) -> bool:
         return hasattr(self, key)
@@ -58,7 +60,7 @@ class TransformationPipeline:
     parallel processing, incremental updates, error recovery, and progress monitoring.
     """
 
-    def __init__(self, config: Optional[PipelineConfig] = None):
+    def __init__(self, config: PipelineConfig | None = None):
         self.config = config or PipelineConfig()
         self.logger = logging.getLogger(__name__)
 
@@ -71,8 +73,8 @@ class TransformationPipeline:
 
     async def execute_pipeline(
         self,
-        raw_data: Dict[str, List[Dict[str, Any]]],
-        gene_symbol: Optional[str] = None,
+        raw_data: dict[str, list[dict[str, Any]]],
+        gene_symbol: str | None = None,
     ) -> PipelineResult:
         """
         Execute the complete transformation pipeline.
@@ -90,7 +92,7 @@ class TransformationPipeline:
 
         try:
             self.logger.info(
-                f"Starting transformation pipeline in {self.config.mode.value} mode"
+                f"Starting transformation pipeline in {self.config.mode.value} mode",
             )
 
             if self.config.mode == PipelineMode.SEQUENTIAL:
@@ -113,13 +115,13 @@ class TransformationPipeline:
 
             self.logger.info(
                 f"Pipeline completed in {execution_time:.2f}s "
-                f"with {len(pipeline_result.errors)} errors"
+                f"with {len(pipeline_result.errors)} errors",
             )
             return pipeline_result
 
         except Exception as e:
             execution_time = asyncio.get_event_loop().time() - start_time
-            error_msg = f"Pipeline execution failed: {str(e)}"
+            error_msg = f"Pipeline execution failed: {e!s}"
 
             self.logger.error(error_msg)
             return PipelineResult(
@@ -135,22 +137,25 @@ class TransformationPipeline:
             self.is_running = False
 
     async def _execute_sequential(
-        self, raw_data: Dict[str, List[Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+        self,
+        raw_data: dict[str, list[dict[str, Any]]],
+    ) -> dict[str, Any]:
         """Execute pipeline in sequential mode."""
         self._update_progress("Starting sequential transformation", 0.0)
 
         # Execute full ETL transformation
         result = await self.transformer.transform_all_sources(
-            raw_data, validate=self.config.enable_validation
+            raw_data,
+            validate=self.config.enable_validation,
         )
 
         self._update_progress("Transformation completed", 100.0)
         return result
 
     async def _execute_parallel(
-        self, raw_data: Dict[str, List[Dict[str, Any]]]
-    ) -> Dict[str, Any]:
+        self,
+        raw_data: dict[str, list[dict[str, Any]]],
+    ) -> dict[str, Any]:
         """Execute pipeline in parallel mode."""
         self._update_progress("Starting parallel transformation", 0.0)
 
@@ -158,22 +163,22 @@ class TransformationPipeline:
         # to support parallel processing of different sources
         # For now, fall back to sequential
         self.logger.warning(
-            "Parallel mode not yet implemented, falling back to sequential"
+            "Parallel mode not yet implemented, falling back to sequential",
         )
         return await self._execute_sequential(raw_data)
 
     async def _execute_incremental(
         self,
-        raw_data: Dict[str, List[Dict[str, Any]]],
-        gene_symbol: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        raw_data: dict[str, list[dict[str, Any]]],
+        gene_symbol: str | None = None,
+    ) -> dict[str, Any]:
         """Execute pipeline in incremental mode."""
         self._update_progress("Starting incremental transformation", 0.0)
 
         # Incremental mode would only process new/changed data
         # For now, fall back to full transformation
         self.logger.warning(
-            "Incremental mode not yet implemented, falling back to full transformation"
+            "Incremental mode not yet implemented, falling back to full transformation",
         )
         return await self._execute_sequential(raw_data)
 
@@ -188,7 +193,7 @@ class TransformationPipeline:
             except Exception as e:
                 self.logger.error(f"Progress callback failed: {e}")
 
-    async def validate_pipeline_config(self) -> List[str]:
+    async def validate_pipeline_config(self) -> list[str]:
         """
         Validate pipeline configuration.
 
@@ -212,7 +217,7 @@ class TransformationPipeline:
 
         return errors
 
-    def get_pipeline_status(self) -> Dict[str, Any]:
+    def get_pipeline_status(self) -> dict[str, Any]:
         """
         Get current pipeline execution status.
 
@@ -245,7 +250,7 @@ class TransformationPipeline:
         except Exception as e:
             self.logger.error(f"Cleanup failed: {e}")
 
-    def export_pipeline_metrics(self, filepath: Optional[str] = None) -> str:
+    def export_pipeline_metrics(self, filepath: str | None = None) -> str:
         """
         Export pipeline execution metrics.
 
@@ -276,7 +281,8 @@ class TransformationPipeline:
         metrics_json = json.dumps(metrics, indent=2, default=str)
 
         if filepath:
-            with open(filepath, "w") as f:
+            path = Path(filepath)
+            with path.open("w", encoding="utf-8") as f:
                 f.write(metrics_json)
 
         return metrics_json
@@ -286,8 +292,8 @@ class TransformationPipeline:
 
 
 async def run_quick_transformation(
-    raw_data: Dict[str, List[Dict[str, Any]]],
-    progress_callback: Optional[Callable[[str, float], None]] = None,
+    raw_data: dict[str, list[dict[str, Any]]],
+    progress_callback: Callable[[str, float], None] | None = None,
 ) -> PipelineResult:
     """
     Run a quick transformation pipeline with default settings.
@@ -324,7 +330,8 @@ async def run_quick_transformation(
 
 
 async def run_parallel_transformation(
-    raw_data: Dict[str, List[Dict[str, Any]]], max_concurrent: int = 2
+    raw_data: dict[str, list[dict[str, Any]]],
+    max_concurrent: int = 2,
 ) -> PipelineResult:
     """
     Run transformation pipeline in parallel mode.

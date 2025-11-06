@@ -5,17 +5,22 @@ Revises: a672f05b90d4
 Create Date: 2025-11-02
 """
 
-from typing import Sequence, Union
+from __future__ import annotations
 
-from alembic import op
+from typing import TYPE_CHECKING
+
 import sqlalchemy as sa
 
+from alembic import op
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
 revision: str = "add_curation_tables_20251102"
-down_revision: Union[str, None] = "a672f05b90d4"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "a672f05b90d4"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -26,18 +31,30 @@ def upgrade() -> None:
         sa.Column("entity_id", sa.String(length=128), nullable=False, index=True),
         sa.Column("status", sa.String(length=32), nullable=False, index=True),
         sa.Column(
-            "priority", sa.String(length=16), nullable=False, server_default="medium"
+            "priority",
+            sa.String(length=16),
+            nullable=False,
+            server_default="medium",
         ),
         sa.Column("quality_score", sa.Float(), nullable=True),
         sa.Column("issues", sa.Integer(), nullable=False, server_default="0"),
         sa.Column(
-            "last_updated", sa.DateTime(), nullable=False, server_default=sa.func.now()
+            "last_updated",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.func.now(),
         ),
         sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.func.now(),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.func.now(),
         ),
     )
 
@@ -54,10 +71,16 @@ def upgrade() -> None:
         sa.Column("user", sa.String(length=128), nullable=True),
         sa.Column("details", sa.Text(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
+            "created_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.func.now(),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
+            "updated_at",
+            sa.DateTime(),
+            nullable=False,
+            server_default=sa.func.now(),
         ),
     )
 

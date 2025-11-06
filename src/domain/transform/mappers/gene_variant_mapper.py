@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+
+UPSTREAM_PADDING_BP = 2000
+DOWNSTREAM_PADDING_BP = 500
+SPLICE_BORDER_BP = 10
 
 
 class GeneVariantRelationship(Enum):
@@ -21,25 +25,31 @@ class GeneVariantLink:
     variant_id: str
     relationship_type: GeneVariantRelationship
     confidence_score: float
-    evidence_sources: List[str]
-    genomic_distance: Optional[int]
-    functional_impact: Optional[str]
+    evidence_sources: list[str]
+    genomic_distance: int | None
+    functional_impact: str | None
 
 
 class GeneVariantMapper:
     def __init__(self) -> None:
-        self.gene_coordinates: Dict[str, Tuple[str, int, int]] = {}
-        self.gene_to_variants: Dict[str, List[GeneVariantLink]] = {}
-        self.variant_to_genes: Dict[str, List[GeneVariantLink]] = {}
+        self.gene_coordinates: dict[str, tuple[str, int, int]] = {}
+        self.gene_to_variants: dict[str, list[GeneVariantLink]] = {}
+        self.variant_to_genes: dict[str, list[GeneVariantLink]] = {}
 
     def add_gene_coordinates(
-        self, gene_id: str, chromosome: str, start_pos: int, end_pos: int
+        self,
+        gene_id: str,
+        chromosome: str,
+        start_pos: int,
+        end_pos: int,
     ) -> None:
         self.gene_coordinates[gene_id] = (chromosome, start_pos, end_pos)
 
     def map_gene_variant_relationship(
-        self, gene: Any, variant: Any
-    ) -> Optional[GeneVariantLink]:
+        self,
+        gene: Any,
+        variant: Any,
+    ) -> GeneVariantLink | None:
         gene_coords = self.gene_coordinates.get(getattr(gene, "primary_id", ""))
         variant_location = getattr(variant, "genomic_location", None)
 
@@ -56,7 +66,10 @@ class GeneVariantMapper:
             return None
 
         relationship = self._determine_relationship_type(
-            gene_start, gene_end, position, variant
+            gene_start,
+            gene_end,
+            position,
+            variant,
         )
         if relationship is None:
             return None
@@ -75,14 +88,14 @@ class GeneVariantMapper:
         self.variant_to_genes.setdefault(link.variant_id, []).append(link)
         return link
 
-    def find_variants_for_gene(self, gene_id: str) -> List[GeneVariantLink]:
+    def find_variants_for_gene(self, gene_id: str) -> list[GeneVariantLink]:
         return list(self.gene_to_variants.get(gene_id, []))
 
-    def find_genes_for_variant(self, variant_id: str) -> List[GeneVariantLink]:
+    def find_genes_for_variant(self, variant_id: str) -> list[GeneVariantLink]:
         return list(self.variant_to_genes.get(variant_id, []))
 
-    def validate_mapping(self, link: GeneVariantLink) -> List[str]:
-        errors: List[str] = []
+    def validate_mapping(self, link: GeneVariantLink) -> list[str]:
+        errors: list[str] = []
         if not link.gene_id:
             errors.append("Missing gene ID")
         if not link.variant_id:
@@ -93,7 +106,7 @@ class GeneVariantMapper:
             errors.append("Invalid genomic distance")
         return errors
 
-    def export_mappings(self) -> Dict[str, List[Dict[str, Any]]]:
+    def export_mappings(self) -> dict[str, list[dict[str, Any]]]:
         return {
             gene_id: [link.__dict__ for link in links]
             for gene_id, links in self.gene_to_variants.items()
@@ -104,13 +117,16 @@ class GeneVariantMapper:
         gene_start: int,
         gene_end: int,
         variant_pos: int,
-        variant: Optional[Any] = None,
-    ) -> Optional[GeneVariantRelationship]:
-        extended_start = gene_start - 2000
-        extended_end = gene_end + 500
+        _variant: Any | None = None,
+    ) -> GeneVariantRelationship | None:
+        extended_start = gene_start - UPSTREAM_PADDING_BP
+        extended_end = gene_end + DOWNSTREAM_PADDING_BP
 
         if gene_start <= variant_pos <= gene_end:
-            if variant_pos - gene_start <= 10 or gene_end - variant_pos <= 10:
+            if (
+                variant_pos - gene_start <= SPLICE_BORDER_BP
+                or gene_end - variant_pos <= SPLICE_BORDER_BP
+            ):
                 return GeneVariantRelationship.SPLICE_SITE
             return GeneVariantRelationship.CODING
         if extended_start <= variant_pos < gene_start:
@@ -128,4 +144,4 @@ class GeneVariantMapper:
         return variant_pos - gene_end
 
 
-__all__ = ["GeneVariantMapper", "GeneVariantLink", "GeneVariantRelationship"]
+__all__ = ["GeneVariantLink", "GeneVariantMapper", "GeneVariantRelationship"]

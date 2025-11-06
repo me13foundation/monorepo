@@ -6,10 +6,12 @@ for REST API data sources in the Data Sources module.
 """
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-import httpx
+import base64
+import contextlib
+from datetime import UTC, datetime
+from typing import Any
 
+import httpx
 from pydantic import BaseModel
 
 from src.domain.entities.user_data_source import SourceConfiguration
@@ -19,12 +21,12 @@ class APIRequestResult(BaseModel):
     """Result of an API request operation."""
 
     success: bool
-    data: Optional[Any] = None
+    data: Any | None = None
     record_count: int = 0
     response_time_ms: float = 0.0
-    status_code: Optional[int] = None
-    errors: List[str] = []
-    metadata: Dict[str, Any] = {}
+    status_code: int | None = None
+    errors: list[str] = []
+    metadata: dict[str, Any] = {}
 
 
 class APIConnectionTest(BaseModel):
@@ -32,10 +34,10 @@ class APIConnectionTest(BaseModel):
 
     success: bool
     response_time_ms: float = 0.0
-    status_code: Optional[int] = None
-    error_message: Optional[str] = None
-    response_headers: Dict[str, str] = {}
-    sample_data: Optional[Any] = None
+    status_code: int | None = None
+    error_message: str | None = None
+    response_headers: dict[str, str] = {}
+    sample_data: Any | None = None
 
 
 class APISourceService:
@@ -67,7 +69,8 @@ class APISourceService:
         }
 
     async def test_connection(
-        self, configuration: SourceConfiguration
+        self,
+        configuration: SourceConfiguration,
     ) -> APIConnectionTest:
         """
         Test connection to an API endpoint.
@@ -81,7 +84,7 @@ class APISourceService:
         if not configuration.url:
             return APIConnectionTest(success=False, error_message="No URL provided")
 
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
@@ -104,30 +107,32 @@ class APISourceService:
                     params["limit"] = 1
 
                 response = await client.request(
-                    method=method, url=url, headers=headers, params=params
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    params=params,
                 )
 
-                response_time = (
-                    datetime.now(timezone.utc) - start_time
-                ).total_seconds() * 1000
+                response_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
 
                 # If HEAD not allowed, try GET
-                if response.status_code == 405:  # Method not allowed
+                method_not_allowed = 405
+                if response.status_code == method_not_allowed:
                     response = await client.get(url=url, headers=headers, params=params)
                     response_time = (
-                        datetime.now(timezone.utc) - start_time
+                        datetime.now(UTC) - start_time
                     ).total_seconds() * 1000
 
-                success = 200 <= response.status_code < 300
+                http_ok = 200
+                http_multiple_choices = 300
+                success = http_ok <= response.status_code < http_multiple_choices
 
                 sample_data = None
                 if success and response.headers.get("content-type", "").startswith(
-                    "application/json"
+                    "application/json",
                 ):
-                    try:
+                    with contextlib.suppress(Exception):
                         sample_data = response.json()
-                    except Exception:
-                        pass
 
                 return APIConnectionTest(
                     success=success,
@@ -142,16 +147,18 @@ class APISourceService:
                     sample_data=sample_data,
                 )
 
-        except Exception as e:
-            response_time = (
-                datetime.now(timezone.utc) - start_time
-            ).total_seconds() * 1000
+        except Exception as e:  # noqa: BLE001
+            response_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
             return APIConnectionTest(
-                success=False, response_time_ms=response_time, error_message=str(e)
+                success=False,
+                response_time_ms=response_time,
+                error_message=str(e),
             )
 
     async def fetch_data(
-        self, configuration: SourceConfiguration, **kwargs: Any
+        self,
+        configuration: SourceConfiguration,
+        **kwargs: Any,
     ) -> APIRequestResult:
         """
         Fetch data from an API endpoint.
@@ -166,7 +173,7 @@ class APISourceService:
         if not configuration.url:
             return APIRequestResult(success=False, errors=["No URL provided"])
 
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
@@ -188,12 +195,14 @@ class APISourceService:
 
                 # Make request with retries
                 response = await self._make_request_with_retries(
-                    client, method, url, headers, params
+                    client,
+                    method,
+                    url,
+                    headers,
+                    params,
                 )
 
-                response_time = (
-                    datetime.now(timezone.utc) - start_time
-                ).total_seconds() * 1000
+                response_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
 
                 if not response:
                     return APIRequestResult(
@@ -202,7 +211,9 @@ class APISourceService:
                         errors=["Request failed after retries"],
                     )
 
-                success = 200 <= response.status_code < 300
+                http_ok = 200
+                http_multiple_choices = 300
+                success = http_ok <= response.status_code < http_multiple_choices
 
                 data = None
                 record_count = 0
@@ -212,8 +223,8 @@ class APISourceService:
                     try:
                         data = response.json()
                         record_count = self._count_records(data)
-                    except Exception as e:
-                        errors.append(f"Failed to parse response: {str(e)}")
+                    except Exception as e:  # noqa: BLE001
+                        errors.append(f"Failed to parse response: {e!s}")
                         data = response.text[:1000]  # Include some raw response
                 else:
                     errors.append(f"HTTP {response.status_code}: {response.text[:200]}")
@@ -232,15 +243,15 @@ class APISourceService:
                     },
                 )
 
-        except Exception as e:
-            response_time = (
-                datetime.now(timezone.utc) - start_time
-            ).total_seconds() * 1000
+        except Exception as e:  # noqa: BLE001
+            response_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
             return APIRequestResult(
-                success=False, response_time_ms=response_time, errors=[str(e)]
+                success=False,
+                response_time_ms=response_time,
+                errors=[str(e)],
             )
 
-    def _prepare_headers(self, configuration: SourceConfiguration) -> Dict[str, str]:
+    def _prepare_headers(self, configuration: SourceConfiguration) -> dict[str, str]:
         """Prepare HTTP headers for the request."""
         headers = {
             "User-Agent": "MED13-Data-Source/1.0",
@@ -253,21 +264,20 @@ class APISourceService:
 
         return headers
 
-    def _prepare_auth(self, configuration: SourceConfiguration) -> Optional[Any]:
+    def _prepare_auth(self, configuration: SourceConfiguration) -> Any | None:
         """Prepare authentication for the request."""
         auth_config = configuration.auth_credentials or {}
         auth_type = configuration.auth_type or "none"
 
         if auth_type in self.auth_methods:
             return self.auth_methods[auth_type](auth_config)
-        else:
-            return None
-
-    def _auth_none(self, config: Dict[str, Any]) -> None:
-        """No authentication."""
         return None
 
-    def _auth_bearer(self, config: Dict[str, Any]) -> Optional[Any]:
+    def _auth_none(self, _config: dict[str, Any]) -> None:
+        """No authentication."""
+        return
+
+    def _auth_bearer(self, config: dict[str, Any]) -> Any | None:
         """Bearer token authentication."""
         token = config.get("token", "")
         if token:
@@ -275,23 +285,21 @@ class APISourceService:
             return {"Authorization": f"Bearer {token}"}
         return None
 
-    def _auth_basic(self, config: Dict[str, Any]) -> Optional[Any]:
+    def _auth_basic(self, config: dict[str, Any]) -> Any | None:
         """Basic HTTP authentication."""
         username = config.get("username", "")
         password = config.get("password", "")
         if username and password:
-            import base64
-
             auth_string = base64.b64encode(f"{username}:{password}".encode()).decode()
             return {"Authorization": f"Basic {auth_string}"}
         return None
 
-    def _auth_api_key(self, config: Dict[str, Any]) -> None:
+    def _auth_api_key(self, _config: dict[str, Any]) -> None:
         """API key authentication (added to headers)."""
         # This is handled in _prepare_headers
-        return None
+        return
 
-    def _auth_oauth2(self, config: Dict[str, Any]) -> Optional[Any]:
+    def _auth_oauth2(self, config: dict[str, Any]) -> Any | None:
         """OAuth2 authentication (simplified - would need token refresh logic)."""
         token = config.get("access_token", "")
         if token:
@@ -312,20 +320,22 @@ class APISourceService:
         client: httpx.AsyncClient,
         method: str,
         url: str,
-        headers: Dict[str, str],
-        params: Dict[str, Any],
-    ) -> Optional[httpx.Response]:
+        headers: dict[str, str],
+        params: dict[str, Any],
+    ) -> httpx.Response | None:
         """Make HTTP request with retry logic."""
         for attempt in range(self.max_retries):
             try:
-                response = await client.request(
-                    method=method, url=url, headers=headers, params=params
+                return await client.request(
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    params=params,
                 )
-                return response
 
-            except (httpx.TimeoutException, httpx.ConnectError) as e:
+            except (httpx.TimeoutException, httpx.ConnectError):
                 if attempt == self.max_retries - 1:
-                    raise e
+                    raise
                 await asyncio.sleep(2**attempt)  # Exponential backoff
 
         return None
@@ -334,68 +344,65 @@ class APISourceService:
         """Count the number of records in API response data."""
         if isinstance(data, list):
             return len(data)
-        elif isinstance(data, dict):
+        if isinstance(data, dict):
             # Look for common array fields
             for key in ["data", "results", "records", "items"]:
                 if key in data and isinstance(data[key], list):
                     return len(data[key])
             # Check if it's a single record
             return 1
-        else:
-            return 0
+        return 0
 
-    def validate_configuration(self, configuration: SourceConfiguration) -> List[str]:
-        """
-        Validate API source configuration.
-
-        Args:
-            configuration: Configuration to validate
-
-        Returns:
-            List of validation error messages
-        """
-        errors = []
-
-        # Check required fields
-        if not configuration.url:
-            errors.append("API URL is required")
-
-        # Validate URL format
-        if configuration.url:
-            if not configuration.url.startswith(("http://", "https://")):
-                errors.append("URL must start with http:// or https://")
-
-        # Validate authentication
-        if configuration.auth_type and configuration.auth_type not in self.auth_methods:
-            errors.append(f"Unsupported authentication type: {configuration.auth_type}")
-
-        # Validate auth credentials based on type
-        if configuration.auth_type and configuration.auth_type != "none":
-            required_fields = self._get_auth_required_fields(configuration.auth_type)
-            missing_fields = []
-            for field in required_fields:
-                if (
-                    not configuration.auth_credentials
-                    or field not in configuration.auth_credentials
-                ):
-                    missing_fields.append(field)
-
-            if missing_fields:
-                errors.append(
-                    f"Missing authentication fields for {configuration.auth_type}: {missing_fields}"
-                )
-
-        # Validate rate limiting
-        if configuration.requests_per_minute:
-            if (
-                configuration.requests_per_minute < 1
-                or configuration.requests_per_minute > 1000
-            ):
-                errors.append("Requests per minute must be between 1 and 1000")
-
+    def validate_configuration(self, configuration: SourceConfiguration) -> list[str]:
+        """Validate API source configuration."""
+        errors: list[str] = []
+        errors.extend(self._validate_url(configuration))
+        errors.extend(self._validate_auth(configuration))
+        errors.extend(self._validate_rate_limit(configuration))
         return errors
 
-    def _get_auth_required_fields(self, auth_type: str) -> List[str]:
+    @staticmethod
+    def _validate_url(configuration: SourceConfiguration) -> list[str]:
+        errs: list[str] = []
+        if not configuration.url:
+            errs.append("API URL is required")
+            return errs
+        if configuration.url and not configuration.url.startswith(
+            ("http://", "https://"),
+        ):
+            errs.append("URL must start with http:// or https://")
+        return errs
+
+    def _validate_auth(self, configuration: SourceConfiguration) -> list[str]:
+        errs: list[str] = []
+        if configuration.auth_type and configuration.auth_type not in self.auth_methods:
+            errs.append(f"Unsupported authentication type: {configuration.auth_type}")
+            return errs
+        if configuration.auth_type and configuration.auth_type != "none":
+            required_fields = self._get_auth_required_fields(configuration.auth_type)
+            missing_fields = [
+                field
+                for field in required_fields
+                if not configuration.auth_credentials
+                or field not in configuration.auth_credentials
+            ]
+            if missing_fields:
+                errs.append(
+                    f"Missing authentication fields for {configuration.auth_type}: {missing_fields}",
+                )
+        return errs
+
+    @staticmethod
+    def _validate_rate_limit(configuration: SourceConfiguration) -> list[str]:
+        errs: list[str] = []
+        max_rpm = 1000
+        if configuration.requests_per_minute and not (
+            1 <= configuration.requests_per_minute <= max_rpm
+        ):
+            errs.append("Requests per minute must be between 1 and 1000")
+        return errs
+
+    def _get_auth_required_fields(self, auth_type: str) -> list[str]:
         """Get required fields for authentication type."""
         auth_fields = {
             "bearer": ["token"],

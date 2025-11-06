@@ -11,11 +11,12 @@ dashboard and reporting layers.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from statistics import mean
-from typing import Any, ClassVar, Dict, List, Optional, Sequence, Union
+from typing import Any, ClassVar, Union
 
 from ..rules.base_rules import ValidationResult, ValidationSeverity
 
@@ -38,7 +39,7 @@ class MetricValue:
     value: float
     metric_type: MetricType
     timestamp: datetime
-    tags: Dict[str, str]
+    tags: dict[str, str]
 
 
 @dataclass
@@ -50,7 +51,7 @@ class MetricSummary:
     average: float
     minimum: float
     maximum: float
-    percentiles: Dict[str, float]
+    percentiles: dict[str, float]
     time_range_hours: int
 
 
@@ -59,19 +60,19 @@ class MetricsCollector:
 
     def __init__(self, retention_hours: int = 168) -> None:
         self._retention = timedelta(hours=retention_hours)
-        self._metrics: Dict[str, List[MetricValue]] = {}
-        self._alerts: List[Dict[str, Any]] = []
-        self._thresholds: Dict[str, float] = {
+        self._metrics: dict[str, list[MetricValue]] = {}
+        self._alerts: list[dict[str, Any]] = []
+        self._thresholds: dict[str, float] = {
             "validation.error_rate": 0.1,
             "validation.quality_score": 0.75,
             "pipeline.execution_time": 300.0,
         }
         MetricsCollector._default_instance = self
 
-    _default_instance: ClassVar[Optional["MetricsCollector"]] = None
+    _default_instance: ClassVar[MetricsCollector | None] = None
 
     @classmethod
-    def get_default_instance(cls) -> Optional["MetricsCollector"]:
+    def get_default_instance(cls) -> MetricsCollector | None:
         return cls._default_instance
 
     # ------------------------------------------------------------------ #
@@ -80,7 +81,7 @@ class MetricsCollector:
 
     def collect_validation_metrics(
         self,
-        results: Union[ValidationResult, Sequence[ValidationResult]],
+        results: ValidationResult | Sequence[ValidationResult],
         pipeline_name: str = "default",
         entity_type: str = "unknown",
     ) -> None:
@@ -89,10 +90,13 @@ class MetricsCollector:
 
         for result in samples:
             self.record_metric(
-                "validation.quality_score", result.score, MetricType.GAUGE, tags
+                "validation.quality_score",
+                result.score,
+                MetricType.GAUGE,
+                tags,
             )
 
-            severity_counts: Dict[str, int] = {"error": 0, "warning": 0, "info": 0}
+            severity_counts: dict[str, int] = {"error": 0, "warning": 0, "info": 0}
             for issue in result.issues:
                 severity_value = issue.get("severity", ValidationSeverity.INFO)
                 if isinstance(severity_value, ValidationSeverity):
@@ -109,7 +113,10 @@ class MetricsCollector:
                 else 0.0
             )
             self.record_metric(
-                "validation.error_rate", error_rate, MetricType.GAUGE, tags
+                "validation.error_rate",
+                error_rate,
+                MetricType.GAUGE,
+                tags,
             )
 
             for severity, count in severity_counts.items():
@@ -123,7 +130,10 @@ class MetricsCollector:
 
             status_value = 1.0 if result.is_valid else 0.0
             self.record_metric(
-                "validation.status", status_value, MetricType.GAUGE, tags
+                "validation.status",
+                status_value,
+                MetricType.GAUGE,
+                tags,
             )
 
     def collect_pipeline_metrics(
@@ -140,7 +150,10 @@ class MetricsCollector:
         error_rate = error_count / max(entities_processed, 1)
 
         self.record_metric(
-            "pipeline.execution_time", execution_time, MetricType.TIMER, tags
+            "pipeline.execution_time",
+            execution_time,
+            MetricType.TIMER,
+            tags,
         )
         self.record_metric(
             "pipeline.entities_processed",
@@ -150,13 +163,22 @@ class MetricsCollector:
         )
         self.record_metric("pipeline.throughput", throughput, MetricType.GAUGE, tags)
         self.record_metric(
-            "pipeline.quality_score", quality_score, MetricType.GAUGE, tags
+            "pipeline.quality_score",
+            quality_score,
+            MetricType.GAUGE,
+            tags,
         )
         self.record_metric(
-            "pipeline.error_count", float(error_count), MetricType.COUNTER, tags
+            "pipeline.error_count",
+            float(error_count),
+            MetricType.COUNTER,
+            tags,
         )
         self.record_metric(
-            "pipeline.warning_count", float(warning_count), MetricType.COUNTER, tags
+            "pipeline.warning_count",
+            float(warning_count),
+            MetricType.COUNTER,
+            tags,
         )
         self.record_metric("pipeline.error_rate", error_rate, MetricType.GAUGE, tags)
 
@@ -174,7 +196,10 @@ class MetricsCollector:
         self.record_metric("gate.status", status_value, MetricType.GAUGE, tags)
         self.record_metric("gate.quality_score", quality_score, MetricType.GAUGE, tags)
         self.record_metric(
-            "gate.evaluation_time", evaluation_time, MetricType.TIMER, tags
+            "gate.evaluation_time",
+            evaluation_time,
+            MetricType.TIMER,
+            tags,
         )
 
         issue_counts = getattr(gate_result, "issue_counts", {})
@@ -190,13 +215,15 @@ class MetricsCollector:
     # Metric queries
     # ------------------------------------------------------------------ #
 
-    def get_current_value(self, name: str) -> Optional[float]:
+    def get_current_value(self, name: str) -> float | None:
         samples = self._metrics.get(name, [])
         return samples[-1].value if samples else None
 
     def get_metric_summary(
-        self, name: str, time_range_hours: int = 24
-    ) -> Optional[MetricSummary]:
+        self,
+        name: str,
+        time_range_hours: int = 24,
+    ) -> MetricSummary | None:
         self._prune_expired()
         cutoff = datetime.now(UTC) - timedelta(hours=time_range_hours)
         samples = [
@@ -238,11 +265,11 @@ class MetricsCollector:
 
         return round(score, 4)
 
-    def get_alerts(self, time_range_hours: int = 1) -> List[Dict[str, Any]]:
+    def get_alerts(self, time_range_hours: int = 1) -> list[dict[str, Any]]:
         cutoff = datetime.now(UTC) - timedelta(hours=time_range_hours)
         return [alert for alert in self._alerts if alert["timestamp"] >= cutoff]
 
-    def get_performance_report(self, time_range_hours: int = 24) -> Dict[str, Any]:
+    def get_performance_report(self, time_range_hours: int = 24) -> dict[str, Any]:
         quality = self.get_metric_summary("validation.quality_score", time_range_hours)
         error = self.get_metric_summary("validation.error_rate", time_range_hours)
         throughput = self.get_metric_summary("pipeline.throughput", time_range_hours)
@@ -266,7 +293,7 @@ class MetricsCollector:
         name: str,
         value: Number,
         metric_type: MetricType,
-        tags: Optional[Dict[str, str]] = None,
+        tags: dict[str, str] | None = None,
     ) -> None:
         tags = tags or {}
         sample = MetricValue(
@@ -281,7 +308,10 @@ class MetricsCollector:
         self._maybe_record_alert(sample)
 
     def increment_counter(
-        self, name: str, tags: Optional[Dict[str, str]] = None, increment: Number = 1
+        self,
+        name: str,
+        tags: dict[str, str] | None = None,
+        increment: Number = 1,
     ) -> None:
         self.record_metric(name, float(increment), MetricType.COUNTER, tags)
 
@@ -320,8 +350,8 @@ class MetricsCollector:
                     "threshold": threshold,
                     "timestamp": sample.timestamp,
                     "tags": sample.tags,
-                }
+                },
             )
 
 
-__all__ = ["MetricType", "MetricValue", "MetricSummary", "MetricsCollector"]
+__all__ = ["MetricSummary", "MetricType", "MetricValue", "MetricsCollector"]

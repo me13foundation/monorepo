@@ -6,12 +6,11 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import List, Optional, Tuple
 
-from .base import Repository
-from ..entities.gene import Gene
-from ..value_objects.identifiers import GeneIdentifier
-from ...type_definitions.common import GeneUpdate
+from src.domain.entities.gene import Gene
+from src.domain.repositories.base import Repository
+from src.domain.value_objects.identifiers import GeneIdentifier
+from src.type_definitions.common import GeneUpdate
 
 
 class GeneRepository(Repository[Gene, int]):
@@ -23,29 +22,24 @@ class GeneRepository(Repository[Gene, int]):
     """
 
     @abstractmethod
-    def find_by_symbol(self, symbol: str) -> Optional[Gene]:
+    def find_by_symbol(self, symbol: str) -> Gene | None:
         """Find a gene by its symbol (case-insensitive)."""
-        pass
 
     @abstractmethod
-    def find_by_gene_id(self, gene_id: str) -> Optional[Gene]:
+    def find_by_gene_id(self, gene_id: str) -> Gene | None:
         """Find a gene by its gene_id."""
-        pass
 
     @abstractmethod
-    def find_by_external_id(self, external_id: str) -> Optional[Gene]:
+    def find_by_external_id(self, external_id: str) -> Gene | None:
         """Find a gene by any external identifier (Ensembl, NCBI, UniProt)."""
-        pass
 
     @abstractmethod
-    def find_by_identifier(self, identifier: GeneIdentifier) -> Optional[Gene]:
+    def find_by_identifier(self, identifier: GeneIdentifier) -> Gene | None:
         """Find a gene by its identifier (supports multiple ID types)."""
-        pass
 
     @abstractmethod
-    def search_by_name_or_symbol(self, query: str, limit: int = 10) -> List[Gene]:
+    def search_by_name_or_symbol(self, query: str, limit: int = 10) -> list[Gene]:
         """Search genes by name or symbol containing the query string."""
-        pass
 
     @abstractmethod
     def paginate_genes(
@@ -54,35 +48,29 @@ class GeneRepository(Repository[Gene, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        search: Optional[str] = None,
-    ) -> Tuple[List[Gene], int]:
+        search: str | None = None,
+    ) -> tuple[list[Gene], int]:
         """Retrieve paginated genes with optional search and sorting."""
-        pass
 
     @abstractmethod
-    def find_with_variants(self, gene_id: int) -> Optional[Gene]:
+    def find_with_variants(self, gene_id: int) -> Gene | None:
         """Find a gene with its associated variants loaded."""
-        pass
 
     @abstractmethod
     def find_by_symbol_or_fail(self, symbol: str) -> Gene:
         """Find a gene by symbol, raising NotFoundError if not found."""
-        pass
 
     @abstractmethod
     def find_by_gene_id_or_fail(self, gene_id: str) -> Gene:
         """Find a gene by gene_id, raising NotFoundError if not found."""
-        pass
 
     @abstractmethod
     def get_gene_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about genes in the repository."""
-        pass
 
     @abstractmethod
     def update_gene(self, gene_id: int, updates: GeneUpdate) -> Gene:
         """Update a gene with type-safe update parameters."""
-        pass
 
 
 __all__ = ["GeneRepository"]

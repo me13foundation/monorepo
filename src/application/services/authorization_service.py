@@ -4,34 +4,28 @@ Authorization service for MED13 Resource Library.
 Handles permission checking, role-based access control, and resource authorization.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any
 from uuid import UUID
 
-from ...domain.entities.user import User, UserRole
-from ...domain.value_objects.permission import (
+from src.domain.entities.user import User, UserRole
+from src.domain.repositories.user_repository import UserRepository
+from src.domain.value_objects.permission import (
     Permission,
-    RolePermissions,
     PermissionChecker,
+    RolePermissions,
 )
-from ...domain.repositories.user_repository import UserRepository
 
 
 class AuthorizationError(Exception):
     """Base exception for authorization errors."""
 
-    pass
-
 
 class InsufficientPermissionsError(AuthorizationError):
     """Raised when user lacks required permissions."""
 
-    pass
-
 
 class ResourceNotFoundError(AuthorizationError):
     """Raised when requested resource doesn't exist."""
-
-    pass
 
 
 class AuthorizationService:
@@ -69,7 +63,9 @@ class AuthorizationService:
         return PermissionChecker.has_permission(user_permissions, permission)
 
     async def has_any_permission(
-        self, user_id: UUID, permissions: List[Permission]
+        self,
+        user_id: UUID,
+        permissions: list[Permission],
     ) -> bool:
         """
         Check if user has any of the required permissions.
@@ -89,7 +85,9 @@ class AuthorizationService:
         return PermissionChecker.has_any_permission(user_permissions, permissions)
 
     async def has_all_permissions(
-        self, user_id: UUID, permissions: List[Permission]
+        self,
+        user_id: UUID,
+        permissions: list[Permission],
     ) -> bool:
         """
         Check if user has all required permissions.
@@ -108,7 +106,7 @@ class AuthorizationService:
         user_permissions = RolePermissions.get_permissions_for_role(user.role)
         return PermissionChecker.has_all_permissions(user_permissions, permissions)
 
-    async def get_user_permissions(self, user_id: UUID) -> List[Permission]:
+    async def get_user_permissions(self, user_id: UUID) -> list[Permission]:
         """
         Get all permissions for a user.
 
@@ -125,8 +123,10 @@ class AuthorizationService:
         return RolePermissions.get_permissions_for_role(user.role)
 
     async def get_missing_permissions(
-        self, user_id: UUID, required_permissions: List[Permission]
-    ) -> List[Permission]:
+        self,
+        user_id: UUID,
+        required_permissions: list[Permission],
+    ) -> list[Permission]:
         """
         Get permissions the user is missing.
 
@@ -139,7 +139,8 @@ class AuthorizationService:
         """
         user_permissions = await self.get_user_permissions(user_id)
         return PermissionChecker.get_missing_permissions(
-            user_permissions, required_permissions
+            user_permissions,
+            required_permissions,
         )
 
     async def require_permission(self, user_id: UUID, permission: Permission) -> None:
@@ -154,12 +155,13 @@ class AuthorizationService:
             InsufficientPermissionsError: If user lacks permission
         """
         if not await self.has_permission(user_id, permission):
-            raise InsufficientPermissionsError(
-                f"User lacks required permission: {permission.value}"
-            )
+            msg = f"User lacks required permission: {permission.value}"
+            raise InsufficientPermissionsError(msg)
 
     async def require_any_permission(
-        self, user_id: UUID, permissions: List[Permission]
+        self,
+        user_id: UUID,
+        permissions: list[Permission],
     ) -> None:
         """
         Require user to have any of the specified permissions.
@@ -173,12 +175,13 @@ class AuthorizationService:
         """
         if not await self.has_any_permission(user_id, permissions):
             perm_names = [p.value for p in permissions]
-            raise InsufficientPermissionsError(
-                f"User lacks any of required permissions: {perm_names}"
-            )
+            msg = f"User lacks any of required permissions: {perm_names}"
+            raise InsufficientPermissionsError(msg)
 
     async def require_all_permissions(
-        self, user_id: UUID, permissions: List[Permission]
+        self,
+        user_id: UUID,
+        permissions: list[Permission],
     ) -> None:
         """
         Require user to have all specified permissions.
@@ -193,12 +196,15 @@ class AuthorizationService:
         if not await self.has_all_permissions(user_id, permissions):
             missing = await self.get_missing_permissions(user_id, permissions)
             missing_names = [p.value for p in missing]
-            raise InsufficientPermissionsError(
-                f"User lacks required permissions: {missing_names}"
-            )
+            msg = f"User lacks required permissions: {missing_names}"
+            raise InsufficientPermissionsError(msg)
 
     async def check_resource_access(
-        self, user: User, resource_type: str, resource_id: Optional[UUID], action: str
+        self,
+        user: User,
+        resource_type: str,
+        _resource_id: UUID | None,
+        action: str,
     ) -> bool:
         """
         Check if user can perform action on specific resource.
@@ -238,7 +244,9 @@ class AuthorizationService:
         return await self.has_permission(user.id, required_permission)
 
     async def check_user_management_access(
-        self, manager_user: User, target_user: Optional[User] = None
+        self,
+        manager_user: User,
+        target_user: User | None = None,
     ) -> bool:
         """
         Check if user can manage other users.
@@ -262,8 +270,11 @@ class AuthorizationService:
         return RolePermissions.can_role_manage_role(manager_user.role, target_user.role)
 
     async def get_accessible_resources(
-        self, user_id: UUID, resource_type: str, action: str
-    ) -> Dict[str, Any]:
+        self,
+        user_id: UUID,
+        resource_type: str,
+        action: str,
+    ) -> dict[str, Any]:
         """
         Get information about what resources user can access.
 
@@ -297,7 +308,9 @@ class AuthorizationService:
         }
 
     async def validate_role_hierarchy(
-        self, requesting_user: User, target_user: Optional[User] = None
+        self,
+        requesting_user: User,
+        target_user: User | None = None,
     ) -> bool:
         """
         Validate that requesting user can perform actions on target user.
@@ -316,7 +329,7 @@ class AuthorizationService:
 
     # Administrative methods
 
-    async def get_role_capabilities(self, role: UserRole) -> Dict[str, Any]:
+    async def get_role_capabilities(self, role: UserRole) -> dict[str, Any]:
         """
         Get detailed information about a role's capabilities.
 
@@ -342,7 +355,7 @@ class AuthorizationService:
             "can_manage_equal_roles": False,  # Current policy
         }
 
-    async def get_system_permissions_summary(self) -> Dict[str, Any]:
+    async def get_system_permissions_summary(self) -> dict[str, Any]:
         """
         Get summary of all permissions in the system.
 
@@ -352,7 +365,7 @@ class AuthorizationService:
         all_permissions = Permission.__members__.values()
         roles = [r.value for r in UserRole]
 
-        role_summaries: Dict[str, Dict[str, Any]] = {}
+        role_summaries: dict[str, dict[str, Any]] = {}
         for role in UserRole:
             permissions = RolePermissions.get_permissions_for_role(role)
             role_summaries[role.value] = {

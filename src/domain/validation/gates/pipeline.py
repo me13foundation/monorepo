@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass
 from statistics import mean
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any
 
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 from .quality_gate import GateResult, QualityGate
@@ -13,20 +14,20 @@ from .quality_gate import GateResult, QualityGate
 
 @dataclass
 class CheckpointEntry:
-    gates: List[QualityGate]
+    gates: list[QualityGate]
     required: bool
 
 
-class _CheckpointRegistry(Dict[str, CheckpointEntry]):
-    def keys(self) -> List[str]:  # type: ignore[override]
+class _CheckpointRegistry(dict[str, CheckpointEntry]):
+    def keys(self) -> list[str]:  # type: ignore[override]
         return list(super().keys())
 
 
 @dataclass
 class StageEvaluation:
     stage: str
-    results: List[ValidationResult]
-    gate_results: List[GateResult]
+    results: list[ValidationResult]
+    gate_results: list[GateResult]
 
     @property
     def passed(self) -> bool:
@@ -39,15 +40,15 @@ class StageEvaluation:
         return mean(gate.quality_score for gate in self.gate_results)
 
     @property
-    def actions(self) -> List[str]:
-        actions: List[str] = []
+    def actions(self) -> list[str]:
+        actions: list[str] = []
         for gate in self.gate_results:
             actions.extend(gate.actions)
         return actions
 
 
 class ValidationPipeline:
-    def __init__(self, rule_engine: Optional[ValidationRuleEngine] = None) -> None:
+    def __init__(self, rule_engine: ValidationRuleEngine | None = None) -> None:
         self.rule_engine = rule_engine or ValidationRuleEngine()
         self.checkpoints: _CheckpointRegistry = _CheckpointRegistry()
 
@@ -55,21 +56,24 @@ class ValidationPipeline:
         self,
         name: str,
         gates: Sequence[QualityGate],
+        *,
         required: bool = True,
     ) -> None:
         self.checkpoints[name] = CheckpointEntry(gates=list(gates), required=required)
 
     async def validate_stage(
-        self, stage_name: str, payload: Dict[str, Sequence[Dict[str, Any]]]
-    ) -> Dict[str, object]:
+        self,
+        stage_name: str,
+        payload: dict[str, Sequence[dict[str, Any]]],
+    ) -> dict[str, object]:
         checkpoint = self.checkpoints.get(stage_name)
         if not checkpoint:
             return {"stage": stage_name, "passed": True, "actions": []}
 
         entity_results = self._collect_results(payload)
-        gate_results: List[GateResult] = []
-        for gate in checkpoint.gates:
-            gate_results.append(gate.evaluate(entity_results))
+        gate_results: list[GateResult] = [
+            gate.evaluate(entity_results) for gate in checkpoint.gates
+        ]
 
         stage_evaluation = StageEvaluation(stage_name, entity_results, gate_results)
         # Simulate asynchronous workload to mirror original behaviour
@@ -83,13 +87,15 @@ class ValidationPipeline:
         }
 
     def _collect_results(
-        self, payload: Dict[str, Sequence[Dict[str, Any]]]
-    ) -> List[ValidationResult]:
-        results: List[ValidationResult] = []
+        self,
+        payload: dict[str, Sequence[dict[str, Any]]],
+    ) -> list[ValidationResult]:
+        results: list[ValidationResult] = []
         for entity_collection, items in payload.items():
             entity_type = entity_collection.rstrip("s")
-            for item in items:
-                results.append(self.rule_engine.validate_entity(entity_type, item))
+            results.extend(
+                self.rule_engine.validate_entity(entity_type, item) for item in items
+            )
         return results
 
 

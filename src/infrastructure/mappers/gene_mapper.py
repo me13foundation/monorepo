@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING
 
 from src.domain.entities.gene import Gene, GeneType
 from src.domain.entities.variant import VariantSummary
 from src.domain.value_objects.identifiers import GeneIdentifier
 from src.models.database.gene import GeneModel
-from src.models.database.variant import VariantModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
+    from src.models.database.variant import VariantModel
 
 
 class GeneMapper:
@@ -43,7 +47,7 @@ class GeneMapper:
         return gene
 
     @staticmethod
-    def to_model(entity: Gene, model: Optional[GeneModel] = None) -> GeneModel:
+    def to_model(entity: Gene, model: GeneModel | None = None) -> GeneModel:
         target = model or GeneModel()
         target.gene_id = entity.gene_id
         target.symbol = entity.symbol

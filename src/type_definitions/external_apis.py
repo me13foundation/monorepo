@@ -6,7 +6,7 @@ ClinVar, PubMed, HPO, UniProt, etc. These provide type safety when
 processing external data and help prevent runtime errors.
 """
 
-from typing import Dict, List, Optional, Any, TypedDict
+from typing import Any, TypedDict
 
 
 # ClinVar API Types
@@ -15,20 +15,20 @@ class ClinVarSearchResult(TypedDict):
 
     uid: str
     term: str
-    count: Optional[int]
+    count: int | None
 
 
 class ClinVarSearchResponse(TypedDict):
     """ClinVar ESearch API response structure."""
 
-    header: Dict[str, Any]
-    esearchresult: Dict[str, Any]
+    header: dict[str, Any]
+    esearchresult: dict[str, Any]
     count: str
     retmax: str
     retstart: str
-    idlist: List[str]
-    translationset: List[ClinVarSearchResult]
-    translationstack: Dict[str, Any]
+    idlist: list[str]
+    translationset: list[ClinVarSearchResult]
+    translationstack: dict[str, Any]
     querytranslation: str
 
 
@@ -37,34 +37,34 @@ class ClinVarVariantRecord(TypedDict, total=False):
 
     variation_id: str
     variation_name: str
-    gene: Optional[Dict[str, Any]]
-    condition: Optional[Dict[str, Any]]
-    clinical_significance: Optional[Dict[str, Any]]
-    review_status: Optional[str]
-    interpretation: Optional[Dict[str, Any]]
-    submissions: List[Dict[str, Any]]
-    last_updated: Optional[str]
+    gene: dict[str, Any] | None
+    condition: dict[str, Any] | None
+    clinical_significance: dict[str, Any] | None
+    review_status: str | None
+    interpretation: dict[str, Any] | None
+    submissions: list[dict[str, Any]]
+    last_updated: str | None
 
 
 class ClinVarVariantResponse(TypedDict):
     """ClinVar ESummary API response for variant details."""
 
-    header: Dict[str, Any]
-    result: Dict[str, ClinVarVariantRecord]
+    header: dict[str, Any]
+    result: dict[str, ClinVarVariantRecord]
 
 
 # PubMed API Types
 class PubMedSearchResponse(TypedDict):
     """PubMed ESearch API response structure."""
 
-    header: Dict[str, Any]
-    esearchresult: Dict[str, Any]
+    header: dict[str, Any]
+    esearchresult: dict[str, Any]
     count: str
     retmax: str
     retstart: str
-    idlist: List[str]
-    translationset: List[Dict[str, Any]]
-    translationstack: Dict[str, Any]
+    idlist: list[str]
+    translationset: list[dict[str, Any]]
+    translationstack: dict[str, Any]
     querytranslation: str
 
 
@@ -74,16 +74,16 @@ class PubMedArticleAuthor(TypedDict, total=False):
     lastname: str
     firstname: str
     initials: str
-    affiliation: Optional[str]
+    affiliation: str | None
 
 
 class PubMedArticleJournal(TypedDict, total=False):
     """PubMed article journal information."""
 
     title: str
-    volume: Optional[str]
-    issue: Optional[str]
-    pages: Optional[str]
+    volume: str | None
+    issue: str | None
+    pages: str | None
 
 
 class PubMedArticleResponse(TypedDict, total=False):
@@ -91,14 +91,14 @@ class PubMedArticleResponse(TypedDict, total=False):
 
     uid: str
     pubmed_id: str
-    doi: Optional[str]
+    doi: str | None
     title: str
-    authors: List[PubMedArticleAuthor]
+    authors: list[PubMedArticleAuthor]
     journal: PubMedArticleJournal
     pubdate: str
-    abstract: Optional[str]
-    keywords: List[str]
-    pmc_id: Optional[str]
+    abstract: str | None
+    keywords: list[str]
+    pmc_id: str | None
 
 
 # HPO Ontology Types
@@ -107,13 +107,13 @@ class HPOTerm(TypedDict, total=False):
 
     id: str
     name: str
-    definition: Optional[str]
-    synonyms: List[str]
-    parents: List[str]
-    children: List[str]
-    ancestors: List[str]
-    descendants: List[str]
-    comment: Optional[str]
+    definition: str | None
+    synonyms: list[str]
+    parents: list[str]
+    children: list[str]
+    ancestors: list[str]
+    descendants: list[str]
+    comment: str | None
 
 
 class HPOOntologyResponse(TypedDict):
@@ -121,8 +121,8 @@ class HPOOntologyResponse(TypedDict):
 
     version: str
     date: str
-    terms: Dict[str, HPOTerm]
-    metadata: Dict[str, Any]
+    terms: dict[str, HPOTerm]
+    metadata: dict[str, Any]
 
 
 # UniProt API Types
@@ -130,14 +130,14 @@ class UniProtReference(TypedDict, total=False):
     """UniProt reference structure."""
 
     citation: str
-    authors: List[str]
+    authors: list[str]
     title: str
     journal: str
-    volume: Optional[str]
-    pages: Optional[str]
+    volume: str | None
+    pages: str | None
     year: int
-    doi: Optional[str]
-    pubmed_id: Optional[str]
+    doi: str | None
+    pubmed_id: str | None
 
 
 class UniProtFeature(TypedDict, total=False):
@@ -147,7 +147,7 @@ class UniProtFeature(TypedDict, total=False):
     description: str
     begin: int
     end: int
-    evidence: List[str]
+    evidence: list[str]
 
 
 class UniProtEntryResponse(TypedDict, total=False):
@@ -155,18 +155,18 @@ class UniProtEntryResponse(TypedDict, total=False):
 
     accession: str
     name: str
-    protein_names: List[str]
-    gene_name: Optional[str]
+    protein_names: list[str]
+    gene_name: str | None
     organism: str
     sequence: str
     length: int
-    molecular_weight: Optional[int]
-    features: List[UniProtFeature]
-    references: List[UniProtReference]
-    function: Optional[str]
-    subcellular_location: Optional[List[str]]
-    tissue_specificity: Optional[str]
-    disease_association: Optional[List[str]]
+    molecular_weight: int | None
+    features: list[UniProtFeature]
+    references: list[UniProtReference]
+    function: str | None
+    subcellular_location: list[str] | None
+    tissue_specificity: str | None
+    disease_association: list[str] | None
     last_modified: str
 
 
@@ -176,8 +176,8 @@ class ExternalAPIError(TypedDict):
 
     error: str
     message: str
-    code: Optional[str]
-    details: Optional[Dict[str, Any]]
+    code: str | None
+    details: dict[str, Any] | None
 
 
 class ExternalAPIRateLimit(TypedDict):
@@ -186,7 +186,7 @@ class ExternalAPIRateLimit(TypedDict):
     limit: int
     remaining: int
     reset_time: int
-    retry_after: Optional[int]
+    retry_after: int | None
 
 
 class ExternalAPIResponse(TypedDict, total=False):
@@ -194,9 +194,9 @@ class ExternalAPIResponse(TypedDict, total=False):
 
     success: bool
     data: Any
-    error: Optional[ExternalAPIError]
-    rate_limit: Optional[ExternalAPIRateLimit]
-    request_id: Optional[str]
+    error: ExternalAPIError | None
+    rate_limit: ExternalAPIRateLimit | None
+    request_id: str | None
     timestamp: str
 
 
@@ -205,11 +205,11 @@ class ExternalDataValidationResult(TypedDict):
     """Result of validating external API data."""
 
     is_valid: bool
-    errors: List[str]
-    warnings: List[str]
+    errors: list[str]
+    warnings: list[str]
     data_quality_score: float
     transformation_needed: bool
-    sanitized_data: Optional[Any]
+    sanitized_data: Any | None
 
 
 class APIEndpointConfig(TypedDict):
@@ -219,7 +219,7 @@ class APIEndpointConfig(TypedDict):
     timeout: int
     retries: int
     rate_limit: int
-    headers: Dict[str, str]
+    headers: dict[str, str]
     auth_required: bool
     cache_enabled: bool
 
@@ -238,9 +238,9 @@ class APIResponseValidationResult(TypedDict):
     """Result of validating an external API response."""
 
     is_valid: bool
-    issues: List[ValidationIssue]
+    issues: list[ValidationIssue]
     data_quality_score: float
-    sanitized_data: Optional[Any]
+    sanitized_data: Any | None
     validation_time_ms: float
 
 
@@ -250,13 +250,13 @@ class ZenodoMetadata(TypedDict, total=False):
 
     title: str
     description: str
-    creators: List[Dict[str, str]]
-    keywords: List[str]
+    creators: list[dict[str, str]]
+    keywords: list[str]
     license: str
     publication_date: str
     access_right: str
-    communities: List[Dict[str, str]]
-    subjects: List[Dict[str, str]]
+    communities: list[dict[str, str]]
+    subjects: list[dict[str, str]]
     version: str
     language: str
     notes: str
@@ -287,8 +287,8 @@ class ZenodoDepositResponse(TypedDict, total=False):
     record_url: str
     state: str
     submitted: bool
-    files: List[ZenodoFileInfo]
-    links: Dict[str, str]
+    files: list[ZenodoFileInfo]
+    links: dict[str, str]
 
 
 class ZenodoPublishResponse(TypedDict):

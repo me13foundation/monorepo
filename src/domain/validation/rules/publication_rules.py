@@ -5,7 +5,7 @@ Validation helpers for publication metadata.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .base_rules import (
     ValidationLevel,
@@ -14,7 +14,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = Dict[str, Any]
+IssueDict = dict[str, Any]
 
 
 class PublicationValidationRules:
@@ -24,7 +24,8 @@ class PublicationValidationRules:
 
     @staticmethod
     def validate_doi_format_and_accessibility(
-        _placeholder: Any, field: str = "doi"
+        _placeholder: Any,
+        field: str = "doi",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if value is None:
@@ -36,7 +37,8 @@ class PublicationValidationRules:
                     "Provide a DOI in the format 10.xxxx/…",
                 )
             if not isinstance(
-                value, str
+                value,
+                str,
             ) or not PublicationValidationRules._DOI_PATTERN.fullmatch(value):
                 return (
                     False,
@@ -55,7 +57,8 @@ class PublicationValidationRules:
 
     @staticmethod
     def validate_author_information(
-        _placeholder: Any, field: str = "authors"
+        _placeholder: Any,
+        field: str = "authors",
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if value in (None, []):
@@ -65,7 +68,7 @@ class PublicationValidationRules:
                     "Provide the author list",
                 )
             if not isinstance(value, list) or not all(
-                isinstance(author, dict) or isinstance(author, str) for author in value
+                isinstance(author, dict | str) for author in value
             ):
                 return (
                     False,
@@ -103,9 +106,9 @@ class PublicationValidationRules:
 
     @staticmethod
     def validate_publication_comprehensively(
-        publication: Dict[str, Any],
-    ) -> List[IssueDict]:
-        issues: List[IssueDict] = []
+        publication: dict[str, Any],
+    ) -> list[IssueDict]:
+        issues: list[IssueDict] = []
 
         rules = (
             PublicationValidationRules.validate_doi_format_and_accessibility(""),
@@ -122,7 +125,7 @@ class PublicationValidationRules:
                         "message": message,
                         "suggestion": suggestion,
                         "severity": rule.severity.name.lower(),
-                    }
+                    },
                 )
 
         pubmed_id = publication.get("pubmed_id")
@@ -133,7 +136,7 @@ class PublicationValidationRules:
                     rule="pubmed_id_format",
                     message=f"Invalid PubMed identifier: {pubmed_id}",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
 
         if not publication.get("title"):
@@ -143,7 +146,7 @@ class PublicationValidationRules:
                     rule="title_required",
                     message="Publication title is required",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
 
         return issues
@@ -155,7 +158,7 @@ class PublicationValidationRules:
         rule: str,
         message: str,
         severity: ValidationSeverity,
-        suggestion: Optional[str] = None,
+        suggestion: str | None = None,
     ) -> IssueDict:
         return {
             "field": field,

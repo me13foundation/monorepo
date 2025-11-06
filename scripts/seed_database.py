@@ -3,21 +3,30 @@
 
 from __future__ import annotations
 
-from datetime import datetime, UTC
-from typing import Optional
+import logging
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.database.session import SessionLocal, engine
 from src.models.database import (
     Base,
-    GeneModel,
-    VariantModel,
-    PhenotypeModel,
     EvidenceModel,
+    GeneModel,
+    PhenotypeModel,
+    VariantModel,
 )
-from src.models.database.review import ReviewRecord
 from src.models.database.audit import AuditLog
+from src.models.database.review import ReviewRecord
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+else:
+    Session = Any  # type: ignore[assignment]
+
+
+logger = logging.getLogger(__name__)
 
 
 def ensure_gene(session: Session) -> GeneModel:
@@ -99,7 +108,9 @@ def ensure_phenotype(session: Session) -> PhenotypeModel:
 
 
 def ensure_evidence(
-    session: Session, variant: VariantModel, phenotype: PhenotypeModel
+    session: Session,
+    variant: VariantModel,
+    phenotype: PhenotypeModel,
 ) -> EvidenceModel:
     evidence = (
         session.query(EvidenceModel)
@@ -164,13 +175,15 @@ def ensure_audit_log(session: Session, variant: VariantModel) -> None:
             entity_id=variant.variant_id,
             user="demo-curator",
             details="Initial curator note seeded for demo dashboard.",
-        )
+        ),
     )
 
 
 def main() -> None:
     Base.metadata.create_all(bind=engine)
-    session: Optional[Session] = None
+    logging.basicConfig(level=logging.INFO)
+
+    session: Session | None = None
     try:
         session = SessionLocal()
         gene = ensure_gene(session)
@@ -180,11 +193,16 @@ def main() -> None:
         ensure_review(session, variant)
         ensure_audit_log(session, variant)
         session.commit()
-        print("✅ Seeded MED13 demo data for curation workflows.")
-    except Exception as exc:  # pragma: no cover - seeding diagnostics
+        logger.info("Seeded MED13 demo data for curation workflows.")
+    except (
+        SQLAlchemyError,
+        RuntimeError,
+        ValueError,
+    ) as exc:  # pragma: no cover - seeding diagnostics
         if session is not None:
             session.rollback()
-        raise SystemExit(f"Failed to seed database: {exc}") from exc
+        message = f"Failed to seed database: {exc}"
+        raise SystemExit(message) from exc
     finally:
         if session is not None:
             session.close()

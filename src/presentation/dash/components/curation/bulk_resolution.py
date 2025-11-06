@@ -4,18 +4,23 @@ Bulk Resolution Component for MED13 Curation Dashboard.
 Provides tools for resolving multiple conflicts and curation tasks simultaneously.
 """
 
-from typing import Any, Dict, List
+from typing import Any
 
-from dash import html, dcc
 import dash_bootstrap_components as dbc
 
+from dash import dcc, html
 from src.presentation.dash.components.curation.clinical_card import (
     get_clinical_significance_color,
 )
 
+# UI constants
+PREVIEW_MAX_ITEMS: int = 5
+PREVIEW_DESC_MAX_LEN: int = 60
+
 
 def create_bulk_resolution_panel(
-    conflicts: List[Dict[str, Any]], variants: List[Dict[str, Any]]
+    conflicts: list[dict[str, Any]],
+    variants: list[dict[str, Any]],
 ) -> dbc.Card:
     """
     Create a bulk resolution panel for handling multiple conflicts and variants.
@@ -37,7 +42,7 @@ def create_bulk_resolution_panel(
                         color="info",
                         className="ms-2",
                     ),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
@@ -56,18 +61,20 @@ def create_bulk_resolution_panel(
                     ),
                     # Preview and confirmation
                     html.Div(
-                        id="bulk-preview-container", children=create_bulk_preview([])
+                        id="bulk-preview-container",
+                        children=create_bulk_preview([]),
                     ),
                     # Action summary
                     dbc.Row([dbc.Col(create_action_summary(), width=12)]),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
 def create_quick_actions(
-    conflicts: List[Dict[str, Any]], variants: List[Dict[str, Any]]
+    conflicts: list[dict[str, Any]],
+    variants: list[dict[str, Any]],
 ) -> dbc.Card:
     """Create quick action buttons for common bulk operations."""
     conflict_count = len(conflicts)
@@ -159,13 +166,13 @@ def create_quick_actions(
                         vertical=True,
                         className="w-100",
                     ),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
-def create_batch_processing(conflicts: List[Dict[str, Any]]) -> dbc.Card:
+def create_batch_processing(conflicts: list[dict[str, Any]]) -> dbc.Card:
     """Create batch processing interface with filters and rules."""
     return dbc.Card(
         [
@@ -258,19 +265,22 @@ def create_batch_processing(conflicts: List[Dict[str, Any]]) -> dbc.Card:
                         style={"display": "none"},
                         children=[
                             dbc.Progress(
-                                id="batch-progress", value=0, className="mb-2"
+                                id="batch-progress",
+                                value=0,
+                                className="mb-2",
                             ),
                             html.Small(id="batch-status", className="text-muted"),
                         ],
                     ),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
 def create_bulk_selection(
-    conflicts: List[Dict[str, Any]], variants: List[Dict[str, Any]]
+    conflicts: list[dict[str, Any]],
+    variants: list[dict[str, Any]],
 ) -> html.Div:
     """Create bulk selection interface with checkboxes."""
     return html.Div(
@@ -310,15 +320,15 @@ def create_bulk_selection(
                 ],
                 className="mt-3",
             ),
-        ]
+        ],
     )
 
 
-def create_conflict_selection_table(conflicts: List[Dict[str, Any]]) -> dbc.Table:
+def create_conflict_selection_table(conflicts: list[dict[str, Any]]) -> dbc.Table:
     """Create a table for selecting individual conflicts."""
     if not conflicts:
         return dbc.Table(
-            html.Tbody(html.Tr(html.Td("No conflicts available", colSpan=4)))
+            html.Tbody(html.Tr(html.Td("No conflicts available", colSpan=4))),
         )
 
     headers = [
@@ -332,24 +342,29 @@ def create_conflict_selection_table(conflicts: List[Dict[str, Any]]) -> dbc.Tabl
     rows = []
     for i, conflict in enumerate(conflicts):
         severity_color = {"high": "danger", "medium": "warning", "low": "info"}.get(
-            conflict["severity"], "secondary"
+            conflict["severity"],
+            "secondary",
         )
 
         row = html.Tr(
             [
                 html.Td(
                     html.Span(
-                        "☐", id=f"conflict-select-{i}", className="text-primary fw-bold"
-                    )
+                        "☐",
+                        id=f"conflict-select-{i}",
+                        className="text-primary fw-bold",
+                    ),
                 ),
                 html.Td(conflict["type"].replace("_", " ").title()),
                 html.Td(dbc.Badge(conflict["severity"].title(), color=severity_color)),
                 html.Td(
                     html.Small(
-                        conflict["description"][:60] + "..."
-                        if len(conflict["description"]) > 60
-                        else conflict["description"]
-                    )
+                        (
+                            conflict["description"][:PREVIEW_DESC_MAX_LEN] + "..."
+                            if len(conflict["description"]) > PREVIEW_DESC_MAX_LEN
+                            else conflict["description"]
+                        ),
+                    ),
                 ),
                 html.Td(
                     dbc.ButtonGroup(
@@ -368,9 +383,9 @@ def create_conflict_selection_table(conflicts: List[Dict[str, Any]]) -> dbc.Tabl
                             ),
                         ],
                         size="sm",
-                    )
+                    ),
                 ),
-            ]
+            ],
         )
         rows.append(row)
 
@@ -383,11 +398,11 @@ def create_conflict_selection_table(conflicts: List[Dict[str, Any]]) -> dbc.Tabl
     )
 
 
-def create_variant_selection_table(variants: List[Dict[str, Any]]) -> dbc.Table:
+def create_variant_selection_table(variants: list[dict[str, Any]]) -> dbc.Table:
     """Create a table for selecting individual variants."""
     if not variants:
         return dbc.Table(
-            html.Tbody(html.Tr(html.Td("No variants available", colSpan=5)))
+            html.Tbody(html.Tr(html.Td("No variants available", colSpan=5))),
         )
 
     headers = [
@@ -401,15 +416,17 @@ def create_variant_selection_table(variants: List[Dict[str, Any]]) -> dbc.Table:
     rows = []
     for i, variant in enumerate(variants):
         significance_color = get_clinical_significance_color(
-            variant.get("clinical_significance", "not_provided")
+            variant.get("clinical_significance", "not_provided"),
         )
 
         row = html.Tr(
             [
                 html.Td(
                     html.Span(
-                        "☐", id=f"variant-select-{i}", className="text-primary fw-bold"
-                    )
+                        "☐",
+                        id=f"variant-select-{i}",
+                        className="text-primary fw-bold",
+                    ),
                 ),
                 html.Td(variant.get("variant_id", "Unknown")),
                 html.Td(variant.get("gene_symbol", "Unknown")),
@@ -419,10 +436,10 @@ def create_variant_selection_table(variants: List[Dict[str, Any]]) -> dbc.Table:
                         .replace("_", " ")
                         .title(),
                         style={"backgroundColor": significance_color, "color": "white"},
-                    )
+                    ),
                 ),
                 html.Td(f"{variant.get('confidence_score', 0):.1f}"),
-            ]
+            ],
         )
         rows.append(row)
 
@@ -435,13 +452,13 @@ def create_variant_selection_table(variants: List[Dict[str, Any]]) -> dbc.Table:
     )
 
 
-def create_bulk_preview(selected_items: List[Dict[str, Any]]) -> dbc.Card:
+def create_bulk_preview(selected_items: list[dict[str, Any]]) -> dbc.Card:
     """Create a preview of bulk actions before execution."""
     if not selected_items:
         return dbc.Card(style={"display": "none"})
 
     # Group actions by type
-    action_groups: Dict[str, List[Dict[str, Any]]] = {}
+    action_groups: dict[str, list[dict[str, Any]]] = {}
     for item in selected_items:
         action = item.get("action", "unknown")
         if action not in action_groups:
@@ -458,16 +475,22 @@ def create_bulk_preview(selected_items: List[Dict[str, Any]]) -> dbc.Card:
                         html.Ul(
                             [
                                 html.Li(
-                                    f"{item.get('id', 'Unknown')} - {item.get('description', '')[:50]}..."
+                                    f"{item.get('id', 'Unknown')} - {item.get('description', '')[:50]}...",
                                 )
-                                for item in items[:5]  # Show max 5 items
-                            ]
+                                for item in items[
+                                    :PREVIEW_MAX_ITEMS
+                                ]  # Show max N items
+                            ],
                         ),
                         html.Small(
-                            f"And {len(items) - 5} more..." if len(items) > 5 else "",
+                            (
+                                f"And {len(items) - PREVIEW_MAX_ITEMS} more..."
+                                if len(items) > PREVIEW_MAX_ITEMS
+                                else ""
+                            ),
                             className="text-muted",
                         ),
-                    ]
+                    ],
                 ),
             ],
             className="mb-2",
@@ -484,7 +507,7 @@ def create_bulk_preview(selected_items: List[Dict[str, Any]]) -> dbc.Card:
                         color="info",
                         className="ms-2",
                     ),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
@@ -502,7 +525,7 @@ def create_bulk_preview(selected_items: List[Dict[str, Any]]) -> dbc.Card:
                                         color="success",
                                         id="confirm-bulk-action",
                                         className="w-100",
-                                    )
+                                    ),
                                 ],
                                 width=6,
                             ),
@@ -516,15 +539,15 @@ def create_bulk_preview(selected_items: List[Dict[str, Any]]) -> dbc.Card:
                                         color="warning",
                                         id="modify-bulk-action",
                                         className="w-100",
-                                    )
+                                    ),
                                 ],
                                 width=6,
                             ),
-                        ]
+                        ],
                     ),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
@@ -541,7 +564,7 @@ def create_action_summary() -> dbc.Card:
                             html.P(
                                 "No bulk actions executed yet.",
                                 className="text-muted mb-0",
-                            )
+                            ),
                         ],
                     ),
                     html.Hr(),
@@ -557,11 +580,12 @@ def create_action_summary() -> dbc.Card:
                                                 className="text-success",
                                             ),
                                             html.Small(
-                                                "Completed", className="text-muted"
+                                                "Completed",
+                                                className="text-muted",
                                             ),
                                         ],
                                         className="text-center",
-                                    )
+                                    ),
                                 ],
                                 width=4,
                             ),
@@ -575,11 +599,12 @@ def create_action_summary() -> dbc.Card:
                                                 className="text-warning",
                                             ),
                                             html.Small(
-                                                "Pending", className="text-muted"
+                                                "Pending",
+                                                className="text-muted",
                                             ),
                                         ],
                                         className="text-center",
-                                    )
+                                    ),
                                 ],
                                 width=4,
                             ),
@@ -593,20 +618,21 @@ def create_action_summary() -> dbc.Card:
                                                 className="text-danger",
                                             ),
                                             html.Small(
-                                                "Failed", className="text-muted"
+                                                "Failed",
+                                                className="text-muted",
                                             ),
                                         ],
                                         className="text-center",
-                                    )
+                                    ),
                                 ],
                                 width=4,
                             ),
                         ],
                         className="mt-3",
                     ),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
@@ -645,7 +671,7 @@ def create_bulk_workflow_templates() -> dbc.Card:
                                     dbc.Button(
                                         [
                                             html.I(
-                                                className="fas fa-exclamation-triangle me-2"
+                                                className="fas fa-exclamation-triangle me-2",
                                             ),
                                             "Conflict Resolution",
                                         ],
@@ -661,7 +687,7 @@ def create_bulk_workflow_templates() -> dbc.Card:
                                 ],
                                 width=6,
                             ),
-                        ]
+                        ],
                     ),
                     dbc.Row(
                         [
@@ -703,7 +729,7 @@ def create_bulk_workflow_templates() -> dbc.Card:
                                 ],
                                 width=6,
                             ),
-                        ]
+                        ],
                     ),
                     html.Hr(),
                     # Custom template creation
@@ -720,18 +746,18 @@ def create_bulk_workflow_templates() -> dbc.Card:
                         id="save-custom-template",
                         className="w-100",
                     ),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
 __all__ = [
-    "create_bulk_resolution_panel",
-    "create_quick_actions",
-    "create_batch_processing",
-    "create_bulk_selection",
-    "create_bulk_preview",
     "create_action_summary",
+    "create_batch_processing",
+    "create_bulk_preview",
+    "create_bulk_resolution_panel",
+    "create_bulk_selection",
     "create_bulk_workflow_templates",
+    "create_quick_actions",
 ]

@@ -4,13 +4,21 @@ Evidence comparison component for curator detail view.
 
 from __future__ import annotations
 
-from typing import Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 import dash_bootstrap_components as dbc
-from dash import html
-from dash.development.base_component import Component
 
-from src.presentation.dash.types import EvidenceSnapshot
+from dash import html
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
+    from dash.development.base_component import Component
+    from src.presentation.dash.types import EvidenceSnapshot
+
+# UI constants for truncation behavior
+SUMMARY_MAX_LEN: int = 160
+TRUNCATE_PREFIX_LEN: int = 157  # Keep existing behavior for UI consistency
 
 
 def render_evidence_matrix(evidence: Sequence[EvidenceSnapshot]) -> Component:
@@ -19,7 +27,7 @@ def render_evidence_matrix(evidence: Sequence[EvidenceSnapshot]) -> Component:
     """
     if not evidence:
         return cast(
-            Component,
+            "Component",
             dbc.Alert(
                 [
                     html.I(className="fas fa-info-circle me-2"),
@@ -39,14 +47,18 @@ def render_evidence_matrix(evidence: Sequence[EvidenceSnapshot]) -> Component:
                 html.Th("Confidence"),
                 html.Th("Clinical Significance"),
                 html.Th("Summary"),
-            ]
-        )
+            ],
+        ),
     )
 
     rows = []
     for item in evidence:
         description = item.get("summary") or item.get("description", "")
-        truncated = description if len(description) <= 160 else f"{description[:157]}…"
+        truncated = (
+            description
+            if len(description) <= SUMMARY_MAX_LEN
+            else f"{description[:TRUNCATE_PREFIX_LEN]}…"
+        )
 
         rows.append(
             html.Tr(
@@ -57,8 +69,8 @@ def render_evidence_matrix(evidence: Sequence[EvidenceSnapshot]) -> Component:
                     html.Td(_format_confidence(item.get("confidence_score"))),
                     html.Td(item.get("clinical_significance", "—")),
                     html.Td(truncated or "—"),
-                ]
-            )
+                ],
+            ),
         )
 
     table = dbc.Table(
@@ -70,7 +82,7 @@ def render_evidence_matrix(evidence: Sequence[EvidenceSnapshot]) -> Component:
     )
 
     return cast(
-        Component,
+        "Component",
         html.Div([html.H5("Evidence Comparison"), table]),
     )
 
@@ -87,8 +99,7 @@ def _format_confidence(value: object) -> str:
 
 
 def _format_level(level: str) -> str:
-    normalized = level.replace("_", " ").title()
-    return normalized
+    return level.replace("_", " ").title()
 
 
 __all__ = ["render_evidence_matrix"]

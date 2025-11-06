@@ -6,16 +6,16 @@ providing a clean separation between domain logic and data persistence.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
 from src.domain.entities.user_data_source import (
-    UserDataSource,
-    SourceType,
-    SourceStatus,
     IngestionSchedule,
     QualityMetrics,
     SourceConfiguration,
+    SourceStatus,
+    SourceType,
+    UserDataSource,
 )
 
 
@@ -38,10 +38,9 @@ class UserDataSourceRepository(ABC):
         Returns:
             The saved UserDataSource with any generated fields populated
         """
-        pass
 
     @abstractmethod
-    def find_by_id(self, source_id: UUID) -> Optional[UserDataSource]:
+    def find_by_id(self, source_id: UUID) -> UserDataSource | None:
         """
         Find a user data source by its ID.
 
@@ -51,12 +50,14 @@ class UserDataSourceRepository(ABC):
         Returns:
             The UserDataSource if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def find_by_owner(
-        self, owner_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        owner_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Find all data sources owned by a specific user.
 
@@ -68,12 +69,14 @@ class UserDataSourceRepository(ABC):
         Returns:
             List of UserDataSource entities owned by the user
         """
-        pass
 
     @abstractmethod
     def find_by_type(
-        self, source_type: SourceType, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        source_type: SourceType,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Find all data sources of a specific type.
 
@@ -85,12 +88,14 @@ class UserDataSourceRepository(ABC):
         Returns:
             List of UserDataSource entities of the specified type
         """
-        pass
 
     @abstractmethod
     def find_by_status(
-        self, status: SourceStatus, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        status: SourceStatus,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Find all data sources with a specific status.
 
@@ -102,12 +107,13 @@ class UserDataSourceRepository(ABC):
         Returns:
             List of UserDataSource entities with the specified status
         """
-        pass
 
     @abstractmethod
     def find_active_sources(
-        self, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Find all active data sources.
 
@@ -118,12 +124,14 @@ class UserDataSourceRepository(ABC):
         Returns:
             List of active UserDataSource entities
         """
-        pass
 
     @abstractmethod
     def find_by_tag(
-        self, tag: str, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        tag: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Find data sources that have a specific tag.
 
@@ -135,16 +143,15 @@ class UserDataSourceRepository(ABC):
         Returns:
             List of UserDataSource entities with the specified tag
         """
-        pass
 
     @abstractmethod
     def search_by_name(
         self,
         query: str,
-        owner_id: Optional[UUID] = None,
+        owner_id: UUID | None = None,
         skip: int = 0,
         limit: int = 50,
-    ) -> List[UserDataSource]:
+    ) -> list[UserDataSource]:
         """
         Search data sources by name using fuzzy matching.
 
@@ -157,12 +164,13 @@ class UserDataSourceRepository(ABC):
         Returns:
             List of UserDataSource entities matching the search
         """
-        pass
 
     @abstractmethod
     def update_status(
-        self, source_id: UUID, status: SourceStatus
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        status: SourceStatus,
+    ) -> UserDataSource | None:
         """
         Update the status of a data source.
 
@@ -173,12 +181,13 @@ class UserDataSourceRepository(ABC):
         Returns:
             The updated UserDataSource if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def update_quality_metrics(
-        self, source_id: UUID, metrics: QualityMetrics
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        metrics: QualityMetrics,
+    ) -> UserDataSource | None:
         """
         Update the quality metrics of a data source.
 
@@ -189,12 +198,13 @@ class UserDataSourceRepository(ABC):
         Returns:
             The updated UserDataSource if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def update_configuration(
-        self, source_id: UUID, config: SourceConfiguration
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        config: SourceConfiguration,
+    ) -> UserDataSource | None:
         """
         Update the configuration of a data source.
 
@@ -205,12 +215,13 @@ class UserDataSourceRepository(ABC):
         Returns:
             The updated UserDataSource if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def update_ingestion_schedule(
-        self, source_id: UUID, schedule: IngestionSchedule
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        schedule: IngestionSchedule,
+    ) -> UserDataSource | None:
         """
         Update the ingestion schedule of a data source.
 
@@ -221,10 +232,9 @@ class UserDataSourceRepository(ABC):
         Returns:
             The updated UserDataSource if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    def record_ingestion(self, source_id: UUID) -> Optional[UserDataSource]:
+    def record_ingestion(self, source_id: UUID) -> UserDataSource | None:
         """
         Record that ingestion has occurred for a data source.
 
@@ -234,7 +244,6 @@ class UserDataSourceRepository(ABC):
         Returns:
             The updated UserDataSource if found, None otherwise
         """
-        pass
 
     @abstractmethod
     def delete(self, source_id: UUID) -> bool:
@@ -247,7 +256,6 @@ class UserDataSourceRepository(ABC):
         Returns:
             True if deleted, False if not found
         """
-        pass
 
     @abstractmethod
     def count_by_owner(self, owner_id: UUID) -> int:
@@ -260,7 +268,6 @@ class UserDataSourceRepository(ABC):
         Returns:
             The count of sources owned by the user
         """
-        pass
 
     @abstractmethod
     def count_by_status(self, status: SourceStatus) -> int:
@@ -273,7 +280,6 @@ class UserDataSourceRepository(ABC):
         Returns:
             The count of sources with the specified status
         """
-        pass
 
     @abstractmethod
     def count_by_type(self, source_type: SourceType) -> int:
@@ -286,7 +292,6 @@ class UserDataSourceRepository(ABC):
         Returns:
             The count of sources of the specified type
         """
-        pass
 
     @abstractmethod
     def exists(self, source_id: UUID) -> bool:
@@ -299,14 +304,12 @@ class UserDataSourceRepository(ABC):
         Returns:
             True if exists, False otherwise
         """
-        pass
 
     @abstractmethod
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get overall statistics about data sources.
 
         Returns:
             Dictionary with various statistics
         """
-        pass

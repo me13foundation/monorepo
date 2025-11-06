@@ -4,19 +4,20 @@ Phenotype API routes for MED13 Resource Library.
 RESTful endpoints for phenotype management with HPO ontology integration.
 """
 
-from typing import Optional, Dict, Any, TYPE_CHECKING
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import TYPE_CHECKING, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from src.database.session import get_session
 from src.application.container import get_legacy_dependency_container
-from src.routes.serializers import serialize_phenotype
+from src.database.session import get_session
 from src.models.api import (
-    PhenotypeResponse,
-    PhenotypeCreate,
-    PhenotypeUpdate,
     PaginatedResponse,
+    PhenotypeCreate,
+    PhenotypeResponse,
+    PhenotypeUpdate,
 )
+from src.routes.serializers import serialize_phenotype
 
 if TYPE_CHECKING:
     from src.application.services.phenotype_service import PhenotypeApplicationService
@@ -35,18 +36,22 @@ def get_phenotype_service(
 
 
 @router.get(
-    "/", summary="List phenotypes", response_model=PaginatedResponse[PhenotypeResponse]
+    "/",
+    summary="List phenotypes",
+    response_model=PaginatedResponse[PhenotypeResponse],
 )
 async def get_phenotypes(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    search: Optional[str] = Query(
-        None, description="Search by HPO term, name, or synonyms"
+    search: str
+    | None = Query(
+        None,
+        description="Search by HPO term, name, or synonyms",
     ),
     sort_by: str = Query("name", description="Sort field"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
-    category: Optional[str] = Query(None, description="Filter by category"),
-    is_root_term: Optional[bool] = Query(None, description="Filter by root terms"),
+    category: str | None = Query(None, description="Filter by category"),
+    is_root_term: bool | None = Query(None, description="Filter by root terms"),
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
 ) -> PaginatedResponse[PhenotypeResponse]:
     """
@@ -84,12 +89,15 @@ async def get_phenotypes(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve phenotypes: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve phenotypes: {e!s}",
         )
 
 
 @router.get(
-    "/{phenotype_id}", summary="Get phenotype by ID", response_model=PhenotypeResponse
+    "/{phenotype_id}",
+    summary="Get phenotype by ID",
+    response_model=PhenotypeResponse,
 )
 async def get_phenotype(
     phenotype_id: int,
@@ -101,23 +109,27 @@ async def get_phenotype(
     try:
         # For now, we'll use get_by_id - may need to enhance service later
         phenotype = service.get_phenotype_by_hpo_id(
-            f"HP:{phenotype_id:07d}"
+            f"HP:{phenotype_id:07d}",
         )  # Convert to HPO format
         if not phenotype:
             raise HTTPException(
-                status_code=404, detail=f"Phenotype {phenotype_id} not found"
+                status_code=404,
+                detail=f"Phenotype {phenotype_id} not found",
             )
         return PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve phenotype: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve phenotype: {e!s}",
         )
 
 
 @router.get(
-    "/hpo/{hpo_id}", summary="Get phenotype by HPO ID", response_model=PhenotypeResponse
+    "/hpo/{hpo_id}",
+    summary="Get phenotype by HPO ID",
+    response_model=PhenotypeResponse,
 )
 async def get_phenotype_by_hpo_id(
     hpo_id: str,
@@ -130,14 +142,16 @@ async def get_phenotype_by_hpo_id(
         phenotype = service.get_phenotype_by_hpo_id(hpo_id)
         if not phenotype:
             raise HTTPException(
-                status_code=404, detail=f"Phenotype with HPO ID {hpo_id} not found"
+                status_code=404,
+                detail=f"Phenotype with HPO ID {hpo_id} not found",
             )
         return PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve phenotype: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve phenotype: {e!s}",
         )
 
 
@@ -168,12 +182,15 @@ async def create_phenotype(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to create phenotype: {str(e)}"
+            status_code=500,
+            detail=f"Failed to create phenotype: {e!s}",
         )
 
 
 @router.put(
-    "/{phenotype_id}", summary="Update phenotype", response_model=PhenotypeResponse
+    "/{phenotype_id}",
+    summary="Update phenotype",
+    response_model=PhenotypeResponse,
 )
 async def update_phenotype(
     phenotype_id: int,
@@ -187,7 +204,8 @@ async def update_phenotype(
         # Validate phenotype exists
         if not service.validate_phenotype_exists(phenotype_id):
             raise HTTPException(
-                status_code=404, detail=f"Phenotype {phenotype_id} not found"
+                status_code=404,
+                detail=f"Phenotype {phenotype_id} not found",
             )
 
         # Convert to dict for update
@@ -199,7 +217,8 @@ async def update_phenotype(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to update phenotype: {str(e)}"
+            status_code=500,
+            detail=f"Failed to update phenotype: {e!s}",
         )
 
 
@@ -214,7 +233,8 @@ async def delete_phenotype(
     try:
         if not service.validate_phenotype_exists(phenotype_id):
             raise HTTPException(
-                status_code=404, detail=f"Phenotype {phenotype_id} not found"
+                status_code=404,
+                detail=f"Phenotype {phenotype_id} not found",
             )
 
         # For now, implement soft delete or check dependencies
@@ -227,17 +247,18 @@ async def delete_phenotype(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to delete phenotype: {str(e)}"
+            status_code=500,
+            detail=f"Failed to delete phenotype: {e!s}",
         )
 
 
-@router.get("/search/", summary="Search phenotypes", response_model=Dict[str, Any])
+@router.get("/search/", summary="Search phenotypes", response_model=dict[str, Any])
 async def search_phenotypes(
     query: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
-    category: Optional[str] = Query(None, description="Filter by category"),
+    category: str | None = Query(None, description="Filter by category"),
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Search phenotypes by name, HPO term, or synonyms.
     """
@@ -252,18 +273,23 @@ async def search_phenotypes(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to search phenotypes: {str(e)}"
+            status_code=500,
+            detail=f"Failed to search phenotypes: {e!s}",
         )
 
 
 @router.get("/category/{category}", summary="Get phenotypes by category")
 async def get_phenotypes_by_category(
     category: str,
-    limit: Optional[int] = Query(
-        None, ge=1, le=100, description="Maximum number of results"
+    limit: int
+    | None = Query(
+        None,
+        ge=1,
+        le=100,
+        description="Maximum number of results",
     ),
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve phenotypes filtered by clinical category.
     """
@@ -281,16 +307,18 @@ async def get_phenotypes_by_category(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve phenotypes for category {category}: {str(e)}",
+            detail=f"Failed to retrieve phenotypes for category {category}: {e!s}",
         )
 
 
 @router.get(
-    "/statistics/", summary="Get phenotype statistics", response_model=Dict[str, Any]
+    "/statistics/",
+    summary="Get phenotype statistics",
+    response_model=dict[str, Any],
 )
 async def get_phenotype_statistics(
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve statistics about phenotypes in the repository.
     """
@@ -299,7 +327,8 @@ async def get_phenotype_statistics(
         return stats
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve phenotype statistics: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve phenotype statistics: {e!s}",
         )
 
 
@@ -307,14 +336,15 @@ async def get_phenotype_statistics(
 async def get_phenotype_evidence(
     phenotype_id: int,
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve all evidence associated with a specific phenotype.
     """
     try:
         if not service.validate_phenotype_exists(phenotype_id):
             raise HTTPException(
-                status_code=404, detail=f"Phenotype {phenotype_id} not found"
+                status_code=404,
+                detail=f"Phenotype {phenotype_id} not found",
             )
 
         # TODO: Implement evidence retrieval for phenotypes
@@ -328,5 +358,5 @@ async def get_phenotype_evidence(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve evidence for phenotype {phenotype_id}: {str(e)}",
+            detail=f"Failed to retrieve evidence for phenotype {phenotype_id}: {e!s}",
         )

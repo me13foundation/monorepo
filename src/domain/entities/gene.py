@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import re
-from typing import Optional
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, ClassVar
 
 from src.domain.value_objects.identifiers import GeneIdentifier
-from src.domain.value_objects.provenance import Provenance
-from src.domain.entities.variant import VariantSummary
+
+if TYPE_CHECKING:
+    from src.domain.entities.variant import VariantSummary
+    from src.domain.value_objects.provenance import Provenance
 
 
 class GeneType:
@@ -16,13 +18,14 @@ class GeneType:
     NCRNA = "ncRNA"
     UNKNOWN = "unknown"
 
-    _VALID_TYPES = {PROTEIN_CODING, PSEUDOGENE, NCRNA, UNKNOWN}
+    _VALID_TYPES: ClassVar[set[str]] = {PROTEIN_CODING, PSEUDOGENE, NCRNA, UNKNOWN}
 
     @classmethod
     def validate(cls, value: str) -> str:
         normalized = value or cls.UNKNOWN
         if normalized not in cls._VALID_TYPES:
-            raise ValueError(f"Unsupported gene_type '{value}'")
+            msg = f"Unsupported gene_type '{value}'"
+            raise ValueError(msg)
         return normalized
 
 
@@ -33,15 +36,15 @@ CHROMOSOME_PATTERN = re.compile(r"^(chr)?[0-9XYM]+$", re.IGNORECASE)
 class Gene:
     identifier: GeneIdentifier
     gene_type: str = GeneType.UNKNOWN
-    name: Optional[str] = None
-    description: Optional[str] = None
-    chromosome: Optional[str] = None
-    start_position: Optional[int] = None
-    end_position: Optional[int] = None
-    provenance: Optional[Provenance] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    id: Optional[int] = None
+    name: str | None = None
+    description: str | None = None
+    chromosome: str | None = None
+    start_position: int | None = None
+    end_position: int | None = None
+    provenance: Provenance | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    id: int | None = None
     variants: list[VariantSummary] = field(default_factory=list, repr=False)
 
     def __post_init__(self) -> None:
@@ -50,34 +53,35 @@ class Gene:
             self.chromosome = self._normalize_chromosome(self.chromosome)
 
         if self.start_position is not None and self.start_position < 1:
-            raise ValueError("start_position must be >= 1")
+            msg = "start_position must be >= 1"
+            raise ValueError(msg)
         if self.end_position is not None and self.end_position < 1:
-            raise ValueError("end_position must be >= 1")
+            msg = "end_position must be >= 1"
+            raise ValueError(msg)
         if (
             self.start_position is not None
             and self.end_position is not None
             and self.end_position < self.start_position
         ):
-            raise ValueError(
-                "end_position must be greater than or equal to start_position"
-            )
+            msg = "end_position must be greater than or equal to start_position"
+            raise ValueError(msg)
 
     @classmethod
-    def create(
+    def create(  # noqa: PLR0913 - explicit factory arguments for clarity
         cls,
         symbol: str,
-        gene_id: Optional[str] = None,
+        gene_id: str | None = None,
         *,
         gene_type: str = GeneType.PROTEIN_CODING,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        chromosome: Optional[str] = None,
-        start_position: Optional[int] = None,
-        end_position: Optional[int] = None,
-        ensembl_id: Optional[str] = None,
-        ncbi_gene_id: Optional[int] = None,
-        uniprot_id: Optional[str] = None,
-        provenance: Optional[Provenance] = None,
+        name: str | None = None,
+        description: str | None = None,
+        chromosome: str | None = None,
+        start_position: int | None = None,
+        end_position: int | None = None,
+        ensembl_id: str | None = None,
+        ncbi_gene_id: int | None = None,
+        uniprot_id: str | None = None,
+        provenance: Provenance | None = None,
     ) -> Gene:
         identifier = GeneIdentifier(
             gene_id=gene_id or symbol,
@@ -106,25 +110,25 @@ class Gene:
         return self.identifier.symbol
 
     @property
-    def ensembl_id(self) -> Optional[str]:
+    def ensembl_id(self) -> str | None:
         return self.identifier.ensembl_id
 
     @property
-    def ncbi_gene_id(self) -> Optional[int]:
+    def ncbi_gene_id(self) -> int | None:
         return self.identifier.ncbi_gene_id
 
     @property
-    def uniprot_id(self) -> Optional[str]:
+    def uniprot_id(self) -> str | None:
         return self.identifier.uniprot_id
 
     def update_identifier(
         self,
         *,
-        gene_id: Optional[str] = None,
-        symbol: Optional[str] = None,
-        ensembl_id: Optional[str] = None,
-        ncbi_gene_id: Optional[int] = None,
-        uniprot_id: Optional[str] = None,
+        gene_id: str | None = None,
+        symbol: str | None = None,
+        ensembl_id: str | None = None,
+        ncbi_gene_id: int | None = None,
+        uniprot_id: str | None = None,
     ) -> None:
         updated = GeneIdentifier(
             gene_id=gene_id or self.identifier.gene_id,
@@ -147,20 +151,22 @@ class Gene:
     def set_location(
         self,
         *,
-        chromosome: Optional[str] = None,
-        start_position: Optional[int] = None,
-        end_position: Optional[int] = None,
+        chromosome: str | None = None,
+        start_position: int | None = None,
+        end_position: int | None = None,
     ) -> None:
         if chromosome is not None:
             self.chromosome = self._normalize_chromosome(chromosome)
 
         if start_position is not None:
             if start_position < 1:
-                raise ValueError("start_position must be >= 1")
+                msg = "start_position must be >= 1"
+                raise ValueError(msg)
             self.start_position = start_position
         if end_position is not None:
             if end_position < 1:
-                raise ValueError("end_position must be >= 1")
+                msg = "end_position must be >= 1"
+                raise ValueError(msg)
             self.end_position = end_position
 
         if (
@@ -168,18 +174,17 @@ class Gene:
             and self.end_position is not None
             and self.end_position < self.start_position
         ):
-            raise ValueError(
-                "end_position must be greater than or equal to start_position"
-            )
+            msg = "end_position must be greater than or equal to start_position"
+            raise ValueError(msg)
 
         self._touch()
 
     def update_metadata(
         self,
         *,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        gene_type: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
+        gene_type: str | None = None,
     ) -> None:
         if name is not None:
             self.name = name
@@ -195,18 +200,20 @@ class Gene:
 
     def add_provenance_step(self, step: str) -> None:
         if self.provenance is None:
-            raise ValueError("Cannot add processing step without provenance")
+            msg = "Cannot add processing step without provenance"
+            raise ValueError(msg)
         self.provenance = self.provenance.add_processing_step(step)
         self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     @staticmethod
     def _normalize_chromosome(chromosome: str) -> str:
         value = chromosome.strip()
         if not CHROMOSOME_PATTERN.fullmatch(value):
-            raise ValueError("chromosome must match pattern chr<id>")
+            msg = "chromosome must match pattern chr<id>"
+            raise ValueError(msg)
         if not value.lower().startswith("chr"):
             value = f"chr{value}"
         return value.upper()

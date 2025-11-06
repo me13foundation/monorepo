@@ -5,12 +5,11 @@ Application service that assembles curated record details for reviewers.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Sequence, Tuple
+from datetime import datetime as _dt
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
 
-from src.application.curation.conflict_detector import ConflictDetector
 from src.application.curation.dto import (
     AuditInfoDTO,
     CuratedRecordDetailDTO,
@@ -19,14 +18,27 @@ from src.application.curation.dto import (
     ProvenanceDTO,
     VariantDetailDTO,
 )
-from src.application.curation.repositories.review_repository import ReviewRepository
-from src.application.services.evidence_service import EvidenceApplicationService
-from src.application.services.variant_service import VariantApplicationService
-from src.domain.entities.evidence import Evidence
-from src.domain.entities.phenotype import Phenotype
-from src.domain.entities.variant import Variant
-from src.domain.repositories.phenotype_repository import PhenotypeRepository
 from src.models.database.audit import AuditLog
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from src.application.curation.conflict_detector import ConflictDetector
+    from src.application.curation.repositories.review_repository import (
+        ReviewRepository,
+    )
+    from src.application.services.evidence_service import EvidenceApplicationService
+    from src.application.services.variant_service import VariantApplicationService
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from src.domain.entities.evidence import Evidence
+    from src.domain.entities.phenotype import Phenotype
+    from src.domain.entities.variant import Variant
+    from src.domain.repositories.phenotype_repository import PhenotypeRepository
+
+    # AuditLog imported at runtime above
 
 
 @dataclass
@@ -56,7 +68,8 @@ class CurationDetailService:
         if normalized_type in {"variant", "variants"}:
             return self._build_variant_detail(entity_id)
 
-        raise ValueError(f"Curation detail not supported for '{entity_type}'")
+        message = f"Curation detail not supported for '{entity_type}'"
+        raise ValueError(message)
 
     # ------------------------------------------------------------------ #
     # Internal helpers
@@ -65,18 +78,21 @@ class CurationDetailService:
     def _build_variant_detail(self, entity_id: str) -> CuratedRecordDetailDTO:
         variant, evidence_records = self._load_variant_and_evidence(entity_id)
         if variant is None:
-            raise ValueError(f"Variant '{entity_id}' not found")
+            message = f"Variant '{entity_id}' not found"
+            raise ValueError(message)
 
         variant_detail = self._to_variant_dto(variant)
         evidence_dtos = self._to_evidence_dtos(evidence_records)
         phenotype_dtos = self._load_phenotype_dtos(variant)
         conflict_dtos = tuple(
-            self.conflict_detector.summarize_conflicts(variant, evidence_records)
+            self.conflict_detector.summarize_conflicts(variant, evidence_records),
         )
 
-        provenance: Optional[ProvenanceDTO] = None
+        provenance: ProvenanceDTO | None = None
         audit = self._load_audit_info(
-            entity_type="variant", entity_identifier=entity_id, variant=variant
+            entity_type="variant",
+            entity_identifier=entity_id,
+            variant=variant,
         )
 
         return CuratedRecordDetailDTO(
@@ -89,12 +105,13 @@ class CurationDetailService:
         )
 
     def _load_variant_and_evidence(
-        self, entity_id: str
-    ) -> Tuple[Optional[Variant], Sequence[Evidence]]:
-        variant: Optional[Variant] = None
+        self,
+        entity_id: str,
+    ) -> tuple[Variant | None, Sequence[Evidence]]:
+        variant: Variant | None = None
         evidence: Sequence[Evidence] = ()
 
-        variant_db_id: Optional[int] = None
+        variant_db_id: int | None = None
 
         if entity_id.isdigit():
             variant_db_id = int(entity_id)
@@ -141,33 +158,32 @@ class CurationDetailService:
         )
 
     def _to_evidence_dtos(
-        self, evidence_records: Sequence[Evidence]
-    ) -> Tuple[EvidenceSnapshotDTO, ...]:
-        snapshots: list[EvidenceSnapshotDTO] = []
-        for ev in evidence_records:
-            snapshots.append(
-                EvidenceSnapshotDTO(
-                    id=ev.id,
-                    evidence_level=ev.evidence_level.value,
-                    evidence_type=ev.evidence_type,
-                    description=ev.description,
-                    confidence_score=ev.confidence.score,
-                    clinical_significance=getattr(ev, "clinical_significance", None),
-                    source=getattr(ev, "source", None),
-                    summary=ev.summary,
-                    publication_id=ev.publication_id,
-                    phenotype_id=ev.phenotype_id,
-                    variant_id=ev.variant_id,
-                    reviewed=ev.reviewed,
-                    reviewer_notes=ev.reviewer_notes,
-                )
+        self,
+        evidence_records: Sequence[Evidence],
+    ) -> tuple[EvidenceSnapshotDTO, ...]:
+        return tuple(
+            EvidenceSnapshotDTO(
+                id=ev.id,
+                evidence_level=ev.evidence_level.value,
+                evidence_type=ev.evidence_type,
+                description=ev.description,
+                confidence_score=ev.confidence.score,
+                clinical_significance=getattr(ev, "clinical_significance", None),
+                source=getattr(ev, "source", None),
+                summary=ev.summary,
+                publication_id=ev.publication_id,
+                phenotype_id=ev.phenotype_id,
+                variant_id=ev.variant_id,
+                reviewed=ev.reviewed,
+                reviewer_notes=ev.reviewer_notes,
             )
-
-        return tuple(snapshots)
+            for ev in evidence_records
+        )
 
     def _load_phenotype_dtos(
-        self, variant: Variant
-    ) -> Tuple[PhenotypeSnapshotDTO, ...]:
+        self,
+        variant: Variant,
+    ) -> tuple[PhenotypeSnapshotDTO, ...]:
         if variant.id is None:
             return ()
 
@@ -193,10 +209,15 @@ class CurationDetailService:
         )
 
     def _load_audit_info(
-        self, entity_type: str, entity_identifier: str, variant: Optional[Variant]
-    ) -> Optional[AuditInfoDTO]:
+        self,
+        entity_type: str,
+        entity_identifier: str,
+        variant: Variant | None,
+    ) -> AuditInfoDTO | None:
         primary_record = self.review_repository.find_by_entity(
-            self.db_session, entity_type, entity_identifier
+            self.db_session,
+            entity_type,
+            entity_identifier,
         )
 
         fallback_identifier = variant.variant_id if variant is not None else None
@@ -206,7 +227,9 @@ class CurationDetailService:
             and fallback_identifier != entity_identifier
         ):
             primary_record = self.review_repository.find_by_entity(
-                self.db_session, entity_type, fallback_identifier
+                self.db_session,
+                entity_type,
+                fallback_identifier,
             )
             if primary_record is not None:
                 entity_identifier = fallback_identifier
@@ -220,15 +243,23 @@ class CurationDetailService:
         )
         annotation_count = int(self.db_session.execute(stmt).scalar_one())
 
+        pr = primary_record  # alias
         pending_actions: tuple[str, ...] = (
-            f"Status: {primary_record.status}",
-            f"Priority: {primary_record.priority}",
-            f"Issues: {primary_record.issues}",
+            f"Status: {pr.get('status', '')}",
+            f"Priority: {pr.get('priority', '')}",
+            f"Issues: {pr.get('issues', 0)}",
         )
+
+        last_updated_raw = primary_record.get("last_updated")
+        last_updated_typed: _dt | None
+        if isinstance(last_updated_raw, _dt):
+            last_updated_typed = last_updated_raw
+        else:
+            last_updated_typed = None
 
         return AuditInfoDTO(
             last_updated_by=None,
-            last_updated_at=primary_record.last_updated,
+            last_updated_at=last_updated_typed,
             pending_actions=pending_actions,
             total_annotations=annotation_count,
         )

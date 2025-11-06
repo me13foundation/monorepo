@@ -5,23 +5,24 @@ Tests the complete validation pipeline including gates, reporting,
 and orchestration components working together.
 """
 
-import pytest
 import asyncio
 import os
 import time
 
-from src.domain.validation.rules.base_rules import ValidationRuleEngine
+import pytest
+
+from src.domain.validation.gates.orchestrator import QualityGateOrchestrator
+from src.domain.validation.gates.pipeline import ValidationPipeline
 from src.domain.validation.gates.quality_gate import (
     GateStatus,
     create_parsing_gate,
 )
-from src.domain.validation.gates.pipeline import ValidationPipeline
-from src.domain.validation.gates.orchestrator import QualityGateOrchestrator
+from src.domain.validation.reporting.dashboard import ValidationDashboard
 from src.domain.validation.reporting.error_reporting import ErrorReporter
 from src.domain.validation.reporting.metrics import MetricsCollector
-from src.domain.validation.reporting.dashboard import ValidationDashboard
-from src.domain.validation.testing.test_framework import ValidationTestFramework
+from src.domain.validation.rules.base_rules import ValidationRuleEngine
 from src.domain.validation.testing.test_data_generator import TestDataGenerator
+from src.domain.validation.testing.test_framework import ValidationTestFramework
 
 
 class TestValidationPipelineIntegration:
@@ -33,7 +34,8 @@ class TestValidationPipelineIntegration:
         self.error_reporter = ErrorReporter()
         self.metrics_collector = MetricsCollector()
         self.dashboard = ValidationDashboard(
-            self.error_reporter, self.metrics_collector
+            self.error_reporter,
+            self.metrics_collector,
         )
 
         # Test data
@@ -134,12 +136,19 @@ class TestValidationPipelineIntegration:
         # Collect some validation metrics
         validation_results = [self.rule_engine.validate_entity("gene", self.test_gene)]
         self.metrics_collector.collect_validation_metrics(
-            validation_results, "test_pipeline", "gene"
+            validation_results,
+            "test_pipeline",
+            "gene",
         )
 
         # Collect pipeline metrics
         self.metrics_collector.collect_pipeline_metrics(
-            "test_pipeline", 1.5, 1, 0.9, 0, 1
+            "test_pipeline",
+            1.5,
+            1,
+            0.9,
+            0,
+            1,
         )
 
         # Get performance report
@@ -152,12 +161,18 @@ class TestValidationPipelineIntegration:
         """Test dashboard data collection and presentation."""
         # Add some test data
         self.error_reporter.add_error(
-            "gene", "TP53", "symbol", "test_rule", "Test error"
+            "gene",
+            "TP53",
+            "symbol",
+            "test_rule",
+            "Test error",
         )
 
         validation_results = [self.rule_engine.validate_entity("gene", self.test_gene)]
         self.metrics_collector.collect_validation_metrics(
-            validation_results, "test", "gene"
+            validation_results,
+            "test",
+            "gene",
         )
 
         # Get dashboard data
@@ -206,7 +221,8 @@ class TestValidationWorkflowIntegration:
         self.error_reporter = ErrorReporter()
         self.metrics_collector = MetricsCollector()
         self.dashboard = ValidationDashboard(
-            self.error_reporter, self.metrics_collector
+            self.error_reporter,
+            self.metrics_collector,
         )
         self.orchestrator = QualityGateOrchestrator()
 
@@ -253,7 +269,8 @@ class TestValidationWorkflowIntegration:
 
         async def run_workflow():
             result = await self.orchestrator.execute_pipeline(
-                "workflow_test", test_data
+                "workflow_test",
+                test_data,
             )
 
             if result:
@@ -315,12 +332,19 @@ class TestValidationWorkflowIntegration:
 
             # Collect metrics
             self.metrics_collector.collect_validation_metrics(
-                results, "integration_test", "gene"
+                results,
+                "integration_test",
+                "gene",
             )
 
         # Collect pipeline metrics
         self.metrics_collector.collect_pipeline_metrics(
-            "integration_test", 2.5, len(gene_data.data), 0.75, 2, 3
+            "integration_test",
+            2.5,
+            len(gene_data.data),
+            0.75,
+            2,
+            3,
         )
 
         # Get comprehensive report
@@ -363,7 +387,7 @@ class TestValidationWorkflowIntegration:
 
         # Check metrics were recorded
         throughput_metric = self.metrics_collector.get_current_value(
-            "pipeline.throughput"
+            "pipeline.throughput",
         )
         assert throughput_metric is not None
 
@@ -379,7 +403,8 @@ class TestValidationWorkflowIntegration:
             # Generate different test data for each pipeline
             data_generator = TestDataGenerator(seed=i)  # Different seed for variety
             gene_data = data_generator.generate_gene_dataset(
-                10, "good" if i % 2 == 0 else "mixed"
+                10,
+                "good" if i % 2 == 0 else "mixed",
             )
 
             pipelines_data[pipeline_name] = {"genes": gene_data.data}
@@ -407,22 +432,24 @@ class TestValidationWorkflowIntegration:
 
         # Add multiple checkpoints
         from src.domain.validation.gates.quality_gate import (
-            create_parsing_gate,
             create_normalization_gate,
+            create_parsing_gate,
             create_relationship_gate,
         )
 
         pipeline.add_checkpoint("parsing", [create_parsing_gate()])
         pipeline.add_checkpoint("normalization", [create_normalization_gate()])
         pipeline.add_checkpoint(
-            "relationships", [create_relationship_gate()], required=False
+            "relationships",
+            [create_relationship_gate()],
+            required=False,
         )
 
         # Test data for different stages
         test_data = {
             "genes": [{"symbol": "TP53", "source": "test"}],
             "relationships": [
-                {"gene_id": "TP53", "variant_id": "VAR1", "type": "gene_variant"}
+                {"gene_id": "TP53", "variant_id": "VAR1", "type": "gene_variant"},
             ],
         }
 
@@ -446,7 +473,9 @@ class TestValidationWorkflowIntegration:
 
         # Set up report generator
         report_generator = ValidationReportGenerator(
-            self.error_reporter, self.metrics_collector, self.dashboard
+            self.error_reporter,
+            self.metrics_collector,
+            self.dashboard,
         )
 
         # Add some test data and errors
@@ -461,7 +490,9 @@ class TestValidationWorkflowIntegration:
 
         validation_results = [self.rule_engine.validate_entity("gene", self.test_gene)]
         self.metrics_collector.collect_validation_metrics(
-            validation_results, "e2e_test", "gene"
+            validation_results,
+            "e2e_test",
+            "gene",
         )
 
         # Generate reports

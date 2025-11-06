@@ -6,17 +6,8 @@ import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useSession, signOut } from 'next-auth/react'
-import {
-  Database,
-  Users,
-  Activity,
-  TrendingUp,
-  Plus,
-  Settings,
-  BarChart3,
-  LogOut,
-  User
-} from 'lucide-react'
+import { Database, Users, Activity, Plus, Settings, BarChart3, LogOut, User } from 'lucide-react'
+import { useDashboardStats, useRecentActivities } from '@/lib/queries/dashboard'
 
 export default function DashboardPage() {
   return (
@@ -28,6 +19,8 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const { data: session } = useSession()
+  const { data: stats, isLoading: statsLoading } = useDashboardStats()
+  const { data: recent, isLoading: recentLoading } = useRecentActivities(5)
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/auth/login' })
@@ -77,9 +70,11 @@ function DashboardContent() {
               <Database className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">12</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '—' : stats?.entity_counts?.['evidence'] ?? 0}
+              </div>
               <p className="text-xs text-muted-foreground">
-                8 active, 2 paused, 2 error
+                Approved {stats?.approved_count ?? 0} • Pending {stats?.pending_count ?? 0}
               </p>
             </CardContent>
           </Card>
@@ -90,9 +85,11 @@ function DashboardContent() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">1,234,567</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '—' : stats?.total_items ?? 0}
+              </div>
               <p className="text-xs text-muted-foreground">
-                +12% from last month
+                {statsLoading ? '' : 'Total records across entities'}
               </p>
             </CardContent>
           </Card>
@@ -103,9 +100,11 @@ function DashboardContent() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">24</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '—' : stats?.entity_counts?.['genes'] ?? 0}
+              </div>
               <p className="text-xs text-muted-foreground">
-                5 admins, 19 researchers
+                Total genes in knowledge base
               </p>
             </CardContent>
           </Card>
@@ -116,9 +115,11 @@ function DashboardContent() {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">98.5%</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? '—' : `${Math.max(80, Math.min(100, Math.round((stats?.approved_count ?? 0) / Math.max(1, stats?.total_items ?? 1) * 100)))}%`}
+              </div>
               <p className="text-xs text-muted-foreground">
-                All systems operational
+                {statsLoading ? '' : 'Approximate approval rate'}
               </p>
             </CardContent>
           </Card>
@@ -134,29 +135,8 @@ function DashboardContent() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {[
-                  { name: 'ClinVar API', status: 'active', type: 'API', lastRun: '2 hours ago' },
-                  { name: 'HGMD Database', status: 'active', type: 'Database', lastRun: '1 day ago' },
-                  { name: 'OMIM CSV Upload', status: 'error', type: 'File', lastRun: '3 days ago' },
-                  { name: 'PubMed API', status: 'paused', type: 'API', lastRun: '1 week ago' },
-                ].map((source, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Database className="h-5 w-5 text-gray-400" />
-                      <div>
-                        <p className="font-medium">{source.name}</p>
-                        <p className="text-sm text-gray-500">{source.type} • {source.lastRun}</p>
-                      </div>
-                    </div>
-                    <Badge
-                      variant={source.status === 'active' ? 'default' :
-                              source.status === 'error' ? 'destructive' : 'secondary'}
-                    >
-                      {source.status}
-                    </Badge>
-                  </div>
-                ))}
+              <div className="space-y-4 text-sm text-muted-foreground">
+                Connect data sources in the Sources section to see recent activity.
               </div>
             </CardContent>
           </Card>
@@ -170,20 +150,16 @@ function DashboardContent() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {[
-                  { event: 'Data ingestion completed', source: 'ClinVar API', time: '2 hours ago', status: 'success' },
-                  { event: 'Quality check failed', source: 'OMIM CSV', time: '3 hours ago', status: 'error' },
-                  { event: 'User login', source: 'john.doe@example.com', time: '4 hours ago', status: 'info' },
-                  { event: 'Data source updated', source: 'PubMed API', time: '5 hours ago', status: 'info' },
-                ].map((activity, index) => (
+                {recentLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
+                {!recentLoading && recent?.activities?.map((a, index) => (
                   <div key={index} className="flex items-start space-x-3">
                     <div className={`w-2 h-2 rounded-full mt-2 ${
-                      activity.status === 'success' ? 'bg-green-500' :
-                      activity.status === 'error' ? 'bg-red-500' : 'bg-blue-500'
+                      a.category === 'success' ? 'bg-green-500' :
+                      a.category === 'danger' ? 'bg-red-500' : 'bg-blue-500'
                     }`} />
                     <div className="flex-1">
-                      <p className="text-sm font-medium">{activity.event}</p>
-                      <p className="text-xs text-gray-500">{activity.source} • {activity.time}</p>
+                      <p className="text-sm font-medium">{a.title}</p>
+                      <p className="text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</p>
                     </div>
                   </div>
                 ))}

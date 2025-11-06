@@ -4,13 +4,14 @@ Unified Search Service for MED13 Resource Library.
 Provides cross-entity search capabilities with relevance scoring and filtering.
 """
 
-from typing import Any, Dict, List, Optional, Union
+import logging
 from enum import Enum
+from typing import Any
 
-from src.application.services.gene_service import GeneApplicationService
-from src.application.services.variant_service import VariantApplicationService
-from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.evidence_service import EvidenceApplicationService
+from src.application.services.gene_service import GeneApplicationService
+from src.application.services.phenotype_service import PhenotypeApplicationService
+from src.application.services.variant_service import VariantApplicationService
 
 
 class SearchEntity(str, Enum):
@@ -32,17 +33,20 @@ class SearchResultType(str, Enum):
     EVIDENCE = "evidence"
 
 
+logger = logging.getLogger(__name__)
+
+
 class SearchResult:
     """Container for search result with scoring."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         entity_type: SearchResultType,
-        entity_id: Union[str, int],
+        entity_id: str | int,
         title: str,
         description: str,
         relevance_score: float,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ):
         self.entity_type = entity_type
         self.entity_id = entity_id
@@ -51,7 +55,7 @@ class SearchResult:
         self.relevance_score = relevance_score
         self.metadata = metadata or {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for API response."""
         return {
             "entity_type": self.entity_type.value,
@@ -94,10 +98,10 @@ class UnifiedSearchService:
     def search(
         self,
         query: str,
-        entity_types: Optional[List[SearchEntity]] = None,
+        entity_types: list[SearchEntity] | None = None,
         limit: int = 20,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        filters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Perform unified search across specified entities.
 
@@ -164,41 +168,45 @@ class UnifiedSearchService:
         }
 
     def _search_genes(
-        self, query: str, limit: int, filters: Optional[Dict[str, Any]]
-    ) -> List[SearchResult]:
+        self,
+        query: str,
+        limit: int,
+        _filters: dict[str, Any] | None,
+    ) -> list[SearchResult]:
         """Search genes and convert to search results."""
         try:
             genes = self._gene_service.search_genes(query, limit)
-
-            results = []
-            for gene in genes:
-                # Calculate relevance score based on exact matches
-                score = self._calculate_gene_relevance(query, gene)
-
-                results.append(
-                    SearchResult(
-                        entity_type=SearchResultType.GENE,
-                        entity_id=gene.gene_id,
-                        title=f"{gene.symbol} ({gene.name})",
-                        description=gene.description
-                        or f"Gene located on chromosome {gene.chromosome}",
-                        relevance_score=score,
-                        metadata={
-                            "symbol": gene.symbol,
-                            "chromosome": gene.chromosome,
-                            "gene_type": gene.gene_type,
-                        },
-                    )
-                )
-
-            return results
-        except Exception:
-            # If gene search fails, return empty results
+        except Exception as exc:  # noqa: BLE001 - defensive fallback
+            logger.warning("Gene search failed: %s", exc)
             return []
 
+        results: list[SearchResult] = []
+        for gene in genes:
+            score = self._calculate_gene_relevance(query, gene)
+            results.append(
+                SearchResult(
+                    entity_type=SearchResultType.GENE,
+                    entity_id=gene.gene_id,
+                    title=f"{gene.symbol} ({gene.name})",
+                    description=gene.description
+                    or f"Gene located on chromosome {gene.chromosome}",
+                    relevance_score=score,
+                    metadata={
+                        "symbol": gene.symbol,
+                        "chromosome": gene.chromosome,
+                        "gene_type": gene.gene_type,
+                    },
+                ),
+            )
+
+        return results
+
     def _search_variants(
-        self, query: str, limit: int, filters: Optional[Dict[str, Any]]
-    ) -> List[SearchResult]:
+        self,
+        query: str,
+        limit: int,
+        filters: dict[str, Any] | None,
+    ) -> list[SearchResult]:
         """Search variants and convert to search results."""
         try:
             # Use the paginate method with filters
@@ -214,112 +222,120 @@ class UnifiedSearchService:
                 sort_order="asc",
                 filters=filters_dict,
             )
-
-            results = []
-            for variant in variants:
-                score = self._calculate_variant_relevance(query, variant)
-
-                # Ensure entity_id is not None
-                entity_id = variant.id if variant.id is not None else 0
-
-                results.append(
-                    SearchResult(
-                        entity_type=SearchResultType.VARIANT,
-                        entity_id=entity_id,
-                        title=f"{variant.variant_id} - {variant.chromosome}:{variant.position}",
-                        description=f"{variant.variant_type} variant with {variant.clinical_significance} significance",
-                        relevance_score=score,
-                        metadata={
-                            "chromosome": variant.chromosome,
-                            "position": variant.position,
-                            "clinical_significance": variant.clinical_significance,
-                            "gene_symbol": variant.gene_symbol,
-                        },
-                    )
-                )
-
-            return results
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - defensive fallback
+            logger.warning("Variant search failed: %s", exc)
             return []
 
+        results: list[SearchResult] = []
+        for variant in variants:
+            score = self._calculate_variant_relevance(query, variant)
+            entity_id = variant.id if variant.id is not None else 0
+            results.append(
+                SearchResult(
+                    entity_type=SearchResultType.VARIANT,
+                    entity_id=entity_id,
+                    title=f"{variant.variant_id} - {variant.chromosome}:{variant.position}",
+                    description=(
+                        f"{variant.variant_type} variant with {variant.clinical_significance} significance"
+                    ),
+                    relevance_score=score,
+                    metadata={
+                        "chromosome": variant.chromosome,
+                        "position": variant.position,
+                        "clinical_significance": variant.clinical_significance,
+                        "gene_symbol": variant.gene_symbol,
+                    },
+                ),
+            )
+
+        return results
+
     def _search_phenotypes(
-        self, query: str, limit: int, filters: Optional[Dict[str, Any]]
-    ) -> List[SearchResult]:
+        self,
+        query: str,
+        limit: int,
+        filters: dict[str, Any] | None,
+    ) -> list[SearchResult]:
         """Search phenotypes and convert to search results."""
         try:
             phenotypes = self._phenotype_service.search_phenotypes(
-                query, limit, filters
+                query,
+                limit,
+                filters,
             )
-
-            results = []
-            for phenotype in phenotypes:
-                score = self._calculate_phenotype_relevance(query, phenotype)
-
-                # Ensure entity_id is not None
-                entity_id = phenotype.id if phenotype.id is not None else 0
-
-                results.append(
-                    SearchResult(
-                        entity_type=SearchResultType.PHENOTYPE,
-                        entity_id=entity_id,
-                        title=f"{phenotype.name} ({phenotype.identifier.hpo_id})",
-                        description=phenotype.definition
-                        or f"{phenotype.category} phenotype",
-                        relevance_score=score,
-                        metadata={
-                            "hpo_id": phenotype.identifier.hpo_id,
-                            "category": phenotype.category,
-                            "synonyms": (
-                                list(phenotype.synonyms) if phenotype.synonyms else []
-                            ),
-                        },
-                    )
-                )
-
-            return results
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - defensive fallback
+            logger.warning("Phenotype search failed: %s", exc)
             return []
 
+        results: list[SearchResult] = []
+        for phenotype in phenotypes:
+            score = self._calculate_phenotype_relevance(query, phenotype)
+            entity_id = phenotype.id if phenotype.id is not None else 0
+            results.append(
+                SearchResult(
+                    entity_type=SearchResultType.PHENOTYPE,
+                    entity_id=entity_id,
+                    title=f"{phenotype.name} ({phenotype.identifier.hpo_id})",
+                    description=phenotype.definition
+                    or f"{phenotype.category} phenotype",
+                    relevance_score=score,
+                    metadata={
+                        "hpo_id": phenotype.identifier.hpo_id,
+                        "category": phenotype.category,
+                        "synonyms": (
+                            list(phenotype.synonyms) if phenotype.synonyms else []
+                        ),
+                    },
+                ),
+            )
+
+        return results
+
     def _search_evidence(
-        self, query: str, limit: int, filters: Optional[Dict[str, Any]]
-    ) -> List[SearchResult]:
+        self,
+        query: str,
+        limit: int,
+        filters: dict[str, Any] | None,
+    ) -> list[SearchResult]:
         """Search evidence and convert to search results."""
         try:
             evidence_list = self._evidence_service.search_evidence(
-                query, limit, filters
+                query,
+                limit,
+                filters,
+            )
+        except Exception as exc:  # noqa: BLE001 - defensive fallback
+            logger.warning("Evidence search failed: %s", exc)
+            return []
+
+        snippet_len = 200
+        results: list[SearchResult] = []
+        for evidence in evidence_list:
+            score = self._calculate_evidence_relevance(query, evidence)
+            entity_id = evidence.id if evidence.id is not None else 0
+            description = (
+                evidence.description[:snippet_len] + "..."
+                if len(evidence.description) > snippet_len
+                else evidence.description
+            )
+            results.append(
+                SearchResult(
+                    entity_type=SearchResultType.EVIDENCE,
+                    entity_id=entity_id,
+                    title=f"Evidence #{entity_id} ({evidence.evidence_level.value})",
+                    description=description,
+                    relevance_score=score,
+                    metadata={
+                        "evidence_level": evidence.evidence_level.value,
+                        "evidence_type": evidence.evidence_type,
+                        "confidence_score": evidence.confidence.score,
+                        "variant_id": evidence.variant_id,
+                        "phenotype_id": evidence.phenotype_id,
+                    },
+                ),
             )
 
-            results = []
-            for evidence in evidence_list:
-                score = self._calculate_evidence_relevance(query, evidence)
-
-                # Ensure entity_id is not None
-                entity_id = evidence.id if evidence.id is not None else 0
-
-                results.append(
-                    SearchResult(
-                        entity_type=SearchResultType.EVIDENCE,
-                        entity_id=entity_id,
-                        title=f"Evidence #{entity_id} ({evidence.evidence_level.value})",
-                        description=(
-                            evidence.description[:200] + "..."
-                            if len(evidence.description) > 200
-                            else evidence.description
-                        ),
-                        relevance_score=score,
-                        metadata={
-                            "evidence_level": evidence.evidence_level.value,
-                            "evidence_type": evidence.evidence_type,
-                            "confidence_score": evidence.confidence.score,
-                            "variant_id": evidence.variant_id,
-                            "phenotype_id": evidence.phenotype_id,
-                        },
-                    )
-                )
-
-            return results
-        except Exception:
-            return []
+        return results
 
     def _calculate_gene_relevance(self, query: str, gene: Any) -> float:
         """Calculate relevance score for gene search result."""
@@ -429,13 +445,13 @@ class UnifiedSearchService:
 
         return min(score, 1.0)
 
-    def _get_entity_breakdown(self, results: List[SearchResult]) -> Dict[str, int]:
+    def _get_entity_breakdown(self, results: list[SearchResult]) -> dict[str, int]:
         """Get count breakdown by entity type."""
-        breakdown: Dict[str, int] = {}
+        breakdown: dict[str, int] = {}
         for result in results:
             entity_type = result.entity_type.value
             breakdown[entity_type] = breakdown.get(entity_type, 0) + 1
         return breakdown
 
 
-__all__ = ["UnifiedSearchService", "SearchEntity", "SearchResultType", "SearchResult"]
+__all__ = ["SearchEntity", "SearchResult", "SearchResultType", "UnifiedSearchService"]

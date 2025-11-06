@@ -4,11 +4,11 @@ Database foundation with type safety and audit capabilities.
 """
 
 from datetime import datetime
+from typing import ClassVar
 
 from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import func
-
 
 # Naming convention for constraints and indexes
 convention = {
@@ -26,16 +26,19 @@ class Base(DeclarativeBase):
     """Base class for all database models with audit fields."""
 
     metadata = metadata
-    type_annotation_map = {
+    type_annotation_map: ClassVar[dict[type, object]] = {
         str: str,  # Ensure strings are not converted to Text
     }
 
     # Audit fields - automatically managed
     created_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), doc="Record creation timestamp"
+        server_default=func.now(),
+        doc="Record creation timestamp",
     )
     updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now(), doc="Last update timestamp"
+        server_default=func.now(),
+        onupdate=func.now(),
+        doc="Last update timestamp",
     )
 
     def __repr__(self) -> str:

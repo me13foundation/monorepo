@@ -1,10 +1,10 @@
 """Application-level orchestration for variant workflows."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.domain.entities.variant import EvidenceSummary, Variant
-from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.repositories.evidence_repository import EvidenceRepository
+from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.variant_domain_service import VariantDomainService
 
 
@@ -34,24 +34,24 @@ class VariantApplicationService:
         self._variant_domain_service = variant_domain_service
         self._evidence_repository = evidence_repository
 
-    def create_variant(
+    def create_variant(  # noqa: PLR0913 - explicit variant creation fields
         self,
         chromosome: str,
         position: int,
         reference_allele: str,
         alternate_allele: str,
         *,
-        variant_id: Optional[str] = None,
-        clinvar_id: Optional[str] = None,
+        variant_id: str | None = None,
+        clinvar_id: str | None = None,
         variant_type: str = "unknown",
         clinical_significance: str = "not_provided",
-        hgvs_genomic: Optional[str] = None,
-        hgvs_protein: Optional[str] = None,
-        hgvs_cdna: Optional[str] = None,
-        condition: Optional[str] = None,
-        review_status: Optional[str] = None,
-        allele_frequency: Optional[float] = None,
-        gnomad_af: Optional[float] = None,
+        hgvs_genomic: str | None = None,
+        hgvs_protein: str | None = None,
+        hgvs_cdna: str | None = None,
+        condition: str | None = None,
+        review_status: str | None = None,
+        allele_frequency: float | None = None,
+        gnomad_af: float | None = None,
     ) -> Variant:
         """
         Create a new variant with validation and business rules.
@@ -100,55 +100,66 @@ class VariantApplicationService:
 
         # Apply domain business logic
         variant_entity = self._variant_domain_service.apply_business_logic(
-            variant_entity, "create"
+            variant_entity,
+            "create",
         )
 
         # Validate business rules
         errors = self._variant_domain_service.validate_business_rules(
-            variant_entity, "create"
+            variant_entity,
+            "create",
         )
         if errors:
-            raise ValueError(f"Business rule violations: {', '.join(errors)}")
+            msg = f"Business rule violations: {', '.join(errors)}"
+            raise ValueError(msg)
 
         # Persist the entity
         return self._variant_repository.create(variant_entity)
 
-    def get_variant_by_id(self, variant_id: str) -> Optional[Variant]:
+    def get_variant_by_id(self, variant_id: str) -> Variant | None:
         """Retrieve a variant by its variant_id."""
         return self._variant_repository.find_by_variant_id(variant_id)
 
-    def get_variant_by_clinvar_id(self, clinvar_id: str) -> Optional[Variant]:
+    def get_variant_by_clinvar_id(self, clinvar_id: str) -> Variant | None:
         """Retrieve a variant by its ClinVar ID."""
         return self._variant_repository.find_by_clinvar_id(clinvar_id)
 
     def get_variants_by_gene(
-        self, gene_id: int, limit: Optional[int] = None
-    ) -> List[Variant]:
+        self,
+        gene_id: int,
+        limit: int | None = None,
+    ) -> list[Variant]:
         """Find variants associated with a gene."""
         return self._variant_repository.find_by_gene(gene_id, limit)
 
     def get_variants_by_chromosome_position(
-        self, chromosome: str, position: int
-    ) -> List[Variant]:
+        self,
+        chromosome: str,
+        position: int,
+    ) -> list[Variant]:
         """Find variants at a specific genomic position."""
         return self._variant_repository.find_by_chromosome_position(
-            chromosome, position
+            chromosome,
+            position,
         )
 
     def get_variants_by_clinical_significance(
-        self, significance: str, limit: Optional[int] = None
-    ) -> List[Variant]:
+        self,
+        significance: str,
+        limit: int | None = None,
+    ) -> list[Variant]:
         """Find variants by clinical significance."""
         return self._variant_repository.find_by_clinical_significance(
-            significance, limit
+            significance,
+            limit,
         )
 
     def search_variants(
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Variant]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Variant]:
         """Search variants with optional filters."""
         return self._variant_repository.search_variants(query, limit, filters)
 
@@ -158,30 +169,31 @@ class VariantApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Variant], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Variant], int]:
         """Retrieve paginated variants with optional filters."""
         return self._variant_repository.paginate_variants(
-            page, per_page, sort_by, sort_order, filters
+            page,
+            per_page,
+            sort_by,
+            sort_order,
+            filters,
         )
 
-    def update_variant(self, variant_id: int, updates: Dict[str, Any]) -> Variant:
+    def update_variant(self, variant_id: int, updates: dict[str, Any]) -> Variant:
         """Update variant fields."""
-        updated_variant = self._variant_repository.update(variant_id, updates)
-
-        # Apply domain business logic to updated entity
-        updated_variant = self._variant_domain_service.apply_business_logic(
-            updated_variant, "update"
+        # Apply domain business logic to updated entity and return
+        return self._variant_domain_service.apply_business_logic(
+            self._variant_repository.update(variant_id, updates),
+            "update",
         )
-
-        return updated_variant
 
     def update_variant_classification(
         self,
         variant_id: int,
         *,
-        variant_type: Optional[str] = None,
-        clinical_significance: Optional[str] = None,
+        variant_type: str | None = None,
+        clinical_significance: str | None = None,
     ) -> Variant:
         """
         Update variant classification information.
@@ -196,7 +208,8 @@ class VariantApplicationService:
         """
         variant = self._variant_repository.get_by_id(variant_id)
         if variant is None:
-            raise ValueError(f"Variant with id {variant_id} not found")
+            msg = f"Variant with id {variant_id} not found"
+            raise ValueError(msg)
 
         # Use domain service to update classification
         variant.update_classification(
@@ -207,7 +220,8 @@ class VariantApplicationService:
         # Validate the changes
         errors = self._variant_domain_service.validate_business_rules(variant, "update")
         if errors:
-            raise ValueError(f"Business rule violations: {', '.join(errors)}")
+            msg = f"Business rule violations: {', '.join(errors)}"
+            raise ValueError(msg)
 
         # Persist the changes
         return self._variant_repository.update(
@@ -218,7 +232,7 @@ class VariantApplicationService:
             },
         )
 
-    def get_variant_with_evidence(self, variant_id: int) -> Optional[Variant]:
+    def get_variant_with_evidence(self, variant_id: int) -> Variant | None:
         """
         Get a variant with its associated evidence loaded.
 
@@ -263,10 +277,11 @@ class VariantApplicationService:
 
         evidence_list = self._evidence_repository.find_by_variant(variant_id)
         return self._variant_domain_service.assess_clinical_significance_confidence(
-            variant, evidence_list
+            variant,
+            evidence_list,
         )
 
-    def detect_evidence_conflicts(self, variant_id: int) -> List[str]:
+    def detect_evidence_conflicts(self, variant_id: int) -> list[str]:
         """
         Detect conflicting evidence for a variant.
 
@@ -281,13 +296,12 @@ class VariantApplicationService:
             return []
 
         evidence_list = self._evidence_repository.find_by_variant(variant_id)
-        conflicts = self._variant_domain_service.detect_evidence_conflicts(
-            variant, evidence_list
+        return self._variant_domain_service.detect_evidence_conflicts(
+            variant,
+            evidence_list,
         )
 
-        return conflicts
-
-    def get_variant_statistics(self) -> Dict[str, int | float | bool | str | None]:
+    def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about variants in the repository."""
         return self._variant_repository.get_variant_statistics()
 

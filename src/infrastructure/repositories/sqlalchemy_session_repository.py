@@ -4,19 +4,21 @@ SQLAlchemy implementation of SessionRepository for MED13 Resource Library.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta, timezone
-from typing import Any, List, Optional, cast
-from uuid import UUID
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any, cast
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import AsyncIterator
+    from uuid import UUID
+
+    from sqlalchemy.engine import CursorResult
+    from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, delete, func, or_, select, update
-from sqlalchemy.engine import CursorResult
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from ...domain.entities.session import SessionStatus, UserSession
-from ...domain.repositories.session_repository import SessionRepository
-from ...models.database.session import SessionModel
+from src.domain.entities.session import SessionStatus, UserSession
+from src.domain.repositories.session_repository import SessionRepository
+from src.models.database.session import SessionModel
 
 
 class SqlAlchemySessionRepository(SessionRepository):
@@ -27,7 +29,7 @@ class SqlAlchemySessionRepository(SessionRepository):
     asynchronous persistence operations for session management.
     """
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(self, session_factory: Any) -> None:
         """
         Initialize repository with session factory.
 
@@ -43,21 +45,21 @@ class SqlAlchemySessionRepository(SessionRepository):
             yield session
 
     @staticmethod
-    def _to_domain(model: Optional[SessionModel]) -> Optional[UserSession]:
+    def _to_domain(model: SessionModel | None) -> UserSession | None:
         """Convert a SQLAlchemy model to a domain entity."""
         if model is None:
             return None
         return UserSession.model_validate(model)
 
     @staticmethod
-    def _to_domain_list(models: List[SessionModel]) -> List[UserSession]:
+    def _to_domain_list(models: list[SessionModel]) -> list[UserSession]:
         """Convert a list of SQLAlchemy models to domain entities."""
         return [UserSession.model_validate(model) for model in models]
 
     async def create(self, session_entity: UserSession) -> UserSession:
         """Create a new session."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             data = session_entity.model_dump(mode="python")
             data.setdefault("created_at", now)
             data.setdefault("last_activity", now)
@@ -68,7 +70,7 @@ class SqlAlchemySessionRepository(SessionRepository):
             await session.refresh(db_session)
             return UserSession.model_validate(db_session)
 
-    async def get_by_id(self, session_id: UUID) -> Optional[UserSession]:
+    async def get_by_id(self, session_id: UUID) -> UserSession | None:
         """Get session by ID."""
         async with self._session() as session:
             stmt = select(SessionModel).where(SessionModel.id == session_id)
@@ -76,38 +78,39 @@ class SqlAlchemySessionRepository(SessionRepository):
             model = result.scalar_one_or_none()
             return self._to_domain(model)
 
-    async def get_by_access_token(self, access_token: str) -> Optional[UserSession]:
+    async def get_by_access_token(self, access_token: str) -> UserSession | None:
         """Get session by access token."""
         async with self._session() as session:
             stmt = select(SessionModel).where(
-                SessionModel.session_token == access_token
+                SessionModel.session_token == access_token,
             )
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
             return self._to_domain(model)
 
-    async def get_by_refresh_token(self, refresh_token: str) -> Optional[UserSession]:
+    async def get_by_refresh_token(self, refresh_token: str) -> UserSession | None:
         """Get session by refresh token."""
         async with self._session() as session:
             stmt = select(SessionModel).where(
-                SessionModel.refresh_token == refresh_token
+                SessionModel.refresh_token == refresh_token,
             )
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
             return self._to_domain(model)
 
     async def get_active_by_refresh_token(
-        self, refresh_token: str
-    ) -> Optional[UserSession]:
+        self,
+        refresh_token: str,
+    ) -> UserSession | None:
         """Get active session by refresh token."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = select(SessionModel).where(
                 and_(
                     SessionModel.refresh_token == refresh_token,
                     SessionModel.status == SessionStatus.ACTIVE,
                     SessionModel.refresh_expires_at > now,
-                )
+                ),
             )
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
@@ -118,12 +121,13 @@ class SqlAlchemySessionRepository(SessionRepository):
         async with self._session() as session:
             db_session = await session.get(SessionModel, session_entity.id)
             if db_session is None:
-                raise ValueError(f"Session with id {session_entity.id} not found")
+                message = f"Session with id {session_entity.id} not found"
+                raise ValueError(message)
 
             data = session_entity.model_dump(mode="python")
             data.pop("id", None)
             data.pop("created_at", None)
-            data.setdefault("last_activity", datetime.now(timezone.utc))
+            data.setdefault("last_activity", datetime.now(UTC))
 
             for field, value in data.items():
                 setattr(db_session, field, value)
@@ -142,7 +146,7 @@ class SqlAlchemySessionRepository(SessionRepository):
     async def revoke_session(self, session_id: UUID) -> None:
         """Revoke a session (mark as revoked)."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 update(SessionModel)
                 .where(SessionModel.id == session_id)
@@ -152,19 +156,21 @@ class SqlAlchemySessionRepository(SessionRepository):
             await session.commit()
 
     async def get_user_sessions(
-        self, user_id: UUID, include_expired: bool = False
-    ) -> List[UserSession]:
+        self,
+        user_id: UUID,
+        include_expired: bool = False,  # noqa: FBT001, FBT002
+    ) -> list[UserSession]:
         """Get all sessions for a user."""
         async with self._session() as session:
             stmt = select(SessionModel).where(SessionModel.user_id == user_id)
 
             if not include_expired:
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 stmt = stmt.where(
                     and_(
                         SessionModel.status == SessionStatus.ACTIVE,
                         SessionModel.expires_at > now,
-                    )
+                    ),
                 )
 
             stmt = stmt.order_by(SessionModel.created_at.desc())
@@ -172,10 +178,10 @@ class SqlAlchemySessionRepository(SessionRepository):
             models = list(result.scalars().all())
             return self._to_domain_list(models)
 
-    async def get_active_sessions(self, user_id: UUID) -> List[UserSession]:
+    async def get_active_sessions(self, user_id: UUID) -> list[UserSession]:
         """Get active sessions for a user."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 select(SessionModel)
                 .where(
@@ -183,7 +189,7 @@ class SqlAlchemySessionRepository(SessionRepository):
                         SessionModel.user_id == user_id,
                         SessionModel.status == SessionStatus.ACTIVE,
                         SessionModel.expires_at > now,
-                    )
+                    ),
                 )
                 .order_by(SessionModel.last_activity.desc())
             )
@@ -194,13 +200,13 @@ class SqlAlchemySessionRepository(SessionRepository):
     async def count_active_sessions(self, user_id: UUID) -> int:
         """Count active sessions for a user."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = select(func.count(SessionModel.id)).where(
                 and_(
                     SessionModel.user_id == user_id,
                     SessionModel.status == SessionStatus.ACTIVE,
                     SessionModel.expires_at > now,
-                )
+                ),
             )
             result = await session.execute(stmt)
             count = result.scalar_one()
@@ -209,47 +215,48 @@ class SqlAlchemySessionRepository(SessionRepository):
     async def revoke_all_user_sessions(self, user_id: UUID) -> int:
         """Revoke all sessions for a user."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 update(SessionModel)
                 .where(
                     and_(
                         SessionModel.user_id == user_id,
                         SessionModel.status == SessionStatus.ACTIVE,
-                    )
+                    ),
                 )
                 .values(status=SessionStatus.REVOKED, last_activity=now)
             )
             result = await session.execute(stmt)
             await session.commit()
-            cursor = cast(CursorResult[Any], result)
+            cursor = cast("CursorResult[Any]", result)
             return int(cursor.rowcount or 0)
 
     async def revoke_expired_sessions(self) -> int:
         """Revoke all expired sessions."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 update(SessionModel)
                 .where(
                     and_(
                         SessionModel.status == SessionStatus.ACTIVE,
                         SessionModel.expires_at <= now,
-                    )
+                    ),
                 )
                 .values(status=SessionStatus.EXPIRED, last_activity=now)
             )
             result = await session.execute(stmt)
             await session.commit()
-            cursor = cast(CursorResult[Any], result)
+            cursor = cast("CursorResult[Any]", result)
             return int(cursor.rowcount or 0)
 
     async def cleanup_expired_sessions(
-        self, before_date: Optional[datetime] = None
+        self,
+        before_date: datetime | None = None,
     ) -> int:
         """Clean up old expired sessions."""
         if before_date is None:
-            before_date = datetime.now(timezone.utc) - timedelta(days=30)
+            before_date = datetime.now(UTC) - timedelta(days=30)
 
         async with self._session() as session:
             stmt = delete(SessionModel).where(
@@ -259,14 +266,14 @@ class SqlAlchemySessionRepository(SessionRepository):
                         SessionModel.status == SessionStatus.REVOKED,
                     ),
                     SessionModel.created_at < before_date,
-                )
+                ),
             )
             result = await session.execute(stmt)
             await session.commit()
-            cursor = cast(CursorResult[Any], result)
+            cursor = cast("CursorResult[Any]", result)
             return int(cursor.rowcount or 0)
 
-    async def get_sessions_by_ip(self, ip_address: str) -> List[UserSession]:
+    async def get_sessions_by_ip(self, ip_address: str) -> list[UserSession]:
         """Get sessions by IP address (for security monitoring)."""
         async with self._session() as session:
             stmt = (
@@ -282,7 +289,7 @@ class SqlAlchemySessionRepository(SessionRepository):
     async def update_session_activity(self, session_id: UUID) -> None:
         """Update session's last activity timestamp."""
         async with self._session() as session:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             stmt = (
                 update(SessionModel)
                 .where(SessionModel.id == session_id)
@@ -291,7 +298,7 @@ class SqlAlchemySessionRepository(SessionRepository):
             await session.execute(stmt)
             await session.commit()
 
-    async def get_recent_sessions(self, limit: int = 50) -> List[UserSession]:
+    async def get_recent_sessions(self, limit: int = 50) -> list[UserSession]:
         """Get most recently active sessions."""
         async with self._session() as session:
             stmt = (
@@ -305,10 +312,11 @@ class SqlAlchemySessionRepository(SessionRepository):
             return self._to_domain_list(models)
 
     async def get_sessions_expiring_soon(
-        self, within_minutes: int = 60
-    ) -> List[UserSession]:
+        self,
+        within_minutes: int = 60,
+    ) -> list[UserSession]:
         """Get sessions expiring within specified time."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         expiration_threshold = now + timedelta(minutes=within_minutes)
 
         async with self._session() as session:
@@ -319,7 +327,7 @@ class SqlAlchemySessionRepository(SessionRepository):
                         SessionModel.status == SessionStatus.ACTIVE,
                         SessionModel.expires_at <= expiration_threshold,
                         SessionModel.expires_at > now,
-                    )
+                    ),
                 )
                 .order_by(SessionModel.expires_at.asc())
             )

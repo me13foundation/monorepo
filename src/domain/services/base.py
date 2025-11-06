@@ -5,13 +5,12 @@ Provides common functionality for domain services that encapsulate
 business rules without infrastructure dependencies.
 """
 
-from abc import ABC
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
 
-class DomainService(ABC):
+class DomainService:
     """
     Base class for domain services.
 
@@ -20,8 +19,11 @@ class DomainService(ABC):
     """
 
     def validate_business_rules(
-        self, entity: Any, operation: str, context: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        self,
+        _entity: Any,
+        _operation: str,
+        _context: dict[str, Any] | None = None,
+    ) -> list[str]:
         """
         Validate business rules for an entity operation.
 
@@ -35,7 +37,7 @@ class DomainService(ABC):
         """
         return []
 
-    def apply_business_logic(self, entity: Any, operation: str) -> Any:
+    def apply_business_logic(self, entity: Any, _operation: str) -> Any:
         """
         Apply business logic transformations to an entity.
 
@@ -48,7 +50,7 @@ class DomainService(ABC):
         """
         return entity
 
-    def calculate_derived_properties(self, entity: Any) -> Dict[str, Any]:
+    def calculate_derived_properties(self, _entity: Any) -> dict[str, Any]:
         """
         Calculate derived properties for an entity.
 

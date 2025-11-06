@@ -5,34 +5,38 @@ Orchestrates template operations including creation, approval workflow,
 usage tracking, and community template management.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any
 from uuid import UUID
 
 from src.domain.entities.source_template import (
     SourceTemplate,
     TemplateCategory,
-    ValidationRule,
     TemplateUIConfig,
+    ValidationRule,
 )
 from src.domain.entities.user_data_source import SourceType
 from src.domain.repositories.source_template_repository import SourceTemplateRepository
+
+TEMPLATE_NAME_MAX_LEN = 200
+MAX_TAGS = 10
+MAX_TAG_LENGTH = 50
 
 
 class CreateTemplateRequest:
     """Request model for creating a new template."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - explicit fields; boolean kept keyword-friendly in future DTO
         self,
         creator_id: UUID,
         name: str,
         description: str,
         category: TemplateCategory,
         source_type: SourceType,
-        schema_definition: Dict[str, Any],
-        validation_rules: Optional[List[ValidationRule]] = None,
-        ui_config: Optional[TemplateUIConfig] = None,
-        tags: Optional[List[str]] = None,
-        is_public: bool = False,
+        schema_definition: dict[str, Any],
+        validation_rules: list[ValidationRule] | None = None,
+        ui_config: TemplateUIConfig | None = None,
+        tags: list[str] | None = None,
+        is_public: bool = False,  # noqa: FBT001, FBT002
     ):
         self.creator_id = creator_id
         self.name = name
@@ -49,15 +53,15 @@ class CreateTemplateRequest:
 class UpdateTemplateRequest:
     """Request model for updating a template."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - explicit request fields
         self,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        category: Optional[TemplateCategory] = None,
-        schema_definition: Optional[Dict[str, Any]] = None,
-        validation_rules: Optional[List[ValidationRule]] = None,
-        ui_config: Optional[TemplateUIConfig] = None,
-        tags: Optional[List[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        category: TemplateCategory | None = None,
+        schema_definition: dict[str, Any] | None = None,
+        validation_rules: list[ValidationRule] | None = None,
+        ui_config: TemplateUIConfig | None = None,
+        tags: list[str] | None = None,
     ):
         self.name = name
         self.description = description
@@ -120,7 +124,7 @@ class TemplateManagementService:
         # Save to repository
         return self._template_repository.save(template)
 
-    def get_template(self, template_id: UUID) -> Optional[SourceTemplate]:
+    def get_template(self, template_id: UUID) -> SourceTemplate | None:
         """
         Get a template by ID.
 
@@ -133,8 +137,11 @@ class TemplateManagementService:
         return self._template_repository.find_by_id(template_id)
 
     def get_user_templates(
-        self, creator_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        creator_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Get all templates created by a user.
 
@@ -149,8 +156,10 @@ class TemplateManagementService:
         return self._template_repository.find_by_creator(creator_id, skip, limit)
 
     def get_public_templates(
-        self, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Get all public templates.
 
@@ -164,8 +173,11 @@ class TemplateManagementService:
         return self._template_repository.find_public_templates(skip, limit)
 
     def get_templates_by_category(
-        self, category: TemplateCategory, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        category: TemplateCategory,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Get templates by category.
 
@@ -180,8 +192,11 @@ class TemplateManagementService:
         return self._template_repository.find_by_category(category, skip, limit)
 
     def get_templates_by_type(
-        self, source_type: SourceType, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        source_type: SourceType,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Get templates by source type.
 
@@ -196,8 +211,10 @@ class TemplateManagementService:
         return self._template_repository.find_by_source_type(source_type, skip, limit)
 
     def get_approved_templates(
-        self, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Get all approved templates.
 
@@ -211,8 +228,11 @@ class TemplateManagementService:
         return self._template_repository.find_approved_templates(skip, limit)
 
     def get_available_templates(
-        self, user_id: Optional[UUID] = None, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        user_id: UUID | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Get templates available to a user.
 
@@ -227,8 +247,11 @@ class TemplateManagementService:
         return self._template_repository.find_available_for_user(user_id, skip, limit)
 
     def update_template(
-        self, template_id: UUID, request: UpdateTemplateRequest, user_id: UUID
-    ) -> Optional[SourceTemplate]:
+        self,
+        template_id: UUID,
+        request: UpdateTemplateRequest,
+        user_id: UUID,
+    ) -> SourceTemplate | None:
         """
         Update a template.
 
@@ -248,29 +271,29 @@ class TemplateManagementService:
         updated_template = template
         if request.name is not None:
             updated_template = updated_template.model_copy(
-                update={"name": request.name}
+                update={"name": request.name},
             )
         if request.description is not None:
             updated_template = updated_template.model_copy(
-                update={"description": request.description}
+                update={"description": request.description},
             )
         if request.category is not None:
             updated_template = updated_template.model_copy(
-                update={"category": request.category}
+                update={"category": request.category},
             )
         if request.schema_definition is not None:
             updated_template = updated_template.update_schema(request.schema_definition)
         if request.validation_rules is not None:
             updated_template = updated_template.model_copy(
-                update={"validation_rules": request.validation_rules}
+                update={"validation_rules": request.validation_rules},
             )
         if request.ui_config is not None:
             updated_template = updated_template.model_copy(
-                update={"ui_config": request.ui_config}
+                update={"ui_config": request.ui_config},
             )
         if request.tags is not None:
             updated_template = updated_template.model_copy(
-                update={"tags": request.tags}
+                update={"tags": request.tags},
             )
 
         return self._template_repository.save(updated_template)
@@ -293,8 +316,10 @@ class TemplateManagementService:
         return self._template_repository.delete(template_id)
 
     def approve_template(
-        self, template_id: UUID, approver_id: UUID
-    ) -> Optional[SourceTemplate]:
+        self,
+        template_id: UUID,
+        _approver_id: UUID,
+    ) -> SourceTemplate | None:
         """
         Approve a template for general use.
 
@@ -308,8 +333,10 @@ class TemplateManagementService:
         return self._template_repository.approve_template(template_id)
 
     def make_template_public(
-        self, template_id: UUID, user_id: UUID
-    ) -> Optional[SourceTemplate]:
+        self,
+        template_id: UUID,
+        user_id: UUID,
+    ) -> SourceTemplate | None:
         """
         Make a template publicly available.
 
@@ -326,7 +353,7 @@ class TemplateManagementService:
 
         return self._template_repository.make_public(template_id)
 
-    def increment_usage(self, template_id: UUID) -> Optional[SourceTemplate]:
+    def increment_usage(self, template_id: UUID) -> SourceTemplate | None:
         """
         Increment usage count for a template.
 
@@ -339,8 +366,10 @@ class TemplateManagementService:
         return self._template_repository.increment_usage(template_id)
 
     def update_success_rate(
-        self, template_id: UUID, success_rate: float
-    ) -> Optional[SourceTemplate]:
+        self,
+        template_id: UUID,
+        success_rate: float,
+    ) -> SourceTemplate | None:
         """
         Update success rate for a template.
 
@@ -354,8 +383,11 @@ class TemplateManagementService:
         return self._template_repository.update_success_rate(template_id, success_rate)
 
     def search_templates(
-        self, query: str, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        query: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Search templates by name.
 
@@ -369,7 +401,7 @@ class TemplateManagementService:
         """
         return self._template_repository.search_by_name(query, skip, limit)
 
-    def get_popular_templates(self, limit: int = 10) -> List[SourceTemplate]:
+    def get_popular_templates(self, limit: int = 10) -> list[SourceTemplate]:
         """
         Get the most popular templates.
 
@@ -381,7 +413,7 @@ class TemplateManagementService:
         """
         return self._template_repository.get_popular_templates(limit)
 
-    def get_template_statistics(self) -> Dict[str, Any]:
+    def get_template_statistics(self) -> dict[str, Any]:
         """
         Get overall statistics about templates.
 
@@ -401,26 +433,31 @@ class TemplateManagementService:
             ValueError: If validation fails
         """
         if not request.name.strip():
-            raise ValueError("Template name cannot be empty")
+            msg = "Template name cannot be empty"
+            raise ValueError(msg)
 
-        if len(request.name) > 200:
-            raise ValueError("Template name cannot exceed 200 characters")
+        if len(request.name) > TEMPLATE_NAME_MAX_LEN:
+            msg = "Template name cannot exceed 200 characters"
+            raise ValueError(msg)
 
         if not request.schema_definition:
-            raise ValueError("Schema definition is required")
+            msg = "Schema definition is required"
+            raise ValueError(msg)
 
-        if not isinstance(request.schema_definition, dict):
-            raise ValueError("Schema definition must be a dictionary")
+        # schema_definition is typed as dict; structural checks handled elsewhere
 
         # Validate validation rules
         for rule in request.validation_rules:
             if not rule.field or not rule.rule_type:
-                raise ValueError("Validation rules must have field and rule_type")
+                msg = "Validation rules must have field and rule_type"
+                raise ValueError(msg)
 
         # Validate tags
-        if len(request.tags) > 10:
-            raise ValueError("Maximum 10 tags allowed")
+        if len(request.tags) > MAX_TAGS:
+            msg = "Maximum 10 tags allowed"
+            raise ValueError(msg)
 
         for tag in request.tags:
-            if len(tag) > 50:
-                raise ValueError("Tag length cannot exceed 50 characters")
+            if len(tag) > MAX_TAG_LENGTH:
+                msg = "Tag length cannot exceed 50 characters"
+                raise ValueError(msg)

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from sqlalchemy.orm import Session
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
 
-from src.models.database.audit import AuditLog
+    from src.models.database.audit import AuditLog
 
 
 class AuditRepository(Protocol):

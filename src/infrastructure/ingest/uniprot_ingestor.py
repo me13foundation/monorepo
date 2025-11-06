@@ -7,13 +7,23 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, Dict, List, Optional
-from defusedxml import ElementTree as ET
-from xml.etree.ElementTree import Element
+import logging
+from typing import TYPE_CHECKING, Any
 
 import httpx
+from defusedxml import ElementTree
 
 from .base_ingestor import BaseIngestor, IngestionError
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from xml.etree.ElementTree import Element  # nosec B405
+
+# HTTP status constants
+STATUS_TOO_MANY_REQUESTS: int = 429
+SERVER_ERROR_MIN_STATUS: int = 500
+PROTEIN_RELEVANCE_THRESHOLD: int = 5
+
+logger = logging.getLogger(__name__)
 
 
 class UniProtIngestor(BaseIngestor):
@@ -34,7 +44,10 @@ class UniProtIngestor(BaseIngestor):
         )
 
     async def _make_request(
-        self, method: str, endpoint: str, **kwargs: Any
+        self,
+        method: str,
+        endpoint: str,
+        **kwargs: Any,
     ) -> httpx.Response:
         """
         Override base _make_request to handle UniProt's redirect issues.
@@ -51,13 +64,13 @@ class UniProtIngestor(BaseIngestor):
                     timeout=httpx.Timeout(self.timeout_seconds),
                     follow_redirects=False,  # Don't follow redirects for UniProt
                     headers={
-                        "User-Agent": "MED13-Resource-Library/1.0 (research@med13.org)"
+                        "User-Agent": "MED13-Resource-Library/1.0 (research@med13.org)",
                     },
                 ) as temp_client:
                     response = await temp_client.request(method, url, **kwargs)
 
                     # Check for rate limiting
-                    if response.status_code == 429:
+                    if response.status_code == STATUS_TOO_MANY_REQUESTS:
                         # Exponential backoff for rate limiting
                         wait_time = 2**attempt
                         await asyncio.sleep(wait_time)
@@ -67,33 +80,30 @@ class UniProtIngestor(BaseIngestor):
                     return response
 
             except httpx.HTTPStatusError as e:
-                if e.response.status_code >= 500:
+                if e.response.status_code >= SERVER_ERROR_MIN_STATUS and (
+                    attempt < self.max_retries - 1
+                ):
                     # Server error - retry
-                    if attempt < self.max_retries - 1:
-                        await asyncio.sleep(2**attempt)
-                        continue
-                raise IngestionError(
-                    f"HTTP {e.response.status_code}: {e.response.text}",
-                    self.source_name,
-                )
+                    await asyncio.sleep(2**attempt)
+                    continue
+                message = f"HTTP {e.response.status_code}: {e.response.text}"
+                raise IngestionError(message, self.source_name) from e
 
             except Exception as e:
                 if attempt < self.max_retries - 1:
                     await asyncio.sleep(2**attempt)
                     continue
-                raise IngestionError(
-                    f"Request failed after {self.max_retries} attempts: {str(e)}",
-                    self.source_name,
-                )
+                message = f"Request failed after {self.max_retries} attempts: {e!s}"
+                raise IngestionError(message, self.source_name) from e
 
-        raise IngestionError(
-            f"Request failed after {self.max_retries} attempts",
-            self.source_name,
-        )
+        final_message = f"Request failed after {self.max_retries} attempts"
+        raise IngestionError(final_message, self.source_name)
 
     async def fetch_data(
-        self, query: str = "MED13", **kwargs: Any
-    ) -> List[Dict[str, Any]]:
+        self,
+        query: str = "MED13",
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
         """
         Fetch UniProt data for specified protein query.
 
@@ -123,7 +133,7 @@ class UniProtIngestor(BaseIngestor):
 
         return all_records
 
-    async def _search_proteins(self, query: str, **kwargs: Any) -> List[str]:
+    async def _search_proteins(self, query: str, **kwargs: Any) -> list[str]:
         """
         Search UniProt for proteins matching the query.
 
@@ -149,7 +159,7 @@ class UniProtIngestor(BaseIngestor):
 
         # Parse XML response to extract accession numbers
         try:
-            root = ET.fromstring(response_text)
+            root = ElementTree.fromstring(response_text)
 
             # Extract accession numbers from XML
             accession_numbers = []
@@ -160,22 +170,26 @@ class UniProtIngestor(BaseIngestor):
 
             # Try explicit namespaces
             for ns_name in ["u", "u2"]:
-                for entry in root.findall(f".//{ns_name}:accession", ns):
-                    if entry.text:
-                        accession_numbers.append(entry.text.strip())
+                accession_numbers.extend(
+                    [
+                        entry.text.strip()
+                        for entry in root.findall(f".//{ns_name}:accession", ns)
+                        if entry.text
+                    ],
+                )
 
-        except Exception:
+        except Exception:  # noqa: BLE001
             accession_numbers = [
                 line.strip() for line in response_text.splitlines() if line.strip()
             ]
 
         # Remove duplicates and limit results
-        accession_numbers = list(set(accession_numbers))[:size]
-        return accession_numbers
+        return list(set(accession_numbers))[:size]
 
-    async def _fetch_protein_details(
-        self, accession_numbers: List[str]
-    ) -> List[Dict[str, Any]]:
+    async def _fetch_protein_details(  # noqa: C901
+        self,
+        accession_numbers: list[str],
+    ) -> list[dict[str, Any]]:
         """
         Fetch detailed UniProt records for given accession numbers.
 
@@ -194,7 +208,7 @@ class UniProtIngestor(BaseIngestor):
         params = {"accession": accessions}
 
         response = await self._make_request("GET", "/proteins", params=params)
-        records: List[Dict[str, Any]] = []
+        records: list[dict[str, Any]] = []
 
         # Try JSON parsing first
         try:
@@ -211,7 +225,7 @@ class UniProtIngestor(BaseIngestor):
                             "source": "uniprot",
                             "fetched_at": response.headers.get("date", ""),
                             "accession_numbers": accession_numbers,
-                        }
+                        },
                     )
                     records.append(parsed)
             if records:
@@ -219,14 +233,14 @@ class UniProtIngestor(BaseIngestor):
 
         # Fallback to XML parsing
         try:
-            root = ET.fromstring(response.text)
-        except ET.ParseError:
+            root = ElementTree.fromstring(response.text)
+        except ElementTree.ParseError:
             return records
 
         ns = {"u": "http://uniprot.org/uniprot", "u2": "https://uniprot.org/uniprot"}
 
         # Try finding entries with different namespace approaches
-        entries: List[Element] = []
+        entries: list[Element] = []
         for ns_name in ["u", "u2"]:
             entries = root.findall(f".//{ns_name}:entry", ns)
             if entries:
@@ -239,13 +253,16 @@ class UniProtIngestor(BaseIngestor):
                     "source": "uniprot",
                     "fetched_at": response.headers.get("date", ""),
                     "accession_numbers": accession_numbers,
-                }
+                },
             )
             records.append(record)
 
         return records
 
-    def _parse_xml_entry(self, entry: Element) -> Dict[str, Any]:
+    def _parse_xml_entry(  # noqa: C901
+        self,
+        entry: Element,
+    ) -> dict[str, Any]:
         """
         Parse XML entry element into dictionary format.
 
@@ -255,7 +272,7 @@ class UniProtIngestor(BaseIngestor):
         Returns:
             Dictionary representation of the entry
         """
-        record: Dict[str, Any] = {}
+        record: dict[str, Any] = {}
 
         # Extract basic information - handle namespace properly
         # The entry element has xmlns="https://uniprot.org/uniprot"
@@ -277,14 +294,13 @@ class UniProtIngestor(BaseIngestor):
             record["proteinDescription"] = self._parse_protein_description(protein_elem)
 
         # Gene information
-        genes: List[Dict[str, Any]] = []
-        for gene_elem in entry.findall("u:gene/u:name", ns):
-            genes.append(
-                {
-                    "geneName": {"value": gene_elem.text},
-                    "type": gene_elem.get("type", "primary"),
-                }
-            )
+        genes: list[dict[str, Any]] = [
+            {
+                "geneName": {"value": gene_elem.text},
+                "type": gene_elem.get("type", "primary"),
+            }
+            for gene_elem in entry.findall("u:gene/u:name", ns)
+        ]
         if genes:
             record["genes"] = genes
 
@@ -305,39 +321,41 @@ class UniProtIngestor(BaseIngestor):
             }
 
         # Comments (function, subcellular location, etc.)
-        comments: List[Dict[str, Any]] = []
-        for comment_elem in entry.findall("u:comment", ns):
-            comments.append(self._parse_comment(comment_elem))
+        comments: list[dict[str, Any]] = [
+            self._parse_comment(comment_elem)
+            for comment_elem in entry.findall("u:comment", ns)
+        ]
         if comments:
             record["comments"] = comments
 
         # References
-        references: List[Dict[str, Any]] = []
-        for ref_elem in entry.findall("u:reference", ns):
-            references.append(self._parse_reference(ref_elem))
+        references: list[dict[str, Any]] = [
+            self._parse_reference(ref_elem)
+            for ref_elem in entry.findall("u:reference", ns)
+        ]
         if references:
             record["references"] = references
 
         # Features (domains, PTMs, etc.)
-        features: List[Dict[str, Any]] = []
-        for feature_elem in entry.findall("u:feature", ns):
-            features.append(self._parse_feature(feature_elem))
+        features: list[dict[str, Any]] = [
+            self._parse_feature(feature_elem)
+            for feature_elem in entry.findall("u:feature", ns)
+        ]
         if features:
             record["features"] = features
 
         # Database references
-        db_refs: List[Dict[str, Any]] = []
-        for db_elem in entry.findall("u:dbReference", ns):
-            db_refs.append(
-                {
-                    "type": db_elem.get("type"),
-                    "id": db_elem.get("id"),
-                    "properties": [
-                        {"type": prop.get("type"), "value": prop.get("value")}
-                        for prop in db_elem.findall("u:property", ns)
-                    ],
-                }
-            )
+        db_refs: list[dict[str, Any]] = [
+            {
+                "type": db_elem.get("type"),
+                "id": db_elem.get("id"),
+                "properties": [
+                    {"type": prop.get("type"), "value": prop.get("value")}
+                    for prop in db_elem.findall("u:property", ns)
+                ],
+            }
+            for db_elem in entry.findall("u:dbReference", ns)
+        ]
         if db_refs:
             record["dbReferences"] = db_refs
 
@@ -346,16 +364,17 @@ class UniProtIngestor(BaseIngestor):
         if audit_elem is not None:
             record["entryAudit"] = {
                 "lastAnnotationUpdateDate": audit_elem.get(
-                    "lastAnnotationUpdateDate", ""
-                )
+                    "lastAnnotationUpdateDate",
+                    "",
+                ),
             }
 
         return record
 
-    def _parse_protein_description(self, protein_elem: Element) -> Dict[str, Any]:
+    def _parse_protein_description(self, protein_elem: Element) -> dict[str, Any]:
         """Parse protein description element."""
         ns = {"u": "https://uniprot.org/uniprot"}
-        desc: Dict[str, Any] = {}
+        desc: dict[str, Any] = {}
 
         # Recommended name
         rec_name = protein_elem.find("u:recommendedName", ns)
@@ -366,10 +385,10 @@ class UniProtIngestor(BaseIngestor):
 
         return desc
 
-    def _parse_organism(self, organism_elem: Element) -> Dict[str, Any]:
+    def _parse_organism(self, organism_elem: Element) -> dict[str, Any]:
         """Parse organism element."""
         ns = {"u": "https://uniprot.org/uniprot"}
-        org: Dict[str, Any] = {}
+        org: dict[str, Any] = {}
 
         # Scientific name
         sci_name = organism_elem.find('u:name[@type="scientific"]', ns)
@@ -388,22 +407,24 @@ class UniProtIngestor(BaseIngestor):
 
         return org
 
-    def _parse_comment(self, comment_elem: Element) -> Dict[str, Any]:
+    def _parse_comment(self, comment_elem: Element) -> dict[str, Any]:
         """Parse comment element."""
         ns = {"u": "https://uniprot.org/uniprot"}
-        comment: Dict[str, Any] = {"commentType": comment_elem.get("type")}
+        comment: dict[str, Any] = {"commentType": comment_elem.get("type")}
 
         # Text content
-        texts: List[Dict[str, Optional[str]]] = []
-        for text_elem in comment_elem.findall("u:text", ns):
-            texts.append({"value": text_elem.text})
+        texts: list[dict[str, str | None]] = [
+            {"value": text_elem.text}
+            for text_elem in comment_elem.findall("u:text", ns)
+        ]
         if texts:
             comment["texts"] = texts
 
         # Subcellular locations
-        locations: List[Dict[str, Optional[str]]] = []
-        for loc_elem in comment_elem.findall("u:subcellularLocation/u:location", ns):
-            locations.append({"value": loc_elem.text})
+        locations: list[dict[str, str | None]] = [
+            {"value": loc_elem.text}
+            for loc_elem in comment_elem.findall("u:subcellularLocation/u:location", ns)
+        ]
         if locations:
             comment["subcellularLocations"] = [
                 {"location": {"value": loc["value"]}} for loc in locations
@@ -411,10 +432,10 @@ class UniProtIngestor(BaseIngestor):
 
         return comment
 
-    def _parse_reference(self, ref_elem: Element) -> Dict[str, Any]:
+    def _parse_reference(self, ref_elem: Element) -> dict[str, Any]:
         """Parse reference element."""
         ns = {"u": "https://uniprot.org/uniprot"}
-        ref: Dict[str, Any] = {}
+        ref: dict[str, Any] = {}
 
         # Citation
         citation = ref_elem.find("u:citation", ns)
@@ -433,10 +454,10 @@ class UniProtIngestor(BaseIngestor):
 
         return ref
 
-    def _parse_feature(self, feature_elem: Element) -> Dict[str, Any]:
+    def _parse_feature(self, feature_elem: Element) -> dict[str, Any]:
         """Parse feature element."""
         ns = {"u": "https://uniprot.org/uniprot"}
-        feature: Dict[str, Any] = {
+        feature: dict[str, Any] = {
             "type": feature_elem.get("type"),
             "description": feature_elem.get("description"),
         }
@@ -444,7 +465,7 @@ class UniProtIngestor(BaseIngestor):
         # Location
         location = feature_elem.find("u:location", ns)
         if location is not None:
-            loc_info: Dict[str, Any] = {}
+            loc_info: dict[str, Any] = {}
             begin_elem = location.find("u:begin", ns)
             end_elem = location.find("u:end", ns)
             position_elem = location.find("u:position", ns)
@@ -459,7 +480,7 @@ class UniProtIngestor(BaseIngestor):
 
         return feature
 
-    def _parse_uniprot_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def _parse_uniprot_record(self, record: dict[str, Any]) -> dict[str, Any]:
         """
         Parse and normalize UniProt record data.
 
@@ -471,7 +492,7 @@ class UniProtIngestor(BaseIngestor):
         """
         try:
             # Extract basic information
-            parsed: Dict[str, Any] = {
+            parsed: dict[str, Any] = {
                 "uniprot_id": record.get("primaryAccession", ""),
                 "entry_name": record.get("uniProtkbId", ""),
                 "protein_name": self._extract_protein_name(record),
@@ -488,23 +509,24 @@ class UniProtIngestor(BaseIngestor):
                 "interactions": self._extract_interactions(record),
                 "references": self._extract_references(record),
                 "last_updated": record.get("entryAudit", {}).get(
-                    "lastAnnotationUpdateDate", ""
+                    "lastAnnotationUpdateDate",
+                    "",
                 ),
             }
 
             # Add MED13-specific analysis
             parsed["med13_analysis"] = self._analyze_med13_relevance(parsed)
 
-            return parsed
-
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return {
                 "parsing_error": str(e),
                 "uniprot_id": record.get("primaryAccession", "unknown"),
                 "raw_record": json.dumps(record)[:1000],  # First 1000 chars
             }
+        else:
+            return parsed
 
-    def _extract_protein_name(self, record: Dict[str, Any]) -> Optional[str]:
+    def _extract_protein_name(self, record: dict[str, Any]) -> str | None:  # noqa: C901
         """Extract recommended protein name."""
         try:
             protein_desc = record.get("proteinDescription")
@@ -532,10 +554,10 @@ class UniProtIngestor(BaseIngestor):
                             return value
 
         except Exception:
-            pass
+            logger.exception("Failed to extract protein name")
         return None
 
-    def _extract_gene_name(self, record: Dict[str, Any]) -> Optional[str]:
+    def _extract_gene_name(self, record: dict[str, Any]) -> str | None:  # noqa: C901
         """Extract primary gene name."""
         try:
             genes = record.get("genes")
@@ -560,12 +582,13 @@ class UniProtIngestor(BaseIngestor):
                     if isinstance(value, str):
                         return value
         except Exception:
-            pass
+            logger.exception("Failed to extract gene name")
         return None
 
     def _extract_organism(
-        self, record: Dict[str, Any]
-    ) -> Optional[Dict[str, Optional[str]]]:
+        self,
+        record: dict[str, Any],
+    ) -> dict[str, str | None] | None:
         """Extract organism information."""
         try:
             organism = record.get("organism")
@@ -574,7 +597,7 @@ class UniProtIngestor(BaseIngestor):
             scientific_name = organism.get("scientificName")
             common_name = organism.get("commonName")
             taxon_id = organism.get("taxonId")
-            result: Dict[str, Optional[str]] = {}
+            result: dict[str, str | None] = {}
             if isinstance(scientific_name, str):
                 result["scientific_name"] = scientific_name
             else:
@@ -587,12 +610,13 @@ class UniProtIngestor(BaseIngestor):
                 result["taxon_id"] = taxon_id
             else:
                 result["taxon_id"] = None
-            return result
         except Exception:
-            pass
+            logger.exception("Failed to extract organism info")
+        else:
+            return result
         return None
 
-    def _extract_sequence(self, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _extract_sequence(self, record: dict[str, Any]) -> dict[str, Any] | None:
         """Extract protein sequence information."""
         try:
             sequence = record.get("sequence", {})
@@ -604,10 +628,10 @@ class UniProtIngestor(BaseIngestor):
                 # Note: Full sequence would be in separate endpoint if needed
             }
         except Exception:
-            pass
+            logger.exception("Failed to extract sequence info")
         return None
 
-    def _extract_function(self, record: Dict[str, Any]) -> List[str]:
+    def _extract_function(self, record: dict[str, Any]) -> list[str]:
         """Extract protein function descriptions."""
         functions = []
         try:
@@ -615,14 +639,14 @@ class UniProtIngestor(BaseIngestor):
             for comment in comments:
                 if comment.get("commentType") == "FUNCTION":
                     texts = comment.get("texts", [])
-                    for text in texts:
-                        if text.get("value"):
-                            functions.append(text["value"])
+                    functions.extend(
+                        [text["value"] for text in texts if text.get("value")],
+                    )
         except Exception:
-            pass
+            logger.exception("Failed to extract function list")
         return functions
 
-    def _extract_subcellular_location(self, record: Dict[str, Any]) -> List[str]:
+    def _extract_subcellular_location(self, record: dict[str, Any]) -> list[str]:
         """Extract subcellular location information."""
         locations = []
         try:
@@ -635,10 +659,10 @@ class UniProtIngestor(BaseIngestor):
                         if location_desc:
                             locations.append(location_desc)
         except Exception:
-            pass
+            logger.exception("Failed to extract subcellular locations")
         return locations
 
-    def _extract_pathway(self, record: Dict[str, Any]) -> List[str]:
+    def _extract_pathway(self, record: dict[str, Any]) -> list[str]:
         """Extract pathway information."""
         pathways = []
         try:
@@ -646,16 +670,17 @@ class UniProtIngestor(BaseIngestor):
             for comment in comments:
                 if comment.get("commentType") == "PATHWAY":
                     texts = comment.get("texts", [])
-                    for text in texts:
-                        if text.get("value"):
-                            pathways.append(text["value"])
+                    pathways.extend(
+                        [text["value"] for text in texts if text.get("value")],
+                    )
         except Exception:
-            pass
+            logger.exception("Failed to extract pathways")
         return pathways
 
     def _extract_disease_associations(
-        self, record: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self,
+        record: dict[str, Any],
+    ) -> list[dict[str, Any]]:
         """Extract disease associations."""
         diseases = []
         try:
@@ -670,13 +695,13 @@ class UniProtIngestor(BaseIngestor):
                                 "description": disease.get("description"),
                                 "acronym": disease.get("acronym"),
                                 "id": disease.get("diseaseId"),
-                            }
+                            },
                         )
         except Exception:
-            pass
+            logger.exception("Failed to extract disease associations")
         return diseases
 
-    def _extract_isoforms(self, record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_isoforms(self, record: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract isoform information."""
         isoforms = []
         try:
@@ -688,56 +713,58 @@ class UniProtIngestor(BaseIngestor):
                         {
                             "name": isoform.get("value"),
                             "sequence_ids": isoform_ref.get("isoformSequenceIds", []),
-                        }
+                        },
                     )
         except Exception:
-            pass
+            logger.exception("Failed to extract isoforms")
         return isoforms
 
-    def _extract_domains(self, record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_domains(self, record: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract domain information."""
         domains = []
         try:
             features = record.get("features", [])
-            for feature in features:
-                if feature.get("type") == "DOMAIN":
-                    domains.append(
-                        {
-                            "name": feature.get("description"),
-                            "start": feature.get("location", {})
-                            .get("start", {})
-                            .get("value"),
-                            "end": feature.get("location", {})
-                            .get("end", {})
-                            .get("value"),
-                        }
-                    )
+            domains.extend(
+                [
+                    {
+                        "name": feature.get("description"),
+                        "start": feature.get("location", {})
+                        .get("start", {})
+                        .get("value"),
+                        "end": feature.get("location", {}).get("end", {}).get("value"),
+                    }
+                    for feature in features
+                    if feature.get("type") == "DOMAIN"
+                ],
+            )
         except Exception:
-            pass
+            logger.exception("Failed to extract domains")
         return domains
 
-    def _extract_ptm_sites(self, record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_ptm_sites(self, record: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract post-translational modification sites."""
         ptm_sites = []
         try:
             features = record.get("features", [])
             ptm_types = ["MODIFIED RESIDUE", "CROSSLNK", "LIPID BINDING SITE"]
-            for feature in features:
-                if feature.get("type") in ptm_types:
-                    ptm_sites.append(
-                        {
-                            "type": feature.get("type"),
-                            "description": feature.get("description"),
-                            "position": feature.get("location", {})
-                            .get("position", {})
-                            .get("value"),
-                        }
-                    )
+            ptm_sites.extend(
+                [
+                    {
+                        "type": feature.get("type"),
+                        "description": feature.get("description"),
+                        "position": feature.get("location", {})
+                        .get("position", {})
+                        .get("value"),
+                    }
+                    for feature in features
+                    if feature.get("type") in ptm_types
+                ],
+            )
         except Exception:
-            pass
+            logger.exception("Failed to extract PTM sites")
         return ptm_sites
 
-    def _extract_interactions(self, record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_interactions(self, record: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract protein interaction information."""
         interactions = []
         try:
@@ -745,20 +772,22 @@ class UniProtIngestor(BaseIngestor):
             for comment in comments:
                 if comment.get("commentType") == "INTERACTION":
                     interactants = comment.get("interactions", [])
-                    for interaction in interactants:
-                        interactions.append(
+                    interactions.extend(
+                        [
                             {
                                 "interactant": interaction.get("interactant", {}).get(
-                                    "value"
+                                    "value",
                                 ),
                                 "label": interaction.get("label"),
                             }
-                        )
+                            for interaction in interactants
+                        ],
+                    )
         except Exception:
-            pass
+            logger.exception("Failed to extract interactions")
         return interactions
 
-    def _extract_references(self, record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_references(self, record: dict[str, Any]) -> list[dict[str, Any]]:
         """Extract reference information."""
         references = []
         try:
@@ -774,17 +803,17 @@ class UniProtIngestor(BaseIngestor):
                             ],
                             "journal": ref.get("journal"),
                             "publication_date": ref.get("publicationDate", {}).get(
-                                "value"
+                                "value",
                             ),
                             "pubmed_id": ref.get("pubmedId"),
                             "doi": ref.get("doiId"),
-                        }
+                        },
                     )
         except Exception:
-            pass
+            logger.exception("Failed to extract references")
         return references
 
-    def _analyze_med13_relevance(self, record: Dict[str, Any]) -> Dict[str, Any]:
+    def _analyze_med13_relevance(self, record: dict[str, Any]) -> dict[str, Any]:
         """
         Analyze MED13 relevance of protein record.
 
@@ -830,10 +859,10 @@ class UniProtIngestor(BaseIngestor):
         return {
             "score": relevance_score,
             "reasons": reasons,
-            "is_relevant": relevance_score >= 5,
+            "is_relevant": relevance_score >= PROTEIN_RELEVANCE_THRESHOLD,
         }
 
-    async def fetch_med13_protein(self, **kwargs: Any) -> List[Dict[str, Any]]:
+    async def fetch_med13_protein(self, **kwargs: Any) -> list[dict[str, Any]]:
         """
         Convenience method to fetch MED13 protein data.
 
@@ -847,8 +876,9 @@ class UniProtIngestor(BaseIngestor):
         return [self._parse_uniprot_record(record) for record in records]
 
     async def fetch_protein_by_accession(
-        self, accession: str
-    ) -> Optional[Dict[str, Any]]:
+        self,
+        accession: str,
+    ) -> dict[str, Any] | None:
         """
         Fetch specific protein by UniProt accession number.
 
@@ -863,7 +893,7 @@ class UniProtIngestor(BaseIngestor):
             return self._parse_uniprot_record(records[0])
         return None
 
-    async def fetch_protein_sequence(self, accession: str) -> Optional[str]:
+    async def fetch_protein_sequence(self, accession: str) -> str | None:
         """
         Fetch protein sequence for given accession.
 
@@ -880,5 +910,5 @@ class UniProtIngestor(BaseIngestor):
             if lines and lines[0].startswith(">"):
                 return "".join(lines[1:])  # Join sequence lines
         except Exception:
-            pass
+            logger.exception("Failed to fetch protein sequence")
         return None

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from statistics import mean
-from typing import Any, Callable, Dict, Iterable, List
+from typing import Any
 
 from ..rules.base_rules import ValidationRuleEngine
 
@@ -13,8 +14,8 @@ from ..rules.base_rules import ValidationRuleEngine
 @dataclass
 class BenchmarkResult:
     benchmark_name: str
-    execution_times: List[float]
-    summary_stats: Dict[str, float]
+    execution_times: list[float]
+    summary_stats: dict[str, float]
 
 
 @dataclass
@@ -35,10 +36,10 @@ class PerformanceBenchmark:
         self,
         entity_type: str,
         rule_name: str,
-        payload: Iterable[Dict[str, Any]],
+        payload: Iterable[dict[str, Any]],
         iterations: int = 5,
     ) -> BenchmarkResult:
-        payload_list: List[Dict[str, Any]] = list(payload)
+        payload_list: list[dict[str, Any]] = list(payload)
         if not payload_list:
             payload_list = [{"placeholder": True}]
         execution_times = self._time_iterations(
@@ -55,10 +56,10 @@ class PerformanceBenchmark:
     def benchmark_entity_validation(
         self,
         entity_type: str,
-        payload: Iterable[Dict[str, Any]],
+        payload: Iterable[dict[str, Any]],
         iterations: int = 3,
     ) -> BenchmarkResult:
-        payload_list: List[Dict[str, Any]] = list(payload)
+        payload_list: list[dict[str, Any]] = list(payload)
         execution_times = self._time_iterations(
             lambda: self.rule_engine.validate_batch(entity_type, payload_list),
             iterations,
@@ -77,10 +78,10 @@ class PerformanceBenchmark:
         self,
         entity_type: str,
         batch_sizes: Iterable[int],
-        payload: Iterable[Dict[str, Any]],
-    ) -> Dict[int, Dict[str, float]]:
-        payload_list: List[Dict[str, Any]] = list(payload)
-        results: Dict[int, Dict[str, float]] = {}
+        payload: Iterable[dict[str, Any]],
+    ) -> dict[int, dict[str, float]]:
+        payload_list: list[dict[str, Any]] = list(payload)
+        results: dict[int, dict[str, float]] = {}
         for batch_size in batch_sizes:
             start = time.perf_counter()
             self.rule_engine.validate_batch(entity_type, payload_list[:batch_size])
@@ -91,10 +92,13 @@ class PerformanceBenchmark:
             }
         return results
 
-    def run_comprehensive_benchmark(self, iterations: int = 3) -> Dict[str, object]:
+    def run_comprehensive_benchmark(self, iterations: int = 3) -> dict[str, object]:
         sample = [{"symbol": "TP53", "source": "test"}]
         rule_result = self.benchmark_validation_rule(
-            "gene", "hgnc_nomenclature", sample, iterations
+            "gene",
+            "hgnc_nomenclature",
+            sample,
+            iterations,
         )
         entity_result = self.benchmark_entity_validation("gene", sample, iterations)
         batch_results = self.benchmark_batch_processing("gene", [10, 25], sample * 25)
@@ -114,16 +118,18 @@ class PerformanceBenchmark:
         }
 
     def _time_iterations(
-        self, func: Callable[[], object], iterations: int
-    ) -> List[float]:
-        timings: List[float] = []
+        self,
+        func: Callable[[], object],
+        iterations: int,
+    ) -> list[float]:
+        timings: list[float] = []
         for _ in range(iterations):
             start = time.perf_counter()
             func()
             timings.append(time.perf_counter() - start)
         return timings
 
-    def _basic_stats(self, execution_times: List[float]) -> Dict[str, float]:
+    def _basic_stats(self, execution_times: list[float]) -> dict[str, float]:
         if not execution_times:
             return {
                 "avg_execution_time": 0.0,
@@ -143,9 +149,9 @@ class PerformanceBenchmark:
 
     def _calculate_performance_metrics(
         self,
-        execution_times: List[float],
-        memory_usage: List[int],
-        throughput: List[float],
+        execution_times: list[float],
+        memory_usage: list[int],
+        throughput: list[float],
     ) -> PerformanceMetrics:
         avg_time = mean(execution_times)
         min_time = min(execution_times)

@@ -4,7 +4,8 @@ Custom exceptions for MED13 Resource Library authentication system.
 Provides structured error handling with appropriate HTTP status codes.
 """
 
-from typing import Optional, Dict, Any
+from typing import Any
+
 from fastapi import HTTPException, status
 
 
@@ -15,8 +16,8 @@ class AuthenticationException(HTTPException):
         self,
         detail: str,
         status_code: int = status.HTTP_401_UNAUTHORIZED,
-        headers: Optional[Dict[str, str]] = None,
-        error_code: Optional[str] = None,
+        headers: dict[str, str] | None = None,
+        error_code: str | None = None,
     ):
         super().__init__(status_code=status_code, detail=detail, headers=headers)
         self.error_code = error_code or "AUTH_ERROR"
@@ -29,7 +30,7 @@ class AuthorizationException(HTTPException):
         self,
         detail: str,
         status_code: int = status.HTTP_403_FORBIDDEN,
-        error_code: Optional[str] = None,
+        error_code: str | None = None,
     ):
         super().__init__(status_code=status_code, detail=detail)
         self.error_code = error_code or "AUTHZ_ERROR"
@@ -42,7 +43,7 @@ class ValidationException(HTTPException):
         self,
         detail: str,
         status_code: int = status.HTTP_400_BAD_REQUEST,
-        error_code: Optional[str] = None,
+        error_code: str | None = None,
     ):
         super().__init__(status_code=status_code, detail=detail)
         self.error_code = error_code or "VALIDATION_ERROR"
@@ -60,7 +61,8 @@ class AccountLockedException(AuthenticationException):
     """Raised when account is locked due to security policy."""
 
     def __init__(
-        self, detail: str = "Account is locked due to multiple failed login attempts"
+        self,
+        detail: str = "Account is locked due to multiple failed login attempts",
     ):
         super().__init__(
             detail=detail,
@@ -163,8 +165,9 @@ class EmailVerificationException(ValidationException):
 
 # Exception handlers
 def create_error_response(
-    exc: Exception, status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
-) -> Dict[str, Any]:
+    exc: Exception,
+    _status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+) -> dict[str, Any]:
     """
     Create standardized error response.
 

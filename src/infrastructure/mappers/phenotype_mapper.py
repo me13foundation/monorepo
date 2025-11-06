@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
-from typing import Optional, Sequence, Tuple
+from typing import TYPE_CHECKING
 
 from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
 from src.domain.value_objects.identifiers import PhenotypeIdentifier
 from src.models.database.phenotype import PhenotypeModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
 
 
 class PhenotypeMapper:
@@ -33,7 +36,8 @@ class PhenotypeMapper:
 
     @staticmethod
     def to_model(
-        entity: Phenotype, model: Optional[PhenotypeModel] = None
+        entity: Phenotype,
+        model: PhenotypeModel | None = None,
     ) -> PhenotypeModel:
         target = model or PhenotypeModel()
         target.hpo_id = entity.identifier.hpo_id
@@ -57,7 +61,7 @@ class PhenotypeMapper:
         return [PhenotypeMapper.to_domain(model) for model in models]
 
     @staticmethod
-    def _parse_synonyms(raw_synonyms: Optional[str]) -> Tuple[str, ...]:
+    def _parse_synonyms(raw_synonyms: str | None) -> tuple[str, ...]:
         if not raw_synonyms:
             return ()
         try:
@@ -71,7 +75,7 @@ class PhenotypeMapper:
         )
 
     @staticmethod
-    def _serialize_synonyms(synonyms: Tuple[str, ...]) -> Optional[str]:
+    def _serialize_synonyms(synonyms: tuple[str, ...]) -> str | None:
         if not synonyms:
             return None
         return json.dumps(list(synonyms))

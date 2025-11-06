@@ -1,25 +1,28 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.database.session import get_session
 from src.application.container import get_legacy_dependency_container
-from src.application.curation.repositories.review_repository import (
-    SqlAlchemyReviewRepository,
-)
 from src.application.curation.repositories.audit_repository import (
     SqlAlchemyAuditRepository,
 )
-from src.application.curation.services.review_service import ReviewService, ReviewQuery
+from src.application.curation.repositories.review_repository import (
+    SqlAlchemyReviewRepository,
+)
 from src.application.curation.services.approval_service import ApprovalService
 from src.application.curation.services.comment_service import CommentService
 from src.application.curation.services.detail_service import CurationDetailService
-from src.models.database.review import ReviewRecord
-
+from src.application.curation.services.review_service import (
+    ReviewQuery,
+    ReviewQueueItem,
+    ReviewService,
+)
+from src.database.session import get_session
 
 router = APIRouter(prefix="/curation", tags=["curation"])
 
@@ -71,7 +74,7 @@ def _curation_detail_service(
     return container.create_curation_detail_service(db)
 
 
-@router.get("/queue", response_model=list[Dict[str, Any]])
+@router.get("/queue", response_model=list[dict[str, Any]])
 def list_queue(
     entity_type: str | None = None,
     status: str | None = None,
@@ -79,9 +82,9 @@ def list_queue(
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_session),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     service = _review_service()
-    results: List[ReviewRecord] = service.list_queue(
+    results: list[ReviewQueueItem] = service.list_queue(
         db,
         ReviewQuery(
             entity_type=entity_type,
@@ -92,57 +95,50 @@ def list_queue(
         ),
     )
     # Minimal JSON response until dedicated API models are defined
-    return [
-        {
-            "id": r.id,
-            "entity_type": r.entity_type,
-            "entity_id": r.entity_id,
-            "status": r.status,
-            "priority": r.priority,
-            "quality_score": r.quality_score,
-            "issues": r.issues,
-            "last_updated": r.last_updated.isoformat() if r.last_updated else None,
-        }
-        for r in results
-    ]
+    return [item.to_serializable() for item in results]
 
 
 @router.post("/submit", status_code=status.HTTP_201_CREATED)
-def submit(req: SubmitRequest, db: Session = Depends(get_session)) -> Dict[str, int]:
+def submit(req: SubmitRequest, db: Session = Depends(get_session)) -> dict[str, int]:
     service = _review_service()
     created = service.submit(db, req.entity_type, req.entity_id, req.priority)
     return {"id": created.id}
 
 
 @router.post("/bulk")
-def bulk(req: BulkRequest, db: Session = Depends(get_session)) -> Dict[str, int]:
+def bulk(req: BulkRequest, db: Session = Depends(get_session)) -> dict[str, int]:
     service = _approval_service()
+    ids_list = list(req.ids)
     if req.action == "approve":
-        count = service.approve(db, req.ids)
+        count = service.approve(db, ids_list)
     elif req.action == "reject":
-        count = service.reject(db, req.ids)
+        count = service.reject(db, ids_list)
     elif req.action == "quarantine":
-        count = service.quarantine(db, req.ids)
+        count = service.quarantine(db, ids_list)
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
     return {"updated": count}
 
 
 @router.post("/comment", status_code=status.HTTP_201_CREATED)
-def comment(req: CommentRequest, db: Session = Depends(get_session)) -> Dict[str, int]:
+def comment(req: CommentRequest, db: Session = Depends(get_session)) -> dict[str, int]:
     service = _comment_service()
     comment_id = service.add_comment(
-        db, req.entity_type, req.entity_id, req.comment, req.user
+        db,
+        req.entity_type,
+        req.entity_id,
+        req.comment,
+        req.user,
     )
     return {"id": comment_id}
 
 
-@router.get("/{entity_type}/{entity_id}", response_model=Dict[str, Any])
+@router.get("/{entity_type}/{entity_id}", response_model=dict[str, Any])
 def get_curated_detail(
     entity_type: str,
     entity_id: str,
     service: CurationDetailService = Depends(_curation_detail_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve enriched detail payload for a queued entity.
 

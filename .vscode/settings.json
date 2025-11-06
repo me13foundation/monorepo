@@ -1,4 +1,23 @@
 {
+  // Python formatting and linting (matches pre-commit hooks exactly)
+  // NOTE: Pre-commit hooks handle all formatting and fixing. VS Code shows linting.
+  "python.formatting.provider": "none", // Use Ruff for formatting
+  "python.formatting.blackPath": "black",
+  "python.formatting.blackArgs": [],
+  "python.linting.enabled": true,
+  "python.linting.ruffEnabled": true,
+  "python.linting.ruffPath": "ruff",
+  "python.linting.ruffArgs": ["--config", "pyproject.toml"],
+  "python.defaultInterpreterPath": "./venv/bin/python3",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      // No auto-fixes - pre-commit handles everything
+    }
+  },
+
+  // CSS/Tailwind settings
   "css.validate": false,
   "less.validate": false,
   "scss.validate": false,

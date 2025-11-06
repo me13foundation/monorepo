@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
 
 
 @dataclass(frozen=True)
 class ItemsApproved:
-    ids: Sequence[int]
+    ids: tuple[int, ...]
 
 
 @dataclass(frozen=True)
 class ItemsRejected:
-    ids: Sequence[int]
+    ids: tuple[int, ...]
 
 
 @dataclass(frozen=True)
 class ItemsQuarantined:
-    ids: Sequence[int]
+    ids: tuple[int, ...]
 
 
-__all__ = ["ItemsApproved", "ItemsRejected", "ItemsQuarantined"]
+__all__ = ["ItemsApproved", "ItemsQuarantined", "ItemsRejected"]

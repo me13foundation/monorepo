@@ -5,12 +5,13 @@ Encapsulates gene-specific business rules, validations, and logic
 without infrastructure dependencies.
 """
 
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any
 
-from .base import DomainService
-from ..entities.gene import Gene, GeneType
-from ..value_objects.identifiers import GeneIdentifier
-from ...type_definitions.domain import GeneDerivedProperties
+from src.domain.entities.gene import Gene, GeneType
+from src.domain.services.base import DomainService
+from src.domain.value_objects.identifiers import GeneIdentifier
+from src.type_definitions.domain import GeneDerivedProperties
 
 
 class GeneDomainService(DomainService):
@@ -22,8 +23,11 @@ class GeneDomainService(DomainService):
     """
 
     def validate_business_rules(
-        self, entity: Gene, operation: str, context: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        self,
+        entity: Gene,
+        _operation: str,  # kept for API compatibility
+        _context: dict[str, Any] | None = None,
+    ) -> list[str]:
         """
         Validate gene business rules.
 
@@ -42,9 +46,12 @@ class GeneDomainService(DomainService):
             errors.append("Gene symbol must be uppercase alphanumeric with underscores")
 
         # Genomic position validation
-        if entity.start_position and entity.end_position:
-            if entity.end_position < entity.start_position:
-                errors.append("End position must be greater than start position")
+        if (
+            entity.start_position
+            and entity.end_position
+            and entity.end_position < entity.start_position
+        ):
+            errors.append("End position must be greater than start position")
 
         # External ID validation
         if entity.ensembl_id and not entity.ensembl_id.startswith("ENSG"):
@@ -76,7 +83,7 @@ class GeneDomainService(DomainService):
 
         return entity
 
-    def calculate_derived_properties(self, entity: Gene) -> Dict[str, Any]:
+    def calculate_derived_properties(self, entity: Gene) -> dict[str, Any]:
         """
         Calculate derived properties for a gene.
 
@@ -100,7 +107,9 @@ class GeneDomainService(DomainService):
 
         # Count external identifiers
         external_ids = [entity.ensembl_id, entity.ncbi_gene_id, entity.uniprot_id]
-        external_id_count = len([id for id in external_ids if id is not None])
+        external_id_count = len(
+            [ext_id for ext_id in external_ids if ext_id is not None],
+        )
 
         # Create typed result for internal type safety
         result = GeneDerivedProperties(
@@ -113,7 +122,9 @@ class GeneDomainService(DomainService):
         return result.__dict__
 
     def validate_gene_symbol_uniqueness(
-        self, symbol: str, existing_symbols: List[str]
+        self,
+        symbol: str,
+        existing_symbols: list[str],
     ) -> bool:
         """
         Validate that a gene symbol is unique.
@@ -138,10 +149,7 @@ class GeneDomainService(DomainService):
         Returns:
             Normalized identifiers
         """
-        symbol = identifiers.symbol or identifiers.gene_id
-        if symbol is None:
-            raise ValueError("GeneIdentifier must contain at least a symbol or gene_id")
-
+        symbol = identifiers.symbol or identifiers.gene_id or ""
         gene_id = identifiers.gene_id or symbol
 
         return GeneIdentifier(
@@ -181,6 +189,7 @@ class GeneDomainService(DomainService):
             total_weight += 0.8
 
         # Genomic location proximity (if both have locations)
+        proximity_bp_threshold = 10_000
         if (
             gene1.chromosome
             and gene2.chromosome
@@ -192,7 +201,7 @@ class GeneDomainService(DomainService):
             if distance == 0:
                 score += 0.9
                 total_weight += 0.9
-            elif distance < 10000:  # Within 10kb
+            elif distance < proximity_bp_threshold:  # Within 10kb
                 score += 0.5
                 total_weight += 0.5
 
@@ -204,8 +213,6 @@ class GeneDomainService(DomainService):
             return False
 
         # Must be uppercase alphanumeric with underscores/hyphens
-        import re
-
         return bool(re.match(r"^[A-Z0-9_-]+$", symbol))
 
     def _infer_gene_type(self, gene: Gene) -> str:
@@ -213,7 +220,7 @@ class GeneDomainService(DomainService):
         # This is a simplified inference - in reality would use more complex rules
         if gene.uniprot_id:
             return GeneType.PROTEIN_CODING
-        elif gene.name and any(
+        if gene.name and any(
             term in gene.name.lower() for term in ["rna", "pseudogene"]
         ):
             return GeneType.NCRNA if "rna" in gene.name.lower() else GeneType.PSEUDOGENE

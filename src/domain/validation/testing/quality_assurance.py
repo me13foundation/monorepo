@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, List
 
 
 @dataclass
 class QualityAssuranceSuite:
     name: str = "default"
-    executed_checks: List[str] = field(default_factory=list)
+    executed_checks: list[str] = field(default_factory=list)
 
-    def run(self) -> Dict[str, str]:
+    def run(self) -> dict[str, str]:
         self.executed_checks.append("basic_sanity_check")
         return {"status": "ok"}
 

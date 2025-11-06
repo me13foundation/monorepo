@@ -64,7 +64,7 @@ class TestROCrateBuilder:
                     "path": "data/test.json",
                     "name": "test.json",
                     "description": "Test data file",
-                }
+                },
             ]
 
             metadata = builder.generate_metadata(data_files)
@@ -104,7 +104,7 @@ class TestROCrateBuilder:
                     "path": file_path,
                     "name": "test_data.json",
                     "description": "Test data",
-                }
+                },
             ]
 
             crate_path = builder.build(data_files)
@@ -114,7 +114,7 @@ class TestROCrateBuilder:
             assert (crate_path / "data" / "test_data.json").exists()
 
             # Validate metadata
-            with open(crate_path / "ro-crate-metadata.json", "r") as f:
+            with open(crate_path / "ro-crate-metadata.json") as f:
                 metadata = json.load(f)
 
             assert "@context" in metadata
@@ -141,7 +141,7 @@ class TestROCrateBuilder:
                 {
                     "path": file_path,
                     "name": "test_data.json",
-                }
+                },
             ]
 
             builder.build(data_files)

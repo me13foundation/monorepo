@@ -3,15 +3,16 @@ Integration tests for individual data source ingestors.
 Tests API interactions, data parsing, and error handling.
 """
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 from httpx import Response
 
-from src.infrastructure.ingest.clinvar_ingestor import ClinVarIngestor
-from src.infrastructure.ingest.pubmed_ingestor import PubMedIngestor
-from src.infrastructure.ingest.hpo_ingestor import HPOIngestor
-from src.infrastructure.ingest.uniprot_ingestor import UniProtIngestor
 from src.infrastructure.ingest.base_ingestor import IngestionStatus
+from src.infrastructure.ingest.clinvar_ingestor import ClinVarIngestor
+from src.infrastructure.ingest.hpo_ingestor import HPOIngestor
+from src.infrastructure.ingest.pubmed_ingestor import PubMedIngestor
+from src.infrastructure.ingest.uniprot_ingestor import UniProtIngestor
 from src.models.value_objects import Provenance
 
 
@@ -28,7 +29,8 @@ class TestClinVarIngestor:
         """Test successful fetching of MED13 variants."""
         # Mock successful API responses
         mock_search_response = Response(
-            200, json={"esearchresult": {"idlist": ["12345", "67890"], "count": "2"}}
+            200,
+            json={"esearchresult": {"idlist": ["12345", "67890"], "count": "2"}},
         )
 
         mock_summary_response = Response(
@@ -38,7 +40,7 @@ class TestClinVarIngestor:
                     "uids": ["12345", "67890"],
                     "12345": {"title": "Variant 1"},
                     "67890": {"title": "Variant 2"},
-                }
+                },
             },
         )
 
@@ -69,11 +71,14 @@ class TestClinVarIngestor:
     async def test_fetch_with_variant_type_filter(self, ingestor):
         """Test fetching variants with type filtering."""
         mock_response = Response(
-            200, json={"esearchresult": {"idlist": ["11111"], "count": "1"}}
+            200,
+            json={"esearchresult": {"idlist": ["11111"], "count": "1"}},
         )
 
         with patch.object(
-            ingestor, "_make_request", return_value=mock_response
+            ingestor,
+            "_make_request",
+            return_value=mock_response,
         ) as mock_request:
             await ingestor.fetch_by_variant_type(["single_nucleotide_variant"])
 
@@ -86,11 +91,14 @@ class TestClinVarIngestor:
     async def test_fetch_by_clinical_significance(self, ingestor):
         """Test fetching variants by clinical significance."""
         mock_response = Response(
-            200, json={"esearchresult": {"idlist": ["22222"], "count": "1"}}
+            200,
+            json={"esearchresult": {"idlist": ["22222"], "count": "1"}},
         )
 
         with patch.object(
-            ingestor, "_make_request", return_value=mock_response
+            ingestor,
+            "_make_request",
+            return_value=mock_response,
         ) as mock_request:
             await ingestor.fetch_by_clinical_significance(["pathogenic"])
 
@@ -112,7 +120,9 @@ class TestClinVarIngestor:
     async def test_error_handling(self, ingestor):
         """Test error handling for failed requests."""
         with patch.object(
-            ingestor, "_make_request", side_effect=Exception("API Error")
+            ingestor,
+            "_make_request",
+            side_effect=Exception("API Error"),
         ):
             result = await ingestor.ingest()
 
@@ -179,11 +189,14 @@ class TestPubMedIngestor:
     async def test_recent_publications_filter(self, ingestor):
         """Test fetching recent publications."""
         mock_response = Response(
-            200, json={"esearchresult": {"idlist": ["11111111"], "count": "1"}}
+            200,
+            json={"esearchresult": {"idlist": ["11111111"], "count": "1"}},
         )
 
         with patch.object(
-            ingestor, "_make_request", return_value=mock_response
+            ingestor,
+            "_make_request",
+            return_value=mock_response,
         ) as mock_request:
             await ingestor.fetch_recent_publications(days_back=365)
 
@@ -199,12 +212,15 @@ class TestPubMedIngestor:
     async def test_xml_parsing_error_handling(self, ingestor):
         """Test handling of malformed XML responses."""
         mock_search_response = Response(
-            200, json={"esearchresult": {"idlist": ["99999999"], "count": "1"}}
+            200,
+            json={"esearchresult": {"idlist": ["99999999"], "count": "1"}},
         )
 
         # Malformed XML
         mock_fetch_response = Response(
-            200, text="<invalid>xml<content>", headers={"content-type": "text/xml"}
+            200,
+            text="<invalid>xml<content>",
+            headers={"content-type": "text/xml"},
         )
 
         with patch.object(ingestor, "_make_request") as mock_request:
@@ -239,7 +255,7 @@ class TestHPOIngestor:
                     {
                         "name": "hp.obo",
                         "browser_download_url": "https://example.com/hp.obo",
-                    }
+                    },
                 ],
             },
         )
@@ -257,7 +273,9 @@ is_a: HP:0000118
 """
 
         mock_ontology_response = Response(
-            200, text=mock_obo_content, headers={"content-type": "text/plain"}
+            200,
+            text=mock_obo_content,
+            headers={"content-type": "text/plain"},
         )
 
         with patch.object(ingestor, "_make_request") as mock_request:
@@ -285,8 +303,8 @@ is_a: HP:0000118
                     {
                         "name": "hp.obo",
                         "browser_download_url": "https://example.com/hp.obo",
-                    }
-                ]
+                    },
+                ],
             },
         )
 
@@ -379,14 +397,14 @@ class TestUniProtIngestor:
                                     "value": (
                                         "Mediator of RNA polymerase II transcription "
                                         "subunit 13"
-                                    )
-                                }
-                            }
+                                    ),
+                                },
+                            },
                         },
                         "gene": [{"geneName": {"value": "MED13"}}],
                         "organism": {"scientificName": "Homo sapiens", "taxonId": 9606},
-                    }
-                ]
+                    },
+                ],
             },
         )
 
@@ -408,8 +426,8 @@ class TestUniProtIngestor:
             200,
             json={
                 "results": [
-                    {"primaryAccession": "P61968", "uniProtkbId": "MED13_HUMAN"}
-                ]
+                    {"primaryAccession": "P61968", "uniProtkbId": "MED13_HUMAN"},
+                ],
             },
         )
 
@@ -463,7 +481,7 @@ KRRRGRRSKRRSYKRGRSK""",
                 {
                     "name": "Intellectual developmental disorder",
                     "description": "Autosomal dominant inheritance",
-                }
+                },
             ],
         }
 
@@ -485,7 +503,9 @@ class TestIngestionErrorHandling:
         ingestor = ClinVarIngestor()
 
         with patch.object(
-            ingestor, "_make_request", side_effect=TimeoutException("Timeout")
+            ingestor,
+            "_make_request",
+            side_effect=TimeoutException("Timeout"),
         ):
             result = await ingestor.ingest()
 

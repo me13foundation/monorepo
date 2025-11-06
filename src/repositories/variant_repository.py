@@ -3,15 +3,17 @@ Variant repository for MED13 Resource Library.
 Data access layer for genetic variant entities with specialized queries.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from sqlalchemy import and_, or_, select
 
-from .base import BaseRepository, NotFoundError
 from src.models.database import (
     ClinicalSignificance,
     GeneModel,
     VariantModel,
 )
+
+from .base import BaseRepository, NotFoundError
 
 
 class VariantRepository(BaseRepository[VariantModel, int]):
@@ -26,7 +28,7 @@ class VariantRepository(BaseRepository[VariantModel, int]):
     def model_class(self) -> type[VariantModel]:
         return VariantModel
 
-    def find_by_variant_id(self, variant_id: str) -> Optional[VariantModel]:
+    def find_by_variant_id(self, variant_id: str) -> VariantModel | None:
         """
         Find a variant by its variant_id.
 
@@ -39,7 +41,7 @@ class VariantRepository(BaseRepository[VariantModel, int]):
         stmt = select(VariantModel).where(VariantModel.variant_id == variant_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def find_by_clinvar_id(self, clinvar_id: str) -> Optional[VariantModel]:
+    def find_by_clinvar_id(self, clinvar_id: str) -> VariantModel | None:
         """
         Find a variant by its ClinVar ID.
 
@@ -53,8 +55,10 @@ class VariantRepository(BaseRepository[VariantModel, int]):
         return self.session.execute(stmt).scalar_one_or_none()
 
     def find_by_gene(
-        self, gene_id: int, limit: Optional[int] = None
-    ) -> List[VariantModel]:
+        self,
+        gene_id: int,
+        limit: int | None = None,
+    ) -> list[VariantModel]:
         """
         Find all variants associated with a specific gene.
 
@@ -71,8 +75,11 @@ class VariantRepository(BaseRepository[VariantModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_genomic_location(
-        self, chromosome: str, start_pos: int, end_pos: int
-    ) -> List[VariantModel]:
+        self,
+        chromosome: str,
+        start_pos: int,
+        end_pos: int,
+    ) -> list[VariantModel]:
         """
         Find variants within a genomic region.
 
@@ -89,13 +96,15 @@ class VariantRepository(BaseRepository[VariantModel, int]):
                 VariantModel.chromosome == chromosome,
                 VariantModel.position >= start_pos,
                 VariantModel.position <= end_pos,
-            )
+            ),
         )
         return list(self.session.execute(stmt).scalars())
 
     def find_by_clinical_significance(
-        self, significance: ClinicalSignificance, limit: Optional[int] = None
-    ) -> List[VariantModel]:
+        self,
+        significance: ClinicalSignificance,
+        limit: int | None = None,
+    ) -> list[VariantModel]:
         """
         Find variants with specific clinical significance.
 
@@ -107,15 +116,17 @@ class VariantRepository(BaseRepository[VariantModel, int]):
             List of VariantModel instances with the specified significance
         """
         stmt = select(VariantModel).where(
-            VariantModel.clinical_significance == significance
+            VariantModel.clinical_significance == significance,
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
     def find_by_gene_symbol(
-        self, gene_symbol: str, limit: Optional[int] = None
-    ) -> List[VariantModel]:
+        self,
+        gene_symbol: str,
+        limit: int | None = None,
+    ) -> list[VariantModel]:
         """
         Find variants associated with a gene symbol.
 
@@ -137,8 +148,9 @@ class VariantRepository(BaseRepository[VariantModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_pathogenic_variants(
-        self, limit: Optional[int] = None
-    ) -> List[VariantModel]:
+        self,
+        limit: int | None = None,
+    ) -> list[VariantModel]:
         """
         Find variants classified as pathogenic or likely pathogenic.
 
@@ -153,13 +165,13 @@ class VariantRepository(BaseRepository[VariantModel, int]):
                 VariantModel.clinical_significance == ClinicalSignificance.PATHOGENIC,
                 VariantModel.clinical_significance
                 == ClinicalSignificance.LIKELY_PATHOGENIC,
-            )
+            ),
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
-    def find_with_evidence(self, variant_id: int) -> Optional[VariantModel]:
+    def find_with_evidence(self, variant_id: int) -> VariantModel | None:
         """
         Find a variant with its associated evidence loaded.
 
@@ -172,7 +184,7 @@ class VariantRepository(BaseRepository[VariantModel, int]):
         stmt = select(VariantModel).where(VariantModel.id == variant_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def get_variant_statistics(self) -> Dict[str, Any]:
+    def get_variant_statistics(self) -> dict[str, Any]:
         """
         Get statistics about variants in the database.
 
@@ -206,5 +218,6 @@ class VariantRepository(BaseRepository[VariantModel, int]):
         """
         variant = self.find_by_variant_id(variant_id)
         if variant is None:
-            raise NotFoundError(f"Variant with variant_id '{variant_id}' not found")
+            message = f"Variant with variant_id '{variant_id}' not found"
+            raise NotFoundError(message)
         return variant

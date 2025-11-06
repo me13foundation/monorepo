@@ -5,9 +5,9 @@ Parses HPO ontology data into structured phenotype records with
 hierarchical relationships, definitions, and clinical information.
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class HPOTermType(Enum):
@@ -36,24 +36,24 @@ class HPOTerm:
 
     hpo_id: str
     name: str
-    definition: Optional[str]
-    synonyms: List[str]
+    definition: str | None
+    synonyms: list[str]
     term_type: HPOTermType
 
     # Hierarchical relationships
-    parents: List[HPORelationship]
-    children: List[HPORelationship]
+    parents: list[HPORelationship]
+    children: list[HPORelationship]
 
     # Clinical information
-    comment: Optional[str]
-    xrefs: List[str]  # Cross-references to other databases
+    comment: str | None
+    xrefs: list[str]  # Cross-references to other databases
 
     # Metadata
     is_obsolete: bool
-    replaced_by: Optional[str]
+    replaced_by: str | None
 
     # Raw data for reference
-    raw_data: Dict[str, Any]
+    raw_data: dict[str, Any]
 
 
 class HPOParser:
@@ -65,9 +65,9 @@ class HPOParser:
     """
 
     def __init__(self) -> None:
-        self.term_cache: Dict[str, HPOTerm] = {}
+        self.term_cache: dict[str, HPOTerm] = {}
 
-    def parse_raw_data(self, raw_data: Dict[str, Any]) -> Optional[HPOTerm]:
+    def parse_raw_data(self, raw_data: dict[str, Any]) -> HPOTerm | None:
         """
         Parse raw HPO data into structured term record.
 
@@ -87,16 +87,15 @@ class HPOParser:
             # Check if this is sample data format
             if raw_data.get("format") == "sample":
                 return self._parse_sample_data(raw_data)
-            else:
-                # Future: Parse full OBO format
-                return self._parse_obo_data(raw_data)
+            # Future: Parse full OBO format
+            return self._parse_obo_data(raw_data)
 
         except Exception as e:
             # Log error but don't fail completely
             print(f"Error parsing HPO term {raw_data.get('hpo_id')}: {e}")
             return None
 
-    def parse_batch(self, raw_data_list: List[Dict[str, Any]]) -> List[HPOTerm]:
+    def parse_batch(self, raw_data_list: list[dict[str, Any]]) -> list[HPOTerm]:
         """
         Parse multiple HPO terms.
 
@@ -115,7 +114,7 @@ class HPOParser:
 
         return parsed_terms
 
-    def _parse_sample_data(self, raw_data: Dict[str, Any]) -> HPOTerm:
+    def _parse_sample_data(self, raw_data: dict[str, Any]) -> HPOTerm:
         """Parse sample HPO data format."""
         hpo_id = raw_data["hpo_id"]
         name = raw_data["name"]
@@ -138,7 +137,7 @@ class HPOParser:
             raw_data=raw_data,
         )
 
-    def _parse_obo_data(self, raw_data: Dict[str, Any]) -> HPOTerm:
+    def _parse_obo_data(self, raw_data: dict[str, Any]) -> HPOTerm:
         """
         Parse full OBO format data.
 
@@ -172,20 +171,19 @@ class HPOParser:
 
         if "abnormality" in name_lower:
             return HPOTermType.PHENOTYPIC_ABNORMALITY
-        elif "course" in name_lower:
+        if "course" in name_lower:
             return HPOTermType.CLINICAL_COURSE
-        elif "modifier" in name_lower:
+        if "modifier" in name_lower:
             return HPOTermType.CLINICAL_MODIFIER
-        elif "frequency" in name_lower:
+        if "frequency" in name_lower:
             return HPOTermType.FREQUENCY
-        elif "inherit" in name_lower:
+        if "inherit" in name_lower:
             return HPOTermType.MODE_OF_INHERITANCE
-        elif "onset" in name_lower:
+        if "onset" in name_lower:
             return HPOTermType.ONSET
-        else:
-            return HPOTermType.OTHER
+        return HPOTermType.OTHER
 
-    def build_hierarchy(self, terms: List[HPOTerm]) -> Dict[str, HPOTerm]:
+    def build_hierarchy(self, terms: list[HPOTerm]) -> dict[str, HPOTerm]:
         """
         Build hierarchical relationships between HPO terms.
 
@@ -215,20 +213,25 @@ class HPOParser:
                     # Add parent-child relationships
                     term.parents.append(
                         HPORelationship(
-                            term_id=root_term.hpo_id, relationship_type="is_a"
-                        )
+                            term_id=root_term.hpo_id,
+                            relationship_type="is_a",
+                        ),
                     )
                     root_term.children.append(
                         HPORelationship(
-                            term_id=term.hpo_id, relationship_type="has_child"
-                        )
+                            term_id=term.hpo_id,
+                            relationship_type="has_child",
+                        ),
                     )
 
         return term_dict
 
     def find_related_terms(
-        self, term_id: str, relationship_type: str = "is_a", max_depth: int = 3
-    ) -> List[str]:
+        self,
+        term_id: str,
+        relationship_type: str = "is_a",
+        max_depth: int = 3,
+    ) -> list[str]:
         """
         Find related terms through hierarchical relationships.
 
@@ -272,7 +275,7 @@ class HPOParser:
         traverse(term, 0)
         return related_terms
 
-    def validate_parsed_data(self, term: HPOTerm) -> List[str]:
+    def validate_parsed_data(self, term: HPOTerm) -> list[str]:
         """
         Validate parsed HPO term data.
 
@@ -300,7 +303,7 @@ class HPOParser:
 
         return errors
 
-    def get_term_by_id(self, term_id: str) -> Optional[HPOTerm]:
+    def get_term_by_id(self, term_id: str) -> HPOTerm | None:
         """
         Get a cached HPO term by ID.
 

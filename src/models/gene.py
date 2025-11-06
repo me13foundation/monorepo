@@ -3,10 +3,11 @@ Gene models for MED13 Resource Library.
 Strongly typed Pydantic models with comprehensive validation.
 """
 
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict, ValidationInfo
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 
 class GeneType(str, Enum):
@@ -45,41 +46,53 @@ class Gene(BaseModel):
     )
 
     # Descriptive fields
-    name: Optional[str] = Field(None, max_length=200, description="Full gene name")
-    description: Optional[str] = Field(
-        None, max_length=1000, description="Gene description"
+    name: str | None = Field(None, max_length=200, description="Full gene name")
+    description: str | None = Field(
+        None,
+        max_length=1000,
+        description="Gene description",
     )
 
     # Classification
     gene_type: GeneType = Field(default=GeneType.UNKNOWN, description="Type of gene")
 
     # Genomic location
-    chromosome: Optional[str] = Field(
-        None, pattern=r"^(chr)?[0-9XYM]+$", description="Chromosome location"
+    chromosome: str | None = Field(
+        None,
+        pattern=r"^(chr)?[0-9XYM]+$",
+        description="Chromosome location",
     )
-    start_position: Optional[int] = Field(
-        None, ge=1, description="Start position on chromosome"
+    start_position: int | None = Field(
+        None,
+        ge=1,
+        description="Start position on chromosome",
     )
-    end_position: Optional[int] = Field(
-        None, ge=1, description="End position on chromosome"
+    end_position: int | None = Field(
+        None,
+        ge=1,
+        description="End position on chromosome",
     )
 
     # External identifiers
-    ensembl_id: Optional[str] = Field(
-        None, pattern=r"^ENSG[0-9]+$", description="Ensembl gene ID"
+    ensembl_id: str | None = Field(
+        None,
+        pattern=r"^ENSG[0-9]+$",
+        description="Ensembl gene ID",
     )
-    ncbi_gene_id: Optional[int] = Field(None, ge=1, description="NCBI Gene ID")
-    uniprot_id: Optional[str] = Field(
-        None, pattern=r"^[A-Z0-9_-]+$", description="UniProt accession"
+    ncbi_gene_id: int | None = Field(None, ge=1, description="NCBI Gene ID")
+    uniprot_id: str | None = Field(
+        None,
+        pattern=r"^[A-Z0-9_-]+$",
+        description="UniProt accession",
     )
 
     # Metadata
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Record creation timestamp",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="Last update timestamp",
     )
 
@@ -93,13 +106,16 @@ class Gene(BaseModel):
     @field_validator("end_position")
     @classmethod
     def validate_positions(
-        cls, v: Optional[int], info: ValidationInfo
-    ) -> Optional[int]:
+        cls,
+        v: int | None,
+        info: ValidationInfo,
+    ) -> int | None:
         """Ensure end position is after start position."""
         if v is not None:
             start_pos = info.data.get("start_position")
             if start_pos is not None and v < start_pos:
-                raise ValueError("end_position must be greater than start_position")
+                message = "end_position must be greater than start_position"
+                raise ValueError(message)
         return v
 
     @field_validator("updated_at")
@@ -108,7 +124,8 @@ class Gene(BaseModel):
         """Ensure updated_at is not before created_at."""
         created_at = info.data.get("created_at")
         if created_at and v < created_at:
-            raise ValueError("updated_at cannot be before created_at")
+            message = "updated_at cannot be before created_at"
+            raise ValueError(message)
         return v
 
 
@@ -121,15 +138,15 @@ class GeneCreate(BaseModel):
     model_config = ConfigDict(strict=True)
 
     symbol: str = Field(..., min_length=1, max_length=20, pattern=r"^[A-Z0-9_-]+$")
-    name: Optional[str] = Field(None, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
+    name: str | None = Field(None, max_length=200)
+    description: str | None = Field(None, max_length=1000)
     gene_type: GeneType = Field(default=GeneType.UNKNOWN)
-    chromosome: Optional[str] = Field(None, pattern=r"^(chr)?[0-9XYM]+$")
-    start_position: Optional[int] = Field(None, ge=1)
-    end_position: Optional[int] = Field(None, ge=1)
-    ensembl_id: Optional[str] = Field(None, pattern=r"^ENSG[0-9]+$")
-    ncbi_gene_id: Optional[int] = Field(None, ge=1)
-    uniprot_id: Optional[str] = Field(None, pattern=r"^[A-Z0-9_-]+$")
+    chromosome: str | None = Field(None, pattern=r"^(chr)?[0-9XYM]+$")
+    start_position: int | None = Field(None, ge=1)
+    end_position: int | None = Field(None, ge=1)
+    ensembl_id: str | None = Field(None, pattern=r"^ENSG[0-9]+$")
+    ncbi_gene_id: int | None = Field(None, ge=1)
+    uniprot_id: str | None = Field(None, pattern=r"^[A-Z0-9_-]+$")
 
     @field_validator("symbol")
     @classmethod
@@ -139,12 +156,15 @@ class GeneCreate(BaseModel):
     @field_validator("end_position")
     @classmethod
     def validate_positions(
-        cls, v: Optional[int], info: ValidationInfo
-    ) -> Optional[int]:
+        cls,
+        v: int | None,
+        info: ValidationInfo,
+    ) -> int | None:
         if v is not None:
             start_pos = info.data.get("start_position")
             if start_pos is not None and v < start_pos:
-                raise ValueError("end_position must be greater than start_position")
+                message = "end_position must be greater than start_position"
+                raise ValueError(message)
         return v
 
 
@@ -159,19 +179,22 @@ class GeneResponse(Gene):
     # Computed fields
     variant_count: int = Field(default=0, description="Number of associated variants")
     phenotype_count: int = Field(
-        default=0, description="Number of associated phenotypes"
+        default=0,
+        description="Number of associated phenotypes",
     )
 
     # Optional relationships (can be included based on query parameters)
-    variants: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Associated variants (optional)"
+    variants: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Associated variants (optional)",
     )
-    phenotypes: Optional[List[Dict[str, Any]]] = Field(
-        default=None, description="Associated phenotypes (optional)"
+    phenotypes: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Associated phenotypes (optional)",
     )
 
 
 # Type aliases for better API documentation
-GeneList = List[GeneResponse]
+GeneList = list[GeneResponse]
 GeneCreateRequest = GeneCreate
 GeneUpdateRequest = GeneCreate  # Same fields for updates

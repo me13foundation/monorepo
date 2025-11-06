@@ -5,7 +5,7 @@ Contains TypedDict classes for update operations, API responses,
 and other common patterns throughout the application.
 """
 
-from typing import Dict, List, Optional, Any, TypedDict, Literal
+from typing import Any, Literal, TypedDict
 
 
 # Update operation types (replace Dict[str, Any])
@@ -13,15 +13,15 @@ class GeneUpdate(TypedDict, total=False):
     """Type-safe gene update parameters."""
 
     symbol: str
-    name: Optional[str]
-    description: Optional[str]
+    name: str | None
+    description: str | None
     gene_type: str
-    chromosome: Optional[str]
-    start_position: Optional[int]
-    end_position: Optional[int]
-    ensembl_id: Optional[str]
-    ncbi_gene_id: Optional[int]
-    uniprot_id: Optional[str]
+    chromosome: str | None
+    start_position: int | None
+    end_position: int | None
+    ensembl_id: str | None
+    ncbi_gene_id: int | None
+    uniprot_id: str | None
 
 
 class VariantUpdate(TypedDict, total=False):
@@ -31,11 +31,11 @@ class VariantUpdate(TypedDict, total=False):
     hgvs_notation: str
     variant_type: str
     clinical_significance: str
-    population_frequency: Dict[str, float]
-    chromosome: Optional[str]
-    position: Optional[int]
-    reference_allele: Optional[str]
-    alternate_allele: Optional[str]
+    population_frequency: dict[str, float]
+    chromosome: str | None
+    position: int | None
+    reference_allele: str | None
+    alternate_allele: str | None
 
 
 class PhenotypeUpdate(TypedDict, total=False):
@@ -43,53 +43,53 @@ class PhenotypeUpdate(TypedDict, total=False):
 
     hpo_id: str
     name: str
-    definition: Optional[str]
-    synonyms: List[str]
-    parents: List[str]
-    children: List[str]
+    definition: str | None
+    synonyms: list[str]
+    parents: list[str]
+    children: list[str]
 
 
 class EvidenceUpdate(TypedDict, total=False):
     """Type-safe evidence update parameters."""
 
     variant_id: str
-    phenotype_id: Optional[str]
-    publication_id: Optional[str]
+    phenotype_id: str | None
+    publication_id: str | None
     evidence_level: str
     confidence_score: float
     source: str
     evidence_type: str
-    description: Optional[str]
+    description: str | None
 
 
 class PublicationUpdate(TypedDict, total=False):
     """Type-safe publication update parameters."""
 
     title: str
-    authors: List[str]
-    journal: Optional[str]
+    authors: list[str]
+    journal: str | None
     publication_year: int
-    doi: Optional[str]
-    pmid: Optional[str]
-    abstract: Optional[str]
+    doi: str | None
+    pmid: str | None
+    abstract: str | None
 
 
 # API response types
 class APIResponse(TypedDict, total=False):
     """Standard API response structure."""
 
-    data: List[Dict[str, Any]]
+    data: list[dict[str, Any]]
     total: int
     page: int
     per_page: int
-    errors: List[str]
+    errors: list[str]
     message: str
 
 
 class PaginatedResponse(TypedDict, total=False):
     """Paginated API response structure."""
 
-    items: List[Dict[str, Any]]
+    items: list[dict[str, Any]]
     total: int
     page: int
     per_page: int
@@ -111,12 +111,12 @@ class ValidationResult(TypedDict):
     """Validation result structure."""
 
     is_valid: bool
-    errors: List[ValidationError]
-    warnings: List[ValidationError]
+    errors: list[ValidationError]
+    warnings: list[ValidationError]
 
 
 # Data processing types
-RawRecord = Dict[str, Any]
+RawRecord = dict[str, Any]
 """Raw data record from external sources (justified for flexibility with external APIs)."""
 
 

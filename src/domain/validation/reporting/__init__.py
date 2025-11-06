@@ -5,9 +5,9 @@ Provides comprehensive error reporting, metrics collection,
 and dashboard capabilities for validation monitoring.
 """
 
+from .dashboard import ValidationDashboard
 from .error_reporting import ErrorReporter
 from .metrics import MetricsCollector
-from .dashboard import ValidationDashboard
 from .report import ValidationReport
 
 __all__ = [

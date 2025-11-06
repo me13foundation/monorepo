@@ -5,15 +5,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List
 
 
 @dataclass
 class SectionReport:
     valid: bool
-    errors: List[str]
+    errors: list[str]
 
-    def to_dict(self) -> Dict[str, object]:
+    def to_dict(self) -> dict[str, object]:
         return {"valid": self.valid, "errors": list(self.errors)}
 
 
@@ -22,7 +21,7 @@ class ROCrateValidator:
         self.crate_path = Path(crate_path)
 
     def _structure_report(self) -> SectionReport:
-        errors: List[str] = []
+        errors: list[str] = []
         if not self.crate_path.exists():
             errors.append("Crate path does not exist")
         if not (self.crate_path / "ro-crate-metadata.json").exists():
@@ -31,7 +30,7 @@ class ROCrateValidator:
             errors.append("Missing data directory")
         return SectionReport(valid=not errors, errors=errors)
 
-    def validate_structure(self) -> Dict[str, object]:
+    def validate_structure(self) -> dict[str, object]:
         return self._structure_report().to_dict()
 
     def _metadata_report(self) -> SectionReport:
@@ -50,10 +49,10 @@ class ROCrateValidator:
 
         return SectionReport(valid=not missing_fields, errors=missing_fields)
 
-    def validate_metadata(self) -> Dict[str, object]:
+    def validate_metadata(self) -> dict[str, object]:
         return self._metadata_report().to_dict()
 
-    def validate_fair_compliance(self) -> Dict[str, Dict[str, object]]:
+    def validate_fair_compliance(self) -> dict[str, dict[str, object]]:
         structure_report = self._structure_report()
         metadata_report = self._metadata_report()
 
@@ -66,7 +65,7 @@ class ROCrateValidator:
 
         return {name: report.to_dict() for name, report in compliance.items()}
 
-    def validate(self) -> Dict[str, object]:
+    def validate(self) -> dict[str, object]:
         structure = self._structure_report().to_dict()
         metadata = self._metadata_report().to_dict()
         fair = self.validate_fair_compliance()

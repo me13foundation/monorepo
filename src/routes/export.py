@@ -5,19 +5,20 @@ Provides streaming data export capabilities in multiple formats.
 """
 
 import gzip
-from typing import Any, Dict, Generator, Optional, Union
-from fastapi import APIRouter, HTTPException, Query, Depends
-from fastapi.responses import StreamingResponse
+from collections.abc import Generator
+from typing import Any
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from src.database.session import get_session
 from src.application.container import get_legacy_dependency_container
 from src.application.export.export_service import (
-    ExportFormat,
-    CompressionFormat,
     BulkExportService,
+    CompressionFormat,
+    ExportFormat,
 )
+from src.database.session import get_session
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -33,12 +34,21 @@ def get_export_service(db: Session = Depends(get_session)) -> BulkExportService:
 @router.get("/{entity_type}")
 async def export_entity_data(
     entity_type: str,
-    format: ExportFormat = Query(ExportFormat.JSON, description="Export format"),
-    compression: CompressionFormat = Query(
-        CompressionFormat.NONE, description="Compression format"
+    export_format: ExportFormat = Query(
+        ExportFormat.JSON,
+        description="Export format",
+        alias="format",
     ),
-    limit: Optional[int] = Query(
-        None, ge=1, le=100000, description="Maximum number of records to export"
+    compression: CompressionFormat = Query(
+        CompressionFormat.NONE,
+        description="Compression format",
+    ),
+    limit: int
+    | None = Query(
+        None,
+        ge=1,
+        le=100000,
+        description="Maximum number of records to export",
     ),
     service: "BulkExportService" = Depends(get_export_service),
 ) -> StreamingResponse:
@@ -57,32 +67,31 @@ async def export_entity_data(
 
     try:
         # Set up filename and content type based on format and compression
-        filename = f"{entity_type}.{format.value}"
+        filename = f"{entity_type}.{export_format.value}"
         if compression == CompressionFormat.GZIP:
             filename += ".gz"
             media_type = "application/gzip"
-        elif format == ExportFormat.JSON:
+        elif export_format == ExportFormat.JSON:
             media_type = "application/json"
-        elif format in (ExportFormat.CSV, ExportFormat.TSV):
+        elif export_format in (ExportFormat.CSV, ExportFormat.TSV):
             media_type = "text/csv"
-        elif format == ExportFormat.JSONL:
+        elif export_format == ExportFormat.JSONL:
             media_type = "application/x-ndjson"
         else:
             media_type = "application/octet-stream"
 
         # Create streaming response
-        def generate() -> Generator[Union[str, bytes], None, None]:
+        def generate() -> Generator[str | bytes, None, None]:
             try:
-                for chunk in service.export_data(
+                yield from service.export_data(
                     entity_type=entity_type,
-                    export_format=format,
+                    export_format=export_format,
                     compression=compression,
                     filters={"limit": limit} if limit else None,
-                ):
-                    yield chunk
+                )
             except Exception as e:
                 # Log the error and yield an error message
-                error_msg = f"Error during export: {str(e)}"
+                error_msg = f"Error during export: {e!s}"
                 if compression == CompressionFormat.GZIP:
                     yield gzip.compress(error_msg.encode("utf-8"))
                 else:
@@ -94,7 +103,7 @@ async def export_entity_data(
             headers={
                 "Content-Disposition": f"attachment; filename={filename}",
                 "X-Entity-Type": entity_type,
-                "X-Export-Format": format.value,
+                "X-Export-Format": export_format.value,
                 "X-Compression": compression.value,
             },
         )
@@ -102,14 +111,14 @@ async def export_entity_data(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {e!s}")
 
 
 @router.get("/{entity_type}/info")
 async def get_export_info(
     entity_type: str,
     service: "BulkExportService" = Depends(get_export_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get information about export options and data statistics for an entity type.
     """
@@ -130,12 +139,13 @@ async def get_export_info(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to get export info: {str(e)}"
+            status_code=500,
+            detail=f"Failed to get export info: {e!s}",
         )
 
 
 @router.get("/")
-async def list_exportable_entities() -> Dict[str, Any]:
+async def list_exportable_entities() -> dict[str, Any]:
     """
     List all entity types that can be exported.
     """

@@ -1,6 +1,6 @@
-from dash import html, dcc
 import dash_bootstrap_components as dbc
 
+from dash import dcc, html
 from src.presentation.dash.components.sidebar import create_sidebar
 
 
@@ -20,20 +20,20 @@ def create_dashboard_page() -> dbc.Container:
                                             dbc.Card(
                                                 [
                                                     dbc.CardHeader(
-                                                        "Data Quality Overview"
+                                                        "Data Quality Overview",
                                                     ),
                                                     dbc.CardBody(
                                                         [
                                                             dcc.Graph(
                                                                 id="quality-chart",
                                                                 config={
-                                                                    "displayModeBar": False
+                                                                    "displayModeBar": False,
                                                                 },
-                                                            )
-                                                        ]
+                                                            ),
+                                                        ],
                                                     ),
-                                                ]
-                                            )
+                                                ],
+                                            ),
                                         ],
                                         width=8,
                                     ),
@@ -50,11 +50,11 @@ def create_dashboard_page() -> dbc.Container:
                                                                     "height": "300px",
                                                                     "overflowY": "auto",
                                                                 },
-                                                            )
-                                                        ]
+                                                            ),
+                                                        ],
                                                     ),
-                                                ]
-                                            )
+                                                ],
+                                            ),
                                         ],
                                         width=4,
                                     ),
@@ -68,20 +68,20 @@ def create_dashboard_page() -> dbc.Container:
                                             dbc.Card(
                                                 [
                                                     dbc.CardHeader(
-                                                        "Entity Distribution"
+                                                        "Entity Distribution",
                                                     ),
                                                     dbc.CardBody(
                                                         [
                                                             dcc.Graph(
                                                                 id="entity-distribution-chart",
                                                                 config={
-                                                                    "displayModeBar": False
+                                                                    "displayModeBar": False,
                                                                 },
-                                                            )
-                                                        ]
+                                                            ),
+                                                        ],
                                                     ),
-                                                ]
-                                            )
+                                                ],
+                                            ),
                                         ],
                                         width=6,
                                     ),
@@ -95,23 +95,23 @@ def create_dashboard_page() -> dbc.Container:
                                                             dcc.Graph(
                                                                 id="validation-status-chart",
                                                                 config={
-                                                                    "displayModeBar": False
+                                                                    "displayModeBar": False,
                                                                 },
-                                                            )
-                                                        ]
+                                                            ),
+                                                        ],
                                                     ),
-                                                ]
-                                            )
+                                                ],
+                                            ),
                                         ],
                                         width=6,
                                     ),
-                                ]
+                                ],
                             ),
                         ],
                         width=9,
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         fluid=True,
     )

@@ -9,12 +9,12 @@ from datetime import datetime
 from uuid import UUID
 
 from src.domain.entities.user_data_source import (
-    UserDataSource,
-    SourceType,
-    SourceStatus,
     IngestionSchedule,
     QualityMetrics,
     SourceConfiguration,
+    SourceStatus,
+    SourceType,
+    UserDataSource,
 )
 from src.models.database import UserDataSourceModel
 

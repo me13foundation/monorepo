@@ -4,17 +4,15 @@ Common functionality for domain services.
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Optional, TYPE_CHECKING
-from sqlalchemy.orm import Session
+from typing import Generic, TypeVar
 
-if TYPE_CHECKING:
-    pass
+from sqlalchemy.orm import Session
 
 # RepositoryT represents the repository type used by the service
 RepositoryT = TypeVar("RepositoryT")
 
 
-class BaseService(Generic[RepositoryT], ABC):
+class BaseService(ABC, Generic[RepositoryT]):
     """
     Base class for domain services providing common functionality.
 
@@ -22,7 +20,7 @@ class BaseService(Generic[RepositoryT], ABC):
     and provides common operations like transaction management.
     """
 
-    def __init__(self, session: Optional[Session] = None) -> None:
+    def __init__(self, session: Session | None = None) -> None:
         """Initialize service with optional session."""
         self._session = session
 
@@ -30,7 +28,6 @@ class BaseService(Generic[RepositoryT], ABC):
     @abstractmethod
     def repository(self) -> RepositoryT:
         """Return the repository instance for this service."""
-        pass
 
     def commit(self) -> None:
         """Commit current transaction."""

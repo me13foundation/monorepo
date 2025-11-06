@@ -2,12 +2,12 @@
 File upload handling for Zenodo deposits.
 """
 
-from pathlib import Path
-from typing import List
 import logging
+from pathlib import Path
+
+from src.type_definitions.external_apis import ZenodoDepositResponse, ZenodoMetadata
 
 from .client import ZenodoClient
-from ....type_definitions.external_apis import ZenodoMetadata, ZenodoDepositResponse
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ class ZenodoUploader:
         self,
         package_path: Path,
         metadata: ZenodoMetadata,
+        *,
         include_subdirectories: bool = True,
     ) -> ZenodoDepositResponse:
         """
@@ -44,21 +45,27 @@ class ZenodoUploader:
         package_path = Path(package_path)
 
         if not package_path.exists():
-            raise ValueError(f"Package path does not exist: {package_path}")
+            message = f"Package path does not exist: {package_path}"
+            raise ValueError(message)
 
         # Collect files to upload
-        files_to_upload = self._collect_files(package_path, include_subdirectories)
-
-        # Create deposit and upload files
-        deposit = await self.client.create_deposit(
-            metadata=metadata, files=files_to_upload
+        files_to_upload = self._collect_files(
+            package_path,
+            include_subdirectories=include_subdirectories,
         )
 
-        return deposit
+        # Create deposit and upload files
+        return await self.client.create_deposit(
+            metadata=metadata,
+            files=files_to_upload,
+        )
 
     def _collect_files(
-        self, base_path: Path, include_subdirectories: bool
-    ) -> List[Path]:
+        self,
+        base_path: Path,
+        *,
+        include_subdirectories: bool,
+    ) -> list[Path]:
         """
         Collect files from package directory.
 
@@ -84,7 +91,7 @@ class ZenodoUploader:
 
     async def upload_files(
         self,
-        files: List[Path],
+        files: list[Path],
         metadata: ZenodoMetadata,
     ) -> ZenodoDepositResponse:
         """
@@ -100,9 +107,8 @@ class ZenodoUploader:
         # Validate files exist
         for file_path in files:
             if not Path(file_path).exists():
-                raise ValueError(f"File not found: {file_path}")
+                message = f"File not found: {file_path}"
+                raise ValueError(message)
 
         # Create deposit and upload
-        deposit = await self.client.create_deposit(metadata=metadata, files=files)
-
-        return deposit
+        return await self.client.create_deposit(metadata=metadata, files=files)

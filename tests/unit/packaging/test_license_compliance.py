@@ -3,11 +3,11 @@ Unit tests for license compliance checking.
 """
 
 from src.application.packaging.licenses.manager import (
-    LicenseManager,
     LicenseCompatibility,
+    LicenseManager,
 )
-from src.application.packaging.licenses.validator import LicenseValidator
 from src.application.packaging.licenses.manifest import LicenseManifestGenerator
+from src.application.packaging.licenses.validator import LicenseValidator
 
 
 class TestLicenseManager:
@@ -85,7 +85,8 @@ class TestLicenseManifestGenerator:
         ]
 
         manifest = LicenseManifestGenerator.generate_manifest(
-            package_license="CC-BY-4.0", source_licenses=sources
+            package_license="CC-BY-4.0",
+            source_licenses=sources,
         )
 
         assert manifest["package_license"] == "CC-BY-4.0"
@@ -99,7 +100,8 @@ class TestLicenseManifestGenerator:
         ]
 
         manifest = LicenseManifestGenerator.generate_manifest(
-            package_license="CC-BY-4.0", source_licenses=sources
+            package_license="CC-BY-4.0",
+            source_licenses=sources,
         )
 
         assert manifest["compliance"]["status"] == "non-compliant"

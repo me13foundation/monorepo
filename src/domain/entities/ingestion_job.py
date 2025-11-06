@@ -5,12 +5,12 @@ Ingestion jobs track the execution of data acquisition from user sources,
 providing monitoring, error handling, and provenance tracking.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.models.value_objects import Provenance
 
@@ -40,19 +40,22 @@ class JobMetrics(BaseModel):
     """Performance and result metrics for an ingestion job."""
 
     records_processed: int = Field(
-        default=0, description="Number of records successfully processed"
+        default=0,
+        description="Number of records successfully processed",
     )
     records_failed: int = Field(
-        default=0, description="Number of records that failed processing"
+        default=0,
+        description="Number of records that failed processing",
     )
     records_skipped: int = Field(default=0, description="Number of records skipped")
     bytes_processed: int = Field(default=0, description="Number of bytes processed")
     api_calls_made: int = Field(default=0, description="Number of API calls made")
 
-    duration_seconds: Optional[float] = Field(
-        None, description="Total job duration in seconds"
+    duration_seconds: float | None = Field(
+        None,
+        description="Total job duration in seconds",
     )
-    records_per_second: Optional[float] = Field(None, description="Processing rate")
+    records_per_second: float | None = Field(None, description="Processing rate")
 
     def calculate_rate(self) -> None:
         """Calculate processing rate if duration is available."""
@@ -79,12 +82,13 @@ class IngestionError(BaseModel):
 
     error_type: str = Field(..., description="Type of error that occurred")
     error_message: str = Field(..., description="Human-readable error message")
-    error_details: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional error details"
+    error_details: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional error details",
     )
-    record_id: Optional[str] = Field(None, description="ID of record that caused error")
+    record_id: str | None = Field(None, description="ID of record that caused error")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When error occurred",
     )
 
@@ -117,23 +121,27 @@ class IngestionJob(BaseModel):
 
     # Execution details
     trigger: IngestionTrigger = Field(..., description="What triggered this job")
-    triggered_by: Optional[UUID] = Field(
-        None, description="User who triggered the job (if applicable)"
+    triggered_by: UUID | None = Field(
+        None,
+        description="User who triggered the job (if applicable)",
     )
     triggered_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When job was triggered",
     )
 
     # Status and progress
     status: IngestionStatus = Field(
-        default=IngestionStatus.PENDING, description="Current job status"
+        default=IngestionStatus.PENDING,
+        description="Current job status",
     )
-    started_at: Optional[datetime] = Field(
-        None, description="When job execution started"
+    started_at: datetime | None = Field(
+        None,
+        description="When job execution started",
     )
-    completed_at: Optional[datetime] = Field(
-        None, description="When job execution completed"
+    completed_at: datetime | None = Field(
+        None,
+        description="When job execution completed",
     )
 
     # Results and metrics
@@ -149,31 +157,34 @@ class IngestionJob(BaseModel):
         ),
         description="Job performance metrics",
     )
-    errors: List[IngestionError] = Field(
-        default_factory=list, description="Errors encountered during execution"
+    errors: list[IngestionError] = Field(
+        default_factory=list,
+        description="Errors encountered during execution",
     )
 
     # Provenance and metadata
     provenance: Provenance = Field(..., description="Data provenance information")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional job metadata"
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional job metadata",
     )
 
     # Configuration snapshot (what was used for this job)
-    source_config_snapshot: Dict[str, Any] = Field(
-        default_factory=dict, description="Source configuration at job time"
+    source_config_snapshot: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Source configuration at job time",
     )
 
     def start_execution(self) -> "IngestionJob":
         """Create new instance with execution started."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return self.model_copy(
-            update={"status": IngestionStatus.RUNNING, "started_at": now}
+            update={"status": IngestionStatus.RUNNING, "started_at": now},
         )
 
     def complete_successfully(self, metrics: JobMetrics) -> "IngestionJob":
         """Create new instance with successful completion."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         updated_metrics = metrics.model_copy()
         updated_metrics.calculate_rate()
 
@@ -182,29 +193,29 @@ class IngestionJob(BaseModel):
                 "status": IngestionStatus.COMPLETED,
                 "completed_at": now,
                 "metrics": updated_metrics,
-            }
+            },
         )
 
     def fail(self, error: IngestionError) -> "IngestionJob":
         """Create new instance with failure status."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return self.model_copy(
             update={
                 "status": IngestionStatus.FAILED,
                 "completed_at": now,
-                "errors": self.errors + [error],
-            }
+                "errors": [*self.errors, error],
+            },
         )
 
     def add_error(self, error: IngestionError) -> "IngestionJob":
         """Create new instance with additional error."""
-        return self.model_copy(update={"errors": self.errors + [error]})
+        return self.model_copy(update={"errors": [*self.errors, error]})
 
     def cancel(self) -> "IngestionJob":
         """Create new instance with cancelled status."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return self.model_copy(
-            update={"status": IngestionStatus.CANCELLED, "completed_at": now}
+            update={"status": IngestionStatus.CANCELLED, "completed_at": now},
         )
 
     def update_metrics(self, metrics: JobMetrics) -> "IngestionJob":
@@ -229,7 +240,7 @@ class IngestionJob(BaseModel):
         ]
 
     @property
-    def duration(self) -> Optional[float]:
+    def duration(self) -> float | None:
         """Get job duration in seconds."""
         if self.started_at and self.completed_at:
             return (self.completed_at - self.started_at).total_seconds()

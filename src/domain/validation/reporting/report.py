@@ -6,7 +6,7 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from .dashboard import ValidationDashboard
 from .error_reporting import ErrorReporter, ErrorSummary
@@ -19,12 +19,12 @@ class ValidationReport:
     title: str
     generated_at: datetime
     time_range_hours: int
-    executive_summary: Dict[str, Any]
-    detailed_findings: Dict[str, Any]
-    recommendations: List[str]
+    executive_summary: dict[str, Any]
+    detailed_findings: dict[str, Any]
+    recommendations: list[str]
     data_quality_score: float
     system_health_score: float
-    appendices: Dict[str, Any]
+    appendices: dict[str, Any]
 
 
 class ValidationReportGenerator:
@@ -40,12 +40,13 @@ class ValidationReportGenerator:
         self._counter = 0
 
     def generate_executive_report(
-        self, time_range_hours: int = 168
+        self,
+        time_range_hours: int = 168,
     ) -> ValidationReport:
         dashboard_data = self._dashboard.get_dashboard_data(force_refresh=True)
         quality_report = self._metrics.get_performance_report(time_range_hours)
         error_summary = self._errors.get_error_summary(
-            time_range_hours=time_range_hours
+            time_range_hours=time_range_hours,
         )
 
         executive_summary = {
@@ -76,7 +77,8 @@ class ValidationReportGenerator:
             detailed_findings=detailed_findings,
             recommendations=recommendations,
             data_quality_score=dashboard_data.quality_metrics.get(
-                "quality_score", {}
+                "quality_score",
+                {},
             ).get("average", 0.0),
             system_health_score=dashboard_data.system_health,
             appendices=appendices,
@@ -114,14 +116,18 @@ class ValidationReportGenerator:
             detailed_findings=detailed_findings,
             recommendations=recommendations,
             data_quality_score=dashboard_data.quality_metrics.get(
-                "quality_score", {}
+                "quality_score",
+                {},
             ).get("average", 0.0),
             system_health_score=dashboard_data.system_health,
             appendices=appendices,
         )
 
     def export_report(
-        self, report: ValidationReport, path: str, format: str = "json"
+        self,
+        report: ValidationReport,
+        path: str,
+        output_format: str = "json",
     ) -> None:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -129,19 +135,17 @@ class ValidationReportGenerator:
         payload = asdict(report)
         payload["generated_at"] = report.generated_at.isoformat()
 
-        if format.lower() == "json":
+        if output_format.lower() == "json":
             target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             return
 
-        if format.lower() == "html":
-            html = """<html><body><h1>{title}</h1><pre>{content}</pre></body></html>""".format(
-                title=report.title,
-                content=json.dumps(payload, indent=2),
-            )
+        if output_format.lower() == "html":
+            html = f"""<html><body><h1>{report.title}</h1><pre>{json.dumps(payload, indent=2)}</pre></body></html>"""
             target.write_text(html, encoding="utf-8")
             return
 
-        raise ValueError(f"Unsupported export format: {format}")
+        msg = f"Unsupported export format: {output_format}"
+        raise ValueError(msg)
 
     # ------------------------------------------------------------------ #
     # Helpers
@@ -152,15 +156,15 @@ class ValidationReportGenerator:
         return f"{prefix.upper()}-{self._counter:05d}"
 
     @staticmethod
-    def _build_recommendations(summary: ErrorSummary) -> List[str]:
-        recommendations: List[str] = []
+    def _build_recommendations(summary: ErrorSummary) -> list[str]:
+        recommendations: list[str] = []
         if summary.total_errors == 0:
             recommendations.append(
-                "Maintain current validation configuration; no blocking issues detected."
+                "Maintain current validation configuration; no blocking issues detected.",
             )
         else:
             recommendations.append(
-                "Review critical validation errors and schedule remediation work."
+                "Review critical validation errors and schedule remediation work.",
             )
         return recommendations
 

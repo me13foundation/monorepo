@@ -5,9 +5,10 @@ Implements API key-based authentication with role-based access control.
 """
 
 import os
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from fastapi import Request, HTTPException, status
+from fastapi import HTTPException, Request, status
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
@@ -19,13 +20,13 @@ class APIKeyAuth:
     def __init__(self) -> None:
         self.api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
         # In production, these would come from environment variables or a database
-        self.valid_api_keys: Dict[str, str] = {
+        self.valid_api_keys: dict[str, str] = {
             os.getenv("ADMIN_API_KEY", "admin-key-123"): "admin",
             os.getenv("READ_API_KEY", "read-key-456"): "read",
             os.getenv("WRITE_API_KEY", "write-key-789"): "write",
         }
 
-    async def authenticate(self, request: Request) -> Optional[str]:
+    async def authenticate(self, request: Request) -> str | None:
         """
         Authenticate the request using API key.
 
@@ -36,8 +37,7 @@ class APIKeyAuth:
         if not api_key:
             return None
 
-        role = self.valid_api_keys.get(api_key)
-        return role
+        return self.valid_api_keys.get(api_key)
 
     def require_role(self, required_role: str) -> Callable[[Request], Awaitable[str]]:
         """
@@ -75,11 +75,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
     def __init__(
         self,
         app: Callable[..., Any],
-        exclude_paths: Optional[List[str]] = None,
+        exclude_paths: list[str] | None = None,
     ) -> None:
         super().__init__(app)
         self.auth = APIKeyAuth()
-        self.exclude_paths: List[str] = exclude_paths or [
+        self.exclude_paths: list[str] = exclude_paths or [
             "/health/",
             "/docs",
             "/openapi.json",
@@ -87,7 +87,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         ]
 
     async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+        self,
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         """Process each request through authentication middleware."""
 
@@ -121,8 +123,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Add user info to request state
         request.state.user_role = role
 
-        response = await call_next(request)
-        return response
+        return await call_next(request)
 
 
 # Global auth instance

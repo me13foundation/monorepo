@@ -6,13 +6,13 @@ data sources, ensuring consistency and interoperability.
 """
 
 from .gene_normalizer import GeneNormalizer
-from .variant_normalizer import VariantNormalizer
 from .phenotype_normalizer import PhenotypeNormalizer
 from .publication_normalizer import PublicationNormalizer
+from .variant_normalizer import VariantNormalizer
 
 __all__ = [
     "GeneNormalizer",
-    "VariantNormalizer",
     "PhenotypeNormalizer",
     "PublicationNormalizer",
+    "VariantNormalizer",
 ]

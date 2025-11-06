@@ -3,9 +3,9 @@ Value objects for standardized biomedical identifiers.
 Immutable objects with validation for MED13 domain identifiers.
 """
 
-from typing import Optional
 import re
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class GeneIdentifier(BaseModel):
@@ -23,9 +23,9 @@ class GeneIdentifier(BaseModel):
     symbol: str = Field(..., min_length=1, max_length=20)
 
     # External identifiers with specific formats
-    ensembl_id: Optional[str] = Field(None, pattern=r"^ENSG[0-9]+$")
-    ncbi_gene_id: Optional[int] = Field(None, ge=1)
-    uniprot_id: Optional[str] = Field(None, pattern=r"^[A-Z0-9_-]+$")
+    ensembl_id: str | None = Field(None, pattern=r"^ENSG[0-9]+$")
+    ncbi_gene_id: int | None = Field(None, ge=1)
+    uniprot_id: str | None = Field(None, pattern=r"^[A-Z0-9_-]+$")
 
     @field_validator("symbol")
     @classmethod
@@ -56,16 +56,16 @@ class VariantIdentifier(BaseModel):
 
     # Primary identifiers
     variant_id: str = Field(..., min_length=1, max_length=100)
-    clinvar_id: Optional[str] = Field(None, pattern=r"^VCV[0-9]+$")
+    clinvar_id: str | None = Field(None, pattern=r"^VCV[0-9]+$")
 
     # HGVS notation - validated formats
-    hgvs_genomic: Optional[str] = Field(None, max_length=500)
-    hgvs_protein: Optional[str] = Field(None, max_length=500)
-    hgvs_cdna: Optional[str] = Field(None, max_length=500)
+    hgvs_genomic: str | None = Field(None, max_length=500)
+    hgvs_protein: str | None = Field(None, max_length=500)
+    hgvs_cdna: str | None = Field(None, max_length=500)
 
     @field_validator("hgvs_genomic", "hgvs_protein", "hgvs_cdna")
     @classmethod
-    def validate_hgvs_format(cls, v: Optional[str]) -> Optional[str]:
+    def validate_hgvs_format(cls, v: str | None) -> str | None:
         """Basic HGVS format validation."""
         if v is None:
             return v
@@ -99,7 +99,8 @@ class PhenotypeIdentifier(BaseModel):
     def validate_hpo_format(cls, v: str) -> str:
         """Ensure HPO ID follows standard format."""
         if not re.match(r"^HP:[0-9]{7}$", v):
-            raise ValueError("HPO ID must be in format HP:#######")
+            message = "HPO ID must be in format HP:#######"
+            raise ValueError(message)
         return v
 
     def __str__(self) -> str:
@@ -118,19 +119,20 @@ class PublicationIdentifier(BaseModel):
     model_config = ConfigDict(frozen=True)  # Immutable
 
     # Publication identifiers
-    pubmed_id: Optional[str] = Field(None, pattern=r"^[0-9]+$")
-    pmc_id: Optional[str] = Field(None, pattern=r"^PMC[0-9]+$")
-    doi: Optional[str] = Field(None, max_length=100)
+    pubmed_id: str | None = Field(None, pattern=r"^[0-9]+$")
+    pmc_id: str | None = Field(None, pattern=r"^PMC[0-9]+$")
+    doi: str | None = Field(None, max_length=100)
 
     @field_validator("doi")
     @classmethod
-    def validate_doi_format(cls, v: Optional[str]) -> Optional[str]:
+    def validate_doi_format(cls, v: str | None) -> str | None:
         """Basic DOI format validation."""
         if v is None:
             return v
         # Basic DOI pattern (simplified)
         if not re.match(r"^(10\.\d{4,9}/[-._;()/:A-Z0-9]+)$", v.upper()):
-            raise ValueError("DOI must be in standard format (10.xxxx/...)")
+            message = "DOI must be in standard format (10.xxxx/...)"
+            raise ValueError(message)
         return v
 
     def get_primary_id(self) -> str:

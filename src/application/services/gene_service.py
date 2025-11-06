@@ -1,6 +1,6 @@
 """Application-level orchestration for gene use cases."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.domain.entities.gene import Gene
 from src.domain.entities.variant import VariantSummary
@@ -37,20 +37,20 @@ class GeneApplicationService:
         self._gene_domain_service = gene_domain_service
         self._variant_repository = variant_repository
 
-    def create_gene(
+    def create_gene(  # noqa: PLR0913 - explicit domain fields
         self,
         symbol: str,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
         gene_type: str = "protein_coding",
-        gene_id: Optional[str] = None,
-        chromosome: Optional[str] = None,
-        start_position: Optional[int] = None,
-        end_position: Optional[int] = None,
-        ensembl_id: Optional[str] = None,
-        ncbi_gene_id: Optional[int] = None,
-        uniprot_id: Optional[str] = None,
-        provenance: Optional[Provenance] = None,
+        gene_id: str | None = None,
+        chromosome: str | None = None,
+        start_position: int | None = None,
+        end_position: int | None = None,
+        ensembl_id: str | None = None,
+        ncbi_gene_id: int | None = None,
+        uniprot_id: str | None = None,
+        provenance: Provenance | None = None,
     ) -> Gene:
         """
         Create a new gene with validation and business rules.
@@ -76,9 +76,13 @@ class GeneApplicationService:
             ValueError: If validation fails
         """
         # Validate positions if both are provided
-        if start_position is not None and end_position is not None:
-            if end_position < start_position:
-                raise ValueError("End position must be greater than start position")
+        if (
+            start_position is not None
+            and end_position is not None
+            and end_position < start_position
+        ):
+            msg = "End position must be greater than start position"
+            raise ValueError(msg)
 
         normalized_symbol = symbol.upper()
         gene_identifier = gene_id or normalized_symbol
@@ -101,15 +105,18 @@ class GeneApplicationService:
 
         # Apply domain business logic
         gene_entity = self._gene_domain_service.apply_business_logic(
-            gene_entity, "create"
+            gene_entity,
+            "create",
         )
 
         # Validate business rules
         errors = self._gene_domain_service.validate_business_rules(
-            gene_entity, "create"
+            gene_entity,
+            "create",
         )
         if errors:
-            raise ValueError(f"Business rule violations: {', '.join(errors)}")
+            msg = "Business rule violations: " + ", ".join(errors)
+            raise ValueError(msg)
 
         # Persist the entity
         return self._gene_repository.create(gene_entity)
@@ -120,8 +127,8 @@ class GeneApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        search: Optional[str] = None,
-    ) -> Tuple[List[Gene], int]:
+        search: str | None = None,
+    ) -> tuple[list[Gene], int]:
         """Retrieve paginated genes with optional search."""
         return self._gene_repository.paginate_genes(
             page=page,
@@ -131,15 +138,15 @@ class GeneApplicationService:
             search=search,
         )
 
-    def get_gene_by_id(self, gene_id: str) -> Optional[Gene]:
+    def get_gene_by_id(self, gene_id: str) -> Gene | None:
         """Retrieve a gene by its public gene identifier."""
         return self._gene_repository.find_by_gene_id(gene_id)
 
-    def get_gene_by_symbol(self, symbol: str) -> Optional[Gene]:
+    def get_gene_by_symbol(self, symbol: str) -> Gene | None:
         """Retrieve a gene by its symbol."""
         return self._gene_repository.find_by_symbol(symbol.upper())
 
-    def find_gene_by_identifier(self, identifier: GeneIdentifier) -> Optional[Gene]:
+    def find_gene_by_identifier(self, identifier: GeneIdentifier) -> Gene | None:
         """
         Find a gene by its identifier (supports multiple ID types).
 
@@ -162,14 +169,14 @@ class GeneApplicationService:
             gene = self._gene_repository.find_by_external_id(identifier.ensembl_id)
         if not gene and identifier.ncbi_gene_id:
             gene = self._gene_repository.find_by_external_id(
-                str(identifier.ncbi_gene_id)
+                str(identifier.ncbi_gene_id),
             )
         if not gene and identifier.uniprot_id:
             gene = self._gene_repository.find_by_external_id(identifier.uniprot_id)
 
         return gene
 
-    def get_gene_with_variants(self, gene_id: int) -> Optional[Gene]:
+    def get_gene_with_variants(self, gene_id: int) -> Gene | None:
         """
         Get a gene with its associated variants loaded.
 
@@ -190,14 +197,16 @@ class GeneApplicationService:
                     chromosome=getattr(variant, "chromosome", ""),
                     position=getattr(variant, "position", 0),
                     clinical_significance=getattr(
-                        variant, "clinical_significance", None
+                        variant,
+                        "clinical_significance",
+                        None,
                     ),
                 )
                 for variant in variant_models
             ]
         return gene
 
-    def search_genes(self, query: str, limit: int = 10) -> List[Gene]:
+    def search_genes(self, query: str, limit: int = 10) -> list[Gene]:
         """
         Search genes by symbol or name.
 
@@ -210,7 +219,7 @@ class GeneApplicationService:
         """
         return self._gene_repository.search_by_name_or_symbol(query, limit)
 
-    def update_gene(self, gene_id: str, updates: Dict[str, Any]) -> Gene:
+    def update_gene(self, gene_id: str, updates: dict[str, Any]) -> Gene:
         """Update mutable gene fields by gene identifier."""
         gene = self._gene_repository.find_by_gene_id_or_fail(gene_id)
 
@@ -231,24 +240,24 @@ class GeneApplicationService:
         }
 
         if not sanitized_updates:
-            raise ValueError("No valid fields provided for update")
+            msg = "No valid fields provided for update"
+            raise ValueError(msg)
 
         gene_db_id = self._require_gene_db_id(gene)
         updated_gene = self._gene_repository.update(gene_db_id, sanitized_updates)
 
         # Apply domain business logic to updated entity
-        updated_gene = self._gene_domain_service.apply_business_logic(
-            updated_gene, "update"
+        return self._gene_domain_service.apply_business_logic(
+            updated_gene,
+            "update",
         )
-
-        return updated_gene
 
     def update_gene_locations(
         self,
         gene_id: int,
-        chromosome: Optional[str] = None,
-        start_position: Optional[int] = None,
-        end_position: Optional[int] = None,
+        chromosome: str | None = None,
+        start_position: int | None = None,
+        end_position: int | None = None,
     ) -> Gene:
         """
         Update gene genomic location information.
@@ -266,11 +275,15 @@ class GeneApplicationService:
             ValueError: If positions are invalid
         """
         # Validate positions
-        if start_position is not None and end_position is not None:
-            if end_position < start_position:
-                raise ValueError("End position must be greater than start position")
+        if (
+            start_position is not None
+            and end_position is not None
+            and end_position < start_position
+        ):
+            msg = "End position must be greater than start position"
+            raise ValueError(msg)
 
-        updates: Dict[str, Any] = {}
+        updates: dict[str, Any] = {}
         if chromosome is not None:
             updates["chromosome"] = chromosome
         if start_position is not None:
@@ -279,7 +292,8 @@ class GeneApplicationService:
             updates["end_position"] = end_position
 
         if not updates:
-            raise ValueError("No location updates provided")
+            msg = "No location updates provided"
+            raise ValueError(msg)
 
         return self._gene_repository.update(gene_id, updates)
 
@@ -289,7 +303,7 @@ class GeneApplicationService:
         gene_db_id = self._require_gene_db_id(gene)
         self._gene_repository.delete(gene_db_id)
 
-    def get_gene_variants(self, gene_id: str) -> List[VariantSummary]:
+    def get_gene_variants(self, gene_id: str) -> list[VariantSummary]:
         """Return serialized variants associated with a gene."""
         gene = self._gene_repository.find_by_gene_id(gene_id)
         if gene is None:
@@ -308,7 +322,7 @@ class GeneApplicationService:
             for variant in variant_models
         ]
 
-    def get_gene_phenotypes(self, gene_id: str) -> List[Dict[str, str]]:
+    def get_gene_phenotypes(self, _gene_id: str) -> list[dict[str, str]]:
         """Return related phenotypes for a gene (placeholder implementation)."""
         # Phenotype relationships are not yet modeled; return empty list for now.
         return []
@@ -323,8 +337,9 @@ class GeneApplicationService:
         return bool(variants)
 
     def get_gene_statistics(
-        self, gene_id: Optional[str] = None
-    ) -> Dict[str, int | float | bool | str | None]:
+        self,
+        gene_id: str | None = None,
+    ) -> dict[str, int | float | bool | str | None]:
         """
         Get comprehensive statistics about genes.
 
@@ -342,11 +357,12 @@ class GeneApplicationService:
                 "has_location": gene.chromosome is not None,
             }
 
-        stats_raw: Dict[str, Any] = self._gene_repository.get_gene_statistics()
-        stats: Dict[str, int | float | bool | str | None] = {}
-        for key, value in stats_raw.items():
-            if isinstance(value, (int, float, bool, str)) or value is None:
-                stats[key] = value
+        stats_raw: dict[str, Any] = self._gene_repository.get_gene_statistics()
+        stats: dict[str, int | float | bool | str | None] = {
+            key: value
+            for key, value in stats_raw.items()
+            if isinstance(value, (int, float, bool, str)) or value is None
+        }
 
         total_genes = self._coerce_int(stats_raw.get("total_genes"))
         stats["total_genes"] = total_genes
@@ -372,8 +388,9 @@ class GeneApplicationService:
         return self._gene_repository.exists(gene_id)
 
     def get_gene_summary(
-        self, gene_id: int
-    ) -> Optional[Dict[str, int | float | bool | str | None]]:
+        self,
+        gene_id: int,
+    ) -> dict[str, int | float | bool | str | None] | None:
         """
         Get a summary of gene information including variant counts.
 
@@ -405,7 +422,8 @@ class GeneApplicationService:
 
     def _require_gene_db_id(self, gene: Gene) -> int:
         if gene.id is None:
-            raise ValueError("Gene is not persisted and lacks a database id")
+            msg = "Gene is not persisted and lacks a database id"
+            raise ValueError(msg)
         return gene.id
 
     @staticmethod

@@ -4,14 +4,15 @@ Gene API routes for MED13 Resource Library.
 RESTful endpoints for gene management with CRUD operations.
 """
 
-from typing import Optional, Dict, Any, TYPE_CHECKING
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import TYPE_CHECKING, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from src.database.session import get_session
 from src.application.container import get_legacy_dependency_container
+from src.database.session import get_session
+from src.models.api import GeneCreate, GeneResponse, GeneUpdate, PaginatedResponse
 from src.routes.serializers import serialize_gene
-from src.models.api import GeneResponse, GeneCreate, GeneUpdate, PaginatedResponse
 
 if TYPE_CHECKING:
     from src.application.services.gene_service import GeneApplicationService
@@ -31,7 +32,7 @@ def get_gene_service(db: Session = Depends(get_session)) -> "GeneApplicationServ
 async def get_genes(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    search: Optional[str] = Query(None, description="Search by gene symbol or name"),
+    search: str | None = Query(None, description="Search by gene symbol or name"),
     sort_by: str = Query("symbol", description="Sort field"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
     service: "GeneApplicationService" = Depends(get_gene_service),
@@ -70,7 +71,8 @@ async def get_genes(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve genes: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve genes: {e!s}",
         )
 
 
@@ -79,7 +81,8 @@ async def get_gene(
     gene_id: str,
     include_variants: bool = Query(False, description="Include associated variants"),
     include_phenotypes: bool = Query(
-        False, description="Include associated phenotypes"
+        False,
+        description="Include associated phenotypes",
     ),
     service: "GeneApplicationService" = Depends(get_gene_service),
 ) -> GeneResponse:
@@ -115,12 +118,16 @@ async def get_gene(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve gene: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve gene: {e!s}",
         )
 
 
 @router.post(
-    "/", summary="Create new gene", response_model=GeneResponse, status_code=201
+    "/",
+    summary="Create new gene",
+    response_model=GeneResponse,
+    status_code=201,
 )
 async def create_gene(
     gene: GeneCreate,
@@ -137,7 +144,8 @@ async def create_gene(
         existing = service.get_gene_by_symbol(gene.symbol)
         if existing:
             raise HTTPException(
-                status_code=409, detail=f"Gene with symbol {gene.symbol} already exists"
+                status_code=409,
+                detail=f"Gene with symbol {gene.symbol} already exists",
             )
 
         created_gene = service.create_gene(
@@ -159,7 +167,7 @@ async def create_gene(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to create gene: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create gene: {e!s}")
 
 
 @router.put("/{gene_id}", summary="Update gene", response_model=GeneResponse)
@@ -190,7 +198,7 @@ async def update_gene(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to update gene: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update gene: {e!s}")
 
 
 @router.delete("/{gene_id}", summary="Delete gene", status_code=204)
@@ -218,19 +226,19 @@ async def delete_gene(
             )
 
         service.delete_gene(gene_id)
-        return None
+        return
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete gene: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete gene: {e!s}")
 
 
 @router.get("/{gene_id}/statistics", summary="Get gene statistics")
 async def get_gene_statistics(
     gene_id: str,
     service: "GeneApplicationService" = Depends(get_gene_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve statistics for a specific gene.
 
@@ -250,5 +258,6 @@ async def get_gene_statistics(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve gene statistics: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve gene statistics: {e!s}",
         )

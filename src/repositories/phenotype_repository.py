@@ -3,16 +3,18 @@ Phenotype repository for MED13 Resource Library.
 Data access layer for clinical phenotype entities with HPO queries.
 """
 
-from typing import List, Optional, Dict, Any
-from sqlalchemy import select, or_
+from typing import Any
 
-from .base import BaseRepository, NotFoundError
+from sqlalchemy import or_, select
+
 from src.models.database import (
-    PhenotypeModel,
-    PhenotypeCategory,
     EvidenceModel,
+    PhenotypeCategory,
+    PhenotypeModel,
     VariantModel,
 )
+
+from .base import BaseRepository, NotFoundError
 
 
 class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
@@ -27,7 +29,7 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
     def model_class(self) -> type[PhenotypeModel]:
         return PhenotypeModel
 
-    def find_by_hpo_id(self, hpo_id: str) -> Optional[PhenotypeModel]:
+    def find_by_hpo_id(self, hpo_id: str) -> PhenotypeModel | None:
         """
         Find a phenotype by its HPO ID.
 
@@ -40,7 +42,7 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
         stmt = select(PhenotypeModel).where(PhenotypeModel.hpo_id == hpo_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def find_by_hpo_term(self, hpo_term: str) -> List[PhenotypeModel]:
+    def find_by_hpo_term(self, hpo_term: str) -> list[PhenotypeModel]:
         """
         Find phenotypes by HPO term (partial match).
 
@@ -52,13 +54,15 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
         """
         search_pattern = f"%{hpo_term}%"
         stmt = select(PhenotypeModel).where(
-            PhenotypeModel.hpo_term.ilike(search_pattern)
+            PhenotypeModel.hpo_term.ilike(search_pattern),
         )
         return list(self.session.execute(stmt).scalars())
 
     def find_by_category(
-        self, category: PhenotypeCategory, limit: Optional[int] = None
-    ) -> List[PhenotypeModel]:
+        self,
+        category: PhenotypeCategory,
+        limit: int | None = None,
+    ) -> list[PhenotypeModel]:
         """
         Find phenotypes in a specific category.
 
@@ -74,7 +78,7 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
-    def find_root_terms(self) -> List[PhenotypeModel]:
+    def find_root_terms(self) -> list[PhenotypeModel]:
         """
         Find root HPO terms (terms with no parent).
 
@@ -84,7 +88,7 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
         stmt = select(PhenotypeModel).where(PhenotypeModel.is_root_term)
         return list(self.session.execute(stmt).scalars())
 
-    def find_children(self, parent_hpo_id: str) -> List[PhenotypeModel]:
+    def find_children(self, parent_hpo_id: str) -> list[PhenotypeModel]:
         """
         Find child phenotypes of a parent HPO term.
 
@@ -95,11 +99,11 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
             List of child PhenotypeModel instances
         """
         stmt = select(PhenotypeModel).where(
-            PhenotypeModel.parent_hpo_id == parent_hpo_id
+            PhenotypeModel.parent_hpo_id == parent_hpo_id,
         )
         return list(self.session.execute(stmt).scalars())
 
-    def find_with_evidence(self, phenotype_id: int) -> Optional[PhenotypeModel]:
+    def find_with_evidence(self, phenotype_id: int) -> PhenotypeModel | None:
         """
         Find a phenotype with its associated evidence loaded.
 
@@ -112,7 +116,7 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
         stmt = select(PhenotypeModel).where(PhenotypeModel.id == phenotype_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def search_phenotypes(self, query: str, limit: int = 20) -> List[PhenotypeModel]:
+    def search_phenotypes(self, query: str, limit: int = 20) -> list[PhenotypeModel]:
         """
         Search phenotypes by name, definition, or synonyms.
 
@@ -131,13 +135,13 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
                     PhenotypeModel.name.ilike(search_pattern),
                     PhenotypeModel.definition.ilike(search_pattern),
                     PhenotypeModel.synonyms.ilike(search_pattern),
-                )
+                ),
             )
             .limit(limit)
         )
         return list(self.session.execute(stmt).scalars())
 
-    def get_phenotype_statistics(self) -> Dict[str, Any]:
+    def get_phenotype_statistics(self) -> dict[str, Any]:
         """
         Get statistics about phenotypes in the database.
 
@@ -168,10 +172,11 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
         """
         phenotype = self.find_by_hpo_id(hpo_id)
         if phenotype is None:
-            raise NotFoundError(f"Phenotype with HPO ID '{hpo_id}' not found")
+            message = f"Phenotype with HPO ID '{hpo_id}' not found"
+            raise NotFoundError(message)
         return phenotype
 
-    def find_by_variant_associations(self, variant_id: int) -> List[PhenotypeModel]:
+    def find_by_variant_associations(self, variant_id: int) -> list[PhenotypeModel]:
         """
         Find phenotypes linked to a variant via evidence associations.
         """
@@ -183,7 +188,7 @@ class PhenotypeRepository(BaseRepository[PhenotypeModel, int]):
         ).distinct()
         return list(self.session.execute(stmt).scalars())
 
-    def find_by_gene_associations(self, gene_id: int) -> List[PhenotypeModel]:
+    def find_by_gene_associations(self, gene_id: int) -> list[PhenotypeModel]:
         """
         Find phenotypes indirectly associated with a gene via variants.
         """

@@ -2,12 +2,15 @@
 Provenance tracking utilities for packaging.
 """
 
-from datetime import datetime, UTC
-from typing import Dict, Any, List
-from pathlib import Path
-import json
+from __future__ import annotations
 
-from src.models.value_objects.provenance import Provenance
+import json
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from src.models.value_objects.provenance import Provenance
 
 
 class ProvenanceTracker:
@@ -15,8 +18,8 @@ class ProvenanceTracker:
 
     @staticmethod
     def serialize_provenance(
-        provenance_records: List[Provenance],
-    ) -> Dict[str, Any]:
+        provenance_records: list[Provenance],
+    ) -> dict[str, Any]:
         """
         Serialize provenance records to JSON-LD format.
 
@@ -26,10 +29,10 @@ class ProvenanceTracker:
         Returns:
             Serialized provenance dictionary
         """
-        sources: List[Dict[str, Any]] = []
+        sources: list[dict[str, Any]] = []
 
         for prov in provenance_records:
-            source_info: Dict[str, Any] = {
+            source_info: dict[str, Any] = {
                 "@type": "DataDownload",
                 "name": prov.source.value,
                 "datePublished": (
@@ -60,7 +63,7 @@ class ProvenanceTracker:
 
     @staticmethod
     def write_provenance_metadata(
-        provenance_records: List[Provenance],
+        provenance_records: list[Provenance],
         output_path: Path,
     ) -> None:
         """
@@ -75,14 +78,14 @@ class ProvenanceTracker:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
-        with open(output_path, "w", encoding="utf-8") as f:
+        with output_path.open("w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
 
     @staticmethod
     def enrich_with_provenance(
-        metadata: Dict[str, Any],
-        provenance_records: List[Provenance],
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any],
+        provenance_records: list[Provenance],
+    ) -> dict[str, Any]:
         """
         Enrich metadata dictionary with provenance information.
 

@@ -5,10 +5,10 @@ Validates that all required fields are present and meet minimum
 quality thresholds for data completeness.
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from typing import Any
 
-from ..rules.base_rules import ValidationResult, ValidationIssue, ValidationSeverity
+from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
 
 @dataclass
@@ -20,7 +20,7 @@ class CompletenessValidator:
     minimum completeness requirements.
     """
 
-    def __init__(self, required_fields: Optional[Dict[str, List[str]]] = None):
+    def __init__(self, required_fields: dict[str, list[str]] | None = None):
         """Initialize with required fields by entity type."""
         self.required_fields = required_fields or {
             "gene": ["symbol", "name"],
@@ -31,7 +31,9 @@ class CompletenessValidator:
         }
 
     def validate_required_fields(
-        self, entity_data: Dict[str, Any], entity_type: str
+        self,
+        entity_data: dict[str, Any],
+        entity_type: str,
     ) -> ValidationResult:
         """Validate that all required fields are present."""
         issues = []
@@ -46,7 +48,7 @@ class CompletenessValidator:
                         rule="required_field",
                         message=f"Required field '{field}' is missing",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
             elif isinstance(entity_data[field], str) and not entity_data[field].strip():
                 issues.append(
@@ -56,13 +58,16 @@ class CompletenessValidator:
                         rule="required_field",
                         message=f"Required field '{field}' is empty",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_data_coverage(
-        self, entity_data: Dict[str, Any], entity_type: str, min_coverage: float = 0.8
+        self,
+        entity_data: dict[str, Any],
+        _entity_type: str,
+        min_coverage: float = 0.8,
     ) -> ValidationResult:
         """Validate data coverage meets minimum threshold."""
         issues = []
@@ -76,13 +81,13 @@ class CompletenessValidator:
                     rule="data_coverage",
                     message="No data fields provided",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
             return ValidationResult(is_valid=False, issues=issues)
 
         # Count non-null, non-empty fields
         filled_fields = 0
-        for key, value in entity_data.items():
+        for value in entity_data.values():
             if value is not None:
                 if isinstance(value, str):
                     if value.strip():
@@ -102,13 +107,15 @@ class CompletenessValidator:
                     rule="data_coverage",
                     message=f"Data coverage {coverage:.1%} below minimum threshold {min_coverage:.1%}",
                     severity=ValidationSeverity.WARNING,
-                )
+                ),
             )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_relationship_completeness(
-        self, entity_data: Dict[str, Any], entity_type: str
+        self,
+        entity_data: dict[str, Any],
+        entity_type: str,
     ) -> ValidationResult:
         """Validate that relationships are properly established."""
         issues = []
@@ -127,7 +134,7 @@ class CompletenessValidator:
                         rule="relationship_completeness",
                         message="Gene should have associated variants, phenotypes, or evidence",
                         severity=ValidationSeverity.WARNING,
-                    )
+                    ),
                 )
 
         elif entity_type == "variant":
@@ -141,7 +148,7 @@ class CompletenessValidator:
                         rule="relationship_completeness",
                         message="Variant must be associated with at least one gene",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
         elif entity_type == "evidence":
@@ -155,13 +162,15 @@ class CompletenessValidator:
                         rule="relationship_completeness",
                         message="Evidence must reference source entities",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_quality_thresholds(
-        self, entity_data: Dict[str, Any], quality_scores: Dict[str, float]
+        self,
+        entity_data: dict[str, Any],
+        quality_scores: dict[str, float],
     ) -> ValidationResult:
         """Validate quality scores meet thresholds."""
         issues = []
@@ -177,7 +186,7 @@ class CompletenessValidator:
                             rule="quality_threshold",
                             message=f"Quality score {score} below minimum threshold {min_score}",
                             severity=ValidationSeverity.WARNING,
-                        )
+                        ),
                     )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)

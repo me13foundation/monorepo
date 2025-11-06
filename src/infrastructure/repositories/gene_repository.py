@@ -5,23 +5,25 @@ Data access layer for gene entities with specialized queries.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select, or_, func, asc, desc, update, delete
-from sqlalchemy.orm import Session
+from sqlalchemy import asc, delete, desc, func, or_, select, update
 
-from src.domain.entities.gene import Gene
 from src.domain.repositories.gene_repository import (
     GeneRepository as GeneRepositoryInterface,
 )
-from src.domain.repositories.base import QuerySpecification
-from src.domain.value_objects.identifiers import GeneIdentifier
-from src.type_definitions.common import GeneUpdate
 from src.infrastructure.mappers.gene_mapper import GeneMapper
 from src.models.database import GeneModel
 
 if TYPE_CHECKING:
-    pass
+    from src.type_definitions.common import GeneUpdate
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from sqlalchemy.orm import Session
+
+    from src.domain.entities.gene import Gene
+    from src.domain.repositories.base import QuerySpecification
+    from src.domain.value_objects.identifiers import GeneIdentifier
 
 
 class SqlAlchemyGeneRepository(GeneRepositoryInterface):
@@ -32,14 +34,15 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
     symbol-based lookups, external ID searches, and relationship queries.
     """
 
-    def __init__(self, session: Optional[Session] = None) -> None:
+    def __init__(self, session: Session | None = None) -> None:
         self._session = session
 
     @property
     def session(self) -> Session:
         """Get the current database session."""
         if self._session is None:
-            raise ValueError("Session not provided")
+            message = "Session not provided"
+            raise ValueError(message)
         return self._session
 
     def create(self, gene: Gene) -> Gene:
@@ -55,8 +58,8 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        search: Optional[str] = None,
-    ) -> Tuple[List[Gene], int]:
+        search: str | None = None,
+    ) -> tuple[list[Gene], int]:
         """
         Retrieve paginated genes with optional search and sorting.
 
@@ -102,7 +105,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
 
         return GeneMapper.to_domain_sequence(models), int(total)
 
-    def find_by_gene_id(self, gene_id: str) -> Optional[Gene]:
+    def find_by_gene_id(self, gene_id: str) -> Gene | None:
         """
         Find a gene by its gene_id.
 
@@ -116,7 +119,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         model = self.session.execute(stmt).scalar_one_or_none()
         return GeneMapper.to_domain(model) if model else None
 
-    def find_by_symbol(self, symbol: str) -> Optional[Gene]:
+    def find_by_symbol(self, symbol: str) -> Gene | None:
         """
         Find a gene by its symbol (case-insensitive).
 
@@ -130,7 +133,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         model = self.session.execute(stmt).scalar_one_or_none()
         return GeneMapper.to_domain(model) if model else None
 
-    def find_by_external_id(self, external_id: str) -> Optional[Gene]:
+    def find_by_external_id(self, external_id: str) -> Gene | None:
         """
         Find a gene by any external identifier (Ensembl, NCBI, UniProt).
 
@@ -166,7 +169,8 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         """
         gene = self.find_by_gene_id(gene_id)
         if gene is None:
-            raise ValueError(f"Gene with gene_id '{gene_id}' not found")
+            message = f"Gene with gene_id '{gene_id}' not found"
+            raise ValueError(message)
         return gene
 
     def find_by_symbol_or_fail(self, symbol: str) -> Gene:
@@ -184,10 +188,11 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         """
         gene = self.find_by_symbol(symbol)
         if gene is None:
-            raise ValueError(f"Gene with symbol '{symbol}' not found")
+            message = f"Gene with symbol '{symbol}' not found"
+            raise ValueError(message)
         return gene
 
-    def get_by_id(self, gene_id: int) -> Optional[Gene]:
+    def get_by_id(self, gene_id: int) -> Gene | None:
         """Get gene by database ID."""
         stmt = select(GeneModel).where(GeneModel.id == gene_id)
         model = self.session.execute(stmt).scalar_one_or_none()
@@ -197,12 +202,15 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         """Get gene by database ID, raising exception if not found."""
         gene = self.get_by_id(gene_id)
         if gene is None:
-            raise ValueError(f"Gene with id '{gene_id}' not found")
+            message = f"Gene with id '{gene_id}' not found"
+            raise ValueError(message)
         return gene
 
     def find_all(
-        self, limit: Optional[int] = None, offset: Optional[int] = None
-    ) -> List[Gene]:
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[Gene]:
         """Get all genes with optional pagination."""
         stmt = select(GeneModel)
         if offset:
@@ -212,7 +220,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         models = list(self.session.execute(stmt).scalars())
         return GeneMapper.to_domain_sequence(models)
 
-    def update(self, gene_id: int, updates: Dict[str, Any]) -> Gene:
+    def update(self, gene_id: int, updates: dict[str, Any]) -> Gene:
         """Update a gene by ID."""
         stmt = update(GeneModel).where(GeneModel.id == gene_id).values(**updates)
         self.session.execute(stmt)
@@ -236,7 +244,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         count = self.session.execute(stmt).scalar_one()
         return count > 0
 
-    def get_gene_statistics(self) -> Dict[str, Any]:
+    def get_gene_statistics(self) -> dict[str, Any]:
         """Get statistics about genes in the database."""
         total_genes = self.count()
         return {
@@ -245,7 +253,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
             "genes_with_phenotypes": 0,  # Would need a complex join query
         }
 
-    def search_by_name_or_symbol(self, query: str, limit: int = 10) -> List[Gene]:
+    def search_by_name_or_symbol(self, query: str, limit: int = 10) -> list[Gene]:
         """Search genes by name or symbol containing the query string."""
         search_pattern = f"%{query}%"
         stmt = (
@@ -254,7 +262,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
                 or_(
                     GeneModel.symbol.ilike(search_pattern),
                     GeneModel.name.ilike(search_pattern),
-                )
+                ),
             )
             .limit(limit)
         )
@@ -267,13 +275,12 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         return self.session.execute(stmt).scalar_one()
 
     # Required interface implementations
-    def find_by_criteria(self, spec: QuerySpecification) -> List[Gene]:
+    def find_by_criteria(self, spec: QuerySpecification) -> list[Gene]:
         """Find genes by query specification."""
         # Simplified implementation - would need more complex query building
-        models = self.find_all(limit=spec.limit, offset=spec.offset)
-        return models
+        return self.find_all(limit=spec.limit, offset=spec.offset)
 
-    def find_by_identifier(self, identifier: GeneIdentifier) -> Optional[Gene]:
+    def find_by_identifier(self, identifier: GeneIdentifier) -> Gene | None:
         """Find a gene by its identifier (supports multiple ID types)."""
         # Try different ID types in order of preference
         gene = self.find_by_gene_id(identifier.gene_id)
@@ -293,7 +300,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
 
         return gene
 
-    def find_with_variants(self, gene_id: int) -> Optional[Gene]:
+    def find_with_variants(self, gene_id: int) -> Gene | None:
         """Find a gene with its associated variants loaded."""
         stmt = select(GeneModel).where(GeneModel.id == gene_id)
         model = self.session.execute(stmt).scalar_one_or_none()

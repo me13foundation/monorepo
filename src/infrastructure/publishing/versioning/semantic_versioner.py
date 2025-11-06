@@ -3,7 +3,6 @@ Semantic versioning for releases.
 """
 
 import re
-from typing import Optional, Tuple
 from enum import Enum
 
 
@@ -19,13 +18,13 @@ class SemanticVersioner:
     """Manage semantic versioning for releases."""
 
     VERSION_PATTERN = re.compile(
-        r"^(\d+)\.(\d+)\.(\d+)(?:-([\w\.-]+))?(?:\+([\w\.-]+))?$"
+        r"^(\d+)\.(\d+)\.(\d+)(?:-([\w\.-]+))?(?:\+([\w\.-]+))?$",
     )
 
     @staticmethod
     def parse_version(
         version: str,
-    ) -> Tuple[int, int, int, Optional[str], Optional[str]]:
+    ) -> tuple[int, int, int, str | None, str | None]:
         """
         Parse semantic version string.
 
@@ -37,7 +36,8 @@ class SemanticVersioner:
         """
         match = SemanticVersioner.VERSION_PATTERN.match(version)
         if not match:
-            raise ValueError(f"Invalid version format: {version}")
+            message = f"Invalid version format: {version}"
+            raise ValueError(message)
 
         major, minor, patch, prerelease, build = match.groups()
         return (
@@ -60,8 +60,8 @@ class SemanticVersioner:
         Returns:
             New version string
         """
-        major, minor, patch, prerelease, build = SemanticVersioner.parse_version(
-            current_version
+        major, minor, patch, _prerelease, _build = SemanticVersioner.parse_version(
+            current_version,
         )
 
         if version_type == VersionType.MAJOR:
@@ -75,9 +75,7 @@ class SemanticVersioner:
             patch += 1
 
         # Reset prerelease and build for new versions
-        new_version = f"{major}.{minor}.{patch}"
-
-        return new_version
+        return f"{major}.{minor}.{patch}"
 
     @staticmethod
     def validate_version(version: str) -> bool:
@@ -117,7 +115,7 @@ class SemanticVersioner:
         return 0
 
     @staticmethod
-    def get_latest_version(versions: list[str]) -> Optional[str]:
+    def get_latest_version(versions: list[str]) -> str | None:
         """
         Get latest version from a list.
 
@@ -131,6 +129,7 @@ class SemanticVersioner:
             return None
 
         sorted_versions = sorted(
-            versions, key=lambda v: SemanticVersioner.parse_version(v)[:3]
+            versions,
+            key=lambda v: SemanticVersioner.parse_version(v)[:3],
         )
         return sorted_versions[-1]

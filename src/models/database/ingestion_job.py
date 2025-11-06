@@ -5,10 +5,12 @@ Database representation of data ingestion job executions with
 relationships and constraints for the Data Sources module.
 """
 
-from typing import Optional, Dict, Any, List, TYPE_CHECKING
-from sqlalchemy import String, JSON, Enum as SQLEnum, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import TYPE_CHECKING, Any
+
+from sqlalchemy import JSON, ForeignKey, String
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
@@ -60,10 +62,13 @@ class IngestionJobModel(Base):
 
     # Execution details
     trigger: Mapped[IngestionTriggerEnum] = mapped_column(
-        IngestionTriggerEnum, nullable=False
+        IngestionTriggerEnum,
+        nullable=False,
     )
-    triggered_by: Mapped[Optional[str]] = mapped_column(
-        PGUUID(as_uuid=False), nullable=True, index=True
+    triggered_by: Mapped[str | None] = mapped_column(
+        PGUUID(as_uuid=False),
+        nullable=True,
+        index=True,
     )
     triggered_at: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
 
@@ -74,31 +79,40 @@ class IngestionJobModel(Base):
         default=IngestionStatusEnum.PENDING,
         index=True,
     )
-    started_at: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
-    completed_at: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    started_at: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    completed_at: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     # Results and metrics
-    metrics: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
-    errors: Mapped[List[Dict[str, Any]]] = mapped_column(
-        JSON, nullable=False, default=list
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    errors: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
     )
 
     # Provenance and metadata
-    provenance: Mapped[Dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default=dict
+    provenance: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
     )
-    job_metadata: Mapped[Dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default=dict
+    job_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
     )
 
     # Configuration snapshot
-    source_config_snapshot: Mapped[Dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default=dict
+    source_config_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
     )
 
     # Relationships
     source: Mapped["UserDataSourceModel"] = relationship(
-        "UserDataSourceModel", back_populates="ingestion_jobs"
+        "UserDataSourceModel",
+        back_populates="ingestion_jobs",
     )
 
     def __repr__(self) -> str:

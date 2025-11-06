@@ -5,30 +5,36 @@ These endpoints provide administrative functionality for managing users,
 data sources, system monitoring, and audit logging.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
+from src.application.services.data_source_authorization_service import (
+    DataSourceAuthorizationService,
+)
 from src.application.services.source_management_service import (
-    SourceManagementService,
     CreateSourceRequest,
+    SourceManagementService,
     UpdateSourceRequest,
 )
 from src.application.services.template_management_service import (
     TemplateManagementService,
 )
-from src.application.services.data_source_authorization_service import (
-    DataSourceAuthorizationService,
+from src.domain.entities.user_data_source import (
+    IngestionSchedule,
+    SourceConfiguration,
+    SourceStatus,
 )
-from src.domain.entities.user_data_source import SourceStatus
+from src.domain.entities.user_data_source import (
+    SourceType as DomainSourceType,
+)
 from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
 )
-from sqlalchemy.orm import Session
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 # Create router
 router = APIRouter(
@@ -59,13 +65,14 @@ def get_source_service() -> SourceManagementService:
     user_repo = SqlAlchemyUserDataSourceRepository(session)
     # TODO: Create template repository when needed
     # For now, pass None - this will need to be fixed when template functionality is implemented
-    return SourceManagementService(user_repo, None)  # type: ignore
+    return SourceManagementService(user_repo, None)  # type: ignore[arg-type]
 
 
 def get_template_service() -> TemplateManagementService:
     """Get template management service instance."""
     # TODO: Implement proper template service
-    raise NotImplementedError("Template service not yet implemented")
+    message = "Template service not yet implemented"
+    raise NotImplementedError(message)
 
 
 async def get_auth_service() -> DataSourceAuthorizationService:
@@ -78,26 +85,29 @@ class CreateDataSourceRequest(BaseModel):
     """Request model for creating a data source."""
 
     name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
+    description: str | None = Field(None, max_length=500)
     source_type: str = Field(..., pattern="^(api|file|database)$")
-    template_id: Optional[UUID] = None
-    config: Dict[str, Any] = Field(..., description="Data source configuration")
-    ingestion_schedule: Optional[Dict[str, Any]] = Field(
-        None, description="Ingestion schedule configuration"
+    template_id: UUID | None = None
+    config: dict[str, Any] = Field(..., description="Data source configuration")
+    ingestion_schedule: dict[str, Any] | None = Field(
+        None,
+        description="Ingestion schedule configuration",
     )
 
 
 class UpdateDataSourceRequest(BaseModel):
     """Request model for updating a data source."""
 
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = Field(None, max_length=500)
-    status: Optional[SourceStatus] = None
-    config: Optional[Dict[str, Any]] = Field(
-        None, description="Updated data source configuration"
+    name: str | None = Field(None, min_length=1, max_length=100)
+    description: str | None = Field(None, max_length=500)
+    status: SourceStatus | None = None
+    config: dict[str, Any] | None = Field(
+        None,
+        description="Updated data source configuration",
     )
-    ingestion_schedule: Optional[Dict[str, Any]] = Field(
-        None, description="Updated ingestion schedule"
+    ingestion_schedule: dict[str, Any] | None = Field(
+        None,
+        description="Updated ingestion schedule",
     )
 
 
@@ -107,14 +117,14 @@ class DataSourceResponse(BaseModel):
     id: UUID
     owner_id: UUID
     name: str
-    description: Optional[str]
+    description: str | None
     source_type: str
     status: SourceStatus
-    config: Dict[str, Any]
-    template_id: Optional[UUID]
-    ingestion_schedule: Optional[Dict[str, Any]]
-    quality_metrics: Optional[Dict[str, Any]]
-    last_ingested_at: Optional[str]
+    config: dict[str, Any]
+    template_id: UUID | None
+    ingestion_schedule: dict[str, Any] | None
+    quality_metrics: dict[str, Any] | None
+    last_ingested_at: str | None
     created_at: str
     updated_at: str
 
@@ -124,7 +134,7 @@ class DataSourceResponse(BaseModel):
 class DataSourceListResponse(BaseModel):
     """Response model for data source listing."""
 
-    data_sources: List[DataSourceResponse]
+    data_sources: list[DataSourceResponse]
     total: int
     page: int
     limit: int
@@ -148,7 +158,7 @@ class DataSourceStats(BaseModel):
     total_sources: int
     active_sources: int
     error_sources: int
-    sources_by_type: Dict[str, int]
+    sources_by_type: dict[str, int]
 
 
 # Routes
@@ -163,8 +173,8 @@ class DataSourceStats(BaseModel):
 async def list_data_sources(
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
-    status: Optional[SourceStatus] = Query(None, description="Filter by status"),
-    source_type: Optional[str] = Query(None, description="Filter by source type"),
+    status: SourceStatus | None = Query(None, description="Filter by status"),
+    source_type: str | None = Query(None, description="Filter by source type"),
     service: SourceManagementService = Depends(get_source_service),
 ) -> DataSourceListResponse:
     """List data sources with pagination and filtering."""
@@ -178,10 +188,6 @@ async def list_data_sources(
         if status:
             data_sources = [ds for ds in data_sources if ds.status == status]
         if source_type:
-            from src.domain.entities.user_data_source import (
-                SourceType as DomainSourceType,
-            )
-
             type_enum = DomainSourceType(source_type)
             data_sources = [ds for ds in data_sources if ds.source_type == type_enum]
 
@@ -203,7 +209,8 @@ async def list_data_sources(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to list data sources: {str(e)}"
+            status_code=500,
+            detail=f"Failed to list data sources: {e!s}",
         )
 
 
@@ -224,21 +231,8 @@ async def create_data_source(
         # TODO: Get current user from authentication context
         owner_id = UUID("00000000-0000-0000-0000-000000000001")  # Placeholder
 
-        # Check permissions (simplified for now - TODO: integrate with real auth)
-        # from src.application.services.data_source_authorization_service import DataSourcePermission
-        # if not auth_service.has_permission(owner_id, "admin", DataSourcePermission.CREATE_SOURCE):
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Insufficient permissions to create data sources"
-        #     )
-
         # Create the data source request
-        from src.domain.entities.user_data_source import SourceType as DomainSourceType
-
         source_type_enum = DomainSourceType(request.source_type)
-
-        # Convert config to SourceConfiguration
-        from src.domain.entities.user_data_source import SourceConfiguration
 
         config_obj = SourceConfiguration(**request.config)
 
@@ -260,7 +254,7 @@ async def create_data_source(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create data source: {str(e)}",
+            detail=f"Failed to create data source: {e!s}",
         )
 
 
@@ -279,7 +273,8 @@ async def get_data_source(
         data_source = service.get_source(source_id)
         if not data_source:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Data source not found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Data source not found",
             )
         return DataSourceResponse.model_validate(data_source)
     except HTTPException:
@@ -287,7 +282,7 @@ async def get_data_source(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get data source: {str(e)}",
+            detail=f"Failed to get data source: {e!s}",
         )
 
 
@@ -308,20 +303,7 @@ async def update_data_source(
         # TODO: Get current user from authentication context
         user_id = UUID("00000000-0000-0000-0000-000000000001")  # Placeholder
 
-        # Check permissions (simplified for now - TODO: integrate with real auth)
-        # from src.application.services.data_source_authorization_service import DataSourcePermission
-        # if not auth_service.has_permission(user_id, "admin", DataSourcePermission.UPDATE_SOURCE):
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Insufficient permissions to update data sources"
-        #     )
-
         # Create update request
-        from src.domain.entities.user_data_source import (
-            SourceConfiguration,
-            IngestionSchedule,
-        )
-
         update_request = UpdateSourceRequest(
             name=request.name,
             description=request.description,
@@ -340,7 +322,8 @@ async def update_data_source(
 
         if not data_source:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Data source not found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Data source not found",
             )
 
         return DataSourceResponse.model_validate(data_source)
@@ -349,7 +332,7 @@ async def update_data_source(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update data source: {str(e)}",
+            detail=f"Failed to update data source: {e!s}",
         )
 
 
@@ -369,25 +352,18 @@ async def delete_data_source(
         # TODO: Get current user from authentication context
         user_id = UUID("00000000-0000-0000-0000-000000000001")  # Placeholder
 
-        # Check permissions (simplified for now - TODO: integrate with real auth)
-        # from src.application.services.data_source_authorization_service import DataSourcePermission
-        # if not auth_service.has_permission(user_id, "admin", DataSourcePermission.DELETE_SOURCE):
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Insufficient permissions to delete data sources"
-        #     )
-
         success = service.delete_source(source_id, user_id)
         if not success:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Data source not found"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Data source not found",
             )
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete data source: {str(e)}",
+            detail=f"Failed to delete data source: {e!s}",
         )
 
 
@@ -406,7 +382,7 @@ async def get_system_stats(
         stats = service.get_statistics()
         data_sources = service.get_active_sources(0, 1000)
         active_sources = len(
-            [ds for ds in data_sources if ds.status == SourceStatus.ACTIVE]
+            [ds for ds in data_sources if ds.status == SourceStatus.ACTIVE],
         )
 
         return SystemStatsResponse(
@@ -419,7 +395,7 @@ async def get_system_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get system stats: {str(e)}",
+            detail=f"Failed to get system stats: {e!s}",
         )
 
 
@@ -441,13 +417,13 @@ async def get_data_source_stats(
         all_sources = service.get_active_sources(0, 1000)
         # TODO: Get sources by status when service supports it
         active_sources = len(
-            [ds for ds in all_sources if ds.status == SourceStatus.ACTIVE]
+            [ds for ds in all_sources if ds.status == SourceStatus.ACTIVE],
         )
         # For now, assume no error sources (TODO: add error status filtering)
         error_sources = 0
 
         # Count by type from all sources
-        sources_by_type: Dict[str, int] = {}
+        sources_by_type: dict[str, int] = {}
         for ds in all_sources:
             source_type = ds.source_type.value
             sources_by_type[source_type] = sources_by_type.get(source_type, 0) + 1
@@ -463,5 +439,5 @@ async def get_data_source_stats(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get data source stats: {str(e)}",
+            detail=f"Failed to get data source stats: {e!s}",
         )

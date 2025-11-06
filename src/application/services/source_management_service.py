@@ -5,34 +5,34 @@ Orchestrates domain services and repositories to implement
 data source management use cases with proper business logic.
 """
 
-from typing import List, Optional, Dict, Any
+from typing import Any
 from uuid import UUID
 
+from src.domain.entities.source_template import SourceTemplate
 from src.domain.entities.user_data_source import (
-    UserDataSource,
-    SourceType,
-    SourceStatus,
-    SourceConfiguration,
     IngestionSchedule,
     QualityMetrics,
+    SourceConfiguration,
+    SourceStatus,
+    SourceType,
+    UserDataSource,
 )
-from src.domain.entities.source_template import SourceTemplate
-from src.domain.repositories.user_data_source_repository import UserDataSourceRepository
 from src.domain.repositories.source_template_repository import SourceTemplateRepository
+from src.domain.repositories.user_data_source_repository import UserDataSourceRepository
 
 
 class CreateSourceRequest:
     """Request model for creating a new data source."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - explicit request fields for clarity
         self,
         owner_id: UUID,
         name: str,
         source_type: SourceType,
         description: str = "",
-        template_id: Optional[UUID] = None,
-        configuration: Optional[SourceConfiguration] = None,
-        tags: Optional[List[str]] = None,
+        template_id: UUID | None = None,
+        configuration: SourceConfiguration | None = None,
+        tags: list[str] | None = None,
     ):
         self.owner_id = owner_id
         self.name = name
@@ -57,11 +57,11 @@ class UpdateSourceRequest:
 
     def __init__(
         self,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
-        configuration: Optional[SourceConfiguration] = None,
-        ingestion_schedule: Optional[IngestionSchedule] = None,
-        tags: Optional[List[str]] = None,
+        name: str | None = None,
+        description: str | None = None,
+        configuration: SourceConfiguration | None = None,
+        ingestion_schedule: IngestionSchedule | None = None,
+        tags: list[str] | None = None,
     ):
         self.name = name
         self.description = description
@@ -110,9 +110,11 @@ class SourceManagementService:
         if request.template_id:
             template = self._template_repository.find_by_id(request.template_id)
             if not template:
-                raise ValueError(f"Template {request.template_id} not found")
+                msg = f"Template {request.template_id} not found"
+                raise ValueError(msg)
             if not template.is_available(request.owner_id):
-                raise ValueError(f"Template {request.template_id} is not available")
+                msg = f"Template {request.template_id} is not available"
+                raise ValueError(msg)
 
         # Create the source entity
         source = UserDataSource(
@@ -131,8 +133,10 @@ class SourceManagementService:
         return self._source_repository.save(source)
 
     def get_source(
-        self, source_id: UUID, owner_id: Optional[UUID] = None
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        owner_id: UUID | None = None,
+    ) -> UserDataSource | None:
         """
         Get a data source by ID.
 
@@ -149,8 +153,11 @@ class SourceManagementService:
         return source
 
     def get_user_sources(
-        self, owner_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        owner_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Get all data sources owned by a user.
 
@@ -165,8 +172,11 @@ class SourceManagementService:
         return self._source_repository.find_by_owner(owner_id, skip, limit)
 
     def update_source(
-        self, source_id: UUID, request: UpdateSourceRequest, owner_id: UUID
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        request: UpdateSourceRequest,
+        owner_id: UUID,
+    ) -> UserDataSource | None:
         """
         Update a data source.
 
@@ -189,13 +199,13 @@ class SourceManagementService:
             pass
         if request.description is not None:
             updated_source = updated_source.model_copy(
-                update={"description": request.description}
+                update={"description": request.description},
             )
         if request.configuration is not None:
             updated_source = updated_source.update_configuration(request.configuration)
         if request.ingestion_schedule is not None:
             updated_source = updated_source.model_copy(
-                update={"ingestion_schedule": request.ingestion_schedule}
+                update={"ingestion_schedule": request.ingestion_schedule},
             )
         if request.tags is not None:
             updated_source = updated_source.model_copy(update={"tags": request.tags})
@@ -220,8 +230,10 @@ class SourceManagementService:
         return self._source_repository.delete(source_id)
 
     def activate_source(
-        self, source_id: UUID, owner_id: UUID
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        owner_id: UUID,
+    ) -> UserDataSource | None:
         """
         Activate a data source for ingestion.
 
@@ -240,8 +252,10 @@ class SourceManagementService:
         return self._source_repository.save(activated_source)
 
     def deactivate_source(
-        self, source_id: UUID, owner_id: UUID
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        owner_id: UUID,
+    ) -> UserDataSource | None:
         """
         Deactivate a data source.
 
@@ -259,7 +273,7 @@ class SourceManagementService:
         deactivated_source = source.update_status(SourceStatus.INACTIVE)
         return self._source_repository.save(deactivated_source)
 
-    def record_ingestion_success(self, source_id: UUID) -> Optional[UserDataSource]:
+    def record_ingestion_success(self, source_id: UUID) -> UserDataSource | None:
         """
         Record successful data ingestion for a source.
 
@@ -272,8 +286,10 @@ class SourceManagementService:
         return self._source_repository.record_ingestion(source_id)
 
     def update_quality_metrics(
-        self, source_id: UUID, metrics: QualityMetrics
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        metrics: QualityMetrics,
+    ) -> UserDataSource | None:
         """
         Update quality metrics for a source.
 
@@ -287,8 +303,11 @@ class SourceManagementService:
         return self._source_repository.update_quality_metrics(source_id, metrics)
 
     def get_sources_by_type(
-        self, source_type: SourceType, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        source_type: SourceType,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Get sources by type.
 
@@ -303,8 +322,10 @@ class SourceManagementService:
         return self._source_repository.find_by_type(source_type, skip, limit)
 
     def get_active_sources(
-        self, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """
         Get all active sources.
 
@@ -320,10 +341,10 @@ class SourceManagementService:
     def search_sources(
         self,
         query: str,
-        owner_id: Optional[UUID] = None,
+        owner_id: UUID | None = None,
         skip: int = 0,
         limit: int = 50,
-    ) -> List[UserDataSource]:
+    ) -> list[UserDataSource]:
         """
         Search sources by name.
 
@@ -339,8 +360,11 @@ class SourceManagementService:
         return self._source_repository.search_by_name(query, owner_id, skip, limit)
 
     def get_available_templates(
-        self, user_id: Optional[UUID] = None, skip: int = 0, limit: int = 50
-    ) -> List[SourceTemplate]:
+        self,
+        user_id: UUID | None = None,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[SourceTemplate]:
         """
         Get templates available to a user.
 
@@ -354,7 +378,7 @@ class SourceManagementService:
         """
         return self._template_repository.find_available_for_user(user_id, skip, limit)
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get overall statistics about data sources.
 
@@ -363,7 +387,10 @@ class SourceManagementService:
         """
         return self._source_repository.get_statistics()
 
-    def validate_source_configuration(self, source: UserDataSource) -> List[str]:
+    def validate_source_configuration(  # noqa: C901 - validator is intentionally comprehensive
+        self,
+        source: UserDataSource,
+    ) -> list[str]:
         """
         Validate a source's configuration.
 
@@ -379,7 +406,8 @@ class SourceManagementService:
         if not source.name.strip():
             errors.append("Source name cannot be empty")
 
-        if len(source.name) > 200:
+        name_max_len = 200
+        if len(source.name) > name_max_len:
             errors.append("Source name cannot exceed 200 characters")
 
         # Type-specific validation
@@ -394,7 +422,8 @@ class SourceManagementService:
 
         elif source.source_type == SourceType.FILE_UPLOAD:
             if not source.configuration.file_path and not hasattr(
-                source.configuration, "uploaded_file"
+                source.configuration,
+                "uploaded_file",
             ):
                 errors.append("File upload sources require a file")
 
@@ -403,7 +432,7 @@ class SourceManagementService:
             template = self._template_repository.find_by_id(source.template_id)
             if not template:
                 errors.append(
-                    f"Referenced template {source.template_id} does not exist"
+                    f"Referenced template {source.template_id} does not exist",
                 )
             elif not template.is_available(source.owner_id):
                 errors.append(f"Template {source.template_id} is not available")

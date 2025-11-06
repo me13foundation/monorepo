@@ -10,21 +10,14 @@ strict MyPy settings.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import (
     Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
 )
 
-
-ValidationOutcome = Tuple[bool, str, Optional[str]]
+ValidationOutcome = tuple[bool, str, str | None]
 ValidatorFn = Callable[[Any], ValidationOutcome]
 
 
@@ -64,12 +57,12 @@ class ValidationIssue:
     rule: str
     message: str
     severity: ValidationSeverity
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
 
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
+    def get(self, key: str, default: Any | None = None) -> Any:
         return getattr(self, key, default)
 
 
@@ -78,7 +71,7 @@ class ValidationResult:
     """Collection of validation issues with a derived quality score."""
 
     is_valid: bool
-    issues: List[ValidationIssue]
+    issues: list[ValidationIssue]
     score: float = 0.0
 
 
@@ -87,18 +80,20 @@ class DataQualityValidator:
 
     def __init__(self, level: ValidationLevel = ValidationLevel.STANDARD):
         self.level = level
-        self._rules: Dict[str, List[ValidationRule]] = self._build_rules()
+        self._rules: dict[str, list[ValidationRule]] = self._build_rules()
 
     # --------------------------------------------------------------------- #
     # Public API
     # --------------------------------------------------------------------- #
 
     def validate_entity(
-        self, entity_type: str, payload: Dict[str, Any]
+        self,
+        entity_type: str,
+        payload: dict[str, Any],
     ) -> ValidationResult:
         """Validate a single entity payload and return the aggregated result."""
 
-        issues: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
 
         for rule in self._rules.get(entity_type, []):
             if not self._rule_is_applicable(rule):
@@ -116,7 +111,7 @@ class DataQualityValidator:
                         message=message,
                         severity=rule.severity,
                         suggestion=suggestion,
-                    )
+                    ),
                 )
 
         score = self._calculate_quality_score(issues)
@@ -127,8 +122,10 @@ class DataQualityValidator:
         return ValidationResult(is_valid=is_valid, issues=issues, score=score)
 
     def validate_batch(
-        self, entity_type: str, entities: Iterable[Dict[str, Any]]
-    ) -> List[ValidationResult]:
+        self,
+        entity_type: str,
+        entities: Iterable[dict[str, Any]],
+    ) -> list[ValidationResult]:
         """Validate a collection of entities."""
 
         return [self.validate_entity(entity_type, entity) for entity in entities]
@@ -137,7 +134,7 @@ class DataQualityValidator:
     # Rule construction helpers
     # --------------------------------------------------------------------- #
 
-    def _build_rules(self) -> Dict[str, List[ValidationRule]]:
+    def _build_rules(self) -> dict[str, list[ValidationRule]]:
         """Construct the validation rules we support."""
 
         return {
@@ -153,7 +150,9 @@ class DataQualityValidator:
                     field="confidence_score",
                     rule="confidence_score_range",
                     validator=lambda value: self._validate_numeric_range(
-                        value, 0.0, 1.0
+                        value,
+                        0.0,
+                        1.0,
                     ),
                     severity=ValidationSeverity.ERROR,
                     level=ValidationLevel.LAX,
@@ -171,7 +170,9 @@ class DataQualityValidator:
                     field="position",
                     rule="position_range",
                     validator=lambda value: self._validate_integer_range(
-                        value, 0, 1_000_000_000
+                        value,
+                        0,
+                        1_000_000_000,
                     ),
                     severity=ValidationSeverity.ERROR,
                     level=ValidationLevel.STANDARD,
@@ -203,7 +204,9 @@ class DataQualityValidator:
                     field="title",
                     rule="title_length",
                     validator=lambda value: self._validate_string_length(
-                        value, min_len=5, max_len=512
+                        value,
+                        min_len=5,
+                        max_len=512,
                     ),
                     severity=ValidationSeverity.ERROR,
                     level=ValidationLevel.STANDARD,
@@ -253,7 +256,9 @@ class DataQualityValidator:
 
     @staticmethod
     def _validate_numeric_range(
-        value: Any, minimum: float, maximum: float
+        value: Any,
+        minimum: float,
+        maximum: float,
     ) -> ValidationOutcome:
         if not isinstance(value, (int, float)):
             return (
@@ -274,7 +279,9 @@ class DataQualityValidator:
 
     @staticmethod
     def _validate_integer_range(
-        value: Any, minimum: int, maximum: int
+        value: Any,
+        minimum: int,
+        maximum: int,
     ) -> ValidationOutcome:
         if not isinstance(value, int):
             return (
@@ -334,7 +341,10 @@ class DataQualityValidator:
 
     @staticmethod
     def _validate_string_length(
-        value: Any, *, min_len: int = 0, max_len: int = 1024
+        value: Any,
+        *,
+        min_len: int = 0,
+        max_len: int = 1024,
     ) -> ValidationOutcome:
         if value is None:
             return (
@@ -388,7 +398,7 @@ class DataQualityValidator:
         return rule.level is ValidationLevel.LAX
 
     @staticmethod
-    def _calculate_quality_score(issues: List[ValidationIssue]) -> float:
+    def _calculate_quality_score(issues: list[ValidationIssue]) -> float:
         if not issues:
             return 1.0
 
@@ -403,21 +413,27 @@ class DataQualityValidator:
 
         return max(0.0, 1.0 - min(penalty, 1.0))
 
+    @staticmethod
+    def calculate_quality_score(issues: list[ValidationIssue]) -> float:
+        """Public wrapper for quality-score calculation."""
+        return DataQualityValidator._calculate_quality_score(issues)
+
 
 class ValidationRuleEngine:
     """Facade that coordinates rule validation across entity types."""
 
     def __init__(self, level: ValidationLevel = ValidationLevel.STANDARD):
         self.level = level
-        self.rule_registry: Dict[str, List[ValidationRule]] = self._load_default_rules()
+        self.rule_registry: dict[str, list[ValidationRule]] = self._load_default_rules()
 
     # ------------------------------------------------------------------ #
     # Public API
     # ------------------------------------------------------------------ #
 
     def get_available_rules(
-        self, entity_type: Optional[str] = None
-    ) -> Dict[str, List[ValidationRule]]:
+        self,
+        entity_type: str | None = None,
+    ) -> dict[str, list[ValidationRule]]:
         if entity_type is None:
             return {key: list(value) for key, value in self.rule_registry.items()}
         return {entity_type: list(self.rule_registry.get(entity_type, []))}
@@ -425,8 +441,8 @@ class ValidationRuleEngine:
     def validate_entity(
         self,
         entity_type: str,
-        entity_data: Dict[str, Any],
-        rule_names: Optional[Sequence[str]] = None,
+        entity_data: dict[str, Any],
+        rule_names: Sequence[str] | None = None,
     ) -> ValidationResult:
         rules = self._select_rules(entity_type, rule_names)
 
@@ -440,7 +456,7 @@ class ValidationRuleEngine:
             )
             return ValidationResult(is_valid=False, issues=[issue], score=0.0)
 
-        issues: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
         for rule in rules:
             if not self._rule_is_applicable(rule):
                 continue
@@ -460,10 +476,10 @@ class ValidationRuleEngine:
                         message=message,
                         severity=rule.severity,
                         suggestion=suggestion,
-                    )
+                    ),
                 )
 
-        score = DataQualityValidator._calculate_quality_score(issues)
+        score = DataQualityValidator.calculate_quality_score(issues)
         is_valid = not any(
             issue.severity is ValidationSeverity.ERROR for issue in issues
         )
@@ -472,9 +488,9 @@ class ValidationRuleEngine:
     def validate_batch(
         self,
         entity_type: str,
-        entities: Iterable[Dict[str, Any]],
-        rule_names: Optional[Sequence[str]] = None,
-    ) -> List[ValidationResult]:
+        entities: Iterable[dict[str, Any]],
+        rule_names: Sequence[str] | None = None,
+    ) -> list[ValidationResult]:
         return [
             self.validate_entity(entity_type, entity, rule_names) for entity in entities
         ]
@@ -483,7 +499,7 @@ class ValidationRuleEngine:
     # Internal helpers
     # ------------------------------------------------------------------ #
 
-    def _load_default_rules(self) -> Dict[str, List[ValidationRule]]:
+    def _load_default_rules(self) -> dict[str, list[ValidationRule]]:
         from .gene_rules import GeneValidationRules
         from .phenotype_rules import PhenotypeValidationRules
         from .publication_rules import PublicationValidationRules
@@ -502,8 +518,10 @@ class ValidationRuleEngine:
         }
 
     def _select_rules(
-        self, entity_type: str, rule_names: Optional[Sequence[str]]
-    ) -> List[ValidationRule]:
+        self,
+        entity_type: str,
+        rule_names: Sequence[str] | None,
+    ) -> list[ValidationRule]:
         rules = self.rule_registry.get(entity_type, [])
         if not rule_names:
             return list(rules)
@@ -525,6 +543,6 @@ __all__ = [
     "ValidationLevel",
     "ValidationResult",
     "ValidationRule",
-    "ValidationSeverity",
     "ValidationRuleEngine",
+    "ValidationSeverity",
 ]

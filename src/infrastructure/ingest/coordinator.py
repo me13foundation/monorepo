@@ -4,12 +4,15 @@ Orchestrates parallel data ingestion from multiple biomedical sources.
 """
 
 import asyncio
+import logging
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-import logging
+from typing import Any
+
+from src.models.value_objects import DataSource, Provenance
 
 from .base_ingestor import (
     BaseIngestor,
@@ -18,8 +21,8 @@ from .base_ingestor import (
     IngestionStatus,
 )
 from .clinvar_ingestor import ClinVarIngestor
-from .pubmed_ingestor import PubMedIngestor
 from .hpo_ingestor import HPOIngestor
+from .pubmed_ingestor import PubMedIngestor
 from .uniprot_ingestor import UniProtIngestor
 
 
@@ -39,7 +42,7 @@ class IngestionTask:
 
     source: str
     ingestor_class: Callable[[], BaseIngestor]
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
     priority: int = 1  # Lower number = higher priority
 
 
@@ -53,7 +56,7 @@ class CoordinatorResult:
     total_records: int
     total_errors: int
     duration_seconds: float
-    source_results: Dict[str, IngestionResult]
+    source_results: dict[str, IngestionResult]
     start_time: datetime
     end_time: datetime
     phase: IngestionPhase
@@ -70,17 +73,15 @@ class IngestionCoordinator:
     def __init__(
         self,
         max_concurrent_ingestors: int = 4,
-        enable_parallel: bool = True,
-        progress_callback: Optional[
-            Callable[[str, IngestionPhase, float], None]
-        ] = None,
+        enable_parallel: bool = True,  # noqa: FBT001, FBT002
+        progress_callback: Callable[[str, IngestionPhase, float], None] | None = None,
     ):
         self.max_concurrent_ingestors = max_concurrent_ingestors
         self.enable_parallel = enable_parallel
         self.progress_callback = progress_callback
 
         # Ingestion results storage
-        self.results: Dict[str, IngestionResult] = {}
+        self.results: dict[str, IngestionResult] = {}
 
         # Configure logging
         self.logger = logging.getLogger(__name__)
@@ -89,7 +90,9 @@ class IngestionCoordinator:
         self.executor = ThreadPoolExecutor(max_workers=max_concurrent_ingestors)
 
     async def coordinate_ingestion(
-        self, tasks: List[IngestionTask], **global_params: Any
+        self,
+        tasks: list[IngestionTask],
+        **global_params: Any,
     ) -> CoordinatorResult:
         """
         Coordinate ingestion across multiple data sources.
@@ -106,7 +109,7 @@ class IngestionCoordinator:
         # Update phase
         self._update_progress("all", IngestionPhase.INITIALIZING, 0.0)
 
-        global_params_dict: Dict[str, Any] = dict(global_params)
+        global_params_dict: dict[str, Any] = dict(global_params)
 
         try:
             # Sort tasks by priority
@@ -118,19 +121,15 @@ class IngestionCoordinator:
             else:
                 # Execute tasks sequentially
                 results = await self._execute_sequential(
-                    sorted_tasks, global_params_dict
+                    sorted_tasks,
+                    global_params_dict,
                 )
 
             # Aggregate results
             coordinator_result = self._aggregate_results(results, start_time)
 
-            # Update final phase
-            self._update_progress("all", IngestionPhase.COMPLETED, 100.0)
-
-            return coordinator_result
-
-        except Exception as e:
-            self.logger.error(f"Ingestion coordination failed: {str(e)}")
+        except Exception:
+            self.logger.exception("Ingestion coordination failed")
             # Return failed result
             return CoordinatorResult(
                 total_sources=len(tasks),
@@ -144,10 +143,16 @@ class IngestionCoordinator:
                 end_time=datetime.now(UTC),
                 phase=IngestionPhase.FAILED,
             )
+        else:
+            # Update final phase and return
+            self._update_progress("all", IngestionPhase.COMPLETED, 100.0)
+            return coordinator_result
 
     async def _execute_parallel(
-        self, tasks: List[IngestionTask], global_params: Dict[str, Any]
-    ) -> List[IngestionResult]:
+        self,
+        tasks: list[IngestionTask],
+        global_params: dict[str, Any],
+    ) -> list[IngestionResult]:
         """
         Execute ingestion tasks in parallel with concurrency control.
 
@@ -159,7 +164,7 @@ class IngestionCoordinator:
             List of ingestion results
         """
         semaphore = asyncio.Semaphore(self.max_concurrent_ingestors)
-        results: List[IngestionResult] = []
+        results: list[IngestionResult] = []
 
         async def execute_with_semaphore(task: IngestionTask) -> IngestionResult:
             async with semaphore:
@@ -169,11 +174,12 @@ class IngestionCoordinator:
         execution_tasks = [execute_with_semaphore(task) for task in tasks]
 
         # Execute with progress tracking
-        completed = 0
-        for coro in asyncio.as_completed(execution_tasks):
+        for completed, coro in enumerate(
+            asyncio.as_completed(execution_tasks),
+            start=1,
+        ):
             result = await coro
             results.append(result)
-            completed += 1
 
             # Update progress
             progress = (completed / len(tasks)) * 100
@@ -182,8 +188,10 @@ class IngestionCoordinator:
         return results
 
     async def _execute_sequential(
-        self, tasks: List[IngestionTask], global_params: Dict[str, Any]
-    ) -> List[IngestionResult]:
+        self,
+        tasks: list[IngestionTask],
+        global_params: dict[str, Any],
+    ) -> list[IngestionResult]:
         """
         Execute ingestion tasks sequentially.
 
@@ -194,7 +202,7 @@ class IngestionCoordinator:
         Returns:
             List of ingestion results
         """
-        results: List[IngestionResult] = []
+        results: list[IngestionResult] = []
 
         for i, task in enumerate(tasks):
             result = await self._execute_single_task(task, global_params)
@@ -207,7 +215,9 @@ class IngestionCoordinator:
         return results
 
     async def _execute_single_task(
-        self, task: IngestionTask, global_params: Dict[str, Any]
+        self,
+        task: IngestionTask,
+        global_params: dict[str, Any],
     ) -> IngestionResult:
         """
         Execute a single ingestion task.
@@ -220,10 +230,10 @@ class IngestionCoordinator:
             Ingestion result
         """
         try:
-            self.logger.info(f"Starting ingestion from {task.source}")
+            self.logger.info("Starting ingestion from %s", task.source)
 
             # Merge task parameters with global parameters
-            task_params: Dict[str, Any] = {**global_params, **task.parameters}
+            task_params: dict[str, Any] = {**global_params, **task.parameters}
 
             # Create and execute ingestor
             ingestor_instance: BaseIngestor = task.ingestor_class()
@@ -231,28 +241,26 @@ class IngestionCoordinator:
                 result = await ingestor.ingest(**task_params)
 
             self.logger.info(
-                f"Completed ingestion from {task.source}: "
-                f"{result.records_processed} records processed, "
-                f"{result.records_failed} failed"
+                "Completed ingestion from %s: %d records processed, %d failed",
+                task.source,
+                result.records_processed,
+                result.records_failed,
             )
 
             # Store result
             self.results[task.source] = result
-            return result
 
         except Exception as e:
-            self.logger.error(f"Ingestion failed for {task.source}: {str(e)}")
+            self.logger.exception("Ingestion failed for %s", task.source)
 
             # Return failed result
-            from src.models.value_objects import Provenance, DataSource
-
             failed_provenance = Provenance(
                 source=DataSource(task.source),
                 source_version=None,
                 source_url=None,
                 acquired_at=datetime.now(UTC),
                 acquired_by="MED13-Resource-Library-Coordinator",
-                processing_steps=[f"Failed ingestion: {str(e)}"],
+                processing_steps=[f"Failed ingestion: {e!s}"],
                 validation_status="failed",
                 quality_score=0.0,
             )
@@ -268,9 +276,13 @@ class IngestionCoordinator:
                 duration_seconds=0.0,
                 timestamp=datetime.now(UTC),
             )
+        else:
+            return result
 
     def _aggregate_results(
-        self, results: List[IngestionResult], start_time: datetime
+        self,
+        results: list[IngestionResult],
+        start_time: datetime,
     ) -> CoordinatorResult:
         """
         Aggregate results from multiple ingestion tasks.
@@ -308,14 +320,19 @@ class IngestionCoordinator:
         )
 
     def _update_progress(
-        self, source: str, phase: IngestionPhase, progress: float
+        self,
+        source: str,
+        phase: IngestionPhase,
+        progress: float,
     ) -> None:
         """Update progress if callback is provided."""
         if self.progress_callback:
             self.progress_callback(source, phase, progress)
 
     async def ingest_all_sources(
-        self, gene_symbol: str = "MED13", **global_params: Any
+        self,
+        gene_symbol: str = "MED13",
+        **global_params: Any,
     ) -> CoordinatorResult:
         """
         Convenience method to ingest from all available sources.
@@ -357,7 +374,9 @@ class IngestionCoordinator:
         return await self.coordinate_ingestion(tasks, **global_params)
 
     async def ingest_critical_sources_only(
-        self, gene_symbol: str = "MED13", **global_params: Any
+        self,
+        gene_symbol: str = "MED13",
+        **global_params: Any,
     ) -> CoordinatorResult:
         """
         Ingest only critical sources (ClinVar and UniProt) for faster execution.
@@ -386,7 +405,7 @@ class IngestionCoordinator:
 
         return await self.coordinate_ingestion(tasks, **global_params)
 
-    def get_ingestion_summary(self, result: CoordinatorResult) -> Dict[str, Any]:
+    def get_ingestion_summary(self, result: CoordinatorResult) -> dict[str, Any]:
         """
         Generate a summary of ingestion results.
 
@@ -396,7 +415,7 @@ class IngestionCoordinator:
         Returns:
             Summary dictionary
         """
-        source_details: Dict[str, Dict[str, Any]] = {}
+        source_details: dict[str, dict[str, Any]] = {}
 
         for source, source_result in result.source_results.items():
             source_details[source] = {
@@ -418,7 +437,7 @@ class IngestionCoordinator:
             else 0
         )
 
-        summary: Dict[str, Any] = {
+        summary: dict[str, Any] = {
             "total_sources": result.total_sources,
             "completed_sources": result.completed_sources,
             "failed_sources": result.failed_sources,
@@ -433,7 +452,9 @@ class IngestionCoordinator:
         return summary
 
     async def retry_failed_sources(
-        self, previous_result: CoordinatorResult, **retry_params: Any
+        self,
+        previous_result: CoordinatorResult,
+        **retry_params: Any,
     ) -> CoordinatorResult:
         """
         Retry ingestion for failed sources.
@@ -445,7 +466,7 @@ class IngestionCoordinator:
         Returns:
             New coordinated ingestion result
         """
-        failed_sources: List[str] = [
+        failed_sources: list[str] = [
             source
             for source, result in previous_result.source_results.items()
             if result.status.name == "FAILED"
@@ -455,11 +476,11 @@ class IngestionCoordinator:
             # No failures to retry
             return previous_result
 
-        self.logger.info(f"Retrying {len(failed_sources)} failed sources")
+        self.logger.info("Retrying %d failed sources", len(failed_sources))
 
         # Create retry tasks (would need to reconstruct original task parameters)
         # For now, create basic retry tasks
-        retry_tasks: List[IngestionTask] = []
+        retry_tasks: list[IngestionTask] = []
         for source in failed_sources:
             if source == "clinvar":
                 retry_tasks.append(
@@ -468,7 +489,7 @@ class IngestionCoordinator:
                         ingestor_class=ClinVarIngestor,
                         parameters={"gene_symbol": "MED13"},
                         priority=1,
-                    )
+                    ),
                 )
             elif source == "pubmed":
                 retry_tasks.append(
@@ -477,7 +498,7 @@ class IngestionCoordinator:
                         ingestor_class=PubMedIngestor,
                         parameters={"query": "MED13"},
                         priority=2,
-                    )
+                    ),
                 )
             elif source == "hpo":
                 retry_tasks.append(
@@ -486,7 +507,7 @@ class IngestionCoordinator:
                         ingestor_class=HPOIngestor,
                         parameters={"med13_only": True},
                         priority=3,
-                    )
+                    ),
                 )
             elif source == "uniprot":
                 retry_tasks.append(
@@ -495,7 +516,7 @@ class IngestionCoordinator:
                         ingestor_class=UniProtIngestor,
                         parameters={"query": "MED13"},
                         priority=1,
-                    )
+                    ),
                 )
 
         return await self.coordinate_ingestion(retry_tasks, **retry_params)

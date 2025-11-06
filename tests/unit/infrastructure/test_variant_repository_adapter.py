@@ -33,7 +33,8 @@ def persisted_gene(test_session):
 def test_variant_repository_creates_domain_variant(test_session, persisted_gene):
     repository = SqlAlchemyVariantRepository(test_session)
     gene_identifier = GeneIdentifier(
-        gene_id=persisted_gene.gene_id, symbol=persisted_gene.symbol
+        gene_id=persisted_gene.gene_id,
+        symbol=persisted_gene.symbol,
     )
 
     variant = Variant.create(

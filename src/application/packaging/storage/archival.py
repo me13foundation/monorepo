@@ -4,9 +4,8 @@ Storage and archival functionality for packages.
 
 import json
 import shutil
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional, List
 from zipfile import ZipFile
 
 
@@ -27,7 +26,7 @@ class PackageStorage:
         self,
         package_path: Path,
         version: str,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> Path:
         """
         Archive a package with versioning.
@@ -63,7 +62,7 @@ class PackageStorage:
         }
 
         metadata_path = archive_dir / "archive_metadata.json"
-        with open(metadata_path, "w", encoding="utf-8") as f:
+        with metadata_path.open("w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2)
 
         return archive_path
@@ -72,7 +71,7 @@ class PackageStorage:
         self,
         package_path: Path,
         version: str,
-        name: Optional[str] = None,
+        name: str | None = None,
     ) -> Path:
         """
         Create ZIP archive of package.
@@ -107,7 +106,7 @@ class PackageStorage:
 
         return zip_path
 
-    def list_versions(self, package_name: str) -> List[str]:
+    def list_versions(self, package_name: str) -> list[str]:
         """
         List all versions of a package.
 
@@ -121,14 +120,10 @@ class PackageStorage:
         if not package_dir.exists():
             return []
 
-        versions = []
-        for item in package_dir.iterdir():
-            if item.is_dir():
-                versions.append(item.name)
-
+        versions = [item.name for item in package_dir.iterdir() if item.is_dir()]
         return sorted(versions)
 
-    def get_latest_version(self, package_name: str) -> Optional[str]:
+    def get_latest_version(self, package_name: str) -> str | None:
         """
         Get latest version of a package.
 

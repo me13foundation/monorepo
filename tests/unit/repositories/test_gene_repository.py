@@ -8,6 +8,9 @@ from sqlalchemy.orm import sessionmaker
 
 from src.models.database import Base, GeneModel
 from src.repositories import GeneRepository
+from src.repositories.base import NotFoundError
+
+EXPECTED_TOTAL_GENES = 2
 
 
 @pytest.fixture
@@ -16,8 +19,8 @@ def test_session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
 
-    SessionLocal = sessionmaker(bind=engine)
-    session = SessionLocal()
+    session_local = sessionmaker(bind=engine)
+    session = session_local()
 
     try:
         yield session
@@ -172,7 +175,7 @@ class TestGeneRepository:
 
         # Check updated stats
         stats = repo.get_gene_statistics()
-        assert stats["total_genes"] == 2
+        assert stats["total_genes"] == EXPECTED_TOTAL_GENES
         # Note: Additional stats would need variant relationships to be meaningful
 
     def test_find_by_symbol_or_fail_success(self, test_session):
@@ -191,5 +194,5 @@ class TestGeneRepository:
         """Test find_by_symbol_or_fail with non-existent symbol."""
         repo = GeneRepository(test_session)
 
-        with pytest.raises(Exception):  # Should raise NotFoundError
+        with pytest.raises(NotFoundError):
             repo.find_by_symbol_or_fail("NONEXISTENT")

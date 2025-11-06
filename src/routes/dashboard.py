@@ -3,18 +3,19 @@ Dashboard API routes for the MED13 Resource Library.
 Provides statistics and activity feed endpoints for the curation dashboard.
 """
 
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Dict, Any
-from datetime import datetime, timedelta
 
 from src.database.session import get_session
 from src.infrastructure.repositories import (
-    SqlAlchemyGeneRepository,
-    SqlAlchemyVariantRepository,
-    SqlAlchemyPhenotypeRepository,
     SqlAlchemyEvidenceRepository,
+    SqlAlchemyGeneRepository,
+    SqlAlchemyPhenotypeRepository,
     SqlAlchemyPublicationRepository,
+    SqlAlchemyVariantRepository,
 )
 from src.routes.serializers import build_activity_feed_item, build_dashboard_summary
 
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/stats", tags=["dashboard"])
 
 
 @router.get("/dashboard", summary="Get dashboard statistics")
-async def get_dashboard_stats(db: Session = Depends(get_session)) -> Dict[str, Any]:
+async def get_dashboard_stats(db: Session = Depends(get_session)) -> dict[str, Any]:
     """
     Retrieve overall dashboard statistics.
 
@@ -86,14 +87,16 @@ async def get_dashboard_stats(db: Session = Depends(get_session)) -> Dict[str, A
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve dashboard statistics: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve dashboard statistics: {e!s}",
         )
 
 
 @router.get("/activities/recent", summary="Get recent activity feed")
 async def get_recent_activities(
-    db: Session = Depends(get_session), limit: int = 10
-) -> Dict[str, Any]:
+    db: Session = Depends(get_session),
+    limit: int = 10,
+) -> dict[str, Any]:
     """
     Retrieve recent activities for the dashboard activity feed.
 
@@ -103,7 +106,7 @@ async def get_recent_activities(
         # For now, return mock activities since we don't have an activity log yet
         # TODO: Implement activity tracking when audit log is added
 
-        now = datetime.now()
+        now = datetime.now(UTC)
         activities = [
             build_activity_feed_item(
                 "Gene BRCA1 validated",
@@ -144,5 +147,6 @@ async def get_recent_activities(
 
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve recent activities: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve recent activities: {e!s}",
         )

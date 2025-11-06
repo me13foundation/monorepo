@@ -5,15 +5,16 @@ SQLAlchemy model for user accounts with security fields and constraints.
 """
 
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import String, Boolean, Integer, TIMESTAMP, Enum as SQLEnum, Index
+from sqlalchemy import TIMESTAMP, Boolean, Index, Integer, String
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.domain.entities.user import UserRole, UserStatus
+
 from .base import Base
-from ...domain.entities.user import UserRole, UserStatus
 
 
 class UserModel(Base):
@@ -35,7 +36,11 @@ class UserModel(Base):
 
     # Authentication fields
     email: Mapped[str] = mapped_column(
-        String(255), unique=True, index=True, nullable=False, doc="User's email address"
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False,
+        doc="User's email address",
     )
     username: Mapped[str] = mapped_column(
         String(50),
@@ -45,10 +50,14 @@ class UserModel(Base):
         doc="Unique username for login",
     )
     full_name: Mapped[str] = mapped_column(
-        String(100), nullable=False, doc="User's full display name"
+        String(100),
+        nullable=False,
+        doc="User's full display name",
     )
     hashed_password: Mapped[str] = mapped_column(
-        String(255), nullable=False, doc="Bcrypt hashed password"
+        String(255),
+        nullable=False,
+        doc="Bcrypt hashed password",
     )
 
     # Authorization
@@ -69,24 +78,31 @@ class UserModel(Base):
 
     # Email verification
     email_verified: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, doc="Whether email has been verified"
+        Boolean,
+        nullable=False,
+        default=False,
+        doc="Whether email has been verified",
     )
-    email_verification_token: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, doc="Token for email verification"
+    email_verification_token: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        doc="Token for email verification",
     )
 
     # Password reset
-    password_reset_token: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, doc="Token for password reset"
+    password_reset_token: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        doc="Token for password reset",
     )
-    password_reset_expires: Mapped[Optional[datetime]] = mapped_column(
+    password_reset_expires: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=True,
         doc="Expiration time for password reset token",
     )
 
     # Security tracking
-    last_login: Mapped[Optional[datetime]] = mapped_column(
+    last_login: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=True,
         index=True,
@@ -98,8 +114,10 @@ class UserModel(Base):
         default=0,
         doc="Number of consecutive failed login attempts",
     )
-    locked_until: Mapped[Optional[datetime]] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=True, doc="Account lockout expiration time"
+    locked_until: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True,
+        doc="Account lockout expiration time",
     )
 
     # Override base audit fields for explicit control

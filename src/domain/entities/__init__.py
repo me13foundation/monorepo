@@ -6,56 +6,52 @@ These entities represent the core business objects and their relationships.
 
 from .evidence import Evidence
 from .gene import Gene
-from .phenotype import Phenotype
-from .publication import Publication
-from .variant import Variant
 
 # Data Sources module entities
 from .ingestion_job import (
+    IngestionError,
     IngestionJob,
     IngestionStatus,
     IngestionTrigger,
     JobMetrics,
-    IngestionError,
 )
+from .phenotype import Phenotype
+from .publication import Publication
 from .source_template import (
     SourceTemplate,
     TemplateCategory,
-    ValidationRule,
     TemplateUIConfig,
+    ValidationRule,
 )
 from .user_data_source import (
-    UserDataSource,
-    SourceType,
-    SourceStatus,
-    SourceConfiguration,
     IngestionSchedule,
     QualityMetrics,
+    SourceConfiguration,
+    SourceStatus,
+    SourceType,
+    UserDataSource,
 )
+from .variant import Variant
 
 __all__ = [
-    # Core entities
     "Evidence",
     "Gene",
-    "Phenotype",
-    "Publication",
-    "Variant",
-    # Data Sources entities
-    "UserDataSource",
-    "SourceTemplate",
+    "IngestionError",
     "IngestionJob",
-    # Enums and value objects
-    "SourceType",
-    "SourceStatus",
+    "IngestionSchedule",
     "IngestionStatus",
     "IngestionTrigger",
-    "TemplateCategory",
-    # Supporting models
-    "SourceConfiguration",
-    "IngestionSchedule",
-    "QualityMetrics",
     "JobMetrics",
-    "IngestionError",
-    "ValidationRule",
+    "Phenotype",
+    "Publication",
+    "QualityMetrics",
+    "SourceConfiguration",
+    "SourceStatus",
+    "SourceTemplate",
+    "SourceType",
+    "TemplateCategory",
     "TemplateUIConfig",
+    "UserDataSource",
+    "ValidationRule",
+    "Variant",
 ]

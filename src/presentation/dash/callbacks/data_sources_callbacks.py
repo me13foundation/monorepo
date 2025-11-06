@@ -4,8 +4,8 @@ Callbacks for the Data Sources management page.
 Handles source listing, creation, editing, monitoring, and template management.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime
+from typing import Any
 
 import dash_bootstrap_components as dbc
 from dash import Dash, Input, Output, State, ctx, html
@@ -13,7 +13,7 @@ from dash.development.base_component import Component
 from dash.exceptions import PreventUpdate
 
 
-def register_callbacks(app: Dash) -> None:
+def register_callbacks(app: Dash) -> None:  # noqa: C901
     """Register all data sources page callbacks."""
 
     # Main page data loading - using dummy data for now
@@ -30,9 +30,9 @@ def register_callbacks(app: Dash) -> None:
         Input("interval-component", "n_intervals"),
     )
     def load_sources_data(
-        refresh_clicks: Optional[int],
+        refresh_clicks: int | None,
         interval: int,
-    ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], str, str, str, str]:
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str, str, str, str]:
         """Load sources and templates data."""
         # Dummy data for demonstration
         sources_data = [
@@ -81,7 +81,7 @@ def register_callbacks(app: Dash) -> None:
             "2",
             "1",
             "47.5%",
-            datetime.now(timezone.utc).strftime("%H:%M:%S"),
+            datetime.now(UTC).strftime("%H:%M:%S"),
         )
 
     # Sources table update
@@ -95,11 +95,11 @@ def register_callbacks(app: Dash) -> None:
         ],
     )
     def update_sources_table(
-        sources_data: List[Dict[str, Any]],
-        search_term: Optional[str],
+        sources_data: list[dict[str, Any]],
+        search_term: str | None,
         status_filter: str,
         type_filter: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Update sources table with filtering."""
         if not sources_data:
             return []
@@ -144,15 +144,15 @@ def register_callbacks(app: Dash) -> None:
         State("add-source-modal", "is_open"),
     )
     def toggle_modals(
-        add_clicks: Optional[int],
-        cancel_clicks: Optional[int],
-        close_templates_clicks: Optional[int],
-        close_details_clicks: Optional[int],
+        add_clicks: int | None,
+        cancel_clicks: int | None,
+        close_templates_clicks: int | None,
+        close_details_clicks: int | None,
         is_open: bool,
     ) -> bool:
         """Toggle modal visibility."""
         if any(
-            [add_clicks, cancel_clicks, close_templates_clicks, close_details_clicks]
+            [add_clicks, cancel_clicks, close_templates_clicks, close_details_clicks],
         ):
             return not is_open
         return is_open
@@ -163,7 +163,7 @@ def register_callbacks(app: Dash) -> None:
         Input("browse-templates-btn", "n_clicks"),
         State("template-browser-modal", "is_open"),
     )
-    def toggle_template_browser(browse_clicks: Optional[int], is_open: bool) -> bool:
+    def toggle_template_browser(browse_clicks: int | None, is_open: bool) -> bool:
         """Toggle template browser modal."""
         if browse_clicks:
             return not is_open
@@ -175,8 +175,8 @@ def register_callbacks(app: Dash) -> None:
         Input("templates-data-store", "data"),
     )
     def populate_templates_grid(
-        templates_data: List[Dict[str, Any]],
-    ) -> List[Component]:
+        templates_data: list[dict[str, Any]],
+    ) -> list[Component]:
         """Populate the templates grid."""
         if not templates_data:
             return [html.P("No templates available", className="text-muted")]
@@ -208,7 +208,7 @@ def register_callbacks(app: Dash) -> None:
                                     size="sm",
                                     className="mt-2",
                                 ),
-                            ]
+                            ],
                         ),
                     ],
                     className="h-100",
@@ -238,13 +238,19 @@ def register_callbacks(app: Dash) -> None:
         State("add-source-modal", "is_open"),
     )
     def manage_wizard_steps(
-        next_clicks: Optional[int],
-        prev_clicks: Optional[int],
-        api_clicks: Optional[int],
-        file_clicks: Optional[int],
+        next_clicks: int | None,
+        prev_clicks: int | None,
+        api_clicks: int | None,
+        file_clicks: int | None,
         modal_open: bool,
-    ) -> Tuple[
-        Dict[str, Any], Dict[str, Any], Dict[str, Any], bool, str, bool, Component
+    ) -> tuple[
+        dict[str, Any],
+        dict[str, Any],
+        dict[str, Any],
+        bool,
+        str,
+        bool,
+        Component,
     ]:
         """Manage wizard step visibility and navigation."""
         if not modal_open:
@@ -277,7 +283,7 @@ def register_callbacks(app: Dash) -> None:
             )
 
         # Step 2: Configuration
-        elif triggered_id in ["select-api-type", "select-file-type"]:
+        if triggered_id in ["select-api-type", "select-file-type"]:
             source_type = "API" if triggered_id == "select-api-type" else "File"
             return (
                 {"display": "none"},
@@ -287,12 +293,12 @@ def register_callbacks(app: Dash) -> None:
                 "Review",
                 False,
                 dbc.ModalTitle(
-                    f"Add Data Source - Step 2: Configure {source_type} Source"
+                    f"Add Data Source - Step 2: Configure {source_type} Source",
                 ),
             )
 
         # Step 3: Review
-        elif triggered_id == "wizard-next-btn":
+        if triggered_id == "wizard-next-btn":
             return (
                 {"display": "none"},
                 {"display": "none"},
@@ -320,7 +326,8 @@ def register_callbacks(app: Dash) -> None:
         Input("select-file-type", "n_clicks"),
     )
     def populate_config_form(
-        api_clicks: Optional[int], file_clicks: Optional[int]
+        api_clicks: int | None,
+        file_clicks: int | None,
     ) -> Component:
         """Populate the configuration form based on selected type."""
         if not any([api_clicks, file_clicks]):
@@ -328,8 +335,7 @@ def register_callbacks(app: Dash) -> None:
 
         if api_clicks:
             return create_api_config_form()
-        else:
-            return create_file_config_form()
+        return create_file_config_form()
 
     # Save source callback
     @app.callback(
@@ -343,11 +349,11 @@ def register_callbacks(app: Dash) -> None:
         prevent_initial_call=True,
     )
     def save_source(
-        save_clicks: Optional[int],
+        save_clicks: int | None,
         modal_open: bool,
         config_form: Component,
-        settings: Optional[Dict[str, Any]],
-    ) -> Tuple[bool, List[Dict[str, Any]]]:
+        settings: dict[str, Any] | None,
+    ) -> tuple[bool, list[dict[str, Any]]]:
         """Save the new source."""
         if not modal_open or not save_clicks:
             raise PreventUpdate

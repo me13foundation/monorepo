@@ -4,12 +4,13 @@ Progress Analytics Component for MED13 Curation Dashboard.
 Provides comprehensive analytics and progress tracking for curation workflows.
 """
 
-from typing import Any, Dict, List
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+
+from dash import dcc, html
 
 
 def create_progress_analytics_dashboard() -> dbc.Container:
@@ -30,9 +31,9 @@ def create_progress_analytics_dashboard() -> dbc.Container:
                                 "Real-time insights into curation workflow performance and team progress",
                                 className="text-muted mb-4",
                             ),
-                        ]
-                    )
-                ]
+                        ],
+                    ),
+                ],
             ),
             # Key Metrics Row
             dbc.Row(
@@ -92,10 +93,10 @@ def create_completion_gauge() -> dbc.Card:
                                 f"{completed:,} of {total:,} variants",
                                 className="text-muted text-center d-block",
                             ),
-                        ]
+                        ],
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         className="h-100",
     )
@@ -132,17 +133,17 @@ def create_conflict_resolution_stats() -> dbc.Card:
                                 [
                                     html.Span("🚩 ", className="text-danger"),
                                     f"Escalated: {escalated}",
-                                ]
+                                ],
                             ),
-                        ]
+                        ],
                     ),
                     html.Hr(),
                     html.Small(
-                        f"Resolution Rate: {resolved/(resolved+pending+escalated)*100:.1f}%",
+                        f"Resolution Rate: {resolved / (resolved + pending + escalated) * 100:.1f}%",
                         className="text-muted",
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         className="h-100",
     )
@@ -170,16 +171,17 @@ def create_team_productivity_metrics() -> dbc.Card:
                                 className="mb-1",
                             ),
                             html.Div(
-                                [html.Strong("Top Performer:"), f" {top_performer}"]
+                                [html.Strong("Top Performer:"), f" {top_performer}"],
                             ),
-                        ]
+                        ],
                     ),
                     html.Hr(),
                     html.Small(
-                        "📈 12% increase from last week", className="text-success"
+                        "📈 12% increase from last week",
+                        className="text-success",
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         className="h-100",
     )
@@ -200,9 +202,10 @@ def create_quality_trends() -> dbc.Card:
                         [
                             html.H4(f"{avg_quality}%", className="mb-1"),
                             html.Small(
-                                "Average curation quality", className="text-muted"
+                                "Average curation quality",
+                                className="text-muted",
                             ),
-                        ]
+                        ],
                     ),
                     html.Hr(),
                     html.Small(
@@ -214,8 +217,8 @@ def create_quality_trends() -> dbc.Card:
                             "text-success" if trend_direction == "up" else "text-danger"
                         ),
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         className="h-100",
     )
@@ -224,7 +227,7 @@ def create_quality_trends() -> dbc.Card:
 def create_progress_timeline_chart() -> dbc.Card:
     """Create a timeline chart showing curation progress over time."""
     # Mock timeline data
-    dates = [datetime.now() - timedelta(days=i) for i in range(30, 0, -1)]
+    dates = [datetime.now(UTC) - timedelta(days=i) for i in range(30, 0, -1)]
     completed = [2200 + i * 5 for i in range(30)]  # Cumulative completion
 
     fig = go.Figure()
@@ -234,9 +237,9 @@ def create_progress_timeline_chart() -> dbc.Card:
             y=completed,
             mode="lines+markers",
             name="Completed Variants",
-            line=dict(color="#28a745", width=3),
-            marker=dict(size=6),
-        )
+            line={"color": "#28a745", "width": 3},
+            marker={"size": 6},
+        ),
     )
 
     # Add target line
@@ -247,8 +250,8 @@ def create_progress_timeline_chart() -> dbc.Card:
             y=target,
             mode="lines",
             name="Target",
-            line=dict(color="#6c757d", width=2, dash="dash"),
-        )
+            line={"color": "#6c757d", "width": 2, "dash": "dash"},
+        ),
     )
 
     fig.update_layout(
@@ -256,12 +259,12 @@ def create_progress_timeline_chart() -> dbc.Card:
         xaxis_title="Date",
         yaxis_title="Variants Completed",
         height=400,
-        margin=dict(l=20, r=20, t=40, b=20),
+        margin={"l": 20, "r": 20, "t": 40, "b": 20},
         showlegend=True,
     )
 
     return dbc.Card(
-        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])]
+        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])],
     )
 
 
@@ -289,7 +292,7 @@ def create_conflict_heatmap() -> dbc.Card:
             texttemplate="%{text}",
             textfont={"size": 12},
             hoverongaps=False,
-        )
+        ),
     )
 
     fig.update_layout(
@@ -297,18 +300,18 @@ def create_conflict_heatmap() -> dbc.Card:
         xaxis_title="Conflict Type",
         yaxis_title="Curator",
         height=400,
-        margin=dict(l=20, r=20, t=40, b=20),
+        margin={"l": 20, "r": 20, "t": 40, "b": 20},
     )
 
     return dbc.Card(
-        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])]
+        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])],
     )
 
 
 def create_curator_performance_table() -> dbc.Card:
     """Create a table showing curator performance metrics."""
     # Mock curator performance data
-    performance_data: List[Dict[str, Any]] = [
+    performance_data: list[dict[str, Any]] = [
         {
             "name": "Dr. Smith",
             "reviews": 1247,
@@ -341,6 +344,8 @@ def create_curator_performance_table() -> dbc.Card:
 
     table_rows = []
     for curator in performance_data:
+        high_quality_threshold = 90
+        medium_quality_threshold = 85
         row = html.Tr(
             [
                 html.Td(curator["name"]),
@@ -351,16 +356,18 @@ def create_curator_performance_table() -> dbc.Card:
                         " ",
                         (
                             "🟢"
-                            if curator["avg_quality"] >= 90
-                            else "🟡"
-                            if curator["avg_quality"] >= 85
-                            else "🔴"
+                            if curator["avg_quality"] >= high_quality_threshold
+                            else (
+                                "🟡"
+                                if curator["avg_quality"] >= medium_quality_threshold
+                                else "🔴"
+                            )
                         ),
-                    ]
+                    ],
                 ),
                 html.Td(curator["conflicts_resolved"]),
                 html.Td(curator["avg_time"]),
-            ]
+            ],
         )
         table_rows.append(row)
 
@@ -379,8 +386,8 @@ def create_curator_performance_table() -> dbc.Card:
                                         html.Th("Avg Quality"),
                                         html.Th("Conflicts Resolved"),
                                         html.Th("Avg Time"),
-                                    ]
-                                )
+                                    ],
+                                ),
                             ),
                             html.Tbody(table_rows),
                         ],
@@ -388,10 +395,10 @@ def create_curator_performance_table() -> dbc.Card:
                         hover=True,
                         responsive=True,
                         size="sm",
-                    )
-                ]
+                    ),
+                ],
             ),
-        ]
+        ],
     )
 
 
@@ -425,19 +432,19 @@ def create_variant_category_breakdown() -> dbc.Card:
                 textinfo="label+percent",
                 textposition="inside",
                 hovertemplate="<b>%{label}</b><br>Count: %{value}<br>Percentage: %{percent}<extra></extra>",
-            )
-        ]
+            ),
+        ],
     )
 
     fig.update_layout(
         title="Variants by Clinical Significance",
         height=400,
-        margin=dict(l=20, r=20, t=40, b=20),
+        margin={"l": 20, "r": 20, "t": 40, "b": 20},
         showlegend=False,
     )
 
     return dbc.Card(
-        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])]
+        [dbc.CardBody([dcc.Graph(figure=fig, config={"displayModeBar": False})])],
     )
 
 
@@ -482,7 +489,7 @@ def create_recent_activity_feed() -> dbc.Card:
         },
     ]
 
-    activity_items = []
+    activity_items: list = []
     for activity in activities:
         activity_item = dbc.Row(
             [
@@ -506,9 +513,10 @@ def create_recent_activity_feed() -> dbc.Card:
                                     className="text-primary me-3",
                                 ),
                                 html.Small(
-                                    activity["timestamp"], className="text-muted"
+                                    activity["timestamp"],
+                                    className="text-muted",
                                 ),
-                            ]
+                            ],
                         ),
                     ],
                     width=10,
@@ -518,7 +526,7 @@ def create_recent_activity_feed() -> dbc.Card:
                         # Activity type icon
                         html.I(
                             className=f"{get_activity_icon(activity['action'])} fa-lg text-info",
-                        )
+                        ),
                     ],
                     width=2,
                     className="text-end",
@@ -535,17 +543,17 @@ def create_recent_activity_feed() -> dbc.Card:
                 [
                     html.H6("Recent Activity Feed", className="mb-0"),
                     dbc.Badge("Live", color="success", className="ms-2"),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
                     html.Div(
                         activity_items,
                         style={"maxHeight": "400px", "overflowY": "auto"},
-                    )
-                ]
+                    ),
+                ],
             ),
-        ]
+        ],
     )
 
 
@@ -569,7 +577,7 @@ def create_bulk_resolution_tools() -> dbc.Card:
                 [
                     html.H6("Bulk Resolution Tools", className="mb-0"),
                     dbc.Badge("Advanced", color="info", className="ms-2"),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
@@ -583,7 +591,7 @@ def create_bulk_resolution_tools() -> dbc.Card:
                                             dbc.Button(
                                                 [
                                                     html.I(
-                                                        className="fas fa-check-double me-2"
+                                                        className="fas fa-check-double me-2",
                                                     ),
                                                     "Accept All Highest Evidence",
                                                 ],
@@ -594,7 +602,7 @@ def create_bulk_resolution_tools() -> dbc.Card:
                                             dbc.Button(
                                                 [
                                                     html.I(
-                                                        className="fas fa-flag me-2"
+                                                        className="fas fa-flag me-2",
                                                     ),
                                                     "Flag All Conflicts",
                                                 ],
@@ -647,24 +655,24 @@ def create_bulk_resolution_tools() -> dbc.Card:
                                 ],
                                 width=6,
                             ),
-                        ]
-                    )
-                ]
+                        ],
+                    ),
+                ],
             ),
-        ]
+        ],
     )
 
 
 __all__ = [
-    "create_progress_analytics_dashboard",
-    "create_completion_gauge",
-    "create_conflict_resolution_stats",
-    "create_team_productivity_metrics",
-    "create_quality_trends",
-    "create_progress_timeline_chart",
-    "create_conflict_heatmap",
-    "create_curator_performance_table",
-    "create_variant_category_breakdown",
-    "create_recent_activity_feed",
     "create_bulk_resolution_tools",
+    "create_completion_gauge",
+    "create_conflict_heatmap",
+    "create_conflict_resolution_stats",
+    "create_curator_performance_table",
+    "create_progress_analytics_dashboard",
+    "create_progress_timeline_chart",
+    "create_quality_trends",
+    "create_recent_activity_feed",
+    "create_team_productivity_metrics",
+    "create_variant_category_breakdown",
 ]

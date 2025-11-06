@@ -4,11 +4,10 @@ Clinical Significance Assessment Domain Service.
 Encapsulates business logic for assessing clinical significance from evidence.
 """
 
-from typing import List
 from dataclasses import dataclass
 
-from src.domain.entities.variant import ClinicalSignificance
 from src.domain.entities.evidence import Evidence
+from src.domain.entities.variant import ClinicalSignificance
 from src.domain.value_objects.confidence import Confidence
 
 
@@ -31,7 +30,7 @@ class ClinicalSignificanceService:
     """
 
     @staticmethod
-    def assess_significance(evidence_list: List[Evidence]) -> SignificanceAssessment:
+    def assess_significance(evidence_list: list[Evidence]) -> SignificanceAssessment:
         """
         Assess clinical significance from evidence.
 
@@ -54,15 +53,19 @@ class ClinicalSignificanceService:
 
         for evidence in evidence_list:
             sig_raw = getattr(evidence, "clinical_significance", None)
-            if sig_raw in ClinicalSignificance._VALID_SIGNIFICANCE:
-                sig = sig_raw
-            else:
+            if sig_raw is None:
                 sig = ClinicalSignificance.NOT_PROVIDED
+            else:
+                try:
+                    sig = ClinicalSignificance.validate(sig_raw)
+                except ValueError:
+                    sig = ClinicalSignificance.NOT_PROVIDED
             significance_counts[sig] = significance_counts.get(sig, 0) + 1
 
         # Find most common significance
         most_common_sig, most_common_count = max(
-            significance_counts.items(), key=lambda x: x[1]
+            significance_counts.items(),
+            key=lambda x: x[1],
         )
 
         # Calculate confidence based on consensus

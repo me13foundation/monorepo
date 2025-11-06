@@ -5,10 +5,10 @@ Defines the contract for session data persistence operations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
-from uuid import UUID
 from datetime import datetime
-from ..entities.session import UserSession
+from uuid import UUID
+
+from src.domain.entities.session import UserSession
 
 
 class SessionRepository(ABC):
@@ -29,10 +29,9 @@ class SessionRepository(ABC):
         Returns:
             Created session entity with any generated fields
         """
-        pass
 
     @abstractmethod
-    async def get_by_id(self, session_id: UUID) -> Optional[UserSession]:
+    async def get_by_id(self, session_id: UUID) -> UserSession | None:
         """
         Get session by ID.
 
@@ -42,10 +41,9 @@ class SessionRepository(ABC):
         Returns:
             Session entity if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    async def get_by_access_token(self, access_token: str) -> Optional[UserSession]:
+    async def get_by_access_token(self, access_token: str) -> UserSession | None:
         """
         Get session by access token.
 
@@ -55,10 +53,9 @@ class SessionRepository(ABC):
         Returns:
             Session entity if found, None otherwise
         """
-        pass
 
     @abstractmethod
-    async def get_by_refresh_token(self, refresh_token: str) -> Optional[UserSession]:
+    async def get_by_refresh_token(self, refresh_token: str) -> UserSession | None:
         """
         Get session by refresh token.
 
@@ -68,12 +65,12 @@ class SessionRepository(ABC):
         Returns:
             Session entity if found, None otherwise
         """
-        pass
 
     @abstractmethod
     async def get_active_by_refresh_token(
-        self, refresh_token: str
-    ) -> Optional[UserSession]:
+        self,
+        refresh_token: str,
+    ) -> UserSession | None:
         """
         Get active session by refresh token.
 
@@ -83,7 +80,6 @@ class SessionRepository(ABC):
         Returns:
             Active session entity if found, None otherwise
         """
-        pass
 
     @abstractmethod
     async def update(self, session: UserSession) -> UserSession:
@@ -96,7 +92,6 @@ class SessionRepository(ABC):
         Returns:
             Updated session entity
         """
-        pass
 
     @abstractmethod
     async def delete(self, session_id: UUID) -> None:
@@ -106,7 +101,6 @@ class SessionRepository(ABC):
         Args:
             session_id: Session's unique identifier
         """
-        pass
 
     @abstractmethod
     async def revoke_session(self, session_id: UUID) -> None:
@@ -116,12 +110,14 @@ class SessionRepository(ABC):
         Args:
             session_id: Session's unique identifier
         """
-        pass
 
     @abstractmethod
     async def get_user_sessions(
-        self, user_id: UUID, include_expired: bool = False
-    ) -> List[UserSession]:
+        self,
+        user_id: UUID,
+        *,
+        include_expired: bool = False,
+    ) -> list[UserSession]:
         """
         Get all sessions for a user.
 
@@ -132,10 +128,9 @@ class SessionRepository(ABC):
         Returns:
             List of user's sessions
         """
-        pass
 
     @abstractmethod
-    async def get_active_sessions(self, user_id: UUID) -> List[UserSession]:
+    async def get_active_sessions(self, user_id: UUID) -> list[UserSession]:
         """
         Get active sessions for a user.
 
@@ -145,7 +140,6 @@ class SessionRepository(ABC):
         Returns:
             List of active user sessions
         """
-        pass
 
     @abstractmethod
     async def count_active_sessions(self, user_id: UUID) -> int:
@@ -158,7 +152,6 @@ class SessionRepository(ABC):
         Returns:
             Number of active sessions
         """
-        pass
 
     @abstractmethod
     async def revoke_all_user_sessions(self, user_id: UUID) -> int:
@@ -171,7 +164,6 @@ class SessionRepository(ABC):
         Returns:
             Number of sessions revoked
         """
-        pass
 
     @abstractmethod
     async def revoke_expired_sessions(self) -> int:
@@ -181,11 +173,11 @@ class SessionRepository(ABC):
         Returns:
             Number of sessions revoked
         """
-        pass
 
     @abstractmethod
     async def cleanup_expired_sessions(
-        self, before_date: Optional[datetime] = None
+        self,
+        before_date: datetime | None = None,
     ) -> int:
         """
         Clean up old expired sessions.
@@ -197,10 +189,9 @@ class SessionRepository(ABC):
         Returns:
             Number of sessions deleted
         """
-        pass
 
     @abstractmethod
-    async def get_sessions_by_ip(self, ip_address: str) -> List[UserSession]:
+    async def get_sessions_by_ip(self, ip_address: str) -> list[UserSession]:
         """
         Get sessions by IP address (for security monitoring).
 
@@ -210,7 +201,6 @@ class SessionRepository(ABC):
         Returns:
             List of sessions from the IP address
         """
-        pass
 
     @abstractmethod
     async def update_session_activity(self, session_id: UUID) -> None:
@@ -220,4 +210,3 @@ class SessionRepository(ABC):
         Args:
             session_id: Session's unique identifier
         """
-        pass

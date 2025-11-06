@@ -5,10 +5,10 @@ Validates business logic, cross-references, and domain-specific rules
 that go beyond basic format validation.
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
 
-from ..rules.base_rules import ValidationResult, ValidationIssue, ValidationSeverity
+from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
 
 @dataclass
@@ -21,7 +21,9 @@ class SemanticValidator:
     """
 
     def validate_gene_variant_relationship(
-        self, gene_id: str, variant_data: Dict[str, Any]
+        self,
+        gene_id: str,
+        variant_data: dict[str, Any],
     ) -> ValidationResult:
         """Validate relationship between gene and variant."""
         issues = []
@@ -36,7 +38,7 @@ class SemanticValidator:
                     rule="gene_variant_relationship",
                     message=f"Variant not associated with gene {gene_id}",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
 
         # Validate clinical significance consistency
@@ -59,13 +61,15 @@ class SemanticValidator:
                         rule="clinical_significance_valid",
                         message=f"Invalid clinical significance: {clinical_sig}",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_phenotype_gene_association(
-        self, phenotype_id: str, gene_data: Dict[str, Any]
+        self,
+        _phenotype_id: str,
+        gene_data: dict[str, Any],
     ) -> ValidationResult:
         """Validate phenotype-gene associations."""
         issues = []
@@ -80,7 +84,7 @@ class SemanticValidator:
                     rule="phenotype_association_required",
                     message="Gene must have at least one associated phenotype",
                     severity=ValidationSeverity.WARNING,
-                )
+                ),
             )
 
         # Validate HPO ID format for phenotypes
@@ -96,13 +100,14 @@ class SemanticValidator:
                         rule="hpo_format",
                         message=f"Invalid HPO ID format: {hpo_id}",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_publication_evidence(
-        self, publication_data: Dict[str, Any]
+        self,
+        publication_data: dict[str, Any],
     ) -> ValidationResult:
         """Validate publication evidence quality."""
         issues = []
@@ -118,7 +123,7 @@ class SemanticValidator:
                         rule="publication_completeness",
                         message=f"Publication missing required field: {field}",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
         # Validate DOI format if present
@@ -131,7 +136,7 @@ class SemanticValidator:
                     rule="doi_format",
                     message="DOI must start with '10.'",
                     severity=ValidationSeverity.ERROR,
-                )
+                ),
             )
 
         # Check publication date is not in future
@@ -143,7 +148,9 @@ class SemanticValidator:
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_cross_references(
-        self, entity_data: Dict[str, Any], entity_type: str
+        self,
+        entity_data: dict[str, Any],
+        entity_type: str,
     ) -> ValidationResult:
         """Validate cross-references between different entity types."""
         issues = []
@@ -160,7 +167,7 @@ class SemanticValidator:
                         rule="gene_cross_references",
                         message="Gene should have associated variants",
                         severity=ValidationSeverity.WARNING,
-                    )
+                    ),
                 )
 
         elif entity_type == "variant":
@@ -173,21 +180,19 @@ class SemanticValidator:
                         rule="variant_cross_references",
                         message="Variant should be associated with at least one gene",
                         severity=ValidationSeverity.ERROR,
-                    )
+                    ),
                 )
 
-        elif entity_type == "phenotype":
-            # Phenotypes should have gene associations
-            if not cross_refs.get("genes"):
-                issues.append(
-                    ValidationIssue(
-                        field="cross_references.genes",
-                        value=cross_refs.get("genes"),
-                        rule="phenotype_cross_references",
-                        message="Phenotype should be associated with genes",
-                        severity=ValidationSeverity.WARNING,
-                    )
-                )
+        elif entity_type == "phenotype" and not cross_refs.get("genes"):
+            issues.append(
+                ValidationIssue(
+                    field="cross_references.genes",
+                    value=cross_refs.get("genes"),
+                    rule="phenotype_cross_references",
+                    message="Phenotype should be associated with genes",
+                    severity=ValidationSeverity.WARNING,
+                ),
+            )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 

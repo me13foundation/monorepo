@@ -5,9 +5,9 @@ Parses UniProt XML data into structured protein records with
 sequence information, annotations, functions, and cross-references.
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class ProteinExistence(Enum):
@@ -32,8 +32,8 @@ class UniProtGene:
     """Structured representation of gene information."""
 
     name: str
-    synonyms: List[str]
-    locus: Optional[str]
+    synonyms: list[str]
+    locus: str | None
 
 
 @dataclass
@@ -41,9 +41,9 @@ class UniProtOrganism:
     """Structured representation of organism information."""
 
     scientific_name: str
-    common_name: Optional[str]
+    common_name: str | None
     taxon_id: str
-    lineage: List[str]
+    lineage: list[str]
 
 
 @dataclass
@@ -51,9 +51,9 @@ class UniProtSequence:
     """Structured representation of protein sequence."""
 
     length: int
-    mass: Optional[int]
-    checksum: Optional[str]
-    modified: Optional[str]
+    mass: int | None
+    checksum: str | None
+    modified: str | None
     version: int
 
 
@@ -62,7 +62,7 @@ class UniProtFunction:
     """Structured representation of protein function."""
 
     description: str
-    evidence: Optional[str]
+    evidence: str | None
 
 
 @dataclass
@@ -70,22 +70,22 @@ class UniProtFeature:
     """Structured representation of protein features."""
 
     type: str
-    description: Optional[str]
-    position: Optional[int]
-    begin: Optional[int]
-    end: Optional[int]
+    description: str | None
+    position: int | None
+    begin: int | None
+    end: int | None
 
 
 @dataclass
 class UniProtReference:
     """Structured representation of literature references."""
 
-    title: Optional[str]
-    authors: List[str]
-    journal: Optional[str]
-    publication_date: Optional[str]
-    pubmed_id: Optional[str]
-    doi: Optional[str]
+    title: str | None
+    authors: list[str]
+    journal: str | None
+    publication_date: str | None
+    pubmed_id: str | None
+    doi: str | None
 
 
 @dataclass
@@ -101,7 +101,7 @@ class UniProtProtein:
     existence: ProteinExistence
 
     # Gene information
-    genes: List[UniProtGene]
+    genes: list[UniProtGene]
 
     # Organism
     organism: UniProtOrganism
@@ -110,24 +110,24 @@ class UniProtProtein:
     sequence: UniProtSequence
 
     # Functions and features
-    functions: List[UniProtFunction]
-    subcellular_locations: List[str]
-    features: List[UniProtFeature]
+    functions: list[UniProtFunction]
+    subcellular_locations: list[str]
+    features: list[UniProtFeature]
 
     # References
-    references: List[UniProtReference]
+    references: list[UniProtReference]
 
     # Cross-references
-    database_references: Dict[str, List[str]]
+    database_references: dict[str, list[str]]
 
     # Keywords
-    keywords: List[str]
+    keywords: list[str]
 
     # Comments
-    comments: Dict[str, List[str]]
+    comments: dict[str, list[str]]
 
     # Raw data for reference
-    raw_data: Dict[str, Any]
+    raw_data: dict[str, Any]
 
 
 class UniProtParser:
@@ -139,9 +139,9 @@ class UniProtParser:
     """
 
     def __init__(self) -> None:
-        self.protein_cache: Dict[str, UniProtProtein] = {}
+        self.protein_cache: dict[str, UniProtProtein] = {}
 
-    def parse_raw_data(self, raw_data: Dict[str, Any]) -> Optional[UniProtProtein]:
+    def parse_raw_data(self, raw_data: dict[str, Any]) -> UniProtProtein | None:
         """
         Parse raw UniProt data into structured protein record.
 
@@ -198,11 +198,11 @@ class UniProtParser:
         except Exception as e:
             # Log error but don't fail completely
             print(
-                f"Error parsing UniProt record {raw_data.get('primaryAccession')}: {e}"
+                f"Error parsing UniProt record {raw_data.get('primaryAccession')}: {e}",
             )
             return None
 
-    def parse_batch(self, raw_data_list: List[Dict[str, Any]]) -> List[UniProtProtein]:
+    def parse_batch(self, raw_data_list: list[dict[str, Any]]) -> list[UniProtProtein]:
         """
         Parse multiple UniProt records.
 
@@ -220,7 +220,7 @@ class UniProtParser:
 
         return parsed_proteins
 
-    def _extract_protein_name(self, data: Dict[str, Any]) -> str:
+    def _extract_protein_name(self, data: dict[str, Any]) -> str:
         """Extract protein name from data."""
         protein_desc = data.get("proteinDescription", {})
         recommended = protein_desc.get("recommendedName", {})
@@ -238,19 +238,19 @@ class UniProtParser:
         # Ensure we always return a string even if unexpected types appear
         return "Unknown Protein"
 
-    def _extract_status(self, data: Dict[str, Any]) -> UniProtStatus:
+    def _extract_status(self, data: dict[str, Any]) -> UniProtStatus:
         """Extract entry status."""
         # This information might not be in the current data structure
         # Default to unreviewed for now
         return UniProtStatus.UNREVIEWED
 
-    def _extract_existence(self, data: Dict[str, Any]) -> ProteinExistence:
+    def _extract_existence(self, data: dict[str, Any]) -> ProteinExistence:
         """Extract protein existence evidence."""
         # This information might not be in the current data structure
         # Default to predicted for now
         return ProteinExistence.PREDICTED
 
-    def _extract_genes(self, data: Dict[str, Any]) -> List[UniProtGene]:
+    def _extract_genes(self, data: dict[str, Any]) -> list[UniProtGene]:
         """Extract gene information."""
         genes = []
 
@@ -267,7 +267,7 @@ class UniProtParser:
 
         return genes
 
-    def _extract_organism(self, data: Dict[str, Any]) -> UniProtOrganism:
+    def _extract_organism(self, data: dict[str, Any]) -> UniProtOrganism:
         """Extract organism information."""
         org_data = data.get("organism", {})
 
@@ -278,7 +278,7 @@ class UniProtParser:
             lineage=org_data.get("lineage", []),
         )
 
-    def _extract_sequence(self, data: Dict[str, Any]) -> UniProtSequence:
+    def _extract_sequence(self, data: dict[str, Any]) -> UniProtSequence:
         """Extract sequence information."""
         seq_data = data.get("sequence", {})
 
@@ -290,7 +290,7 @@ class UniProtParser:
             version=seq_data.get("version", 1),
         )
 
-    def _extract_functions(self, data: Dict[str, Any]) -> List[UniProtFunction]:
+    def _extract_functions(self, data: dict[str, Any]) -> list[UniProtFunction]:
         """Extract protein functions."""
         functions = []
 
@@ -298,13 +298,14 @@ class UniProtParser:
             if comment.get("commentType") == "FUNCTION":
                 for text_data in comment.get("texts", []):
                     func = UniProtFunction(
-                        description=text_data.get("value", ""), evidence=None
+                        description=text_data.get("value", ""),
+                        evidence=None,
                     )
                     functions.append(func)
 
         return functions
 
-    def _extract_subcellular_locations(self, data: Dict[str, Any]) -> List[str]:
+    def _extract_subcellular_locations(self, data: dict[str, Any]) -> list[str]:
         """Extract subcellular locations."""
         locations = []
 
@@ -317,7 +318,7 @@ class UniProtParser:
 
         return locations
 
-    def _extract_features(self, data: Dict[str, Any]) -> List[UniProtFeature]:
+    def _extract_features(self, data: dict[str, Any]) -> list[UniProtFeature]:
         """Extract protein features."""
         features = []
 
@@ -333,7 +334,7 @@ class UniProtParser:
 
         return features
 
-    def _extract_references(self, data: Dict[str, Any]) -> List[UniProtReference]:
+    def _extract_references(self, data: dict[str, Any]) -> list[UniProtReference]:
         """Extract literature references."""
         references = []
 
@@ -353,10 +354,11 @@ class UniProtParser:
         return references
 
     def _extract_database_references(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, List[str]]:
+        self,
+        data: dict[str, Any],
+    ) -> dict[str, list[str]]:
         """Extract database cross-references."""
-        db_refs: Dict[str, List[str]] = {}
+        db_refs: dict[str, list[str]] = {}
 
         for db_ref in data.get("dbReferences", []):
             db_type = db_ref.get("type")
@@ -369,14 +371,14 @@ class UniProtParser:
 
         return db_refs
 
-    def _extract_keywords(self, data: Dict[str, Any]) -> List[str]:
+    def _extract_keywords(self, data: dict[str, Any]) -> list[str]:
         """Extract keywords."""
         # Keywords might not be in current data structure
         return []
 
-    def _extract_comments(self, data: Dict[str, Any]) -> Dict[str, List[str]]:
+    def _extract_comments(self, data: dict[str, Any]) -> dict[str, list[str]]:
         """Extract comments by type."""
-        comments: Dict[str, List[str]] = {}
+        comments: dict[str, list[str]] = {}
 
         for comment in data.get("comments", []):
             comment_type = comment.get("commentType")
@@ -391,7 +393,7 @@ class UniProtParser:
 
         return comments
 
-    def validate_parsed_data(self, protein: UniProtProtein) -> List[str]:
+    def validate_parsed_data(self, protein: UniProtProtein) -> list[str]:
         """
         Validate parsed UniProt protein data.
 
@@ -417,7 +419,7 @@ class UniProtParser:
 
         return errors
 
-    def get_protein_by_accession(self, accession: str) -> Optional[UniProtProtein]:
+    def get_protein_by_accession(self, accession: str) -> UniProtProtein | None:
         """
         Get a cached protein by accession.
 

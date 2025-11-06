@@ -4,15 +4,16 @@ Domain-specific type definitions for MED13 Resource Library.
 Contains types for domain entities, value objects, and domain operations.
 """
 
-from typing import Dict, List, Optional, Protocol, TypeVar, Any, TypedDict
 import abc
 from datetime import datetime
-from .common import ValidationResult, EntityStatus, PriorityLevel
+from typing import Any, Protocol, TypedDict, TypeVar
 
+from .common import EntityStatus, PriorityLevel, ValidationResult
 
 # Generic types for domain operations
-T = TypeVar(
-    "T", contravariant=True
+T_contra = TypeVar(
+    "T_contra",
+    contravariant=True,
 )  # Generic entity type (contravariant for protocols)
 ID = TypeVar("ID")  # Generic ID type
 
@@ -30,9 +31,9 @@ class DomainOperationResult(TypedDict, total=False):
     """Result of a domain operation."""
 
     success: bool
-    entity: Optional[Any]
-    errors: List[str]
-    warnings: List[str]
+    entity: Any | None
+    errors: list[str]
+    warnings: list[str]
     validation_result: ValidationResult
 
 
@@ -46,14 +47,14 @@ class BusinessRuleViolation(TypedDict):
     violation_type: str
     message: str
     severity: str
-    suggested_fix: Optional[str]
+    suggested_fix: str | None
 
 
 class BusinessRuleValidationResult(TypedDict):
     """Result of business rule validation."""
 
     is_valid: bool
-    violations: List[BusinessRuleViolation]
+    violations: list[BusinessRuleViolation]
     entity_type: str
     entity_id: str
     validated_at: datetime
@@ -78,8 +79,8 @@ class VariantPhenotypeRelationship(TypedDict):
     phenotype_id: str
     evidence_level: str
     confidence_score: float
-    publications: List[str]
-    inheritance_pattern: Optional[str]
+    publications: list[str]
+    inheritance_pattern: str | None
 
 
 class EvidencePublicationRelationship(TypedDict):
@@ -99,9 +100,9 @@ class GeneAnalysisResult(TypedDict):
     variant_count: int
     phenotype_count: int
     evidence_count: int
-    clinical_significance_summary: Dict[str, int]
-    population_frequency_range: Dict[str, float]
-    inheritance_patterns: List[str]
+    clinical_significance_summary: dict[str, int]
+    population_frequency_range: dict[str, float]
+    inheritance_patterns: list[str]
 
 
 class VariantAnalysisResult(TypedDict):
@@ -110,10 +111,10 @@ class VariantAnalysisResult(TypedDict):
     variant_id: str
     gene_id: str
     clinical_significance: str
-    evidence_levels: Dict[str, int]
-    phenotype_associations: List[str]
-    population_frequency: Dict[str, float]
-    functional_predictions: Dict[str, str]
+    evidence_levels: dict[str, int]
+    phenotype_associations: list[str]
+    population_frequency: dict[str, float]
+    functional_predictions: dict[str, str]
 
 
 class EvidenceConsistencyResult(TypedDict):
@@ -121,8 +122,8 @@ class EvidenceConsistencyResult(TypedDict):
 
     evidence_id: str
     is_consistent: bool
-    conflicts: List[str]
-    supporting_evidence: List[str]
+    conflicts: list[str]
+    supporting_evidence: list[str]
     confidence_score: float
     last_reviewed: datetime
 
@@ -136,7 +137,7 @@ class CurationDecision(TypedDict):
     decision: str  # approve, reject, quarantine
     curator_id: str
     decision_date: datetime
-    comments: Optional[str]
+    comments: str | None
     confidence_score: float
 
 
@@ -149,7 +150,7 @@ class CurationQueueItem(TypedDict):
     status: EntityStatus
     queued_date: datetime
     last_modified: datetime
-    validation_errors: List[str]
+    validation_errors: list[str]
     evidence_count: int
 
 
@@ -161,21 +162,21 @@ class DomainEvent(TypedDict):
     entity_type: str
     entity_id: str
     timestamp: datetime
-    user_id: Optional[str]
-    details: Dict[str, Any]
+    user_id: str | None
+    details: dict[str, Any]
 
 
 class GeneCreatedEvent(DomainEvent):
     """Gene created event."""
 
-    gene_data: Dict[str, Any]
+    gene_data: dict[str, Any]
 
 
 class VariantUpdatedEvent(DomainEvent):
     """Variant updated event."""
 
-    changes: Dict[str, Any]
-    old_values: Dict[str, Any]
+    changes: dict[str, Any]
+    old_values: dict[str, Any]
 
 
 class EvidenceValidatedEvent(DomainEvent):
@@ -225,7 +226,7 @@ class CompletenessValidationRule(ValidationRule):
 class GeneDerivedProperties(TypedDict):
     """Derived properties calculated for genes."""
 
-    genomic_size: Optional[int]
+    genomic_size: int | None
     has_genomic_location: bool
     external_id_count: int
 
@@ -235,7 +236,7 @@ class VariantDerivedProperties(TypedDict):
 
     has_population_data: bool
     population_frequency_count: int
-    average_population_frequency: Optional[float]
+    average_population_frequency: float | None
     has_functional_impact: bool
     evidence_count: int
     significance_consistency_score: float
@@ -248,8 +249,8 @@ class EvidenceConsistencyAnalysis(TypedDict):
     conflicting_evidence: int
     consistent_evidence: int
     consistency_score: float
-    dominant_significance: Optional[str]
-    significance_distribution: Dict[str, int]
+    dominant_significance: str | None
+    significance_distribution: dict[str, int]
 
 
 class EvidenceDerivedProperties(TypedDict):
@@ -271,7 +272,7 @@ class NormalizationResult(TypedDict, total=False):
     normalized_value: Any
     normalization_method: str
     confidence_score: float
-    alternatives: List[Any]
+    alternatives: list[Any]
 
 
 class IdentifierNormalizationResult(NormalizationResult):
@@ -287,10 +288,10 @@ class ProvenanceChain(TypedDict):
     """Chain of data provenance."""
 
     source: str
-    source_version: Optional[str]
+    source_version: str | None
     acquired_at: datetime
-    processing_steps: List[str]
-    derived_from: Optional[List[str]]
+    processing_steps: list[str]
+    derived_from: list[str] | None
     quality_score: float
     validation_status: str
 
@@ -312,8 +313,8 @@ class DataQualityReport(TypedDict):
     """Comprehensive data quality report."""
 
     overall_score: float
-    metrics_by_type: Dict[str, QualityMetrics]
-    issues_found: List[str]
-    recommendations: List[str]
+    metrics_by_type: dict[str, QualityMetrics]
+    issues_found: list[str]
+    recommendations: list[str]
     generated_at: datetime
-    coverage: Dict[str, int]  # entity_type -> count
+    coverage: dict[str, int]  # entity_type -> count

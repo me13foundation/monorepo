@@ -6,11 +6,11 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
-from .base import Repository
-from ..entities.publication import Publication
-from ...type_definitions.common import PublicationUpdate
+from src.domain.entities.publication import Publication
+from src.domain.repositories.base import Repository
+from src.type_definitions.common import PublicationUpdate
 
 
 class PublicationRepository(Repository[Publication, int]):
@@ -22,49 +22,41 @@ class PublicationRepository(Repository[Publication, int]):
     """
 
     @abstractmethod
-    def find_by_pmid(self, pmid: str) -> Optional[Publication]:
+    def find_by_pmid(self, pmid: str) -> Publication | None:
         """Find a publication by PubMed ID."""
-        pass
 
     @abstractmethod
-    def find_by_doi(self, doi: str) -> Optional[Publication]:
+    def find_by_doi(self, doi: str) -> Publication | None:
         """Find a publication by DOI."""
-        pass
 
     @abstractmethod
-    def find_by_title(self, title: str, fuzzy: bool = False) -> List[Publication]:
+    def find_by_title(self, title: str, *, fuzzy: bool = False) -> list[Publication]:
         """Find publications by title (exact or fuzzy match)."""
-        pass
 
     @abstractmethod
-    def find_by_author(self, author_name: str) -> List[Publication]:
+    def find_by_author(self, author_name: str) -> list[Publication]:
         """Find publications by author name."""
-        pass
 
     @abstractmethod
-    def find_by_year_range(self, start_year: int, end_year: int) -> List[Publication]:
+    def find_by_year_range(self, start_year: int, end_year: int) -> list[Publication]:
         """Find publications within a year range."""
-        pass
 
     @abstractmethod
-    def find_by_gene_associations(self, gene_id: int) -> List[Publication]:
+    def find_by_gene_associations(self, gene_id: int) -> list[Publication]:
         """Find publications associated with a gene."""
-        pass
 
     @abstractmethod
-    def find_by_variant_associations(self, variant_id: int) -> List[Publication]:
+    def find_by_variant_associations(self, variant_id: int) -> list[Publication]:
         """Find publications associated with a variant."""
-        pass
 
     @abstractmethod
     def search_publications(
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Publication]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Publication]:
         """Search publications with optional filters."""
-        pass
 
     @abstractmethod
     def paginate_publications(
@@ -73,27 +65,25 @@ class PublicationRepository(Repository[Publication, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Publication], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Publication], int]:
         """Retrieve paginated publications with optional filters."""
-        pass
 
     @abstractmethod
     def get_publication_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about publications in the repository."""
-        pass
 
     @abstractmethod
-    def find_recent_publications(self, days: int = 30) -> List[Publication]:
+    def find_recent_publications(self, days: int = 30) -> list[Publication]:
         """Find publications from the last N days."""
-        pass
 
     @abstractmethod
     def update_publication(
-        self, publication_id: int, updates: PublicationUpdate
+        self,
+        publication_id: int,
+        updates: PublicationUpdate,
     ) -> Publication:
         """Update a publication with type-safe update parameters."""
-        pass
 
 
 __all__ = ["PublicationRepository"]

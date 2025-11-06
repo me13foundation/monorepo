@@ -7,14 +7,15 @@ Handles large dataset serialization and streaming export capabilities.
 import csv
 import gzip
 import json
+from collections.abc import Callable, Generator, Sequence
 from enum import Enum
 from io import StringIO
-from typing import Any, Dict, Generator, List, Optional, Sequence, Union
+from typing import Any, cast
 
-from src.application.services.gene_service import GeneApplicationService
-from src.application.services.variant_service import VariantApplicationService
-from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.evidence_service import EvidenceApplicationService
+from src.application.services.gene_service import GeneApplicationService
+from src.application.services.phenotype_service import PhenotypeApplicationService
+from src.application.services.variant_service import VariantApplicationService
 
 
 class ExportFormat(str, Enum):
@@ -66,9 +67,9 @@ class BulkExportService:
         entity_type: str,
         export_format: ExportFormat,
         compression: CompressionFormat = CompressionFormat.NONE,
-        filters: Optional[Dict[str, Any]] = None,
+        filters: dict[str, Any] | None = None,
         chunk_size: int = 1000,
-    ) -> Generator[Union[str, bytes], None, None]:
+    ) -> Generator[str | bytes, None, None]:
         """
         Export data for a specific entity type in the requested format.
 
@@ -84,41 +85,64 @@ class BulkExportService:
         """
         if entity_type == "genes":
             yield from self._export_genes(
-                export_format, compression, filters, chunk_size
+                export_format,
+                compression,
+                filters,
+                chunk_size,
             )
         elif entity_type == "variants":
             yield from self._export_variants(
-                export_format, compression, filters, chunk_size
+                export_format,
+                compression,
+                filters,
+                chunk_size,
             )
         elif entity_type == "phenotypes":
             yield from self._export_phenotypes(
-                export_format, compression, filters, chunk_size
+                export_format,
+                compression,
+                filters,
+                chunk_size,
             )
         elif entity_type == "evidence":
             yield from self._export_evidence(
-                export_format, compression, filters, chunk_size
+                export_format,
+                compression,
+                filters,
+                chunk_size,
             )
         else:
-            raise ValueError(f"Unsupported entity type: {entity_type}")
+            msg = f"Unsupported entity type: {entity_type}"
+            raise ValueError(msg)
 
     def _export_genes(
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: Optional[Dict[str, Any]],
+        filters: dict[str, Any] | None,
         chunk_size: int,
-    ) -> Generator[Union[str, bytes], None, None]:
+    ) -> Generator[str | bytes, None, None]:
         """Export genes data."""
-        # Get all genes (simplified - in production would use pagination)
-        genes = self._gene_service.list_genes(
-            page=1, per_page=10000, sort_by="symbol", sort_order="asc"
-        )[0]  # Get just the genes list
+        search_term = (filters or {}).get("search")
+        genes = self._collect_paginated(
+            lambda page, size: self._gene_service.list_genes(
+                page=page,
+                per_page=size,
+                sort_by="symbol",
+                sort_order="asc",
+                search=search_term,
+            ),
+            chunk_size,
+        )
 
         if export_format == ExportFormat.JSON:
             yield from self._export_as_json(genes, compression, "genes")
         elif export_format in (ExportFormat.CSV, ExportFormat.TSV):
             yield from self._export_as_csv(
-                genes, export_format, compression, self._get_gene_fields()
+                genes,
+                export_format,
+                compression,
+                self._get_gene_fields(),
             )
         elif export_format == ExportFormat.JSONL:
             yield from self._export_as_jsonl(genes, compression)
@@ -127,23 +151,29 @@ class BulkExportService:
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: Optional[Dict[str, Any]],
+        filters: dict[str, Any] | None,
         chunk_size: int,
-    ) -> Generator[Union[str, bytes], None, None]:
+    ) -> Generator[str | bytes, None, None]:
         """Export variants data."""
-        variants = self._variant_service.list_variants(
-            page=1,
-            per_page=10000,
-            sort_by="variant_id",
-            sort_order="asc",
-            filters=filters,
-        )[0]  # Get just the variants list
+        variants = self._collect_paginated(
+            lambda page, size: self._variant_service.list_variants(
+                page=page,
+                per_page=size,
+                sort_by="variant_id",
+                sort_order="asc",
+                filters=filters,
+            ),
+            chunk_size,
+        )
 
         if export_format == ExportFormat.JSON:
             yield from self._export_as_json(variants, compression, "variants")
         elif export_format in (ExportFormat.CSV, ExportFormat.TSV):
             yield from self._export_as_csv(
-                variants, export_format, compression, self._get_variant_fields()
+                variants,
+                export_format,
+                compression,
+                self._get_variant_fields(),
             )
         elif export_format == ExportFormat.JSONL:
             yield from self._export_as_jsonl(variants, compression)
@@ -152,19 +182,29 @@ class BulkExportService:
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: Optional[Dict[str, Any]],
+        filters: dict[str, Any] | None,
         chunk_size: int,
-    ) -> Generator[Union[str, bytes], None, None]:
+    ) -> Generator[str | bytes, None, None]:
         """Export phenotypes data."""
-        phenotypes = self._phenotype_service.list_phenotypes(
-            page=1, per_page=10000, sort_by="name", sort_order="asc", filters=filters
-        )[0]  # Get just the phenotypes list
+        phenotypes = self._collect_paginated(
+            lambda page, size: self._phenotype_service.list_phenotypes(
+                page=page,
+                per_page=size,
+                sort_by="name",
+                sort_order="asc",
+                filters=filters,
+            ),
+            chunk_size,
+        )
 
         if export_format == ExportFormat.JSON:
             yield from self._export_as_json(phenotypes, compression, "phenotypes")
         elif export_format in (ExportFormat.CSV, ExportFormat.TSV):
             yield from self._export_as_csv(
-                phenotypes, export_format, compression, self._get_phenotype_fields()
+                phenotypes,
+                export_format,
+                compression,
+                self._get_phenotype_fields(),
             )
         elif export_format == ExportFormat.JSONL:
             yield from self._export_as_jsonl(phenotypes, compression)
@@ -173,33 +213,39 @@ class BulkExportService:
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: Optional[Dict[str, Any]],
+        filters: dict[str, Any] | None,
         chunk_size: int,
-    ) -> Generator[Union[str, bytes], None, None]:
+    ) -> Generator[str | bytes, None, None]:
         """Export evidence data."""
-        evidence_list = self._evidence_service.list_evidence(
-            page=1,
-            per_page=10000,
-            sort_by="created_at",
-            sort_order="asc",
-            filters=filters,
-        )[0]  # Get just the evidence list
+        evidence_list = self._collect_paginated(
+            lambda page, size: self._evidence_service.list_evidence(
+                page=page,
+                per_page=size,
+                sort_by="created_at",
+                sort_order="asc",
+                filters=filters,
+            ),
+            chunk_size,
+        )
 
         if export_format == ExportFormat.JSON:
             yield from self._export_as_json(evidence_list, compression, "evidence")
         elif export_format in (ExportFormat.CSV, ExportFormat.TSV):
             yield from self._export_as_csv(
-                evidence_list, export_format, compression, self._get_evidence_fields()
+                evidence_list,
+                export_format,
+                compression,
+                self._get_evidence_fields(),
             )
         elif export_format == ExportFormat.JSONL:
             yield from self._export_as_jsonl(evidence_list, compression)
 
     def _export_as_json(
         self,
-        items: List[Any],
+        items: list[Any],
         compression: CompressionFormat,
         entity_type: str,
-    ) -> Generator[Union[str, bytes], None, None]:
+    ) -> Generator[str | bytes, None, None]:
         """Export data as JSON format."""
         data = {entity_type: [self._serialize_item(item) for item in items]}
 
@@ -212,16 +258,14 @@ class BulkExportService:
 
     def _export_as_jsonl(
         self,
-        items: List[Any],
+        items: list[Any],
         compression: CompressionFormat,
-    ) -> Generator[Union[str, bytes], None, None]:
+    ) -> Generator[str | bytes, None, None]:
         """Export data as JSON Lines format (one JSON object per line)."""
-        lines = []
-        for item in items:
-            line = json.dumps(self._serialize_item(item), default=str)
-            lines.append(line)
-
-        content = "\n".join(lines)
+        content_lines = [
+            json.dumps(self._serialize_item(item), default=str) for item in items
+        ]
+        content = "\n".join(content_lines)
 
         if compression == CompressionFormat.GZIP:
             yield gzip.compress(content.encode("utf-8"))
@@ -230,11 +274,11 @@ class BulkExportService:
 
     def _export_as_csv(
         self,
-        items: List[Any],
+        items: list[Any],
         export_format: ExportFormat,
         compression: CompressionFormat,
-        field_names: List[str],
-    ) -> Generator[Union[str, bytes], None, None]:
+        field_names: list[str],
+    ) -> Generator[str | bytes, None, None]:
         """Export data as CSV or TSV format."""
         delimiter = "\t" if export_format == ExportFormat.TSV else ","
 
@@ -256,59 +300,76 @@ class BulkExportService:
         else:
             yield content
 
-    def _serialize_item(self, item: Any) -> Dict[str, Any]:
-        """Serialize an entity item to a dictionary."""
-        # Handle NamedTuple objects (test fixtures)
-        if hasattr(item, "_fields"):
-            # This is a NamedTuple
-            result: Dict[str, Any] = {}
-            for field in item._fields:
-                value = getattr(item, field)
-                if hasattr(value, "_fields") or hasattr(
-                    value, "__dict__"
-                ):  # Nested objects
-                    result[field] = self._serialize_item(value)
-                elif isinstance(value, (list, tuple)):
-                    result[field] = [
-                        (
-                            self._serialize_item(v)
-                            if (hasattr(v, "_fields") or hasattr(v, "__dict__"))
-                            else v
-                        )
-                        for v in value
-                    ]
-                else:
-                    result[field] = value
-            return result
-        # Handle regular objects with __dict__
-        elif hasattr(item, "__dict__"):
-            obj_result: Dict[str, Any] = {}
-            for key, value in item.__dict__.items():
-                if not key.startswith("_"):  # Skip private attributes
-                    if hasattr(value, "__dict__") or hasattr(
-                        value, "_fields"
-                    ):  # Handle nested objects
-                        obj_result[key] = self._serialize_item(value)
-                    elif isinstance(value, (list, tuple)):
-                        obj_result[key] = [
-                            (
-                                self._serialize_item(v)
-                                if (hasattr(v, "__dict__") or hasattr(v, "_fields"))
-                                else v
-                            )
-                            for v in value
-                        ]
-                    else:
-                        obj_result[key] = value
-            return obj_result
-        elif isinstance(item, dict):
-            return item
-        else:
-            return {"value": item}
+    def _collect_paginated(
+        self,
+        fetch_page: Callable[[int, int], tuple[list[Any], int]],
+        chunk_size: int,
+    ) -> list[Any]:
+        """Collect paginated records using the provided fetch callable."""
+        page = 1
+        results: list[Any] = []
+        batch_size = max(chunk_size, 1)
 
-    def _item_to_csv_row(self, item: Any, field_names: List[str]) -> Dict[str, Any]:
+        while True:
+            items, _total = fetch_page(page, batch_size)
+            if not items:
+                break
+            results.extend(items)
+            if len(items) < batch_size:
+                break
+            page += 1
+
+        return results
+
+    def _serialize_item(self, item: Any) -> Any:
+        """Serialize an entity item to a dictionary."""
+        if self._is_namedtuple(item):
+            return self._serialize_namedtuple(item)
+
+        if isinstance(item, dict):
+            return {key: self._serialize_item(value) for key, value in item.items()}
+
+        if hasattr(item, "__dict__"):
+            return self._serialize_object(item)
+
+        if isinstance(item, (list, tuple)):
+            return self._serialize_sequence(item)
+
+        return item
+
+    @staticmethod
+    def _is_namedtuple(candidate: Any) -> bool:
+        """Determine if a value behaves like a NamedTuple."""
+        return hasattr(candidate, "_fields") and all(
+            isinstance(field, str) for field in getattr(candidate, "_fields", [])
+        )
+
+    def _serialize_namedtuple(self, item: Any) -> dict[str, Any]:
+        """Serialize a NamedTuple into a dictionary."""
+        fields = cast("Sequence[str]", getattr(item, "_fields", ()))
+        return {field: self._serialize_item(getattr(item, field)) for field in fields}
+
+    def _serialize_object(self, item: Any) -> dict[str, Any]:
+        """Serialize a regular object, excluding private attributes."""
+        result: dict[str, Any] = {}
+        for key, value in vars(item).items():
+            if key.startswith("_"):
+                continue
+            result[key] = self._serialize_item(value)
+        return result
+
+    def _serialize_sequence(self, items: Sequence[Any]) -> list[Any]:
+        """Serialize a list or tuple of items."""
+        return [self._serialize_item(value) for value in items]
+
+    def _item_to_csv_row(self, item: Any, field_names: list[str]) -> dict[str, Any]:
         """Convert an item to a CSV row dictionary."""
-        serialized = self._serialize_item(item)
+        serialized_raw = self._serialize_item(item)
+        serialized = (
+            serialized_raw
+            if isinstance(serialized_raw, dict)
+            else {"value": serialized_raw}
+        )
         row = {}
 
         for field in field_names:
@@ -343,7 +404,7 @@ class BulkExportService:
                 return ""
         return current
 
-    def _get_gene_fields(self) -> List[str]:
+    def _get_gene_fields(self) -> list[str]:
         """Get field names for gene CSV export."""
         return [
             "id",
@@ -362,7 +423,7 @@ class BulkExportService:
             "updated_at",
         ]
 
-    def _get_variant_fields(self) -> List[str]:
+    def _get_variant_fields(self) -> list[str]:
         """Get field names for variant CSV export."""
         return [
             "id",
@@ -386,7 +447,7 @@ class BulkExportService:
             "updated_at",
         ]
 
-    def _get_phenotype_fields(self) -> List[str]:
+    def _get_phenotype_fields(self) -> list[str]:
         """Get field names for phenotype CSV export."""
         return [
             "id",
@@ -403,7 +464,7 @@ class BulkExportService:
             "updated_at",
         ]
 
-    def _get_evidence_fields(self) -> List[str]:
+    def _get_evidence_fields(self) -> list[str]:
         """Get field names for evidence CSV export."""
         return [
             "id",
@@ -425,7 +486,7 @@ class BulkExportService:
             "updated_at",
         ]
 
-    def get_export_info(self, entity_type: str) -> Dict[str, Any]:
+    def get_export_info(self, entity_type: str) -> dict[str, Any]:
         """
         Get information about available export formats and entity counts.
 
@@ -446,4 +507,4 @@ class BulkExportService:
         }
 
 
-__all__ = ["BulkExportService", "ExportFormat", "CompressionFormat"]
+__all__ = ["BulkExportService", "CompressionFormat", "ExportFormat"]

@@ -8,13 +8,13 @@ Follows type safety examples from type_examples.md:
 """
 
 import json
-import pytest
 from unittest.mock import Mock
 
-from fastapi.testclient import TestClient
+import pytest
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-from src.application.export.export_service import ExportFormat, CompressionFormat
+from src.application.export.export_service import CompressionFormat, ExportFormat
 from src.routes.export import router
 
 
@@ -67,7 +67,9 @@ class TestExportRoutes:
         return TestClient(app)
 
     def test_export_genes_json_format(
-        self, test_client: TestClient, mock_export_service: Mock
+        self,
+        test_client: TestClient,
+        mock_export_service: Mock,
     ) -> None:
         """Test exporting genes in JSON format returns correct response."""
         # Act: Make request to export genes
@@ -95,7 +97,9 @@ class TestExportRoutes:
         assert data["genes"][0]["name"] == "Test Item"
 
     def test_export_variants_csv_format(
-        self, test_client: TestClient, mock_export_service: Mock
+        self,
+        test_client: TestClient,
+        mock_export_service: Mock,
     ) -> None:
         """Test exporting variants in CSV format returns correct response."""
         # Act: Make request to export variants as CSV
@@ -105,8 +109,8 @@ class TestExportRoutes:
         assert response.status_code == 200
         assert "text/csv" in response.headers["content-type"]
         assert (
-            "attachment; filename=variants.csv"
-            == response.headers["content-disposition"]
+            response.headers["content-disposition"]
+            == "attachment; filename=variants.csv"
         )
 
         # Verify CSV content
@@ -117,7 +121,9 @@ class TestExportRoutes:
         assert lines[1] == "1,Test Item"
 
     def test_export_with_gzip_compression(
-        self, test_client: TestClient, mock_export_service: Mock
+        self,
+        test_client: TestClient,
+        mock_export_service: Mock,
     ) -> None:
         """Test exporting with gzip compression."""
         # Act: Make request with gzip compression
@@ -137,7 +143,9 @@ class TestExportRoutes:
         )
 
     def test_export_with_limit_parameter(
-        self, test_client: TestClient, mock_export_service: Mock
+        self,
+        test_client: TestClient,
+        mock_export_service: Mock,
     ) -> None:
         """Test exporting with limit parameter."""
         # Act: Make request with limit
@@ -164,7 +172,9 @@ class TestExportRoutes:
         assert "Invalid entity type" in error_data["detail"]
 
     def test_get_export_info_returns_correct_structure(
-        self, test_client: TestClient, mock_export_service: Mock
+        self,
+        test_client: TestClient,
+        mock_export_service: Mock,
     ) -> None:
         """Test get export info endpoint returns typed structure."""
         # Act: Get export info for genes
@@ -186,7 +196,8 @@ class TestExportRoutes:
         mock_export_service.get_export_info.assert_called_once_with("genes")
 
     def test_list_exportable_entities_returns_complete_list(
-        self, test_client: TestClient
+        self,
+        test_client: TestClient,
     ) -> None:
         """Test list exportable entities endpoint returns all supported entities."""
         # Act: Get list of exportable entities
@@ -220,7 +231,8 @@ class TestExportRoutes:
         assert "endpoint" in data["usage"]
 
     def test_invalid_format_parameter_returns_400(
-        self, test_client: TestClient
+        self,
+        test_client: TestClient,
     ) -> None:
         """Test that invalid format parameter returns 400 error."""
         # Act: Make request with invalid format
@@ -230,7 +242,8 @@ class TestExportRoutes:
         assert response.status_code == 422  # FastAPI validation error
 
     def test_invalid_compression_parameter_returns_400(
-        self, test_client: TestClient
+        self,
+        test_client: TestClient,
     ) -> None:
         """Test that invalid compression parameter returns 400 error."""
         # Act: Make request with invalid compression
@@ -240,7 +253,8 @@ class TestExportRoutes:
         assert response.status_code == 422  # FastAPI validation error
 
     def test_streaming_response_headers_are_correct(
-        self, test_client: TestClient
+        self,
+        test_client: TestClient,
     ) -> None:
         """Test that streaming response includes correct headers."""
         # Act: Make export request
@@ -265,7 +279,9 @@ class TestExportRoutes:
         assert "genes.json" in response.headers["content-disposition"]
 
     def test_export_service_error_returns_500(
-        self, test_client: TestClient, mock_export_service: Mock
+        self,
+        test_client: TestClient,
+        mock_export_service: Mock,
     ) -> None:
         """Test that service errors are properly handled and return 500."""
         # Arrange: Make service raise an exception

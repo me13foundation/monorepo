@@ -2,11 +2,15 @@
 Metadata generation utilities for RO-Crate packages.
 """
 
-from datetime import datetime, UTC
-from pathlib import Path
-from typing import Dict, Any, List, Optional
+from __future__ import annotations
 
-from src.models.value_objects.provenance import Provenance
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from src.models.value_objects.provenance import Provenance
 
 
 class MetadataGenerator:
@@ -14,8 +18,8 @@ class MetadataGenerator:
 
     @staticmethod
     def generate_provenance_metadata(
-        provenance_records: List[Provenance],
-    ) -> Dict[str, Any]:
+        provenance_records: list[Provenance],
+    ) -> dict[str, Any]:
         """
         Generate provenance metadata from provenance records.
 
@@ -25,9 +29,9 @@ class MetadataGenerator:
         Returns:
             Provenance metadata dictionary
         """
-        sources: List[Dict[str, Any]] = []
+        sources: list[dict[str, Any]] = []
         for prov in provenance_records:
-            source_info: Dict[str, Any] = {
+            source_info: dict[str, Any] = {
                 "@type": "DataDownload",
                 "name": prov.source.value,
                 "url": prov.source_url or "",
@@ -49,7 +53,7 @@ class MetadataGenerator:
         return {"sources": sources}
 
     @staticmethod
-    def generate_license_metadata(license_id: str) -> Dict[str, Any]:
+    def generate_license_metadata(license_id: str) -> dict[str, Any]:
         """
         Generate license metadata.
 
@@ -67,7 +71,8 @@ class MetadataGenerator:
 
         return {
             "@id": license_urls.get(
-                license_id, f"https://spdx.org/licenses/{license_id}.html"
+                license_id,
+                f"https://spdx.org/licenses/{license_id}.html",
             ),
             "@type": "CreativeWork",
             "name": license_id,
@@ -77,9 +82,9 @@ class MetadataGenerator:
     @staticmethod
     def generate_file_metadata(
         file_path: Path,
-        description: Optional[str] = None,
-        mime_type: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        description: str | None = None,
+        mime_type: str | None = None,
+    ) -> dict[str, Any]:
         """
         Generate metadata for a file.
 
@@ -119,14 +124,14 @@ class MetadataGenerator:
         return metadata
 
     @staticmethod
-    def generate_dataset_metadata(
+    def generate_dataset_metadata(  # noqa: PLR0913 - dataset metadata fields
         name: str,
         description: str,
         version: str,
-        license: str,
+        license_id: str,
         author: str,
-        keywords: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        keywords: list[str] | None = None,
+    ) -> dict[str, Any]:
         """
         Generate root dataset metadata.
 
@@ -134,7 +139,7 @@ class MetadataGenerator:
             name: Dataset name
             description: Dataset description
             version: Dataset version
-            license: License identifier
+            license_id: License identifier
             author: Author/organization name
             keywords: Optional keywords
 
@@ -147,6 +152,7 @@ class MetadataGenerator:
             "name": name,
             "description": description,
             "version": version,
+            "license": license_id,
             "datePublished": datetime.now(UTC).isoformat(),
             "creator": {
                 "@type": "Organization",

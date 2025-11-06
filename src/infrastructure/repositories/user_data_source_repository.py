@@ -7,19 +7,18 @@ and efficient database operations.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
-from uuid import UUID
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, cast
 
-from sqlalchemy import select, func, desc, update, delete, and_
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, delete, desc, func, select, update
 
 from src.domain.entities.user_data_source import (
-    UserDataSource,
-    SourceType,
-    SourceStatus,
     IngestionSchedule,
     QualityMetrics,
     SourceConfiguration,
+    SourceStatus,
+    SourceType,
+    UserDataSource,
 )
 from src.domain.repositories.user_data_source_repository import (
     UserDataSourceRepository as UserDataSourceRepositoryInterface,
@@ -27,8 +26,11 @@ from src.domain.repositories.user_data_source_repository import (
 from src.infrastructure.mappers.user_data_source_mapper import UserDataSourceMapper
 from src.models.database import UserDataSourceModel
 
-if TYPE_CHECKING:
-    pass
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from uuid import UUID
+
+    from sqlalchemy.engine import CursorResult
+    from sqlalchemy.orm import Session
 
 
 class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
@@ -39,14 +41,15 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
     ownership-based filtering, status queries, and quality metric tracking.
     """
 
-    def __init__(self, session: Optional[Session] = None) -> None:
+    def __init__(self, session: Session | None = None) -> None:
         self._session = session
 
     @property
     def session(self) -> Session:
         """Get the current database session."""
         if self._session is None:
-            raise ValueError("Session not provided")
+            message = "Session not provided"
+            raise ValueError(message)
         return self._session
 
     def save(self, source: UserDataSource) -> UserDataSource:
@@ -57,17 +60,20 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         self.session.refresh(model)
         return UserDataSourceMapper.to_domain(model)
 
-    def find_by_id(self, source_id: UUID) -> Optional[UserDataSource]:
+    def find_by_id(self, source_id: UUID) -> UserDataSource | None:
         """Find a user data source by its ID."""
         stmt = select(UserDataSourceModel).where(
-            UserDataSourceModel.id == str(source_id)
+            UserDataSourceModel.id == str(source_id),
         )
         result = self.session.execute(stmt).scalar_one_or_none()
         return UserDataSourceMapper.to_domain(result) if result else None
 
     def find_by_owner(
-        self, owner_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        owner_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """Find all data sources owned by a specific user."""
         stmt = (
             select(UserDataSourceModel)
@@ -80,8 +86,11 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return [UserDataSourceMapper.to_domain(model) for model in results]
 
     def find_by_type(
-        self, source_type: SourceType, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        source_type: SourceType,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """Find all data sources of a specific type."""
         stmt = (
             select(UserDataSourceModel)
@@ -94,8 +103,11 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return [UserDataSourceMapper.to_domain(model) for model in results]
 
     def find_by_status(
-        self, status: SourceStatus, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        status: SourceStatus,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """Find all data sources with a specific status."""
         stmt = (
             select(UserDataSourceModel)
@@ -108,8 +120,10 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return [UserDataSourceMapper.to_domain(model) for model in results]
 
     def find_active_sources(
-        self, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """Find all active data sources."""
         stmt = (
             select(UserDataSourceModel)
@@ -122,8 +136,11 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return [UserDataSourceMapper.to_domain(model) for model in results]
 
     def find_by_tag(
-        self, tag: str, skip: int = 0, limit: int = 50
-    ) -> List[UserDataSource]:
+        self,
+        tag: str,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
         """Find data sources that have a specific tag."""
         # Using JSON containment query for tags array
         stmt = (
@@ -139,14 +156,14 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
     def search_by_name(
         self,
         query: str,
-        owner_id: Optional[UUID] = None,
+        owner_id: UUID | None = None,
         skip: int = 0,
         limit: int = 50,
-    ) -> List[UserDataSource]:
+    ) -> list[UserDataSource]:
         """Search data sources by name using fuzzy matching."""
         search_pattern = f"%{query}%"
         stmt = select(UserDataSourceModel).where(
-            UserDataSourceModel.name.ilike(search_pattern)
+            UserDataSourceModel.name.ilike(search_pattern),
         )
 
         if owner_id:
@@ -162,8 +179,10 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return [UserDataSourceMapper.to_domain(model) for model in results]
 
     def update_status(
-        self, source_id: UUID, status: SourceStatus
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        status: SourceStatus,
+    ) -> UserDataSource | None:
         """Update the status of a data source."""
         stmt = (
             update(UserDataSourceModel)
@@ -178,8 +197,10 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return None
 
     def update_quality_metrics(
-        self, source_id: UUID, metrics: QualityMetrics
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        metrics: QualityMetrics,
+    ) -> UserDataSource | None:
         """Update the quality metrics of a data source."""
         stmt = (
             update(UserDataSourceModel)
@@ -194,8 +215,10 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return None
 
     def update_configuration(
-        self, source_id: UUID, config: SourceConfiguration
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        config: SourceConfiguration,
+    ) -> UserDataSource | None:
         """Update the configuration of a data source."""
         stmt = (
             update(UserDataSourceModel)
@@ -210,8 +233,10 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         return None
 
     def update_ingestion_schedule(
-        self, source_id: UUID, schedule: IngestionSchedule
-    ) -> Optional[UserDataSource]:
+        self,
+        source_id: UUID,
+        schedule: IngestionSchedule,
+    ) -> UserDataSource | None:
         """Update the ingestion schedule of a data source."""
         stmt = (
             update(UserDataSourceModel)
@@ -225,10 +250,8 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
             return UserDataSourceMapper.to_domain(result)
         return None
 
-    def record_ingestion(self, source_id: UUID) -> Optional[UserDataSource]:
+    def record_ingestion(self, source_id: UUID) -> UserDataSource | None:
         """Record that ingestion has occurred for a data source."""
-        from datetime import datetime, UTC
-
         now = datetime.now(UTC)
         stmt = (
             update(UserDataSourceModel)
@@ -245,11 +268,13 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
     def delete(self, source_id: UUID) -> bool:
         """Delete a data source from the repository."""
         stmt = delete(UserDataSourceModel).where(
-            UserDataSourceModel.id == str(source_id)
+            UserDataSourceModel.id == str(source_id),
         )
         result = self.session.execute(stmt)
         self.session.commit()
-        return bool(result.rowcount and result.rowcount > 0)  # type: ignore
+        cursor = cast("CursorResult[Any]", result)
+        affected = int(cursor.rowcount or 0)
+        return affected > 0
 
     def count_by_owner(self, owner_id: UUID) -> int:
         """Count the number of data sources owned by a user."""
@@ -264,7 +289,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
     def count_by_type(self, source_type: SourceType) -> int:
         """Count the number of data sources of a specific type."""
         stmt = select(func.count()).where(
-            UserDataSourceModel.source_type == source_type.value
+            UserDataSourceModel.source_type == source_type.value,
         )
         return self.session.execute(stmt).scalar_one()
 
@@ -273,16 +298,16 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         stmt = select(func.count()).where(UserDataSourceModel.id == str(source_id))
         return self.session.execute(stmt).scalar_one() > 0
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Get overall statistics about data sources."""
         # Get counts by status
-        status_counts: Dict[str, int] = {}
+        status_counts: dict[str, int] = {}
         for status in SourceStatus:
             count = self.count_by_status(status)
             status_counts[status.value] = count
 
         # Get counts by type
-        type_counts: Dict[str, int] = {}
+        type_counts: dict[str, int] = {}
         for source_type in SourceType:
             count = self.count_by_type(source_type)
             type_counts[source_type.value] = count
@@ -291,17 +316,19 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         stmt = select(
             func.avg(
                 func.json_extract(
-                    UserDataSourceModel.quality_metrics, "$.overall_score"
-                )
+                    UserDataSourceModel.quality_metrics,
+                    "$.overall_score",
+                ),
             ),
             func.count(),
         ).where(
             and_(
                 UserDataSourceModel.quality_metrics.isnot(None),
                 func.json_extract(
-                    UserDataSourceModel.quality_metrics, "$.overall_score"
+                    UserDataSourceModel.quality_metrics,
+                    "$.overall_score",
                 ).isnot(None),
-            )
+            ),
         )
         result = self.session.execute(stmt).first()
         if result is None:
@@ -311,7 +338,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
 
         # Get total count
         total_count = self.session.execute(
-            select(func.count()).select_from(UserDataSourceModel)
+            select(func.count()).select_from(UserDataSourceModel),
         ).scalar_one()
 
         return {

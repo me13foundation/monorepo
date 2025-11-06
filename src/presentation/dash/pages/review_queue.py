@@ -1,12 +1,10 @@
-from typing import List
-
-from dash import html, dcc
 import dash_bootstrap_components as dbc
-from dash.dcc import Dropdown
 
-from src.presentation.dash.components.sidebar import create_sidebar
-from src.presentation.dash.components.record_viewer import create_data_table
-from src.presentation.dash.components.theme import COLORS
+from dash import dcc, html
+from dash.dcc import Dropdown
+from src.presentation.dash.components.curation.audit_summary import (
+    render_audit_summary,
+)
 from src.presentation.dash.components.curation.clinical_card import (
     create_clinical_card_grid,
     create_enhanced_filters,
@@ -14,33 +12,33 @@ from src.presentation.dash.components.curation.clinical_card import (
 from src.presentation.dash.components.curation.clinical_viewer import (
     render_clinical_viewer,
 )
-from src.presentation.dash.components.curation.evidence_comparison import (
-    render_evidence_matrix,
-)
 from src.presentation.dash.components.curation.conflict_panel import (
     render_conflict_panel,
 )
-from src.presentation.dash.components.curation.audit_summary import (
-    render_audit_summary,
+from src.presentation.dash.components.curation.evidence_comparison import (
+    render_evidence_matrix,
 )
+from src.presentation.dash.components.record_viewer import create_data_table
+from src.presentation.dash.components.sidebar import create_sidebar
+from src.presentation.dash.components.theme import COLORS
 
 DropdownOption = Dropdown.Options
 
-ENTITY_TYPE_OPTIONS: List[DropdownOption] = [
+ENTITY_TYPE_OPTIONS: list[DropdownOption] = [
     {"label": "Genes", "value": "genes"},
     {"label": "Variants", "value": "variants"},
     {"label": "Phenotypes", "value": "phenotypes"},
     {"label": "Publications", "value": "publications"},
 ]
 
-STATUS_OPTIONS: List[DropdownOption] = [
+STATUS_OPTIONS: list[DropdownOption] = [
     {"label": "Pending", "value": "pending"},
     {"label": "Approved", "value": "approved"},
     {"label": "Rejected", "value": "rejected"},
     {"label": "Quarantined", "value": "quarantined"},
 ]
 
-PRIORITY_OPTIONS: List[DropdownOption] = [
+PRIORITY_OPTIONS: list[DropdownOption] = [
     {"label": "High", "value": "high"},
     {"label": "Medium", "value": "medium"},
     {"label": "Low", "value": "low"},
@@ -78,7 +76,7 @@ def create_review_page() -> dbc.Container:
                                                     ),
                                                     dbc.Button(
                                                         html.I(
-                                                            className="fas fa-table"
+                                                            className="fas fa-table",
                                                         ),
                                                         id="table-view-btn",
                                                         color="outline-primary",
@@ -177,8 +175,8 @@ def create_review_page() -> dbc.Container:
                                                                         color="warning",
                                                                         size="sm",
                                                                     ),
-                                                                ]
-                                                            )
+                                                                ],
+                                                            ),
                                                         ],
                                                         width=8,
                                                     ),
@@ -204,14 +202,14 @@ def create_review_page() -> dbc.Container:
                                             html.Div(
                                                 id="clinical-card-container",
                                                 children=create_clinical_card_grid(
-                                                    []
+                                                    [],
                                                 ),  # Will be populated by callbacks
                                             ),
                                             # Fallback to old table view (can be toggled)
                                             html.Div(
                                                 id="table-view-container",
                                                 style={
-                                                    "display": "none"
+                                                    "display": "none",
                                                 },  # Hidden by default
                                                 children=create_data_table(
                                                     id="review-table",
@@ -284,7 +282,7 @@ def create_review_page() -> dbc.Container:
                                                         {
                                                             "if": {"row_index": "odd"},
                                                             "backgroundColor": "rgb(248, 248, 248)",
-                                                        }
+                                                        },
                                                     ],
                                                 ),
                                             ),
@@ -308,7 +306,7 @@ def create_review_page() -> dbc.Container:
                                                                 ),
                                                             ],
                                                             className="d-flex align-items-center",
-                                                        )
+                                                        ),
                                                     ),
                                                     dbc.CardBody(
                                                         dcc.Loading(
@@ -318,47 +316,48 @@ def create_review_page() -> dbc.Container:
                                                                 html.Div(
                                                                     id="curation-summary-panel",
                                                                     children=render_clinical_viewer(
-                                                                        None, ()
+                                                                        None,
+                                                                        (),
                                                                     ),
                                                                 ),
                                                                 html.Hr(),
                                                                 html.Div(
                                                                     id="curation-evidence-panel",
                                                                     children=render_evidence_matrix(
-                                                                        ()
+                                                                        (),
                                                                     ),
                                                                 ),
                                                                 html.Hr(),
                                                                 html.Div(
                                                                     id="curation-conflict-panel",
                                                                     children=render_conflict_panel(
-                                                                        ()
+                                                                        (),
                                                                     ),
                                                                 ),
                                                                 html.Hr(),
                                                                 html.Div(
                                                                     id="curation-audit-panel",
                                                                     children=render_audit_summary(
-                                                                        None
+                                                                        None,
                                                                     ),
                                                                 ),
                                                             ],
-                                                        )
+                                                        ),
                                                     ),
                                                 ],
                                                 id="curation-detail-container",
                                                 className="mt-4 shadow-sm",
                                                 style={"display": "none"},
                                             ),
-                                        ]
+                                        ],
                                     ),
-                                ]
-                            )
+                                ],
+                            ),
                         ],
                         width=9,
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         fluid=True,
     )

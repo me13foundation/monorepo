@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Optional, Tuple
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, ClassVar
 
-from src.domain.value_objects.identifiers import PhenotypeIdentifier
+if TYPE_CHECKING:
+    from src.domain.value_objects.identifiers import PhenotypeIdentifier
 
 
 class PhenotypeCategory:
@@ -18,7 +19,7 @@ class PhenotypeCategory:
     ONCOLOGICAL = "oncological"
     OTHER = "other"
 
-    _VALID_CATEGORIES = {
+    _VALID_CATEGORIES: ClassVar[set[str]] = {
         CONGENITAL,
         DEVELOPMENTAL,
         NEUROLOGICAL,
@@ -34,7 +35,8 @@ class PhenotypeCategory:
     def validate(cls, value: str) -> str:
         normalized = value or cls.OTHER
         if normalized not in cls._VALID_CATEGORIES:
-            raise ValueError(f"Unsupported phenotype category '{value}'")
+            msg = f"Unsupported phenotype category '{value}'"
+            raise ValueError(msg)
         return normalized
 
 
@@ -42,35 +44,40 @@ class PhenotypeCategory:
 class Phenotype:
     identifier: PhenotypeIdentifier
     name: str
-    definition: Optional[str] = None
-    synonyms: Tuple[str, ...] = field(default_factory=tuple)
+    definition: str | None = None
+    synonyms: tuple[str, ...] = field(default_factory=tuple)
     category: str = PhenotypeCategory.OTHER
-    parent_hpo_id: Optional[str] = None
+    parent_hpo_id: str | None = None
     is_root_term: bool = False
-    frequency_in_med13: Optional[str] = None
-    severity_score: Optional[int] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    id: Optional[int] = None
+    frequency_in_med13: str | None = None
+    severity_score: int | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    id: int | None = None
 
     def __post_init__(self) -> None:
         self.category = PhenotypeCategory.validate(self.category)
         self.synonyms = self._normalize_synonyms(self.synonyms)
         if not self.name:
-            raise ValueError("Phenotype name cannot be empty")
-        if self.severity_score is not None:
-            if not (1 <= self.severity_score <= 5):
-                raise ValueError("severity_score must be between 1 and 5")
+            msg = "Phenotype name cannot be empty"
+            raise ValueError(msg)
+        max_severity = 5
+        if self.severity_score is not None and not (
+            1 <= self.severity_score <= max_severity
+        ):
+            msg = "severity_score must be between 1 and 5"
+            raise ValueError(msg)
 
     def add_synonym(self, synonym: str) -> None:
         cleaned = synonym.strip()
         if not cleaned:
-            raise ValueError("synonym cannot be empty")
+            msg = "synonym cannot be empty"
+            raise ValueError(msg)
         if cleaned not in self.synonyms:
-            self.synonyms = tuple((*self.synonyms, cleaned))
+            self.synonyms = (*self.synonyms, cleaned)
             self._touch()
 
-    def update_definition(self, definition: Optional[str]) -> None:
+    def update_definition(self, definition: str | None) -> None:
         self.definition = definition
         self._touch()
 
@@ -78,16 +85,16 @@ class Phenotype:
         self.category = PhenotypeCategory.validate(category)
         self._touch()
 
-    def mark_as_root(self, *, parent_hpo_id: Optional[str] = None) -> None:
+    def mark_as_root(self, *, parent_hpo_id: str | None = None) -> None:
         self.is_root_term = True
         self.parent_hpo_id = parent_hpo_id
         self._touch()
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     @staticmethod
-    def _normalize_synonyms(synonyms: Tuple[str, ...]) -> Tuple[str, ...]:
+    def _normalize_synonyms(synonyms: tuple[str, ...]) -> tuple[str, ...]:
         seen: set[str] = set()
         normalized: list[str] = []
         for synonym in synonyms:

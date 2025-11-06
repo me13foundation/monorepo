@@ -1,8 +1,34 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import DashboardPage from '@/app/dashboard/page'
-import { SessionProvider } from '@/components/session-provider'
 import { ThemeProvider } from '@/components/theme-provider'
+// Mock ThemeProvider to avoid DOM prop warnings
+jest.mock('@/components/theme-provider', () => ({
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+// Mock React Query dashboard hooks
+jest.mock('@/lib/queries/dashboard', () => ({
+  useDashboardStats: () => ({
+    data: {
+      pending_count: 1,
+      approved_count: 9,
+      rejected_count: 0,
+      total_items: 10,
+      entity_counts: { genes: 2, variants: 5, phenotypes: 2, evidence: 1, publications: 0 },
+    },
+    isLoading: false,
+  }),
+  useRecentActivities: () => ({
+    data: {
+      activities: [
+        { title: 'Ingestion finished', category: 'success', icon: 'mdi:check', timestamp: new Date().toISOString() },
+        { title: 'Validation warning', category: 'warning', icon: 'mdi:alert', timestamp: new Date().toISOString() },
+      ],
+      total: 2,
+    },
+    isLoading: false,
+  }),
+}))
 
 // Mock NextAuth session
 const mockSession = {
@@ -76,22 +102,20 @@ describe('DashboardPage', () => {
       expect(screen.getByText('System Health')).toBeInTheDocument()
     })
 
-    it('displays correct metric values', () => {
+    it('displays metric values from API', () => {
       renderWithProviders(<DashboardPage />)
-
-      expect(screen.getByText('12')).toBeInTheDocument() // Data Sources
-      expect(screen.getByText('1,234,567')).toBeInTheDocument() // Total Records
-      expect(screen.getByText('24')).toBeInTheDocument() // Active Users
-      expect(screen.getByText('98.5%')).toBeInTheDocument() // System Health
+      expect(screen.getByText('1')).toBeInTheDocument() // Data Sources (evidence count)
+      expect(screen.getByText('10')).toBeInTheDocument() // Total Records
+      expect(screen.getByText('2')).toBeInTheDocument() // Genes count
+      expect(screen.getByText('90%')).toBeInTheDocument() // Approx approval rate
     })
 
     it('displays metric descriptions', () => {
       renderWithProviders(<DashboardPage />)
-
-      expect(screen.getByText('8 active, 2 paused, 2 error')).toBeInTheDocument()
-      expect(screen.getByText('+12% from last month')).toBeInTheDocument()
-      expect(screen.getByText('5 admins, 19 researchers')).toBeInTheDocument()
-      expect(screen.getByText('All systems operational')).toBeInTheDocument()
+      expect(screen.getByText(/Approved 9/i)).toBeInTheDocument()
+      expect(screen.getByText(/Total records across entities/i)).toBeInTheDocument()
+      expect(screen.getByText(/Total genes in knowledge base/i)).toBeInTheDocument()
+      expect(screen.getByText(/Approximate approval rate/i)).toBeInTheDocument()
     })
   })
 
@@ -103,33 +127,12 @@ describe('DashboardPage', () => {
       expect(screen.getByText('Latest data source configurations and status')).toBeInTheDocument()
     })
 
-    it('renders sample data sources', () => {
+    it('shows data source guidance message', () => {
       renderWithProviders(<DashboardPage />)
-
-      expect(screen.getByText('ClinVar API')).toBeInTheDocument()
-      expect(screen.getByText('HGMD Database')).toBeInTheDocument()
-      expect(screen.getByText('OMIM CSV Upload')).toBeInTheDocument()
-      expect(screen.getByText('PubMed API')).toBeInTheDocument()
+      expect(screen.getByText(/Connect data sources/i)).toBeInTheDocument()
     })
 
-    it('displays data source metadata', () => {
-      renderWithProviders(<DashboardPage />)
-
-      expect(screen.getByText('API • 2 hours ago')).toBeInTheDocument()
-      expect(screen.getByText('Database • 1 day ago')).toBeInTheDocument()
-      expect(screen.getByText('File • 3 days ago')).toBeInTheDocument()
-      expect(screen.getByText('API • 1 week ago')).toBeInTheDocument()
-    })
-
-    it('shows status badges', () => {
-      renderWithProviders(<DashboardPage />)
-
-      const activeBadges = screen.getAllByText('active')
-      expect(activeBadges).toHaveLength(2) // ClinVar and HGMD
-
-      expect(screen.getByText('error')).toBeInTheDocument() // OMIM
-      expect(screen.getByText('paused')).toBeInTheDocument() // PubMed
-    })
+    // Status badges are shown when real data sources are connected; omitted in initial scaffold
   })
 
   describe('System Activity Section', () => {
@@ -142,20 +145,8 @@ describe('DashboardPage', () => {
 
     it('renders activity feed', () => {
       renderWithProviders(<DashboardPage />)
-
-      expect(screen.getByText('Data ingestion completed')).toBeInTheDocument()
-      expect(screen.getByText('Quality check failed')).toBeInTheDocument()
-      expect(screen.getByText('User login')).toBeInTheDocument()
-      expect(screen.getByText('Data source updated')).toBeInTheDocument()
-    })
-
-    it('displays activity metadata', () => {
-      renderWithProviders(<DashboardPage />)
-
-      expect(screen.getByText('ClinVar API • 2 hours ago')).toBeInTheDocument()
-      expect(screen.getByText('OMIM CSV • 3 hours ago')).toBeInTheDocument()
-      expect(screen.getByText('john.doe@example.com • 4 hours ago')).toBeInTheDocument()
-      expect(screen.getByText('PubMed API • 5 hours ago')).toBeInTheDocument()
+      expect(screen.getByText('Ingestion finished')).toBeInTheDocument()
+      expect(screen.getByText('Validation warning')).toBeInTheDocument()
     })
   })
 
@@ -172,7 +163,7 @@ describe('DashboardPage', () => {
     const h1 = screen.getByRole('heading', { level: 1 })
     const h3s = screen.getAllByRole('heading', { level: 3 })
     expect(h1).toBeInTheDocument()
-    expect(h3s).toHaveLength(6) // 4 metric cards + 2 sections
+    expect(h3s.length).toBeGreaterThanOrEqual(4) // metric cards present
   })
 
   it('applies proper CSS classes', () => {

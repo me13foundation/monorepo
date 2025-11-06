@@ -4,13 +4,17 @@ Conflict panel component for curator detail view.
 
 from __future__ import annotations
 
-from typing import Sequence, cast
+from typing import TYPE_CHECKING, cast
 
 import dash_bootstrap_components as dbc
-from dash import html
-from dash.development.base_component import Component
 
-from src.presentation.dash.types import ConflictSummary
+from dash import html
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+
+    from dash.development.base_component import Component
+    from src.presentation.dash.types import ConflictSummary
 
 
 def render_conflict_panel(conflicts: Sequence[ConflictSummary]) -> Component:
@@ -19,7 +23,7 @@ def render_conflict_panel(conflicts: Sequence[ConflictSummary]) -> Component:
     """
     if not conflicts:
         return cast(
-            Component,
+            "Component",
             dbc.Alert(
                 [
                     html.I(className="fas fa-check-circle me-2"),
@@ -48,18 +52,18 @@ def render_conflict_panel(conflicts: Sequence[ConflictSummary]) -> Component:
                     f"Evidence IDs: {', '.join(str(eid) for eid in conflict.get('evidence_ids', ())) or 'N/A'}",
                     className="text-muted",
                 ),
-            ]
+            ],
         )
         for conflict in conflicts
     ]
 
     return cast(
-        Component,
+        "Component",
         html.Div(
             [
                 html.H5("Conflict Overview"),
                 dbc.ListGroup(conflict_items, flush=True),
-            ]
+            ],
         ),
     )
 
@@ -73,7 +77,7 @@ def _severity_badge(severity: str) -> Component:
     }
     color = color_map.get(normalized, "info")
     label = normalized.title()
-    return cast(Component, dbc.Badge(label, color=color))
+    return cast("Component", dbc.Badge(label, color=color))
 
 
 __all__ = ["render_conflict_panel"]

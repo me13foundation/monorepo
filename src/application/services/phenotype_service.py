@@ -1,6 +1,6 @@
 """Application-level orchestration for phenotype use cases."""
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
 from src.domain.repositories.phenotype_repository import PhenotypeRepository
@@ -28,9 +28,9 @@ class PhenotypeApplicationService:
         self,
         hpo_id: str,
         name: str,
-        definition: Optional[str] = None,
+        definition: str | None = None,
         category: str = PhenotypeCategory.OTHER,
-        synonyms: Optional[List[str]] = None,
+        synonyms: list[str] | None = None,
     ) -> Phenotype:
         """
         Create a new phenotype.
@@ -56,17 +56,20 @@ class PhenotypeApplicationService:
 
         return self._phenotype_repository.create(phenotype_entity)
 
-    def get_phenotype_by_hpo_id(self, hpo_id: str) -> Optional[Phenotype]:
+    def get_phenotype_by_hpo_id(self, hpo_id: str) -> Phenotype | None:
         """Find a phenotype by its HPO ID."""
         return self._phenotype_repository.find_by_hpo_id(hpo_id)
 
     def search_phenotypes_by_name(
-        self, name: str, fuzzy: bool = False
-    ) -> List[Phenotype]:
+        self,
+        name: str,
+        *,
+        fuzzy: bool = False,
+    ) -> list[Phenotype]:
         """Find phenotypes by name."""
-        return self._phenotype_repository.find_by_name(name, fuzzy)
+        return self._phenotype_repository.find_by_name(name, fuzzy=fuzzy)
 
-    def get_phenotypes_by_category(self, category: str) -> List[Phenotype]:
+    def get_phenotypes_by_category(self, category: str) -> list[Phenotype]:
         """Find phenotypes by category."""
         return self._phenotype_repository.find_by_category(category)
 
@@ -74,8 +77,8 @@ class PhenotypeApplicationService:
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Phenotype]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Phenotype]:
         """Search phenotypes with optional filters."""
         return self._phenotype_repository.search_phenotypes(query, limit, filters)
 
@@ -85,18 +88,22 @@ class PhenotypeApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Phenotype], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Phenotype], int]:
         """Retrieve paginated phenotypes with optional filters."""
         return self._phenotype_repository.paginate_phenotypes(
-            page, per_page, sort_by, sort_order, filters
+            page,
+            per_page,
+            sort_by,
+            sort_order,
+            filters,
         )
 
-    def update_phenotype(self, phenotype_id: int, updates: Dict[str, Any]) -> Phenotype:
+    def update_phenotype(self, phenotype_id: int, updates: dict[str, Any]) -> Phenotype:
         """Update phenotype fields."""
         return self._phenotype_repository.update(phenotype_id, updates)
 
-    def get_phenotype_statistics(self) -> Dict[str, int | float | bool | str | None]:
+    def get_phenotype_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about phenotypes in the repository."""
         return self._phenotype_repository.get_phenotype_statistics()
 

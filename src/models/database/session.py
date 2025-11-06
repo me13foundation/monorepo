@@ -5,15 +5,16 @@ SQLAlchemy model for user sessions with security tracking.
 """
 
 from datetime import datetime
-from typing import Optional
 from uuid import uuid4
 
-from sqlalchemy import String, TIMESTAMP, Enum as SQLEnum, ForeignKey, Index, Text
+from sqlalchemy import TIMESTAMP, ForeignKey, Index, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
+from src.domain.entities.session import SessionStatus
+
 from .base import Base
-from ...domain.entities.session import SessionStatus
 
 
 class SessionModel(Base):
@@ -44,22 +45,28 @@ class SessionModel(Base):
 
     # JWT tokens
     session_token: Mapped[str] = mapped_column(
-        Text, nullable=False, doc="JWT access token"
+        Text,
+        nullable=False,
+        doc="JWT access token",
     )
     refresh_token: Mapped[str] = mapped_column(
-        Text, nullable=False, doc="JWT refresh token"
+        Text,
+        nullable=False,
+        doc="JWT refresh token",
     )
 
     # Session metadata
-    ip_address: Mapped[Optional[str]] = mapped_column(
+    ip_address: Mapped[str | None] = mapped_column(
         String(45),  # IPv6 addresses can be up to 45 chars
         nullable=True,
         doc="Client IP address",
     )
-    user_agent: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True, doc="Client user agent string"
+    user_agent: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        doc="Client user agent string",
     )
-    device_fingerprint: Mapped[Optional[str]] = mapped_column(
+    device_fingerprint: Mapped[str | None] = mapped_column(
         String(32),  # SHA256 hex is 64 chars, we'll use truncated
         nullable=True,
         doc="Device fingerprint hash",
@@ -80,7 +87,9 @@ class SessionModel(Base):
         doc="Access token expiration time",
     )
     refresh_expires_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), nullable=False, doc="Refresh token expiration time"
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        doc="Refresh token expiration time",
     )
 
     # Activity tracking
@@ -98,7 +107,6 @@ class SessionModel(Base):
     )
 
     # Relationship to user (optional, for convenience)
-    # user: Mapped[UserModel] = relationship("UserModel", backref="sessions")
 
     __table_args__ = (
         # Composite indexes for performance

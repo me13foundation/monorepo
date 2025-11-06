@@ -5,17 +5,23 @@ Revises:
 Create Date: 2025-11-01 14:14:35.312881
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import sqlalchemy as sa
 
+from alembic import op
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
 revision: str = "a672f05b90d4"
-down_revision: Union[str, Sequence[str], None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -53,7 +59,10 @@ def upgrade() -> None:
     op.create_index(op.f("ix_genes_ensembl_id"), "genes", ["ensembl_id"], unique=True)
     op.create_index(op.f("ix_genes_gene_id"), "genes", ["gene_id"], unique=True)
     op.create_index(
-        op.f("ix_genes_ncbi_gene_id"), "genes", ["ncbi_gene_id"], unique=True
+        op.f("ix_genes_ncbi_gene_id"),
+        "genes",
+        ["ncbi_gene_id"],
+        unique=True,
     )
     op.create_index(op.f("ix_genes_symbol"), "genes", ["symbol"], unique=True)
     op.create_index(op.f("ix_genes_uniprot_id"), "genes", ["uniprot_id"], unique=True)
@@ -91,7 +100,10 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_phenotypes_hpo_id"), "phenotypes", ["hpo_id"], unique=True)
     op.create_index(
-        op.f("ix_phenotypes_hpo_term"), "phenotypes", ["hpo_term"], unique=False
+        op.f("ix_phenotypes_hpo_term"),
+        "phenotypes",
+        ["hpo_term"],
+        unique=False,
     )
     op.create_index(
         op.f("ix_phenotypes_parent_hpo_id"),
@@ -143,7 +155,10 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_publications_doi"), "publications", ["doi"], unique=True)
     op.create_index(
-        op.f("ix_publications_pmc_id"), "publications", ["pmc_id"], unique=True
+        op.f("ix_publications_pmc_id"),
+        "publications",
+        ["pmc_id"],
+        unique=True,
     )
     op.create_index(
         op.f("ix_publications_publication_year"),
@@ -152,7 +167,10 @@ def upgrade() -> None:
         unique=False,
     )
     op.create_index(
-        op.f("ix_publications_pubmed_id"), "publications", ["pubmed_id"], unique=True
+        op.f("ix_publications_pubmed_id"),
+        "publications",
+        ["pubmed_id"],
+        unique=True,
     )
     op.create_table(
         "variants",
@@ -199,14 +217,23 @@ def upgrade() -> None:
         sqlite_autoincrement=True,
     )
     op.create_index(
-        op.f("ix_variants_clinvar_id"), "variants", ["clinvar_id"], unique=True
+        op.f("ix_variants_clinvar_id"),
+        "variants",
+        ["clinvar_id"],
+        unique=True,
     )
     op.create_index(op.f("ix_variants_gene_id"), "variants", ["gene_id"], unique=False)
     op.create_index(
-        op.f("ix_variants_position"), "variants", ["position"], unique=False
+        op.f("ix_variants_position"),
+        "variants",
+        ["position"],
+        unique=False,
     )
     op.create_index(
-        op.f("ix_variants_variant_id"), "variants", ["variant_id"], unique=True
+        op.f("ix_variants_variant_id"),
+        "variants",
+        ["variant_id"],
+        unique=True,
     )
     op.create_table(
         "evidence",
@@ -264,13 +291,22 @@ def upgrade() -> None:
         sqlite_autoincrement=True,
     )
     op.create_index(
-        op.f("ix_evidence_phenotype_id"), "evidence", ["phenotype_id"], unique=False
+        op.f("ix_evidence_phenotype_id"),
+        "evidence",
+        ["phenotype_id"],
+        unique=False,
     )
     op.create_index(
-        op.f("ix_evidence_publication_id"), "evidence", ["publication_id"], unique=False
+        op.f("ix_evidence_publication_id"),
+        "evidence",
+        ["publication_id"],
+        unique=False,
     )
     op.create_index(
-        op.f("ix_evidence_variant_id"), "evidence", ["variant_id"], unique=False
+        op.f("ix_evidence_variant_id"),
+        "evidence",
+        ["variant_id"],
+        unique=False,
     )
     # ### end Alembic commands ###
 

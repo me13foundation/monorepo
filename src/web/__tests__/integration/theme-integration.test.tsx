@@ -87,3 +87,20 @@ describe('Theme Integration', () => {
     expect(screen.getByText('Toggle theme')).toHaveClass('sr-only')
   })
 })
+// Mock React Query dashboard hooks to avoid QueryClient in tests
+jest.mock('@/lib/queries/dashboard', () => ({
+  useDashboardStats: () => ({
+    data: {
+      pending_count: 1,
+      approved_count: 9,
+      rejected_count: 0,
+      total_items: 10,
+      entity_counts: { genes: 2, variants: 5, phenotypes: 2, evidence: 1, publications: 0 },
+    },
+    isLoading: false,
+  }),
+  useRecentActivities: () => ({
+    data: { activities: [], total: 0 },
+    isLoading: false,
+  }),
+}))

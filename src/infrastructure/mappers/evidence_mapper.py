@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
-from typing import Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from src.domain.entities.evidence import Evidence, EvidenceType
 from src.domain.entities.variant import VariantSummary
@@ -15,6 +14,10 @@ from src.models.database.evidence import EvidenceModel
 from src.models.database.phenotype import PhenotypeModel
 from src.models.database.publication import PublicationModel
 from src.models.database.variant import VariantModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Sequence
+    from datetime import date
 
 
 class EvidenceMapper:
@@ -45,7 +48,7 @@ class EvidenceMapper:
             study_type=model.study_type,
             statistical_significance=model.statistical_significance,
             reviewed=model.reviewed,
-            review_date=cast(Optional[date], model.review_date),
+            review_date=cast("date | None", model.review_date),
             reviewer_notes=model.reviewer_notes,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -54,7 +57,7 @@ class EvidenceMapper:
 
         if hasattr(model, "variant") and isinstance(model.variant, VariantModel):
             evidence.variant_identifier = EvidenceMapper._variant_identifier(
-                model.variant
+                model.variant,
             )
             evidence.variant_summary = VariantSummary(
                 variant_id=model.variant.variant_id,
@@ -71,7 +74,8 @@ class EvidenceMapper:
             )
 
         if hasattr(model, "publication") and isinstance(
-            model.publication, PublicationModel
+            model.publication,
+            PublicationModel,
         ):
             evidence.publication_identifier = PublicationIdentifier(
                 pubmed_id=model.publication.pubmed_id,
@@ -83,7 +87,8 @@ class EvidenceMapper:
 
     @staticmethod
     def to_model(
-        entity: Evidence, model: Optional[EvidenceModel] = None
+        entity: Evidence,
+        model: EvidenceModel | None = None,
     ) -> EvidenceModel:
         target = model or EvidenceModel()
         target.variant_id = entity.variant_id
@@ -99,7 +104,7 @@ class EvidenceMapper:
         target.study_type = entity.study_type
         target.statistical_significance = entity.statistical_significance
         target.reviewed = entity.reviewed
-        setattr(target, "review_date", entity.review_date)
+        target.review_date = cast("Any", entity.review_date)
         target.reviewer_notes = entity.reviewer_notes
         if entity.created_at:
             target.created_at = entity.created_at

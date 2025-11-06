@@ -5,8 +5,8 @@ Provides type-safe test data using NamedTuple and TypedDict structures
 for reliable, self-documenting test data.
 """
 
-from typing import NamedTuple, Optional
 from datetime import UTC, datetime
+from typing import NamedTuple
 
 
 # Test data types using NamedTuple for immutable, typed test data
@@ -15,15 +15,15 @@ class TestGene(NamedTuple):
 
     gene_id: str
     symbol: str
-    name: Optional[str]
-    description: Optional[str]
+    name: str | None
+    description: str | None
     gene_type: str
-    chromosome: Optional[str]
-    start_position: Optional[int]
-    end_position: Optional[int]
-    ensembl_id: Optional[str]
-    ncbi_gene_id: Optional[int]
-    uniprot_id: Optional[str]
+    chromosome: str | None
+    start_position: int | None
+    end_position: int | None
+    ensembl_id: str | None
+    ncbi_gene_id: int | None
+    uniprot_id: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -32,22 +32,22 @@ class TestVariant(NamedTuple):
     """Typed test variant data."""
 
     variant_id: str
-    clinvar_id: Optional[str]
+    clinvar_id: str | None
     chromosome: str
     position: int
     reference_allele: str
     alternate_allele: str
     variant_type: str
     clinical_significance: str
-    gene_identifier: Optional[str]
-    gene_database_id: Optional[int]
-    hgvs_genomic: Optional[str]
-    hgvs_protein: Optional[str]
-    hgvs_cdna: Optional[str]
-    condition: Optional[str]
-    review_status: Optional[str]
-    allele_frequency: Optional[float]
-    gnomad_af: Optional[float]
+    gene_identifier: str | None
+    gene_database_id: int | None
+    hgvs_genomic: str | None
+    hgvs_protein: str | None
+    hgvs_cdna: str | None
+    condition: str | None
+    review_status: str | None
+    allele_frequency: float | None
+    gnomad_af: float | None
     created_at: datetime
     updated_at: datetime
 
@@ -57,7 +57,7 @@ class TestPhenotype(NamedTuple):
 
     hpo_id: str
     name: str
-    definition: Optional[str]
+    definition: str | None
     synonyms: list[str]
     created_at: datetime
     updated_at: datetime
@@ -72,7 +72,7 @@ class TestEvidence(NamedTuple):
     evidence_level: str
     evidence_type: str
     confidence_score: float
-    source: Optional[str]
+    source: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -82,11 +82,11 @@ class TestPublication(NamedTuple):
 
     title: str
     authors: list[str]
-    journal: Optional[str]
+    journal: str | None
     publication_year: int
-    doi: Optional[str]
-    pmid: Optional[str]
-    abstract: Optional[str]
+    doi: str | None
+    pmid: str | None
+    abstract: str | None
     created_at: datetime
     updated_at: datetime
 
@@ -95,15 +95,15 @@ class TestPublication(NamedTuple):
 def create_test_gene(
     gene_id: str = "MED13",
     symbol: str = "MED13",
-    name: Optional[str] = "Mediator complex subunit 13",
-    description: Optional[str] = None,
+    name: str | None = "Mediator complex subunit 13",
+    description: str | None = None,
     gene_type: str = "protein_coding",
-    chromosome: Optional[str] = "17",
-    start_position: Optional[int] = 60000000,
-    end_position: Optional[int] = 60010000,
-    ensembl_id: Optional[str] = "ENSG00000108510",
-    ncbi_gene_id: Optional[int] = 9968,
-    uniprot_id: Optional[str] = "Q9UHV7",
+    chromosome: str | None = "17",
+    start_position: int | None = 60000000,
+    end_position: int | None = 60010000,
+    ensembl_id: str | None = "ENSG00000108510",
+    ncbi_gene_id: int | None = 9968,
+    uniprot_id: str | None = "Q9UHV7",
 ) -> TestGene:
     """
     Create a typed test gene with sensible defaults.
@@ -144,22 +144,22 @@ def create_test_gene(
 
 def create_test_variant(
     variant_id: str = "VCV000001234",
-    clinvar_id: Optional[str] = "RCV000001234",
+    clinvar_id: str | None = "RCV000001234",
     chromosome: str = "17",
     position: int = 60005000,
     reference_allele: str = "A",
     alternate_allele: str = "G",
     variant_type: str = "snv",
     clinical_significance: str = "pathogenic",
-    gene_identifier: Optional[str] = "MED13",
-    gene_database_id: Optional[int] = 1,
-    hgvs_genomic: Optional[str] = "chr17:g.60005000A>G",
-    hgvs_protein: Optional[str] = "p.Val123Gly",
-    hgvs_cdna: Optional[str] = "c.367A>G",
-    condition: Optional[str] = "Intellectual disability",
-    review_status: Optional[str] = "criteria_provided",
-    allele_frequency: Optional[float] = 0.0001,
-    gnomad_af: Optional[float] = 0.0002,
+    gene_identifier: str | None = "MED13",
+    gene_database_id: int | None = 1,
+    hgvs_genomic: str | None = "chr17:g.60005000A>G",
+    hgvs_protein: str | None = "p.Val123Gly",
+    hgvs_cdna: str | None = "c.367A>G",
+    condition: str | None = "Intellectual disability",
+    review_status: str | None = "criteria_provided",
+    allele_frequency: float | None = 0.0001,
+    gnomad_af: float | None = 0.0002,
 ) -> TestVariant:
     """
     Create a typed test variant with sensible defaults.
@@ -213,8 +213,8 @@ def create_test_variant(
 def create_test_phenotype(
     hpo_id: str = "HP:0001249",
     name: str = "Intellectual disability",
-    definition: Optional[str] = "Subnormal intellectual functioning",
-    synonyms: Optional[list[str]] = None,
+    definition: str | None = "Subnormal intellectual functioning",
+    synonyms: list[str] | None = None,
 ) -> TestPhenotype:
     """
     Create a typed test phenotype with sensible defaults.
@@ -249,7 +249,7 @@ def create_test_evidence(
     evidence_level: str = "definitive",
     evidence_type: str = "clinical_report",
     confidence_score: float = 0.95,
-    source: Optional[str] = "ClinVar",
+    source: str | None = "ClinVar",
 ) -> TestEvidence:
     """
     Create a typed test evidence with sensible defaults.
@@ -282,12 +282,12 @@ def create_test_evidence(
 
 def create_test_publication(
     title: str = "Novel MED13 pathogenic variant causes intellectual disability",
-    authors: Optional[list[str]] = None,
-    journal: Optional[str] = "American Journal of Human Genetics",
+    authors: list[str] | None = None,
+    journal: str | None = "American Journal of Human Genetics",
     publication_year: int = 2023,
-    doi: Optional[str] = "10.1016/j.ajhg.2023.01.001",
-    pmid: Optional[str] = "36736399",
-    abstract: Optional[str] = None,
+    doi: str | None = "10.1016/j.ajhg.2023.01.001",
+    pmid: str | None = "36736399",
+    abstract: str | None = None,
 ) -> TestPublication:
     """
     Create a typed test publication with sensible defaults.

@@ -3,27 +3,29 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple, cast
+from collections.abc import Mapping, Sequence
+from http import HTTPStatus
+from typing import Any, cast
 
 import requests
 from dash import ALL, Dash, Input, Output, State, callback_context
-from dash.exceptions import PreventUpdate
 from dash.development.base_component import Component
+from dash.exceptions import PreventUpdate
 
+from src.presentation.dash.components.curation.audit_summary import (
+    render_audit_summary,
+)
 from src.presentation.dash.components.curation.clinical_card import (
     create_clinical_card_grid,
 )
 from src.presentation.dash.components.curation.clinical_viewer import (
     render_clinical_viewer,
 )
-from src.presentation.dash.components.curation.evidence_comparison import (
-    render_evidence_matrix,
-)
 from src.presentation.dash.components.curation.conflict_panel import (
     render_conflict_panel,
 )
-from src.presentation.dash.components.curation.audit_summary import (
-    render_audit_summary,
+from src.presentation.dash.components.curation.evidence_comparison import (
+    render_evidence_matrix,
 )
 from src.presentation.dash.types import (
     CuratedRecordDetail,
@@ -36,7 +38,7 @@ from src.presentation.dash.types import (
 logger = logging.getLogger(__name__)
 
 
-def register_callbacks(app: Dash) -> None:
+def register_callbacks(app: Dash) -> None:  # noqa: C901, PLR0915
     """Register curator queue callbacks."""
 
     @app.callback(
@@ -53,13 +55,13 @@ def register_callbacks(app: Dash) -> None:
     )
     def refresh_queue(
         _interval: int,
-        _apply_clicks: Optional[int],
-        entity_type: Optional[str],
-        status: Optional[str],
-        priority: Optional[str],
-        settings_data: Optional[Mapping[str, Any]],
+        _apply_clicks: int | None,
+        entity_type: str | None,
+        status: str | None,
+        priority: str | None,
+        settings_data: Mapping[str, Any] | None,
         pathname: str,
-    ) -> Tuple[Component, List[Dict[str, Any]], str]:
+    ) -> tuple[Component, list[dict[str, Any]], str]:
         if pathname != "/review":
             raise PreventUpdate
 
@@ -82,8 +84,9 @@ def register_callbacks(app: Dash) -> None:
         Input("table-view-btn", "n_clicks"),
     )
     def toggle_view(
-        card_clicks: Optional[int], table_clicks: Optional[int]
-    ) -> Tuple[Dict[str, str], Dict[str, str], bool, bool]:
+        card_clicks: int | None,
+        table_clicks: int | None,
+    ) -> tuple[dict[str, str], dict[str, str], bool, bool]:
         triggered = getattr(callback_context, "triggered_id", None)
 
         if triggered == "table-view-btn":
@@ -105,7 +108,8 @@ def register_callbacks(app: Dash) -> None:
     @app.callback(
         Output("curation-detail-store", "data"),
         Input(
-            {"type": "review-card-open", "entityId": ALL, "entityType": ALL}, "n_clicks"
+            {"type": "review-card-open", "entityId": ALL, "entityType": ALL},
+            "n_clicks",
         ),
         Input("review-table", "active_cell"),
         State({"type": "review-card-open", "entityId": ALL, "entityType": ALL}, "id"),
@@ -114,12 +118,12 @@ def register_callbacks(app: Dash) -> None:
         prevent_initial_call=True,
     )
     def load_curated_detail(
-        card_clicks: Sequence[Optional[int]],
-        active_cell: Optional[Mapping[str, Any]],
+        card_clicks: Sequence[int | None],
+        active_cell: Mapping[str, Any] | None,
         card_ids: Sequence[Mapping[str, str]],
-        table_data: Optional[Sequence[Mapping[str, Any]]],
-        settings_data: Optional[Mapping[str, Any]],
-    ) -> Optional[Mapping[str, Any]]:
+        table_data: Sequence[Mapping[str, Any]] | None,
+        settings_data: Mapping[str, Any] | None,
+    ) -> Mapping[str, Any] | None:
         del card_clicks  # n_clicks values only signal which ID triggered
 
         triggered = getattr(callback_context, "triggered_id", None)
@@ -139,8 +143,8 @@ def register_callbacks(app: Dash) -> None:
                 row = table_data[int(row_index)]
             except (IndexError, ValueError):
                 raise PreventUpdate from None
-            entity_type = cast(Optional[str], row.get("_entity_type"))
-            entity_id = cast(Optional[str], row.get("_entity_id"))
+            entity_type = cast("str | None", row.get("_entity_type"))
+            entity_id = cast("str | None", row.get("_entity_id"))
         else:
             raise PreventUpdate
 
@@ -151,7 +155,7 @@ def register_callbacks(app: Dash) -> None:
         if detail is None:
             raise PreventUpdate
 
-        return cast(Mapping[str, Any], detail)
+        return cast("Mapping[str, Any]", detail)
 
     @app.callback(
         Output("curation-summary-panel", "children"),
@@ -162,8 +166,8 @@ def register_callbacks(app: Dash) -> None:
         Input("curation-detail-store", "data"),
     )
     def update_detail_panels(
-        detail_data: Optional[Mapping[str, Any]],
-    ) -> Tuple[Component, Component, Component, Component, Dict[str, str]]:
+        detail_data: Mapping[str, Any] | None,
+    ) -> tuple[Component, Component, Component, Component, dict[str, str]]:
         if detail_data is None:
             placeholder = render_clinical_viewer(None, ())
             evidence_placeholder = render_evidence_matrix(())
@@ -216,18 +220,18 @@ def register_callbacks(app: Dash) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _coerce_settings(settings: Optional[Mapping[str, Any]]) -> SettingsState:
+def _coerce_settings(settings: Mapping[str, Any] | None) -> SettingsState:
     if not settings:
         raise PreventUpdate
-    return cast(SettingsState, settings)
+    return cast("SettingsState", settings)
 
 
 def _build_query_filters(
-    entity_type: Optional[str],
-    status: Optional[str],
-    priority: Optional[str],
-) -> Dict[str, str]:
-    filters: Dict[str, str] = {}
+    entity_type: str | None,
+    status: str | None,
+    priority: str | None,
+) -> dict[str, str]:
+    filters: dict[str, str] = {}
     if entity_type:
         filters["entity_type"] = entity_type
     if status:
@@ -238,8 +242,9 @@ def _build_query_filters(
 
 
 def _fetch_queue_items(
-    settings: SettingsState, filters: Mapping[str, str]
-) -> List[ReviewQueueItem]:
+    settings: SettingsState,
+    filters: Mapping[str, str],
+) -> list[ReviewQueueItem]:
     url = f"{settings['api_endpoint'].rstrip('/')}/curation/queue"
     headers = _build_headers(settings)
 
@@ -247,8 +252,8 @@ def _fetch_queue_items(
         response = requests.get(url, headers=headers, params=filters, timeout=5)
         response.raise_for_status()
         data = response.json()
-    except requests.RequestException as exc:
-        logger.error("Failed to fetch review queue: %s", exc)
+    except requests.RequestException:
+        logger.exception("Failed to fetch review queue")
         return []
 
     if not isinstance(data, Sequence):
@@ -256,38 +261,40 @@ def _fetch_queue_items(
         return []
 
     try:
-        return coerce_queue_items(cast(Sequence[Mapping[str, object]], data))
+        return coerce_queue_items(cast("Sequence[Mapping[str, object]]", data))
     except ValueError as exc:  # pragma: no cover - defensive logging
         logger.warning("Failed to coerce queue items: %s", exc)
         return []
 
 
 def _fetch_curated_detail(
-    settings: SettingsState, entity_type: str, entity_id: str
-) -> Optional[CuratedRecordDetail]:
+    settings: SettingsState,
+    entity_type: str,
+    entity_id: str,
+) -> CuratedRecordDetail | None:
     url = f"{settings['api_endpoint'].rstrip('/')}/curation/{entity_type}/{entity_id}"
     headers = _build_headers(settings)
 
     try:
         response = requests.get(url, headers=headers, timeout=5)
-        if response.status_code == 404:
+        if response.status_code == HTTPStatus.NOT_FOUND:
             logger.info("Curated detail not found for %s %s", entity_type, entity_id)
             return None
         response.raise_for_status()
         payload = response.json()
-    except requests.RequestException as exc:
-        logger.error("Failed to fetch curator detail: %s", exc)
+    except requests.RequestException:
+        logger.exception("Failed to fetch curator detail")
         return None
 
     try:
-        return coerce_curated_detail(cast(Mapping[str, object], payload))
+        return coerce_curated_detail(cast("Mapping[str, object]", payload))
     except ValueError as exc:  # pragma: no cover - defensive logging
         logger.warning("Failed to coerce curated detail payload: %s", exc)
         return None
 
 
-def _queue_items_to_table(items: Sequence[ReviewQueueItem]) -> List[Dict[str, Any]]:
-    table_rows: List[Dict[str, Any]] = []
+def _queue_items_to_table(items: Sequence[ReviewQueueItem]) -> list[dict[str, Any]]:
+    table_rows: list[dict[str, Any]] = []
     for item in items:
         table_rows.append(
             {
@@ -301,12 +308,12 @@ def _queue_items_to_table(items: Sequence[ReviewQueueItem]) -> List[Dict[str, An
                 "actions": "View",
                 "_entity_type": item["entity_type"],
                 "_entity_id": item["entity_id"],
-            }
+            },
         )
     return table_rows
 
 
-def _build_headers(settings: SettingsState) -> Dict[str, str]:
+def _build_headers(settings: SettingsState) -> dict[str, str]:
     headers = {"Accept": "application/json"}
     api_key = settings.get("api_key")
     if api_key:

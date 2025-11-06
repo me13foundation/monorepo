@@ -6,10 +6,10 @@ into consistent formats for cross-referencing and deduplication.
 """
 
 import re
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Any
 
 
 class PublicationIdentifierType(Enum):
@@ -28,14 +28,14 @@ class NormalizedPublication:
 
     primary_id: str
     id_type: PublicationIdentifierType
-    title: Optional[str]
-    authors: List[str]
-    journal: Optional[str]
-    publication_date: Optional[datetime]
-    doi: Optional[str]
-    pmc_id: Optional[str]
-    pubmed_id: Optional[str]
-    cross_references: Dict[str, List[str]]
+    title: str | None
+    authors: list[str]
+    journal: str | None
+    publication_date: datetime | None
+    doi: str | None
+    pmc_id: str | None
+    pubmed_id: str | None
+    cross_references: dict[str, list[str]]
     source: str
     confidence_score: float
 
@@ -57,11 +57,13 @@ class PublicationNormalizer:
         }
 
         # Cache for normalized publications
-        self.normalized_cache: Dict[str, NormalizedPublication] = {}
+        self.normalized_cache: dict[str, NormalizedPublication] = {}
 
     def normalize(
-        self, raw_publication_data: Dict[str, Any], source: str = "unknown"
-    ) -> Optional[NormalizedPublication]:
+        self,
+        raw_publication_data: dict[str, Any],
+        source: str = "unknown",
+    ) -> NormalizedPublication | None:
         """
         Normalize publication data from various sources.
 
@@ -75,18 +77,18 @@ class PublicationNormalizer:
         try:
             if source.lower() == "pubmed":
                 return self._normalize_pubmed_publication(raw_publication_data)
-            elif source.lower() == "uniprot":
+            if source.lower() == "uniprot":
                 return self._normalize_uniprot_publication(raw_publication_data)
-            else:
-                return self._normalize_generic_publication(raw_publication_data, source)
+            return self._normalize_generic_publication(raw_publication_data, source)
 
         except Exception as e:
             print(f"Error normalizing publication data from {source}: {e}")
             return None
 
     def _normalize_pubmed_publication(
-        self, publication_data: Dict[str, Any]
-    ) -> Optional[NormalizedPublication]:
+        self,
+        publication_data: dict[str, Any],
+    ) -> NormalizedPublication | None:
         """Normalize publication data from PubMed."""
         pubmed_id = publication_data.get("pubmed_id")
         title = publication_data.get("title")
@@ -136,8 +138,9 @@ class PublicationNormalizer:
         return normalized
 
     def _normalize_uniprot_publication(
-        self, publication_data: Dict[str, Any]
-    ) -> Optional[NormalizedPublication]:
+        self,
+        publication_data: dict[str, Any],
+    ) -> NormalizedPublication | None:
         """Normalize publication data from UniProt."""
         citation = publication_data.get("citation", {})
         title = citation.get("title")
@@ -186,8 +189,10 @@ class PublicationNormalizer:
         return normalized
 
     def _normalize_generic_publication(
-        self, publication_data: Dict[str, Any], source: str
-    ) -> Optional[NormalizedPublication]:
+        self,
+        publication_data: dict[str, Any],
+        source: str,
+    ) -> NormalizedPublication | None:
         """Normalize publication data from generic sources."""
         # Try to extract common fields
         pub_id = (
@@ -238,14 +243,13 @@ class PublicationNormalizer:
         """Identify the type of publication identifier."""
         if self.identifier_patterns["pubmed"].match(pub_id):
             return PublicationIdentifierType.PUBMED_ID
-        elif self.identifier_patterns["doi"].match(pub_id):
+        if self.identifier_patterns["doi"].match(pub_id):
             return PublicationIdentifierType.DOI
-        elif self.identifier_patterns["pmc"].match(pub_id):
+        if self.identifier_patterns["pmc"].match(pub_id):
             return PublicationIdentifierType.PMC_ID
-        else:
-            return PublicationIdentifierType.OTHER
+        return PublicationIdentifierType.OTHER
 
-    def _extract_pubmed_authors(self, publication_data: Dict[str, Any]) -> List[str]:
+    def _extract_pubmed_authors(self, publication_data: dict[str, Any]) -> list[str]:
         """Extract author names from PubMed data."""
         authors = []
 
@@ -267,19 +271,20 @@ class PublicationNormalizer:
         return authors
 
     def _extract_pubmed_journal(
-        self, publication_data: Dict[str, Any]
-    ) -> Optional[str]:
+        self,
+        publication_data: dict[str, Any],
+    ) -> str | None:
         """Extract journal information from PubMed data."""
         journal_data = publication_data.get("journal", {})
 
         if isinstance(journal_data, dict):
             return journal_data.get("title") or journal_data.get("Title")
-        elif isinstance(journal_data, str):
+        if isinstance(journal_data, str):
             return journal_data
 
         return None
 
-    def _parse_date_string(self, date_str: str) -> Optional[datetime]:
+    def _parse_date_string(self, date_str: str) -> datetime | None:
         """Parse date string into datetime object."""
         if not date_str:
             return None
@@ -327,7 +332,8 @@ class PublicationNormalizer:
         return doi.lower()
 
     def merge_publication_data(
-        self, publications: List[NormalizedPublication]
+        self,
+        publications: list[NormalizedPublication],
     ) -> NormalizedPublication:
         """
         Merge multiple publication records for the same publication.
@@ -361,7 +367,7 @@ class PublicationNormalizer:
                 merged_pubmed = pub.pubmed_id
 
         # Merge cross-references
-        merged_refs: Dict[str, List[str]] = {}
+        merged_refs: dict[str, list[str]] = {}
         for pub in publications:
             for ref_type, ref_ids in pub.cross_references.items():
                 if ref_type not in merged_refs:
@@ -394,8 +400,9 @@ class PublicationNormalizer:
         )
 
     def validate_normalized_publication(
-        self, publication: NormalizedPublication
-    ) -> List[str]:
+        self,
+        publication: NormalizedPublication,
+    ) -> list[str]:
         """
         Validate normalized publication data.
 
@@ -431,8 +438,9 @@ class PublicationNormalizer:
         return errors
 
     def get_normalized_publication(
-        self, pub_id: str
-    ) -> Optional[NormalizedPublication]:
+        self,
+        pub_id: str,
+    ) -> NormalizedPublication | None:
         """
         Retrieve a cached normalized publication by ID.
 
@@ -444,7 +452,7 @@ class PublicationNormalizer:
         """
         return self.normalized_cache.get(pub_id)
 
-    def find_publication_by_doi(self, doi: str) -> Optional[NormalizedPublication]:
+    def find_publication_by_doi(self, doi: str) -> NormalizedPublication | None:
         """
         Find a normalized publication by DOI.
 

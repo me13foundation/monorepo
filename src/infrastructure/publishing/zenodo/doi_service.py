@@ -2,8 +2,8 @@
 DOI minting service for Zenodo deposits.
 """
 
-from typing import Dict, Any, Optional, cast
 import logging
+from typing import Any, cast
 
 from .client import ZenodoClient
 
@@ -25,8 +25,8 @@ class DOIService:
     async def mint_doi(
         self,
         deposit_id: int,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Mint DOI for a deposit by publishing it.
 
@@ -45,14 +45,15 @@ class DOIService:
         published_deposit = await self.client.publish_deposit(deposit_id)
 
         # Extract DOI (cast to dict for compatibility)
-        doi = self.client.extract_doi(cast(Dict[str, Any], published_deposit))
+        doi = self.client.extract_doi(cast("dict[str, Any]", published_deposit))
 
         if not doi:
-            raise ValueError("DOI not found in published deposit response")
+            message = "DOI not found in published deposit response"
+            raise ValueError(message)
 
-        logger.info(f"DOI minted successfully: {doi}")
+        logger.info("DOI minted successfully: %s", doi)
 
-        published_dict = cast(Dict[str, Any], published_deposit)
+        published_dict = cast("dict[str, Any]", published_deposit)
         return {
             "deposit_id": deposit_id,
             "doi": doi,
@@ -60,7 +61,7 @@ class DOIService:
             "deposit": published_deposit,
         }
 
-    async def get_doi(self, deposit_id: int) -> Optional[str]:
+    async def get_doi(self, deposit_id: int) -> str | None:
         """
         Get DOI for an existing deposit.
 

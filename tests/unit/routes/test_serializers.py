@@ -13,11 +13,15 @@ from src.domain.value_objects.identifiers import GeneIdentifier, VariantIdentifi
 from src.routes.serializers import (
     build_activity_feed_item,
     build_dashboard_summary,
-    serialize_gene,
     serialize_evidence,
     serialize_evidence_brief,
+    serialize_gene,
     serialize_variant,
 )
+
+EXPECTED_CONFIDENCE = 0.75
+TOTAL_ITEMS_EXPECTED = 15
+GENE_COUNT_EXPECTED = 10
 
 
 def build_variant() -> Variant:
@@ -43,7 +47,7 @@ def build_variant() -> Variant:
             evidence_type="clinical_report",
             description="Clinically validated",
             reviewed=True,
-        )
+        ),
     )
     return variant
 
@@ -119,12 +123,12 @@ def test_build_dashboard_summary() -> None:
         rejected_count=1,
     )
 
-    assert summary["total_items"] == 15
-    assert summary["entity_counts"]["genes"] == 10
+    assert summary["total_items"] == TOTAL_ITEMS_EXPECTED
+    assert summary["entity_counts"]["genes"] == GENE_COUNT_EXPECTED
 
 
 def test_serialize_full_evidence() -> None:
-    confidence = Confidence.from_score(0.75, peer_reviewed=True)
+    confidence = Confidence.from_score(EXPECTED_CONFIDENCE, peer_reviewed=True)
     evidence = Evidence(
         variant_id=1,
         phenotype_id=2,
@@ -139,7 +143,7 @@ def test_serialize_full_evidence() -> None:
     )
 
     payload = serialize_evidence(evidence)
-    assert payload["confidence_score"] == 0.75
+    assert payload["confidence_score"] == EXPECTED_CONFIDENCE
     assert payload["review_date"] == evidence.review_date.isoformat()
 
 

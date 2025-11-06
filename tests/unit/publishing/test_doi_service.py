@@ -2,8 +2,9 @@
 Unit tests for DOI service.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 
 from src.infrastructure.publishing.zenodo.client import ZenodoClient
 from src.infrastructure.publishing.zenodo.doi_service import DOIService
@@ -31,7 +32,9 @@ class TestDOIService:
         }
 
         with patch.object(
-            client, "publish_deposit", new_callable=AsyncMock
+            client,
+            "publish_deposit",
+            new_callable=AsyncMock,
         ) as mock_publish:
             mock_publish.return_value = mock_published
 

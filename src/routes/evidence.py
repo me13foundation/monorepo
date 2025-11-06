@@ -4,20 +4,21 @@ Evidence API routes for MED13 Resource Library.
 RESTful endpoints for evidence management linking variants and phenotypes.
 """
 
-from typing import Optional, Dict, Any, TYPE_CHECKING
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import TYPE_CHECKING, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from src.database.session import get_session
 from src.application.container import get_legacy_dependency_container
-from src.routes.serializers import serialize_evidence
+from src.database.session import get_session
+from src.domain.value_objects.confidence import EvidenceLevel
 from src.models.api import (
-    EvidenceResponse,
     EvidenceCreate,
+    EvidenceResponse,
     EvidenceUpdate,
     PaginatedResponse,
 )
-from src.domain.value_objects.confidence import EvidenceLevel
+from src.routes.serializers import serialize_evidence
 
 if TYPE_CHECKING:
     from src.application.services.evidence_service import EvidenceApplicationService
@@ -36,19 +37,21 @@ def get_evidence_service(
 
 
 @router.get(
-    "/", summary="List evidence", response_model=PaginatedResponse[EvidenceResponse]
+    "/",
+    summary="List evidence",
+    response_model=PaginatedResponse[EvidenceResponse],
 )
 async def get_evidence(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    search: Optional[str] = Query(None, description="Search in description or summary"),
+    search: str | None = Query(None, description="Search in description or summary"),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order"),
-    variant_id: Optional[str] = Query(None, description="Filter by variant ID"),
-    phenotype_id: Optional[str] = Query(None, description="Filter by phenotype ID"),
-    evidence_level: Optional[str] = Query(None, description="Filter by evidence level"),
-    evidence_type: Optional[str] = Query(None, description="Filter by evidence type"),
-    reviewed: Optional[bool] = Query(None, description="Filter by review status"),
+    variant_id: str | None = Query(None, description="Filter by variant ID"),
+    phenotype_id: str | None = Query(None, description="Filter by phenotype ID"),
+    evidence_level: str | None = Query(None, description="Filter by evidence level"),
+    evidence_type: str | None = Query(None, description="Filter by evidence type"),
+    reviewed: bool | None = Query(None, description="Filter by review status"),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> PaginatedResponse[EvidenceResponse]:
     """
@@ -89,12 +92,15 @@ async def get_evidence(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve evidence: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve evidence: {e!s}",
         )
 
 
 @router.get(
-    "/{evidence_id}", summary="Get evidence by ID", response_model=EvidenceResponse
+    "/{evidence_id}",
+    summary="Get evidence by ID",
+    response_model=EvidenceResponse,
 )
 async def get_evidence_by_id(
     evidence_id: int,
@@ -106,23 +112,28 @@ async def get_evidence_by_id(
     try:
         # For now, we'll use get_by_id - may need to enhance service later
         evidence = service._evidence_repository.get_by_id(
-            evidence_id
+            evidence_id,
         )  # Direct access for now
         if not evidence:
             raise HTTPException(
-                status_code=404, detail=f"Evidence {evidence_id} not found"
+                status_code=404,
+                detail=f"Evidence {evidence_id} not found",
             )
         return EvidenceResponse.model_validate(serialize_evidence(evidence))
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve evidence: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve evidence: {e!s}",
         )
 
 
 @router.post(
-    "/", summary="Create new evidence", response_model=EvidenceResponse, status_code=201
+    "/",
+    summary="Create new evidence",
+    response_model=EvidenceResponse,
+    status_code=201,
 )
 async def create_evidence(
     evidence_data: EvidenceCreate,
@@ -159,12 +170,15 @@ async def create_evidence(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to create evidence: {str(e)}"
+            status_code=500,
+            detail=f"Failed to create evidence: {e!s}",
         )
 
 
 @router.put(
-    "/{evidence_id}", summary="Update evidence", response_model=EvidenceResponse
+    "/{evidence_id}",
+    summary="Update evidence",
+    response_model=EvidenceResponse,
 )
 async def update_evidence(
     evidence_id: int,
@@ -178,7 +192,8 @@ async def update_evidence(
         # Validate evidence exists
         if not service.validate_evidence_exists(evidence_id):
             raise HTTPException(
-                status_code=404, detail=f"Evidence {evidence_id} not found"
+                status_code=404,
+                detail=f"Evidence {evidence_id} not found",
             )
 
         # Convert to dict for update
@@ -190,7 +205,8 @@ async def update_evidence(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to update evidence: {str(e)}"
+            status_code=500,
+            detail=f"Failed to update evidence: {e!s}",
         )
 
 
@@ -205,7 +221,8 @@ async def delete_evidence(
     try:
         if not service.validate_evidence_exists(evidence_id):
             raise HTTPException(
-                status_code=404, detail=f"Evidence {evidence_id} not found"
+                status_code=404,
+                detail=f"Evidence {evidence_id} not found",
             )
 
         # For now, implement soft delete or check dependencies
@@ -218,18 +235,23 @@ async def delete_evidence(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to delete evidence: {str(e)}"
+            status_code=500,
+            detail=f"Failed to delete evidence: {e!s}",
         )
 
 
 @router.get("/variant/{variant_id}", summary="Get evidence for a variant")
 async def get_evidence_by_variant(
     variant_id: int,
-    limit: Optional[int] = Query(
-        None, ge=1, le=100, description="Maximum number of results"
+    limit: int
+    | None = Query(
+        None,
+        ge=1,
+        le=100,
+        description="Maximum number of results",
     ),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve all evidence associated with a specific variant.
     """
@@ -247,18 +269,22 @@ async def get_evidence_by_variant(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve evidence for variant {variant_id}: {str(e)}",
+            detail=f"Failed to retrieve evidence for variant {variant_id}: {e!s}",
         )
 
 
 @router.get("/phenotype/{phenotype_id}", summary="Get evidence for a phenotype")
 async def get_evidence_by_phenotype(
     phenotype_id: int,
-    limit: Optional[int] = Query(
-        None, ge=1, le=100, description="Maximum number of results"
+    limit: int
+    | None = Query(
+        None,
+        ge=1,
+        le=100,
+        description="Maximum number of results",
     ),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve all evidence associated with a specific phenotype.
     """
@@ -276,18 +302,18 @@ async def get_evidence_by_phenotype(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to retrieve evidence for phenotype {phenotype_id}: {str(e)}",
+            detail=f"Failed to retrieve evidence for phenotype {phenotype_id}: {e!s}",
         )
 
 
-@router.get("/search/", summary="Search evidence", response_model=Dict[str, Any])
+@router.get("/search/", summary="Search evidence", response_model=dict[str, Any])
 async def search_evidence(
     query: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
-    variant_id: Optional[str] = Query(None, description="Filter by variant ID"),
-    phenotype_id: Optional[str] = Query(None, description="Filter by phenotype ID"),
+    variant_id: str | None = Query(None, description="Filter by variant ID"),
+    phenotype_id: str | None = Query(None, description="Filter by phenotype ID"),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Search evidence records by description, summary, or other text fields.
     """
@@ -307,7 +333,8 @@ async def search_evidence(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to search evidence: {str(e)}"
+            status_code=500,
+            detail=f"Failed to search evidence: {e!s}",
         )
 
 
@@ -315,7 +342,7 @@ async def search_evidence(
 async def get_evidence_conflicts(
     variant_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Detect and list any conflicting evidence records for a given variant.
     """
@@ -329,17 +356,18 @@ async def get_evidence_conflicts(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to detect conflicts for variant {variant_id}: {str(e)}",
+            detail=f"Failed to detect conflicts for variant {variant_id}: {e!s}",
         )
 
 
 @router.get(
-    "/variant/{variant_id}/consensus", summary="Get evidence consensus for a variant"
+    "/variant/{variant_id}/consensus",
+    summary="Get evidence consensus for a variant",
 )
 async def get_evidence_consensus(
     variant_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Calculate consensus from multiple evidence records for a variant.
     """
@@ -352,16 +380,18 @@ async def get_evidence_consensus(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to calculate consensus for variant {variant_id}: {str(e)}",
+            detail=f"Failed to calculate consensus for variant {variant_id}: {e!s}",
         )
 
 
 @router.get(
-    "/statistics/", summary="Get evidence statistics", response_model=Dict[str, Any]
+    "/statistics/",
+    summary="Get evidence statistics",
+    response_model=dict[str, Any],
 )
 async def get_evidence_statistics(
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve statistics about evidence in the repository.
     """
@@ -370,5 +400,6 @@ async def get_evidence_statistics(
         return stats
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve evidence statistics: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve evidence statistics: {e!s}",
         )

@@ -5,46 +5,53 @@ Provides REST API endpoints for user authentication, session management,
 and user registration.
 """
 
-from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import secrets
+from datetime import UTC, datetime
+from typing import Any
+from uuid import uuid4
 
-from ..application.container import (
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from src.application.container import (
     container,
     get_authentication_service_dependency,
 )
-from ..application.services.authentication_service import (
-    AuthenticationService,
-    AuthenticationError,
-)
-from ..application.services.authorization_service import (
-    AuthorizationService,
-    AuthorizationError,
-)
-from ..application.services.user_management_service import (
-    UserManagementService,
-    UserManagementError,
-    UserAlreadyExistsError,
-)
-from ..application.dto.auth_requests import (
-    LoginRequest,
-    RegisterUserRequest,
+from src.application.dto.auth_requests import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    LoginRequest,
+    RegisterUserRequest,
     ResetPasswordRequest,
     UpdateProfileRequest,
+    UpdateUserRequest,
 )
-from ..application.dto.auth_responses import (
+from src.application.dto.auth_responses import (
+    ErrorResponse,
+    GenericSuccessResponse,
     LoginResponse,
     TokenRefreshResponse,
     UserProfileResponse,
     UserPublic,
-    GenericSuccessResponse,
-    ErrorResponse,
     ValidationErrorResponse,
 )
-from ..domain.entities.user import User, UserRole
-
+from src.application.services.authentication_service import (
+    AuthenticationError,
+    AuthenticationService,
+)
+from src.application.services.authorization_service import (
+    AuthorizationError,
+    AuthorizationService,
+)
+from src.application.services.user_management_service import (
+    UserAlreadyExistsError,
+    UserManagementError,
+    UserManagementService,
+)
+from src.domain.entities.user import User, UserRole, UserStatus
+from src.domain.value_objects.permission import Permission
+from src.infrastructure.security.password_hasher import PasswordHasher
+from src.models.database.user import UserModel
 
 # Create router
 auth_router = APIRouter(
@@ -63,37 +70,35 @@ security = HTTPBearer(auto_error=False)
 
 
 @auth_router.get("/test")
-async def test_endpoint() -> Dict[str, str]:
+async def test_endpoint() -> dict[str, str]:
     """Simple test endpoint to check if auth routes are working."""
     return {"message": "Auth routes are working!"}
 
 
 @auth_router.get("/routes")
-async def list_routes() -> Dict[str, List[Dict[str, Any]]]:
+async def list_routes() -> dict[str, list[dict[str, Any]]]:
     """List all auth routes."""
-    routes: List[Dict[str, Any]] = []
-    for route in auth_router.routes:
-        routes.append(
-            {
-                "path": getattr(route, "path", str(route)),
-                "methods": getattr(route, "methods", None),
-                "name": getattr(route, "name", None),
-            }
-        )
+    routes = [
+        {
+            "path": getattr(route, "path", str(route)),
+            "methods": getattr(route, "methods", None),
+            "name": getattr(route, "name", None),
+        }
+        for route in auth_router.routes
+    ]
     return {"routes": routes}
 
 
 @auth_router.post("/debug")
-async def debug_endpoint(data: Dict[str, Any]) -> Dict[str, Any]:
+async def debug_endpoint(data: dict[str, Any]) -> dict[str, Any]:
     """Debug endpoint to test request handling."""
-    print(f"DEBUG: Debug endpoint called with data: {data}")
     return {"received": data, "message": "Debug endpoint working"}
 
 
 async def get_current_user(
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     auth_service: AuthenticationService = Depends(
-        get_authentication_service_dependency
+        get_authentication_service_dependency,
     ),
 ) -> User:
     """
@@ -129,7 +134,8 @@ async def get_current_active_user(
     """
     if not current_user.can_authenticate():
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Account is not active"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is not active",
         )
     return current_user
 
@@ -153,8 +159,6 @@ async def require_permission(
     Raises:
         HTTPException if permission denied
     """
-    from ..domain.value_objects.permission import Permission
-
     try:
         # Convert string to Permission enum
         perm_enum = Permission(permission)
@@ -168,7 +172,8 @@ async def require_permission(
 
 
 async def require_role(
-    role: str, current_user: User = Depends(get_current_active_user)
+    role: str,
+    current_user: User = Depends(get_current_active_user),
 ) -> User:
     """
     FastAPI dependency to require specific role.
@@ -187,12 +192,14 @@ async def require_role(
         required_role = UserRole(role.lower())
         if current_user.role != required_role:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail=f"Role '{role}' required"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{role}' required",
             )
         return current_user
     except ValueError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid role: {role}"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid role: {role}",
         )
 
 
@@ -208,13 +215,7 @@ async def login(
     """
     Authenticate user and return access/refresh tokens.
     """
-    # TODO: Implement proper authentication logic here
-    # For now, return a test response
-    from uuid import uuid4
-    from datetime import datetime
-    from ..domain.entities.user import UserRole, UserStatus
-    from ..application.dto.auth_responses import LoginResponse, UserPublic
-
+    # TODO: Implement proper authentication logic here (placeholder response)
     return LoginResponse(
         user=UserPublic(
             id=str(uuid4()),
@@ -225,12 +226,12 @@ async def login(
             status=UserStatus.ACTIVE,
             email_verified=False,
             last_login=None,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(UTC),
         ),
-        access_token="test-token",
-        refresh_token="test-refresh",
+        access_token=secrets.token_urlsafe(24),
+        refresh_token=secrets.token_urlsafe(24),
         expires_in=3600,
-        token_type="bearer",
+        token_type="bearer",  # nosec B106 - standard label, not a credential
     )
 
 
@@ -252,7 +253,8 @@ async def refresh_token(
         return response
     except AuthenticationError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
         )
 
 
@@ -270,8 +272,7 @@ async def logout(
     Logout user by revoking their session.
     """
     try:
-        # TODO: Get token from request
-        # await auth_service.logout(access_token)
+        # TODO: Get token from request and revoke it via service
         return GenericSuccessResponse(message="Logged out successfully")
     except AuthenticationError:
         # Even if logout fails, we return success for security
@@ -293,11 +294,6 @@ async def register_user(
     """
     try:
         # Create user directly using SQLAlchemy model
-        from ..models.database.user import UserModel
-        from ..domain.entities.user import UserRole, UserStatus
-        from ..infrastructure.security.password_hasher import PasswordHasher
-        import secrets
-
         password_hasher = PasswordHasher()
 
         # Create user model
@@ -319,11 +315,9 @@ async def register_user(
             await session.refresh(user)
 
         # TODO: Send verification email in background
-        # user = await user_service.get_user_by_email(request.email)
-        # background_tasks.add_task(send_verification_email, user)
 
         return GenericSuccessResponse(
-            message="User registered successfully. Please check your email for verification instructions."
+            message="User registered successfully. Please check your email for verification instructions.",
         )
     except UserAlreadyExistsError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
@@ -332,16 +326,12 @@ async def register_user(
     except UserManagementError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration failed: {str(e)}",
+            detail=f"Registration failed: {e!s}",
         )
     except Exception as e:
-        print(f"DEBUG: Exception in register_user: {type(e).__name__}: {e}")
-        import traceback
-
-        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Registration failed: {str(e)}",
+            detail=f"Registration failed: {e!s}",
         )
 
 
@@ -370,22 +360,22 @@ async def update_user_profile(
     request: UpdateProfileRequest,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> UserProfileResponse:
     """
     Update current user's profile.
     """
     try:
-        from ..application.dto.auth_requests import UpdateUserRequest
-
         update_request = UpdateUserRequest(
             full_name=request.full_name,
             role=None,  # Users cannot change their own role
         )
 
         updated_user = await user_service.update_user(
-            user_id=current_user.id, request=update_request, updated_by=current_user.id
+            user_id=current_user.id,
+            request=update_request,
+            updated_by=current_user.id,
         )
 
         return UserProfileResponse(user=UserPublic.from_user(updated_user))
@@ -403,7 +393,7 @@ async def change_password(
     request: ChangePasswordRequest,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
     """
@@ -417,7 +407,6 @@ async def change_password(
         )
 
         # TODO: Send confirmation email
-        # background_tasks.add_task(send_password_changed_email, current_user)
 
         return GenericSuccessResponse(message="Password changed successfully")
     except ValueError as e:
@@ -436,7 +425,7 @@ async def forgot_password(
     request: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
     """
@@ -446,15 +435,14 @@ async def forgot_password(
         masked_email = await user_service.request_password_reset(request.email)
 
         # TODO: Send password reset email in background
-        # background_tasks.add_task(send_password_reset_email, request.email)
 
         return GenericSuccessResponse(
-            message=f"Password reset email sent to {masked_email}"
+            message=f"Password reset email sent to {masked_email}",
         )
     except UserManagementError:
         # Don't reveal if email exists or not for security
         return GenericSuccessResponse(
-            message="If the email exists, a password reset link has been sent."
+            message="If the email exists, a password reset link has been sent.",
         )
 
 
@@ -467,7 +455,7 @@ async def forgot_password(
 async def reset_password(
     request: ResetPasswordRequest,
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
     """
@@ -475,7 +463,8 @@ async def reset_password(
     """
     try:
         await user_service.reset_password(
-            token=request.token, new_password=request.new_password
+            token=request.token,
+            new_password=request.new_password,
         )
 
         return GenericSuccessResponse(message="Password reset successfully")
@@ -497,7 +486,7 @@ async def reset_password(
 async def verify_email(
     token: str,
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
     """
@@ -508,5 +497,6 @@ async def verify_email(
         return GenericSuccessResponse(message="Email verified successfully")
     except UserManagementError:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid verification token"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token",
         )

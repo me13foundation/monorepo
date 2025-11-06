@@ -2,9 +2,10 @@
 Webhook notification service for releases.
 """
 
-import httpx
-from typing import Dict, Any, List, Optional
 import logging
+from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,8 @@ class WebhookService:
     async def send_webhook(
         self,
         url: str,
-        payload: Dict[str, Any],
-        headers: Optional[Dict[str, str]] = None,
+        payload: dict[str, Any],
+        headers: dict[str, str] | None = None,
     ) -> bool:
         """
         Send webhook notification.
@@ -51,21 +52,21 @@ class WebhookService:
                 )
                 response.raise_for_status()
 
-            logger.info(f"Webhook sent successfully to {url}")
-            return True
-
-        except Exception as e:
-            logger.error(f"Failed to send webhook to {url}: {e}")
+        except Exception:
+            logger.exception("Failed to send webhook to %s", url)
             return False
+        else:
+            logger.info("Webhook sent successfully to %s", url)
+            return True
 
     async def send_release_webhook(
         self,
-        webhook_urls: List[str],
+        webhook_urls: list[str],
         version: str,
         doi: str,
-        release_notes: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, bool]:
+        release_notes: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, bool]:
         """
         Send release notification webhooks.
 

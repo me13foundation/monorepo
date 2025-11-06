@@ -53,7 +53,10 @@ def test_paginate_genes_returns_domain_entities(test_session):
         repository.create(Gene.create(symbol=f"GENE{index}", name=f"Gene {index}"))
 
     results, total = repository.paginate_genes(
-        page=1, per_page=2, sort_by="symbol", sort_order="asc"
+        page=1,
+        per_page=2,
+        sort_by="symbol",
+        sort_order="asc",
     )
 
     assert total == 3

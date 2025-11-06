@@ -1,15 +1,21 @@
-from typing import List
+from typing import TYPE_CHECKING
+
+import dash_bootstrap_components as dbc
 
 from dash import html
-import dash_bootstrap_components as dbc
-from dash.development.base_component import Component
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from dash.development.base_component import Component
 
 
 def create_sidebar(current_page: str = "/") -> dbc.Col:
     """Create sidebar with quick stats and actions."""
-    quick_actions: List[Component] = [
+    quick_actions: list[Component] = [
         dbc.Button(
-            "Refresh Data", id="refresh-btn", color="primary", className="w-100 mb-2"
+            "Refresh Data",
+            id="refresh-btn",
+            color="primary",
+            className="w-100 mb-2",
         ),
     ]
 
@@ -28,7 +34,7 @@ def create_sidebar(current_page: str = "/") -> dbc.Col:
                     color="light",
                     className="w-100",
                 ),
-            ]
+            ],
         )
 
     return dbc.Col(
@@ -68,9 +74,9 @@ def create_sidebar(current_page: str = "/") -> dbc.Col:
                                         id="rejected-count",
                                         className="text-danger",
                                     ),
-                                ]
+                                ],
                             ),
-                        ]
+                        ],
                     ),
                 ],
                 className="mb-4",
@@ -79,7 +85,7 @@ def create_sidebar(current_page: str = "/") -> dbc.Col:
                 [
                     dbc.CardHeader("Quick Actions"),
                     dbc.CardBody(quick_actions),
-                ]
+                ],
             ),
         ],
         width=3,

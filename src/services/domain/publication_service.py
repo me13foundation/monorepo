@@ -3,18 +3,14 @@ Publication service for MED13 Resource Library.
 Business logic for scientific publication operations.
 """
 
-from typing import Dict, List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.publication import Publication
 from src.infrastructure.repositories import (
-    SqlAlchemyPublicationRepository,
     SqlAlchemyEvidenceRepository,
+    SqlAlchemyPublicationRepository,
 )
 from src.services.domain.base_service import BaseService
-
-if TYPE_CHECKING:
-    pass
 
 PublicationStatisticsValue = int | float | bool | str | None
 
@@ -29,8 +25,8 @@ class PublicationService(BaseService[SqlAlchemyPublicationRepository]):
 
     def __init__(
         self,
-        session: Optional[Session] = None,
-        publication_repository: Optional[SqlAlchemyPublicationRepository] = None,
+        session: Session | None = None,
+        publication_repository: SqlAlchemyPublicationRepository | None = None,
     ):
         super().__init__(session)
         self.publication_repo = (
@@ -45,8 +41,10 @@ class PublicationService(BaseService[SqlAlchemyPublicationRepository]):
         return self.publication_repo
 
     def find_med13_relevant_publications(
-        self, min_relevance: int = 3, limit: Optional[int] = None
-    ) -> List[Publication]:
+        self,
+        min_relevance: int = 3,
+        limit: int | None = None,
+    ) -> list[Publication]:
         """
         Find publications relevant to MED13 research.
 
@@ -59,7 +57,7 @@ class PublicationService(BaseService[SqlAlchemyPublicationRepository]):
         """
         return self.publication_repo.find_med13_relevant(min_relevance, limit)
 
-    def search_publications(self, query: str, limit: int = 20) -> List[Publication]:
+    def search_publications(self, query: str, limit: int = 20) -> list[Publication]:
         """
         Search publications by title, authors, or abstract.
 
@@ -73,8 +71,9 @@ class PublicationService(BaseService[SqlAlchemyPublicationRepository]):
         return self.publication_repo.search_publications(query, limit)
 
     def get_publication_with_evidence(
-        self, publication_id: int
-    ) -> Optional[Publication]:
+        self,
+        publication_id: int,
+    ) -> Publication | None:
         """
         Get a publication with its associated evidence loaded.
 
@@ -91,8 +90,9 @@ class PublicationService(BaseService[SqlAlchemyPublicationRepository]):
                 publication.add_evidence(record)
         return publication
 
-    def get_publication_statistics(self) -> Dict[str, PublicationStatisticsValue]:
-        raw_stats: Dict[
-            str, PublicationStatisticsValue
+    def get_publication_statistics(self) -> dict[str, PublicationStatisticsValue]:
+        raw_stats: dict[
+            str,
+            PublicationStatisticsValue,
         ] = self.publication_repo.get_publication_statistics()
         return dict(raw_stats)

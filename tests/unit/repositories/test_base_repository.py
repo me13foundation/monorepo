@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from src.models.database import Base, GeneModel, GeneType
 from src.repositories import GeneRepository
-from src.repositories.base import NotFoundError, DuplicateError
+from src.repositories.base import DuplicateError, NotFoundError
 
 
 @pytest.fixture
@@ -110,7 +110,9 @@ class TestBaseRepository:
 
         # Create genes with different types
         coding_gene = GeneModel(
-            gene_id="TEST001", symbol="CODING", gene_type=GeneType.PROTEIN_CODING
+            gene_id="TEST001",
+            symbol="CODING",
+            gene_type=GeneType.PROTEIN_CODING,
         )
         rn_gene = GeneModel(gene_id="TEST002", symbol="RNA", gene_type=GeneType.NCRNA)
 

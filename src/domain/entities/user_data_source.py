@@ -5,12 +5,12 @@ These entities represent user-configured data sources that extend the core syste
 with additional biomedical data while maintaining provenance and quality standards.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SourceType(str, Enum):
@@ -44,39 +44,48 @@ class SourceConfiguration(BaseModel):
     model_config = ConfigDict(extra="allow")  # Allow additional fields per source type
 
     # Common fields
-    url: Optional[str] = Field(None, description="Source URL for API/database sources")
-    file_path: Optional[str] = Field(None, description="File path for uploaded files")
-    format: Optional[str] = Field(
-        None, description="Data format (json, csv, xml, etc.)"
+    url: str | None = Field(None, description="Source URL for API/database sources")
+    file_path: str | None = Field(None, description="File path for uploaded files")
+    format: str | None = Field(
+        None,
+        description="Data format (json, csv, xml, etc.)",
     )
 
     # Authentication
-    auth_type: Optional[str] = Field(None, description="Authentication method")
-    auth_credentials: Optional[Dict[str, Any]] = Field(
-        None, description="Authentication credentials"
+    auth_type: str | None = Field(None, description="Authentication method")
+    auth_credentials: dict[str, Any] | None = Field(
+        None,
+        description="Authentication credentials",
     )
 
     # Rate limiting
-    requests_per_minute: Optional[int] = Field(
-        None, ge=1, le=1000, description="API rate limit"
+    requests_per_minute: int | None = Field(
+        None,
+        ge=1,
+        le=1000,
+        description="API rate limit",
     )
 
     # Data mapping
-    field_mapping: Optional[Dict[str, str]] = Field(
-        None, description="Field name mappings"
+    field_mapping: dict[str, str] | None = Field(
+        None,
+        description="Field name mappings",
     )
 
     # Source-specific metadata
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional source-specific metadata"
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Additional source-specific metadata",
     )
 
     @field_validator("requests_per_minute")
     @classmethod
-    def validate_rate_limit(cls, v: Optional[int]) -> Optional[int]:
+    def validate_rate_limit(cls, v: int | None) -> int | None:
         """Validate rate limit is reasonable."""
-        if v is not None and v < 1:
-            raise ValueError("Requests per minute must be at least 1")
+        min_rpm = 1
+        if v is not None and v < min_rpm:
+            msg = "Requests per minute must be at least 1"
+            raise ValueError(msg)
         return v
 
 
@@ -84,13 +93,14 @@ class IngestionSchedule(BaseModel):
     """Schedule configuration for automated data ingestion."""
 
     enabled: bool = Field(
-        default=False, description="Whether scheduled ingestion is enabled"
+        default=False,
+        description="Whether scheduled ingestion is enabled",
     )
     frequency: str = Field(
         default="manual",
         description="Ingestion frequency (manual, hourly, daily, weekly)",
     )
-    start_time: Optional[datetime] = Field(None, description="Scheduled start time")
+    start_time: datetime | None = Field(None, description="Scheduled start time")
     timezone: str = Field(default="UTC", description="Timezone for scheduling")
 
     @field_validator("frequency")
@@ -99,28 +109,42 @@ class IngestionSchedule(BaseModel):
         """Validate frequency is supported."""
         allowed = ["manual", "hourly", "daily", "weekly"]
         if v not in allowed:
-            raise ValueError(f"Frequency must be one of: {allowed}")
+            msg = f"Frequency must be one of: {allowed}"
+            raise ValueError(msg)
         return v
 
 
 class QualityMetrics(BaseModel):
     """Quality metrics for a data source."""
 
-    completeness_score: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Data completeness (0-1)"
+    completeness_score: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Data completeness (0-1)",
     )
-    consistency_score: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Data consistency (0-1)"
+    consistency_score: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Data consistency (0-1)",
     )
-    timeliness_score: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Data timeliness (0-1)"
+    timeliness_score: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Data timeliness (0-1)",
     )
-    overall_score: Optional[float] = Field(
-        None, ge=0.0, le=1.0, description="Overall quality score (0-1)"
+    overall_score: float | None = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Overall quality score (0-1)",
     )
 
-    last_assessed: Optional[datetime] = Field(
-        None, description="When quality was last assessed"
+    last_assessed: datetime | None = Field(
+        None,
+        description="When quality was last assessed",
     )
     issues_count: int = Field(default=0, description="Number of quality issues found")
 
@@ -141,24 +165,32 @@ class UserDataSource(BaseModel):
 
     # Basic information
     name: str = Field(
-        ..., min_length=1, max_length=200, description="Human-readable source name"
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Human-readable source name",
     )
     description: str = Field(
-        "", max_length=1000, description="Detailed description of the source"
+        "",
+        max_length=1000,
+        description="Detailed description of the source",
     )
 
     # Configuration
     source_type: SourceType = Field(..., description="Type of data source")
-    template_id: Optional[UUID] = Field(
-        None, description="Template used to create this source"
+    template_id: UUID | None = Field(
+        None,
+        description="Template used to create this source",
     )
     configuration: SourceConfiguration = Field(
-        ..., description="Source-specific configuration"
+        ...,
+        description="Source-specific configuration",
     )
 
     # Status and lifecycle
     status: SourceStatus = Field(
-        default=SourceStatus.DRAFT, description="Current status"
+        default=SourceStatus.DRAFT,
+        description="Current status",
     )
     ingestion_schedule: IngestionSchedule = Field(
         default_factory=lambda: IngestionSchedule(
@@ -185,20 +217,22 @@ class UserDataSource(BaseModel):
 
     # Timestamps
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When source was created",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When source was last updated",
     )
-    last_ingested_at: Optional[datetime] = Field(
-        None, description="When data was last successfully ingested"
+    last_ingested_at: datetime | None = Field(
+        None,
+        description="When data was last successfully ingested",
     )
 
     # Metadata
-    tags: List[str] = Field(
-        default_factory=list, description="User-defined tags for organization"
+    tags: list[str] = Field(
+        default_factory=list,
+        description="User-defined tags for organization",
     )
     version: str = Field(default="1.0", description="Source configuration version")
 
@@ -207,18 +241,23 @@ class UserDataSource(BaseModel):
     def validate_name(cls, v: str) -> str:
         """Validate source name."""
         if not v.strip():
-            raise ValueError("Source name cannot be empty or whitespace")
+            msg = "Source name cannot be empty or whitespace"
+            raise ValueError(msg)
         return v.strip()
 
     @field_validator("tags")
     @classmethod
-    def validate_tags(cls, v: List[str]) -> List[str]:
+    def validate_tags(cls, v: list[str]) -> list[str]:
         """Validate tags are reasonable."""
-        if len(v) > 10:
-            raise ValueError("Maximum 10 tags allowed")
+        max_tags = 10
+        if len(v) > max_tags:
+            msg = "Maximum 10 tags allowed"
+            raise ValueError(msg)
+        max_tag_len = 50
         for tag in v:
-            if len(tag) > 50:
-                raise ValueError("Tag length cannot exceed 50 characters")
+            if len(tag) > max_tag_len:
+                msg = "Tag length cannot exceed 50 characters"
+                raise ValueError(msg)
         return [tag.strip().lower() for tag in v if tag.strip()]
 
     def is_active(self) -> bool:
@@ -232,7 +271,7 @@ class UserDataSource(BaseModel):
     def update_status(self, new_status: SourceStatus) -> "UserDataSource":
         """Create new instance with updated status."""
         return self.model_copy(
-            update={"status": new_status, "updated_at": datetime.now(timezone.utc)}
+            update={"status": new_status, "updated_at": datetime.now(UTC)},
         )
 
     def update_quality_metrics(self, metrics: QualityMetrics) -> "UserDataSource":
@@ -240,20 +279,21 @@ class UserDataSource(BaseModel):
         return self.model_copy(
             update={
                 "quality_metrics": metrics,
-                "updated_at": datetime.now(timezone.utc),
-            }
+                "updated_at": datetime.now(UTC),
+            },
         )
 
     def record_ingestion(
-        self, timestamp: Optional[datetime] = None
+        self,
+        timestamp: datetime | None = None,
     ) -> "UserDataSource":
         """Create new instance with updated ingestion timestamp."""
-        ingestion_time = timestamp or datetime.now(timezone.utc)
+        ingestion_time = timestamp or datetime.now(UTC)
         return self.model_copy(
             update={
                 "last_ingested_at": ingestion_time,
-                "updated_at": datetime.now(timezone.utc),
-            }
+                "updated_at": datetime.now(UTC),
+            },
         )
 
     def update_configuration(self, config: SourceConfiguration) -> "UserDataSource":
@@ -261,9 +301,9 @@ class UserDataSource(BaseModel):
         return self.model_copy(
             update={
                 "configuration": config,
-                "updated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(UTC),
                 "version": self._increment_version(),
-            }
+            },
         )
 
     def _increment_version(self) -> str:

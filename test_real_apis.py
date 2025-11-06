@@ -1,46 +1,53 @@
-#!/usr/bin/env python3
 """
 Test script to verify that all ingestion APIs are returning real data
 from external biomedical sources.
 """
 
 import asyncio
+import logging
 import time
 from pathlib import Path
+from typing import Final
 
 from src.infrastructure.ingest import (
     ClinVarIngestor,
-    PubMedIngestor,
     HPOIngestor,
-    UniProtIngestor,
     IngestionCoordinator,
+    PubMedIngestor,
+    UniProtIngestor,
 )
+
+LOGGER_NAME: Final[str] = "med13.ingestion.real_apis"
+logger = logging.getLogger(LOGGER_NAME)
 
 
 def print_header(title: str):
     """Print a formatted header."""
-    print(f"\n{'='*60}")
-    print(f" {title}")
-    print(f"{'='*60}")
+    separator = "=" * 60
+    logger.info("")
+    logger.info(separator)
+    logger.info(" %s", title)
+    logger.info(separator)
 
 
 def print_result_summary(result, source_name: str):
     """Print a summary of ingestion results."""
-    print(f"\n📊 {source_name.upper()} RESULTS:")
-    print(f"   Status: {result.status.value}")
-    print(f"   Records processed: {result.records_processed}")
-    print(f"   Records failed: {result.records_failed}")
-    print(f"   Duration: {result.duration_seconds:.2f} seconds")
-    print(f"   Errors: {len(result.errors)}")
+    logger.info("")
+    logger.info("📊 %s RESULTS:", source_name.upper())
+    logger.info("   Status: %s", result.status.value)
+    logger.info("   Records processed: %s", result.records_processed)
+    logger.info("   Records failed: %s", result.records_failed)
+    logger.info("   Duration: %.2f seconds", result.duration_seconds)
+    logger.info("   Errors: %s", len(result.errors))
 
     if result.errors:
-        print("   Error details:")
+        logger.info("   Error details:")
         for error in result.errors[:3]:  # Show first 3 errors
-            print(f"     - {str(error)}")
+            logger.info("     - %s", error)
 
     if result.data:
-        print(f"   Sample data keys: {list(result.data[0].keys())[:5]}...")
-        print(f"   First record preview: {str(result.data[0])[:200]}...")
+        logger.info("   Sample data keys: %s...", list(result.data[0].keys())[:5])
+        logger.info("   First record preview: %s...", str(result.data[0])[:200])
 
 
 async def test_clinvar_real_data():
@@ -48,7 +55,7 @@ async def test_clinvar_real_data():
     print_header("Testing ClinVar API - Real Genetic Variant Data")
 
     async with ClinVarIngestor() as ingestor:
-        print("🔍 Searching for MED13 variants in ClinVar...")
+        logger.info("🔍 Searching for MED13 variants in ClinVar...")
 
         result = await ingestor.ingest(max_results=5)  # Small limit for testing
 
@@ -57,11 +64,12 @@ async def test_clinvar_real_data():
         # Verify we got real data
         if result.data and result.records_processed > 0:
             first_record = result.data[0]
-            print("\n✅ REAL DATA VERIFICATION:")
-            print(f"   Has clinvar_id: {'clinvar_id' in first_record}")
-            print(f"   Has parsed_data: {'parsed_data' in first_record}")
+            logger.info("")
+            logger.info("✅ REAL DATA VERIFICATION:")
+            logger.info("   Has clinvar_id: %s", "clinvar_id" in first_record)
+            logger.info("   Has parsed_data: %s", "parsed_data" in first_record)
             if "clinvar_id" in first_record:
-                print(f"   Sample ClinVar ID: {first_record['clinvar_id']}")
+                logger.info("   Sample ClinVar ID: %s", first_record["clinvar_id"])
 
         return result.records_processed > 0
 
@@ -71,7 +79,7 @@ async def test_pubmed_real_data():
     print_header("Testing PubMed API - Real Scientific Literature")
 
     async with PubMedIngestor() as ingestor:
-        print("🔍 Searching for MED13 publications in PubMed...")
+        logger.info("🔍 Searching for MED13 publications in PubMed...")
 
         result = await ingestor.ingest(max_results=3)  # Small limit for testing
 
@@ -80,12 +88,13 @@ async def test_pubmed_real_data():
         # Verify we got real data
         if result.data and result.records_processed > 0:
             first_record = result.data[0]
-            print("\n✅ REAL DATA VERIFICATION:")
-            print(f"   Has pubmed_id: {'pubmed_id' in first_record}")
-            print(f"   Has title: {'title' in first_record}")
-            print(f"   Has authors: {'authors' in first_record}")
-            if "title" in first_record and first_record["title"]:
-                print(f"   Sample title: {first_record['title'][:100]}...")
+            logger.info("")
+            logger.info("✅ REAL DATA VERIFICATION:")
+            logger.info("   Has pubmed_id: %s", "pubmed_id" in first_record)
+            logger.info("   Has title: %s", "title" in first_record)
+            logger.info("   Has authors: %s", "authors" in first_record)
+            if first_record.get("title"):
+                logger.info("   Sample title: %s...", first_record["title"][:100])
 
         return result.records_processed > 0
 
@@ -95,10 +104,10 @@ async def test_hpo_real_data():
     print_header("Testing HPO API - Real Phenotype Ontology")
 
     async with HPOIngestor() as ingestor:
-        print("🔍 Loading HPO ontology data...")
+        logger.info("🔍 Loading HPO ontology data...")
 
         result = await ingestor.ingest(
-            med13_only=False  # Get full ontology, not just MED13 terms
+            med13_only=False,  # Get full ontology, not just MED13 terms
         )
 
         print_result_summary(result, "hpo")
@@ -106,14 +115,15 @@ async def test_hpo_real_data():
         # Verify we got real data
         if result.data and result.records_processed > 0:
             first_record = result.data[0]
-            print("\n✅ REAL DATA VERIFICATION:")
-            print(f"   Has hpo_id: {'hpo_id' in first_record}")
-            print(f"   Has name: {'name' in first_record}")
-            print(f"   Has definition: {'definition' in first_record}")
+            logger.info("")
+            logger.info("✅ REAL DATA VERIFICATION:")
+            logger.info("   Has hpo_id: %s", "hpo_id" in first_record)
+            logger.info("   Has name: %s", "name" in first_record)
+            logger.info("   Has definition: %s", "definition" in first_record)
             if "hpo_id" in first_record:
-                print(f"   Sample HPO ID: {first_record['hpo_id']}")
+                logger.info("   Sample HPO ID: %s", first_record["hpo_id"])
             if "name" in first_record:
-                print(f"   Sample name: {first_record['name']}")
+                logger.info("   Sample name: %s", first_record["name"])
 
         return result.records_processed > 0
 
@@ -123,7 +133,7 @@ async def test_uniprot_real_data():
     print_header("Testing UniProt API - Real Protein Data")
 
     async with UniProtIngestor() as ingestor:
-        print("🔍 Searching for MED13 protein in UniProt...")
+        logger.info("🔍 Searching for MED13 protein in UniProt...")
 
         result = await ingestor.ingest(max_results=2)  # Small limit for testing
 
@@ -132,19 +142,29 @@ async def test_uniprot_real_data():
         # Verify we got real data
         if result.data and result.records_processed > 0:
             first_record = result.data[0]
-            print("\n✅ REAL DATA VERIFICATION:")
-            print(f"   Has primaryAccession: {'primaryAccession' in first_record}")
-            print(f"   Has proteinDescription: {'proteinDescription' in first_record}")
-            print(f"   Has organism: {'organism' in first_record}")
+            logger.info("")
+            logger.info("✅ REAL DATA VERIFICATION:")
+            logger.info(
+                "   Has primaryAccession: %s",
+                "primaryAccession" in first_record,
+            )
+            logger.info(
+                "   Has proteinDescription: %s",
+                "proteinDescription" in first_record,
+            )
+            logger.info("   Has organism: %s", "organism" in first_record)
             if "primaryAccession" in first_record:
-                print(f"   Sample UniProt ID: {first_record['primaryAccession']}")
+                logger.info(
+                    "   Sample UniProt ID: %s",
+                    first_record["primaryAccession"],
+                )
             # Check nested protein name
             protein_desc = first_record.get("proteinDescription", {})
             rec_name = protein_desc.get("recommendedName", {})
             full_name = rec_name.get("fullName", {})
             protein_name = full_name.get("value")
             if protein_name:
-                print(f"   Sample protein name: {protein_name[:50]}...")
+                logger.info("   Sample protein name: %s...", protein_name[:50])
 
         return result.records_processed > 0
 
@@ -154,14 +174,14 @@ async def test_coordinator_real_data():
     print_header("Testing Ingestion Coordinator - All Sources")
 
     def progress_callback(source, phase, progress):
-        print(f"📈 [{source}] {phase.value}: {progress:.1f}%")
+        logger.info("📈 [%s] %s: %.1f%%", source, phase.value, progress)
 
     coordinator = IngestionCoordinator(
         max_concurrent_ingestors=2,  # Limit concurrency for testing
         progress_callback=progress_callback,
     )
 
-    print("🚀 Starting coordinated ingestion from all sources...")
+    logger.info("🚀 Starting coordinated ingestion from all sources...")
 
     start_time = time.time()
     result = await coordinator.ingest_critical_sources_only(
@@ -171,24 +191,34 @@ async def test_coordinator_real_data():
 
     total_time = time.time() - start_time
 
-    print("\n🎯 COORDINATOR RESULTS:")
-    print(f"   Total sources: {result.total_sources}")
-    print(f"   Completed: {result.completed_sources}")
-    print(f"   Failed: {result.failed_sources}")
-    print(f"   Total records: {result.total_records}")
-    print(f"   Total time: {total_time:.2f} seconds")
-    print(
-        f"   Records per second: {result.total_records / total_time:.2f}"
-        if total_time > 0
-        else "   Records per second: N/A"
-    )
+    logger.info("")
+    logger.info("🎯 COORDINATOR RESULTS:")
+    logger.info("   Total sources: %s", result.total_sources)
+    logger.info("   Completed: %s", result.completed_sources)
+    logger.info("   Failed: %s", result.failed_sources)
+    logger.info("   Total records: %s", result.total_records)
+    logger.info("   Total time: %.2f seconds", total_time)
+    if total_time > 0:
+        logger.info(
+            "   Records per second: %.2f",
+            result.total_records / total_time,
+        )
+    else:
+        logger.info("   Records per second: N/A")
 
-    print("\n📋 PER-SOURCE RESULTS:")
+    logger.info("")
+    logger.info("📋 PER-SOURCE RESULTS:")
     for source, source_result in result.source_results.items():
         status = source_result.status.value
         records = source_result.records_processed
         duration = source_result.duration_seconds
-        print(f"   {source}: {status} ({records} records, {duration:.2f}s)")
+        logger.info(
+            "   %s: %s (%s records, %.2fs)",
+            source,
+            status,
+            records,
+            duration,
+        )
 
     return result.total_records > 0
 
@@ -198,43 +228,43 @@ async def test_raw_data_storage():
     print_header("Testing Raw Data Storage")
 
     raw_data_dir = Path("data/raw")
-    print(f"📁 Checking raw data directory: {raw_data_dir.absolute()}")
+    logger.info("📁 Checking raw data directory: %s", raw_data_dir.absolute())
 
     if raw_data_dir.exists():
-        print("✅ Raw data directory exists")
+        logger.info("✅ Raw data directory exists")
 
         # Check what sources have data
         sources = [d.name for d in raw_data_dir.iterdir() if d.is_dir()]
-        print(f"📂 Sources with stored data: {sources}")
+        logger.info("📂 Sources with stored data: %s", sources)
 
         for source in sources:
             source_dir = raw_data_dir / source
             files = list(source_dir.glob("*.json"))
             if files:
-                print(f"   {source}: {len(files)} files")
+                logger.info("   %s: %s files", source, len(files))
                 # Show most recent file
                 latest_file = max(files, key=lambda f: f.stat().st_mtime)
-                print(f"     Latest: {latest_file.name}")
+                logger.info("     Latest: %s", latest_file.name)
             else:
-                print(f"   {source}: No files")
+                logger.info("   %s: No files", source)
     else:
-        print("❌ Raw data directory does not exist")
+        logger.info("❌ Raw data directory does not exist")
 
     return raw_data_dir.exists()
 
 
 async def main():
     """Run all real API tests."""
-    print("🧪 TESTING REAL API ENDPOINTS")
-    print("This will make actual HTTP requests to biomedical APIs")
-    print("Please ensure you have internet connectivity...\n")
+    logger.info("🧪 TESTING REAL API ENDPOINTS")
+    logger.info("This will make actual HTTP requests to biomedical APIs")
+    logger.info("Please ensure you have internet connectivity...\n")
 
     # Track test results
     results = {}
 
     try:
         # Test individual ingestors
-        print("🔬 Testing Individual Ingestors...")
+        logger.info("🔬 Testing Individual Ingestors...")
 
         results["clinvar"] = await test_clinvar_real_data()
         await asyncio.sleep(1)  # Brief pause between tests
@@ -255,10 +285,11 @@ async def main():
         results["storage"] = await test_raw_data_storage()
 
     except KeyboardInterrupt:
-        print("\n⏹️  Testing interrupted by user")
+        logger.info("")
+        logger.info("⏹️  Testing interrupted by user")
         return
-    except Exception as e:
-        print(f"\n❌ Unexpected error during testing: {e}")
+    except Exception:
+        logger.exception("❌ Unexpected error during testing")
         return
 
     # Print final summary
@@ -266,26 +297,29 @@ async def main():
 
     all_passed = all(results.values())
 
-    print("📈 Test Results:")
+    logger.info("📈 Test Results:")
     for test_name, passed in results.items():
         status = "✅ PASSED" if passed else "❌ FAILED"
-        print(f"   {test_name}: {status}")
+        logger.info("   %s: %s", test_name, status)
 
-    print("\n🎯 OVERALL RESULT:")
+    logger.info("")
+    logger.info("🎯 OVERALL RESULT:")
     if all_passed:
-        print("   ✅ ALL TESTS PASSED - APIs are returning real data!")
-        print("   🎉 The ingestion infrastructure is working correctly.")
+        logger.info("   ✅ ALL TESTS PASSED - APIs are returning real data!")
+        logger.info("   🎉 The ingestion infrastructure is working correctly.")
     else:
         failed_tests = [name for name, passed in results.items() if not passed]
-        print(f"   ❌ Some tests failed: {', '.join(failed_tests)}")
-        print("   🔍 Check the output above for details.")
+        logger.info("   ❌ Some tests failed: %s", ", ".join(failed_tests))
+        logger.info("   🔍 Check the output above for details.")
 
-    print("\n💡 NOTES:")
-    print("   - ClinVar/PubMed: May return 0 results if API limits are hit")
-    print("   - HPO: Should always return ontology data")
-    print("   - UniProt: May return 0 results for some queries")
-    print("   - Raw data is stored in data/raw/ directory")
+    logger.info("")
+    logger.info("💡 NOTES:")
+    logger.info("   - ClinVar/PubMed: May return 0 results if API limits are hit")
+    logger.info("   - HPO: Should always return ontology data")
+    logger.info("   - UniProt: May return 0 results for some queries")
+    logger.info("   - Raw data is stored in data/raw/ directory")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     asyncio.run(main())

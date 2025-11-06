@@ -6,9 +6,9 @@ into consistent formats for cross-referencing and deduplication.
 """
 
 import re
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class PhenotypeIdentifierType(Enum):
@@ -29,10 +29,10 @@ class NormalizedPhenotype:
     primary_id: str
     id_type: PhenotypeIdentifierType
     name: str
-    definition: Optional[str]
-    synonyms: List[str]
-    category: Optional[str]
-    cross_references: Dict[str, List[str]]
+    definition: str | None
+    synonyms: list[str]
+    category: str | None
+    cross_references: dict[str, list[str]]
     source: str
     confidence_score: float
 
@@ -62,11 +62,13 @@ class PhenotypeNormalizer:
         }
 
         # Cache for normalized phenotypes
-        self.normalized_cache: Dict[str, NormalizedPhenotype] = {}
+        self.normalized_cache: dict[str, NormalizedPhenotype] = {}
 
     def normalize(
-        self, raw_phenotype_data: Dict[str, Any], source: str = "unknown"
-    ) -> Optional[NormalizedPhenotype]:
+        self,
+        raw_phenotype_data: dict[str, Any],
+        source: str = "unknown",
+    ) -> NormalizedPhenotype | None:
         """
         Normalize phenotype data from various sources.
 
@@ -80,18 +82,18 @@ class PhenotypeNormalizer:
         try:
             if source.lower() == "hpo":
                 return self._normalize_hpo_phenotype(raw_phenotype_data)
-            elif source.lower() == "clinvar":
+            if source.lower() == "clinvar":
                 return self._normalize_clinvar_phenotype(raw_phenotype_data)
-            else:
-                return self._normalize_generic_phenotype(raw_phenotype_data, source)
+            return self._normalize_generic_phenotype(raw_phenotype_data, source)
 
         except Exception as e:
             print(f"Error normalizing phenotype data from {source}: {e}")
             return None
 
     def _normalize_hpo_phenotype(
-        self, phenotype_data: Dict[str, Any]
-    ) -> Optional[NormalizedPhenotype]:
+        self,
+        phenotype_data: dict[str, Any],
+    ) -> NormalizedPhenotype | None:
         """Normalize phenotype data from HPO."""
         hpo_id = phenotype_data.get("hpo_id")
         name = phenotype_data.get("name")
@@ -132,8 +134,9 @@ class PhenotypeNormalizer:
         return normalized
 
     def _normalize_clinvar_phenotype(
-        self, phenotype_data: Dict[str, Any]
-    ) -> Optional[NormalizedPhenotype]:
+        self,
+        phenotype_data: dict[str, Any],
+    ) -> NormalizedPhenotype | None:
         """Normalize phenotype data from ClinVar."""
         phenotype_name = phenotype_data.get("name") or phenotype_data.get("phenotype")
 
@@ -167,14 +170,16 @@ class PhenotypeNormalizer:
         return normalized
 
     def _normalize_generic_phenotype(
-        self, phenotype_data: Dict[str, Any], source: str
-    ) -> Optional[NormalizedPhenotype]:
+        self,
+        phenotype_data: dict[str, Any],
+        source: str,
+    ) -> NormalizedPhenotype | None:
         """Normalize phenotype data from generic sources."""
         # Try to extract common fields
         phenotype_id = phenotype_data.get("id") or phenotype_data.get("phenotype_id")
         name = phenotype_data.get("name") or phenotype_data.get("term")
         definition = phenotype_data.get("definition") or phenotype_data.get(
-            "description"
+            "description",
         )
 
         if not name and not phenotype_id:
@@ -207,16 +212,15 @@ class PhenotypeNormalizer:
         """Identify the type of phenotype identifier."""
         if self.identifier_patterns["hpo"].match(phenotype_id):
             return PhenotypeIdentifierType.HPO_ID
-        elif self.identifier_patterns["omim"].match(phenotype_id):
+        if self.identifier_patterns["omim"].match(phenotype_id):
             return PhenotypeIdentifierType.OMIM_ID
-        elif self.identifier_patterns["orpha"].match(phenotype_id):
+        if self.identifier_patterns["orpha"].match(phenotype_id):
             return PhenotypeIdentifierType.ORPHA_ID
-        elif self.identifier_patterns["mondo"].match(phenotype_id):
+        if self.identifier_patterns["mondo"].match(phenotype_id):
             return PhenotypeIdentifierType.MONDO_ID
-        else:
-            return PhenotypeIdentifierType.OTHER
+        return PhenotypeIdentifierType.OTHER
 
-    def _determine_hpo_category(self, hpo_id: str) -> Optional[str]:
+    def _determine_hpo_category(self, hpo_id: str) -> str | None:
         """Determine HPO term category."""
         # Check predefined categories
         if hpo_id in self.hpo_categories:
@@ -226,7 +230,7 @@ class PhenotypeNormalizer:
         # based on term hierarchy, but simplified for now
         return None
 
-    def _find_hpo_mappings(self, phenotype_name: str) -> List[str]:
+    def _find_hpo_mappings(self, phenotype_name: str) -> list[str]:
         """
         Find potential HPO mappings for a phenotype name.
 
@@ -270,16 +274,23 @@ class PhenotypeNormalizer:
 
         # Handle some common abbreviations
         normalized = re.sub(
-            r"\bID\b", "Intellectual Disability", normalized, flags=re.IGNORECASE
+            r"\bID\b",
+            "Intellectual Disability",
+            normalized,
+            flags=re.IGNORECASE,
         )
         normalized = re.sub(
-            r"\bASD\b", "Autism Spectrum Disorder", normalized, flags=re.IGNORECASE
+            r"\bASD\b",
+            "Autism Spectrum Disorder",
+            normalized,
+            flags=re.IGNORECASE,
         )
 
         return normalized
 
     def merge_phenotype_data(
-        self, phenotypes: List[NormalizedPhenotype]
+        self,
+        phenotypes: list[NormalizedPhenotype],
     ) -> NormalizedPhenotype:
         """
         Merge multiple phenotype records for the same phenotype.
@@ -300,7 +311,7 @@ class PhenotypeNormalizer:
         base_phenotype = max(phenotypes, key=lambda p: p.confidence_score)
 
         # Merge cross-references
-        merged_refs: Dict[str, List[str]] = {}
+        merged_refs: dict[str, list[str]] = {}
         for phenotype in phenotypes:
             for ref_type, ref_ids in phenotype.cross_references.items():
                 if ref_type not in merged_refs:
@@ -330,8 +341,9 @@ class PhenotypeNormalizer:
         )
 
     def validate_normalized_phenotype(
-        self, phenotype: NormalizedPhenotype
-    ) -> List[str]:
+        self,
+        phenotype: NormalizedPhenotype,
+    ) -> list[str]:
         """
         Validate normalized phenotype data.
 
@@ -359,8 +371,9 @@ class PhenotypeNormalizer:
         return errors
 
     def get_normalized_phenotype(
-        self, phenotype_id: str
-    ) -> Optional[NormalizedPhenotype]:
+        self,
+        phenotype_id: str,
+    ) -> NormalizedPhenotype | None:
         """
         Retrieve a cached normalized phenotype by ID.
 
@@ -372,7 +385,7 @@ class PhenotypeNormalizer:
         """
         return self.normalized_cache.get(phenotype_id)
 
-    def find_phenotype_by_name(self, name: str) -> Optional[NormalizedPhenotype]:
+    def find_phenotype_by_name(self, name: str) -> NormalizedPhenotype | None:
         """
         Find a normalized phenotype by name.
 

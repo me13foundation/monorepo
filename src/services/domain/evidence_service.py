@@ -3,15 +3,11 @@ Evidence service for MED13 Resource Library.
 Business logic for evidence linking variants and phenotypes.
 """
 
-from typing import Dict, List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.evidence import Evidence
 from src.infrastructure.repositories import SqlAlchemyEvidenceRepository
 from src.services.domain.base_service import BaseService
-
-if TYPE_CHECKING:
-    pass
 
 EvidenceStatisticsValue = int | float | bool | str | None
 
@@ -26,8 +22,8 @@ class EvidenceService(BaseService[SqlAlchemyEvidenceRepository]):
 
     def __init__(
         self,
-        session: Optional[Session] = None,
-        evidence_repository: Optional[SqlAlchemyEvidenceRepository] = None,
+        session: Session | None = None,
+        evidence_repository: SqlAlchemyEvidenceRepository | None = None,
     ):
         super().__init__(session)
         self.evidence_repo = (
@@ -41,8 +37,9 @@ class EvidenceService(BaseService[SqlAlchemyEvidenceRepository]):
         return self.evidence_repo
 
     def find_high_confidence_evidence(
-        self, limit: Optional[int] = None
-    ) -> List[Evidence]:
+        self,
+        limit: int | None = None,
+    ) -> list[Evidence]:
         """
         Find evidence with high confidence levels.
 
@@ -55,8 +52,11 @@ class EvidenceService(BaseService[SqlAlchemyEvidenceRepository]):
         return self.evidence_repo.find_high_confidence_evidence(limit)
 
     def find_relationship_evidence(
-        self, variant_id: int, phenotype_id: int, min_confidence: float = 0.5
-    ) -> List[Evidence]:
+        self,
+        variant_id: int,
+        phenotype_id: int,
+        min_confidence: float = 0.5,
+    ) -> list[Evidence]:
         """
         Find evidence supporting the relationship between a variant and phenotype.
 
@@ -69,17 +69,20 @@ class EvidenceService(BaseService[SqlAlchemyEvidenceRepository]):
             List of Evidence entities supporting the relationship
         """
         return self.evidence_repo.find_relationship_evidence(
-            variant_id, phenotype_id, min_confidence
+            variant_id,
+            phenotype_id,
+            min_confidence,
         )
 
-    def get_evidence_statistics(self) -> Dict[str, EvidenceStatisticsValue]:
+    def get_evidence_statistics(self) -> dict[str, EvidenceStatisticsValue]:
         """
         Get comprehensive statistics about evidence.
 
         Returns:
             Dictionary with evidence statistics
         """
-        raw_stats: Dict[
-            str, EvidenceStatisticsValue
+        raw_stats: dict[
+            str,
+            EvidenceStatisticsValue,
         ] = self.evidence_repo.get_evidence_statistics()
         return dict(raw_stats)

@@ -5,12 +5,13 @@ Encapsulates evidence-specific business rules, conflict detection,
 and confidence scoring logic without infrastructure dependencies.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from collections import Counter
+from typing import Any
 
-from .base import DomainService
-from ..entities.evidence import Evidence
-from ..value_objects.confidence import Confidence, EvidenceLevel
-from ...type_definitions.domain import EvidenceDerivedProperties
+from src.domain.entities.evidence import Evidence
+from src.domain.services.base import DomainService
+from src.domain.value_objects.confidence import Confidence, EvidenceLevel
+from src.type_definitions.domain import EvidenceDerivedProperties
 
 
 class EvidenceDomainService(DomainService):
@@ -22,8 +23,11 @@ class EvidenceDomainService(DomainService):
     """
 
     def validate_business_rules(
-        self, entity: Evidence, operation: str, context: Optional[Dict[str, Any]] = None
-    ) -> List[str]:
+        self,
+        entity: Evidence,
+        _operation: str,
+        _context: dict[str, Any] | None = None,
+    ) -> list[str]:
         """
         Validate evidence business rules.
 
@@ -70,7 +74,7 @@ class EvidenceDomainService(DomainService):
         # Auto-calculate confidence score if not provided
         if operation in ("create", "update"):
             entity.update_confidence(
-                Confidence.from_score(self._calculate_default_confidence_score(entity))
+                Confidence.from_score(self._calculate_default_confidence_score(entity)),
             )
 
         # Normalize evidence level
@@ -78,7 +82,7 @@ class EvidenceDomainService(DomainService):
 
         return entity
 
-    def calculate_derived_properties(self, entity: Evidence) -> Dict[str, Any]:
+    def calculate_derived_properties(self, entity: Evidence) -> dict[str, Any]:
         """
         Calculate derived properties for evidence.
 
@@ -90,9 +94,11 @@ class EvidenceDomainService(DomainService):
         """
         # Determine confidence category
         confidence_score = entity.confidence.score
-        if confidence_score >= 0.8:
+        high_threshold = 0.8
+        medium_threshold = 0.6
+        if confidence_score >= high_threshold:
             confidence_category = "high"
-        elif confidence_score >= 0.6:
+        elif confidence_score >= medium_threshold:
             confidence_category = "medium"
         else:
             confidence_category = "low"
@@ -152,8 +158,9 @@ class EvidenceDomainService(DomainService):
         return result.__dict__
 
     def detect_evidence_conflicts(
-        self, evidence_list: List[Evidence]
-    ) -> List[Dict[str, Any]]:
+        self,
+        evidence_list: list[Evidence],
+    ) -> list[dict[str, Any]]:
         """
         Detect conflicts between evidence records.
 
@@ -163,9 +170,10 @@ class EvidenceDomainService(DomainService):
         Returns:
             List of conflict descriptions with details
         """
-        conflicts: List[Dict[str, Any]] = []
+        conflicts: list[dict[str, Any]] = []
 
-        if len(evidence_list) < 2:
+        min_for_conflict = 2
+        if len(evidence_list) < min_for_conflict:
             return conflicts
 
         # Check for clinical significance conflicts
@@ -183,8 +191,9 @@ class EvidenceDomainService(DomainService):
         return conflicts
 
     def calculate_evidence_consensus(
-        self, evidence_list: List[Evidence]
-    ) -> Dict[str, Any]:
+        self,
+        evidence_list: list[Evidence],
+    ) -> dict[str, Any]:
         """
         Calculate consensus from multiple evidence records.
 
@@ -202,10 +211,11 @@ class EvidenceDomainService(DomainService):
             }
 
         # Extract clinical significances
-        significances = []
-        for ev in evidence_list:
-            if hasattr(ev, "clinical_significance") and ev.clinical_significance:
-                significances.append(ev.clinical_significance)
+        significances = [
+            ev.clinical_significance
+            for ev in evidence_list
+            if hasattr(ev, "clinical_significance") and ev.clinical_significance
+        ]
 
         if not significances:
             return {
@@ -215,13 +225,12 @@ class EvidenceDomainService(DomainService):
             }
 
         # Find most common significance
-        from collections import Counter
-
         most_common_sig, count = Counter(significances).most_common(1)[0]
 
         agreement_score = count / len(significances)
         confidence = self._calculate_consensus_confidence(
-            evidence_list, agreement_score
+            evidence_list,
+            agreement_score,
         )
 
         return {
@@ -230,7 +239,7 @@ class EvidenceDomainService(DomainService):
             "agreement_score": agreement_score,
             "total_evidence": len(evidence_list),
             "evidence_levels": list(
-                set(ev.evidence_level for ev in evidence_list if ev.evidence_level)
+                {ev.evidence_level for ev in evidence_list if ev.evidence_level},
             ),
         }
 
@@ -255,7 +264,8 @@ class EvidenceDomainService(DomainService):
             "conflicting": 0.2,
         }
         level_score = level_scores.get(
-            evidence.evidence_level.lower() if evidence.evidence_level else "", 0.3
+            evidence.evidence_level.lower() if evidence.evidence_level else "",
+            0.3,
         )
         score = (score + level_score) / 2
 
@@ -325,7 +335,7 @@ class EvidenceDomainService(DomainService):
         strength = 0.5
 
         # Evidence level contribution
-        level_strengths: Dict[EvidenceLevel, float] = {
+        level_strengths: dict[EvidenceLevel, float] = {
             EvidenceLevel.DEFINITIVE: 1.0,
             EvidenceLevel.STRONG: 0.8,
             EvidenceLevel.MODERATE: 0.6,
@@ -346,34 +356,38 @@ class EvidenceDomainService(DomainService):
         """Determine evidence quality tier."""
         strength = self._calculate_evidence_strength(evidence)
 
-        if strength >= 0.8:
+        high = 0.8
+        medium = 0.6
+        low = 0.4
+        if strength >= high:
             return "high"
-        elif strength >= 0.6:
+        if strength >= medium:
             return "medium"
-        elif strength >= 0.4:
+        if strength >= low:
             return "low"
-        else:
-            return "very_low"
+        return "very_low"
 
-    def _is_recent_evidence(self, evidence: Evidence) -> bool:
+    def _is_recent_evidence(self, _evidence: Evidence) -> bool:
         """Determine if evidence is recent (simplified implementation)."""
         # Would check publication date - simplified for now
         return True
 
     def _detect_significance_conflicts(
-        self, evidence_list: List[Evidence]
-    ) -> List[Dict[str, Any]]:
+        self,
+        evidence_list: list[Evidence],
+    ) -> list[dict[str, Any]]:
         """Detect clinical significance conflicts."""
         conflicts = []
 
-        significances = []
-        for ev in evidence_list:
-            if hasattr(ev, "clinical_significance") and ev.clinical_significance:
-                significances.append((ev.clinical_significance.lower(), ev.id))
+        significances = [
+            (ev.clinical_significance.lower(), ev.id)
+            for ev in evidence_list
+            if hasattr(ev, "clinical_significance") and ev.clinical_significance
+        ]
 
         # Check for pathogenic vs benign conflicts
-        pathogenic = [id for sig, id in significances if "pathogenic" in sig]
-        benign = [id for sig, id in significances if "benign" in sig]
+        pathogenic = [evid_id for sig, evid_id in significances if "pathogenic" in sig]
+        benign = [evid_id for sig, evid_id in significances if "benign" in sig]
 
         if pathogenic and benign:
             conflicts.append(
@@ -382,55 +396,64 @@ class EvidenceDomainService(DomainService):
                     "description": f"Conflicting clinical significance: {len(pathogenic)} pathogenic vs {len(benign)} benign",
                     "severity": "high",
                     "evidence_ids": pathogenic + benign,
-                }
+                },
             )
 
         return conflicts
 
     def _detect_frequency_conflicts(
-        self, evidence_list: List[Evidence]
-    ) -> List[Dict[str, Any]]:
+        self,
+        evidence_list: list[Evidence],
+    ) -> list[dict[str, Any]]:
         """Detect frequency conflicts."""
         conflicts = []
 
-        frequencies: List[Tuple[float, Optional[int]]] = []
-        for ev in evidence_list:
-            if hasattr(ev, "allele_frequency") and ev.allele_frequency is not None:
-                frequencies.append((ev.allele_frequency, ev.id))
+        frequencies: list[tuple[float, int | None]] = [
+            (ev.allele_frequency, ev.id)
+            for ev in evidence_list
+            if hasattr(ev, "allele_frequency") and ev.allele_frequency is not None
+        ]
 
         if len(frequencies) > 1:
             freq_values = [freq for freq, _ in frequencies]
             freq_range = max(freq_values) - min(freq_values)
 
-            if freq_range > 0.05:  # More than 5% difference
+            threshold = 0.05
+            if freq_range > threshold:
                 conflicts.append(
                     {
                         "type": "frequency_conflict",
                         "description": f"Large frequency discrepancy: {freq_range:.4f} across {len(frequencies)} sources",
                         "severity": "medium",
-                        "evidence_ids": [id for _, id in frequencies],
-                    }
+                        "evidence_ids": [evid_id for _, evid_id in frequencies],
+                    },
                 )
 
         return conflicts
 
     def _detect_functional_study_conflicts(
-        self, evidence_list: List[Evidence]
-    ) -> List[Dict[str, Any]]:
+        self,
+        _evidence_list: list[Evidence],
+    ) -> list[dict[str, Any]]:
         """Detect functional study conflicts (placeholder)."""
         # Would implement logic for functional study conflicts
         return []
 
     def _calculate_consensus_confidence(
-        self, evidence_list: List[Evidence], agreement_score: float
+        self,
+        evidence_list: list[Evidence],
+        agreement_score: float,
     ) -> float:
         """Calculate confidence in consensus."""
         base_confidence = agreement_score
 
         # Boost confidence based on evidence quality and quantity
         quality_boost = min(len(evidence_list) * 0.1, 0.3)
+        high_quality_threshold = 0.7
         high_quality_count = sum(
-            1 for ev in evidence_list if self.score_evidence_quality(ev) > 0.7
+            1
+            for ev in evidence_list
+            if self.score_evidence_quality(ev) > high_quality_threshold
         )
         quality_boost += (high_quality_count / len(evidence_list)) * 0.2
 

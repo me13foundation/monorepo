@@ -4,9 +4,10 @@ Unit tests for User domain entity.
 Tests user entity behavior, validation, and business logic.
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
+
+import pytest
 
 from src.domain.entities.user import User, UserRole, UserStatus
 
@@ -120,7 +121,7 @@ class TestUserEntity:
 
     def test_cannot_authenticate_locked_user(self):
         """Test authentication fails for locked user."""
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
         user = User(
             email="test@example.com",
             username="testuser",
@@ -196,7 +197,7 @@ class TestUserEntity:
 
     def test_manual_account_unlocking(self):
         """Test manual account unlocking."""
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
         user = User(
             email="test@example.com",
             username="testuser",
@@ -257,7 +258,7 @@ class TestUserEntity:
 
     def test_expired_password_reset_token(self):
         """Test expired password reset token handling."""
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
         user = User(
             email="test@example.com",
             username="testuser",
@@ -313,7 +314,7 @@ class TestUserEntity:
     def test_business_rules_validation(self):
         """Test cross-field business rules validation."""
         # Password reset token with expired time should be cleared
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
         user = User(
             email="test@example.com",
             username="testuser",

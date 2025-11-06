@@ -1,7 +1,7 @@
 from datetime import date
 
-from src.domain.entities.publication import Publication, PublicationType
 from src.domain.entities.evidence import Evidence, EvidenceType
+from src.domain.entities.publication import Publication, PublicationType
 from src.domain.value_objects.confidence import Confidence, EvidenceLevel
 from src.domain.value_objects.identifiers import PublicationIdentifier
 

@@ -1,8 +1,8 @@
 from fastapi.testclient import TestClient
 
+from src.database.session import engine
 from src.main import create_app
 from src.models.database.base import Base
-from src.database.session import engine
 
 
 def test_curation_submit_list_approve_comment(tmp_path):
@@ -23,7 +23,8 @@ def test_curation_submit_list_approve_comment(tmp_path):
 
     # List queue and ensure our item appears
     resp = client.get(
-        "/curation/queue", params={"entity_type": "genes", "status": "pending"}
+        "/curation/queue",
+        params={"entity_type": "genes", "status": "pending"},
     )
     assert resp.status_code == 200
     items = resp.json()
@@ -31,7 +32,8 @@ def test_curation_submit_list_approve_comment(tmp_path):
 
     # Approve the item
     resp = client.post(
-        "/curation/bulk", json={"ids": [created_id], "action": "approve"}
+        "/curation/bulk",
+        json={"ids": [created_id], "action": "approve"},
     )
     assert resp.status_code == 200
     assert resp.json()["updated"] >= 1

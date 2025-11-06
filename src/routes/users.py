@@ -4,31 +4,33 @@ User management routes for MED13 Resource Library.
 Provides REST API endpoints for administrative user management operations.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..application.container import container
-from ..application.services.user_management_service import (
-    UserManagementService,
-    UserManagementError,
-    UserAlreadyExistsError,
-    UserNotFoundError,
-)
-from ..application.services.authorization_service import AuthorizationService
-from ..application.services.authentication_service import AuthenticationService
-from .auth import get_current_active_user
-from ..application.dto.auth_requests import CreateUserRequest, AdminUpdateUserRequest
-from ..application.dto.auth_responses import (
-    UserProfileResponse,
-    UserListResponse,
-    UserStatisticsResponse,
-    UserPublic,
-    GenericSuccessResponse,
+from src.application.container import container
+from src.application.dto.auth_requests import AdminUpdateUserRequest, CreateUserRequest
+from src.application.dto.auth_responses import (
     ErrorResponse,
+    GenericSuccessResponse,
+    UserListResponse,
+    UserProfileResponse,
+    UserPublic,
+    UserStatisticsResponse,
     ValidationErrorResponse,
 )
-from ..domain.entities.user import User, UserRole, UserStatus
+from src.application.services.authentication_service import AuthenticationService
+from src.application.services.authorization_service import AuthorizationService
+from src.application.services.user_management_service import (
+    UserAlreadyExistsError,
+    UserManagementError,
+    UserManagementService,
+    UserNotFoundError,
+)
+from src.domain.entities.user import User, UserRole, UserStatus
+from src.domain.value_objects.permission import Permission
+from src.routes.auth import get_current_active_user
 
 # HTTP status codes
 HTTP_201_CREATED = 201
@@ -64,7 +66,7 @@ async def create_user(
     request: CreateUserRequest,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> UserProfileResponse:
@@ -73,10 +75,9 @@ async def create_user(
     """
     try:
         # Check permission
-        from ..domain.value_objects.permission import Permission
-
         await authz_service.require_permission(
-            current_user.id, Permission("user:create")
+            current_user.id,
+            Permission("user:create"),
         )
         user = await user_service.create_user(request, current_user.id)
         return UserProfileResponse(user=UserPublic.from_user(user))
@@ -87,7 +88,7 @@ async def create_user(
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"User creation failed: {str(e)}",
+            detail=f"User creation failed: {e!s}",
         )
 
 
@@ -100,13 +101,16 @@ async def create_user(
 async def list_users(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(
-        100, ge=1, le=1000, description="Maximum number of records to return"
+        100,
+        ge=1,
+        le=1000,
+        description="Maximum number of records to return",
     ),
-    role: Optional[str] = Query(None, description="Filter by role"),
-    status_filter: Optional[str] = Query(None, description="Filter by status"),
+    role: str | None = Query(None, description="Filter by role"),
+    status_filter: str | None = Query(None, description="Filter by status"),
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> UserListResponse:
     """
@@ -136,14 +140,17 @@ async def list_users(
                 )
 
         response = await user_service.list_users(
-            skip=skip, limit=limit, role=user_role, status=user_status
+            skip=skip,
+            limit=limit,
+            role=user_role,
+            status=user_status,
         )
 
         return response
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list users: {str(e)}",
+            detail=f"Failed to list users: {e!s}",
         )
 
 
@@ -157,7 +164,7 @@ async def get_user(
     user_id: str,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> UserProfileResponse:
     """
@@ -165,12 +172,14 @@ async def get_user(
     """
     try:
         # Check if user can access this user's information
-        if current_user.role not in [UserRole.ADMIN, UserRole.CURATOR]:
-            # Users can only see their own information
-            if str(current_user.id) != user_id:
-                raise HTTPException(
-                    status_code=HTTP_403_FORBIDDEN, detail="Access denied"
-                )
+        if (
+            current_user.role not in [UserRole.ADMIN, UserRole.CURATOR]
+            and str(current_user.id) != user_id
+        ):
+            raise HTTPException(
+                status_code=HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
 
         user = await user_service.get_user(UUID(user_id))
         if not user:
@@ -180,7 +189,7 @@ async def get_user(
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get user: {str(e)}",
+            detail=f"Failed to get user: {e!s}",
         )
 
 
@@ -195,7 +204,7 @@ async def update_user(
     request: AdminUpdateUserRequest,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> UserProfileResponse:
@@ -204,10 +213,9 @@ async def update_user(
     """
     try:
         # Check permission
-        from ..domain.value_objects.permission import Permission
-
         await authz_service.require_permission(
-            current_user.id, Permission("user:update")
+            current_user.id,
+            Permission("user:update"),
         )
         updated_user = await user_service.admin_update_user(UUID(user_id), request)
         return UserProfileResponse(user=UserPublic.from_user(updated_user))
@@ -218,7 +226,7 @@ async def update_user(
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"User update failed: {str(e)}",
+            detail=f"User update failed: {e!s}",
         )
 
 
@@ -232,7 +240,7 @@ async def delete_user(
     user_id: str,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> GenericSuccessResponse:
@@ -241,10 +249,9 @@ async def delete_user(
     """
     try:
         # Check permission
-        from ..domain.value_objects.permission import Permission
-
         await authz_service.require_permission(
-            current_user.id, Permission("user:delete")
+            current_user.id,
+            Permission("user:delete"),
         )
 
         # Prevent users from deleting themselves
@@ -261,7 +268,7 @@ async def delete_user(
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"User deletion failed: {str(e)}",
+            detail=f"User deletion failed: {e!s}",
         )
 
 
@@ -275,7 +282,7 @@ async def lock_user_account(
     user_id: str,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> GenericSuccessResponse:
@@ -284,10 +291,9 @@ async def lock_user_account(
     """
     try:
         # Check permission
-        from ..domain.value_objects.permission import Permission
-
         await authz_service.require_permission(
-            current_user.id, Permission("user:update")
+            current_user.id,
+            Permission("user:update"),
         )
 
         # Prevent users from locking themselves
@@ -304,7 +310,7 @@ async def lock_user_account(
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Account lock failed: {str(e)}",
+            detail=f"Account lock failed: {e!s}",
         )
 
 
@@ -318,7 +324,7 @@ async def unlock_user_account(
     user_id: str,
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> GenericSuccessResponse:
@@ -327,10 +333,9 @@ async def unlock_user_account(
     """
     try:
         # Check permission
-        from ..domain.value_objects.permission import Permission
-
         await authz_service.require_permission(
-            current_user.id, Permission("user:update")
+            current_user.id,
+            Permission("user:update"),
         )
         await user_service.unlock_user_account(UUID(user_id))
         return GenericSuccessResponse(message="User account unlocked successfully")
@@ -339,7 +344,7 @@ async def unlock_user_account(
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Account unlock failed: {str(e)}",
+            detail=f"Account unlock failed: {e!s}",
         )
 
 
@@ -352,7 +357,7 @@ async def unlock_user_account(
 async def get_user_statistics(
     current_user: User = Depends(get_current_active_user),
     user_service: UserManagementService = Depends(
-        container.get_user_management_service
+        container.get_user_management_service,
     ),
 ) -> UserStatisticsResponse:
     """
@@ -364,7 +369,7 @@ async def get_user_statistics(
     except UserManagementError as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get user statistics: {str(e)}",
+            detail=f"Failed to get user statistics: {e!s}",
         )
 
 
@@ -379,7 +384,7 @@ async def get_user_statistics(
 async def get_user_sessions(
     current_user: User = Depends(get_current_active_user),
     auth_service: AuthenticationService = Depends(container.get_authentication_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get all active sessions for the current user.
     """
@@ -389,7 +394,7 @@ async def get_user_sessions(
     except Exception as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get sessions: {str(e)}",
+            detail=f"Failed to get sessions: {e!s}",
         )
 
 
@@ -408,20 +413,19 @@ async def revoke_user_session(
     Revoke a specific user session.
     """
     try:
-        from uuid import UUID
-
         session_uuid = UUID(session_id)
 
         await auth_service.revoke_user_session(current_user.id, session_uuid)
         return GenericSuccessResponse(message="Session revoked successfully")
     except ValueError:
         raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST, detail="Invalid session ID format"
+            status_code=HTTP_400_BAD_REQUEST,
+            detail="Invalid session ID format",
         )
     except Exception as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to revoke session: {str(e)}",
+            detail=f"Failed to revoke session: {e!s}",
         )
 
 
@@ -441,10 +445,10 @@ async def revoke_all_user_sessions(
     try:
         count = await auth_service.revoke_all_user_sessions(current_user.id)
         return GenericSuccessResponse(
-            message=f"All sessions revoked successfully ({count} sessions)"
+            message=f"All sessions revoked successfully ({count} sessions)",
         )
     except Exception as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to revoke sessions: {str(e)}",
+            detail=f"Failed to revoke sessions: {e!s}",
         )

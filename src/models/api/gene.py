@@ -6,9 +6,10 @@ Extends the basic gene models with API-specific fields.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GeneType(str, Enum):
@@ -37,28 +38,40 @@ class GeneCreate(BaseModel):
         pattern=r"^[A-Z0-9_-]+$",
         description="Gene symbol",
     )
-    name: Optional[str] = Field(None, max_length=200, description="Full gene name")
+    name: str | None = Field(None, max_length=200, description="Full gene name")
 
     # Optional fields
-    description: Optional[str] = Field(
-        None, max_length=1000, description="Gene description"
+    description: str | None = Field(
+        None,
+        max_length=1000,
+        description="Gene description",
     )
     gene_type: GeneType = Field(default=GeneType.UNKNOWN, description="Type of gene")
-    chromosome: Optional[str] = Field(
-        None, pattern=r"^(chr)?[0-9XYM]+$", description="Chromosome location"
+    chromosome: str | None = Field(
+        None,
+        pattern=r"^(chr)?[0-9XYM]+$",
+        description="Chromosome location",
     )
-    start_position: Optional[int] = Field(
-        None, ge=1, description="Start position on chromosome"
+    start_position: int | None = Field(
+        None,
+        ge=1,
+        description="Start position on chromosome",
     )
-    end_position: Optional[int] = Field(
-        None, ge=1, description="End position on chromosome"
+    end_position: int | None = Field(
+        None,
+        ge=1,
+        description="End position on chromosome",
     )
-    ensembl_id: Optional[str] = Field(
-        None, pattern=r"^ENSG[0-9]+$", description="Ensembl gene ID"
+    ensembl_id: str | None = Field(
+        None,
+        pattern=r"^ENSG[0-9]+$",
+        description="Ensembl gene ID",
     )
-    ncbi_gene_id: Optional[int] = Field(None, ge=1, description="NCBI Gene ID")
-    uniprot_id: Optional[str] = Field(
-        None, pattern=r"^[A-Z0-9_-]+$", description="UniProt accession"
+    ncbi_gene_id: int | None = Field(None, ge=1, description="NCBI Gene ID")
+    uniprot_id: str | None = Field(
+        None,
+        pattern=r"^[A-Z0-9_-]+$",
+        description="UniProt accession",
     )
 
 
@@ -72,15 +85,15 @@ class GeneUpdate(BaseModel):
     model_config = ConfigDict(strict=True)
 
     # Updatable fields
-    name: Optional[str] = Field(None, max_length=200)
-    description: Optional[str] = Field(None, max_length=1000)
-    gene_type: Optional[GeneType] = None
-    chromosome: Optional[str] = Field(None, pattern=r"^(chr)?[0-9XYM]+$")
-    start_position: Optional[int] = Field(None, ge=1)
-    end_position: Optional[int] = Field(None, ge=1)
-    ensembl_id: Optional[str] = Field(None, pattern=r"^ENSG[0-9]+$")
-    ncbi_gene_id: Optional[int] = Field(None, ge=1)
-    uniprot_id: Optional[str] = Field(None, pattern=r"^[A-Z0-9_-]+$")
+    name: str | None = Field(None, max_length=200)
+    description: str | None = Field(None, max_length=1000)
+    gene_type: GeneType | None = None
+    chromosome: str | None = Field(None, pattern=r"^(chr)?[0-9XYM]+$")
+    start_position: int | None = Field(None, ge=1)
+    end_position: int | None = Field(None, ge=1)
+    ensembl_id: str | None = Field(None, pattern=r"^ENSG[0-9]+$")
+    ncbi_gene_id: int | None = Field(None, ge=1)
+    uniprot_id: str | None = Field(None, pattern=r"^[A-Z0-9_-]+$")
 
 
 class GeneResponse(BaseModel):
@@ -98,23 +111,24 @@ class GeneResponse(BaseModel):
     symbol: str = Field(..., description="Official gene symbol")
 
     # Descriptive fields
-    name: Optional[str] = Field(None, description="Full gene name")
-    description: Optional[str] = Field(None, description="Gene description")
+    name: str | None = Field(None, description="Full gene name")
+    description: str | None = Field(None, description="Gene description")
 
     # Classification
     gene_type: GeneType = Field(..., description="Type of gene")
 
     # Genomic location
-    chromosome: Optional[str] = Field(None, description="Chromosome location")
-    start_position: Optional[int] = Field(
-        None, description="Start position on chromosome"
+    chromosome: str | None = Field(None, description="Chromosome location")
+    start_position: int | None = Field(
+        None,
+        description="Start position on chromosome",
     )
-    end_position: Optional[int] = Field(None, description="End position on chromosome")
+    end_position: int | None = Field(None, description="End position on chromosome")
 
     # External identifiers
-    ensembl_id: Optional[str] = Field(None, description="Ensembl gene ID")
-    ncbi_gene_id: Optional[int] = Field(None, description="NCBI Gene ID")
-    uniprot_id: Optional[str] = Field(None, description="UniProt accession")
+    ensembl_id: str | None = Field(None, description="Ensembl gene ID")
+    ncbi_gene_id: int | None = Field(None, description="NCBI Gene ID")
+    uniprot_id: str | None = Field(None, description="UniProt accession")
 
     # Metadata
     created_at: datetime = Field(..., description="Record creation timestamp")
@@ -123,17 +137,20 @@ class GeneResponse(BaseModel):
     # Computed fields
     variant_count: int = Field(default=0, description="Number of associated variants")
     phenotype_count: int = Field(
-        default=0, description="Number of associated phenotypes"
+        default=0,
+        description="Number of associated phenotypes",
     )
 
     # Optional relationships (included based on query parameters)
-    variants: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Associated variants (optional)"
+    variants: list[dict[str, Any]] | None = Field(
+        None,
+        description="Associated variants (optional)",
     )
-    phenotypes: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Associated phenotypes (optional)"
+    phenotypes: list[dict[str, Any]] | None = Field(
+        None,
+        description="Associated phenotypes (optional)",
     )
 
 
 # Type aliases for API documentation
-GeneList = List[GeneResponse]
+GeneList = list[GeneResponse]

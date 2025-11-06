@@ -5,7 +5,8 @@ Contains types for API endpoints, request/response schemas,
 and external API integrations.
 """
 
-from typing import Dict, List, Optional, Any, TypedDict
+from typing import Any, TypedDict
+
 from .common import PaginatedResponse
 
 
@@ -14,21 +15,19 @@ class GeneCreateRequest(TypedDict, total=False):
     """Gene creation request."""
 
     symbol: str
-    name: Optional[str]
-    description: Optional[str]
+    name: str | None
+    description: str | None
     gene_type: str
-    chromosome: Optional[str]
-    start_position: Optional[int]
-    end_position: Optional[int]
-    ensembl_id: Optional[str]
-    ncbi_gene_id: Optional[int]
-    uniprot_id: Optional[str]
+    chromosome: str | None
+    start_position: int | None
+    end_position: int | None
+    ensembl_id: str | None
+    ncbi_gene_id: int | None
+    uniprot_id: str | None
 
 
 class GeneUpdateRequest(GeneCreateRequest):
     """Gene update request (same fields as create)."""
-
-    pass
 
 
 class VariantCreateRequest(TypedDict, total=False):
@@ -38,17 +37,15 @@ class VariantCreateRequest(TypedDict, total=False):
     hgvs_notation: str
     variant_type: str
     clinical_significance: str
-    population_frequency: Dict[str, float]
-    chromosome: Optional[str]
-    position: Optional[int]
-    reference_allele: Optional[str]
-    alternate_allele: Optional[str]
+    population_frequency: dict[str, float]
+    chromosome: str | None
+    position: int | None
+    reference_allele: str | None
+    alternate_allele: str | None
 
 
 class VariantUpdateRequest(VariantCreateRequest):
     """Variant update request."""
-
-    pass
 
 
 class PhenotypeCreateRequest(TypedDict, total=False):
@@ -56,51 +53,45 @@ class PhenotypeCreateRequest(TypedDict, total=False):
 
     hpo_id: str
     name: str
-    definition: Optional[str]
-    synonyms: List[str]
+    definition: str | None
+    synonyms: list[str]
 
 
 class PhenotypeUpdateRequest(PhenotypeCreateRequest):
     """Phenotype update request."""
-
-    pass
 
 
 class EvidenceCreateRequest(TypedDict, total=False):
     """Evidence creation request."""
 
     variant_id: str
-    phenotype_id: Optional[str]
-    publication_id: Optional[str]
+    phenotype_id: str | None
+    publication_id: str | None
     evidence_level: str
     confidence_score: float
     source: str
     evidence_type: str
-    description: Optional[str]
+    description: str | None
 
 
 class EvidenceUpdateRequest(EvidenceCreateRequest):
     """Evidence update request."""
-
-    pass
 
 
 class PublicationCreateRequest(TypedDict, total=False):
     """Publication creation request."""
 
     title: str
-    authors: List[str]
-    journal: Optional[str]
+    authors: list[str]
+    journal: str | None
     publication_year: int
-    doi: Optional[str]
-    pmid: Optional[str]
-    abstract: Optional[str]
+    doi: str | None
+    pmid: str | None
+    abstract: str | None
 
 
 class PublicationUpdateRequest(PublicationCreateRequest):
     """Publication update request."""
-
-    pass
 
 
 # Query parameter types
@@ -186,14 +177,14 @@ class APIError(TypedDict):
 
     error: str
     message: str
-    details: Optional[Dict[str, Any]]
+    details: dict[str, Any] | None
     code: str
 
 
 class ValidationErrorResponse(TypedDict):
     """Validation error response."""
 
-    errors: List[Dict[str, str]]
+    errors: list[dict[str, str]]
     message: str
 
 
@@ -201,17 +192,17 @@ class ValidationErrorResponse(TypedDict):
 class BulkUpdateRequest(TypedDict):
     """Bulk update request."""
 
-    ids: List[str]
-    updates: Dict[str, Any]  # Will be replaced with specific types per entity
+    ids: list[str]
+    updates: dict[str, Any]  # Will be replaced with specific types per entity
 
 
 class BulkOperationResponse(TypedDict):
     """Bulk operation response."""
 
-    successful: List[str]
-    failed: List[Dict[str, str]]
+    successful: list[str]
+    failed: list[dict[str, str]]
     total_processed: int
-    errors: List[str]
+    errors: list[str]
 
 
 # Search types
@@ -220,7 +211,7 @@ class SearchRequest(TypedDict, total=False):
 
     q: str
     entity_type: str
-    filters: Dict[str, Any]
+    filters: dict[str, Any]
     sort_by: str
     sort_order: str
     page: int
@@ -233,9 +224,9 @@ class SearchResult(TypedDict):
     id: str
     entity_type: str
     title: str
-    description: Optional[str]
+    description: str | None
     score: float
-    highlights: List[str]
+    highlights: list[str]
 
 
 # Search types

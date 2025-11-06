@@ -9,12 +9,12 @@ from typing import cast
 from dash import Dash, Input, Output, html
 from dash.development.base_component import Component
 
-from src.presentation.dash.pages.quality_dashboard import create_dashboard_page
-from src.presentation.dash.pages.review_queue import create_review_page
 from src.presentation.dash.pages.approval_history import create_bulk_page
-from src.presentation.dash.pages.reports import create_reports_page
-from src.presentation.dash.pages.settings import create_settings_page
 from src.presentation.dash.pages.data_sources import create_data_sources_page
+from src.presentation.dash.pages.quality_dashboard import create_dashboard_page
+from src.presentation.dash.pages.reports import create_reports_page
+from src.presentation.dash.pages.review_queue import create_review_page
+from src.presentation.dash.pages.settings import create_settings_page
 
 
 def register_callbacks(app: Dash) -> None:
@@ -37,7 +37,7 @@ def register_callbacks(app: Dash) -> None:
                 [
                     html.H1("404: Page not found"),
                     html.P(f"The page {pathname} was not found."),
-                ]
+                ],
             )
 
-        return cast(Component, page)
+        return cast("Component", page)

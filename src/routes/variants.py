@@ -4,19 +4,20 @@ Variant API routes for MED13 Resource Library.
 RESTful endpoints for variant management with CRUD operations.
 """
 
-from typing import Optional, Dict, Any, TYPE_CHECKING
-from fastapi import APIRouter, HTTPException, Query, Depends
+from typing import TYPE_CHECKING, Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from src.database.session import get_session
 from src.application.container import get_legacy_dependency_container
-from src.routes.serializers import serialize_variant
+from src.database.session import get_session
 from src.models.api import (
-    VariantResponse,
-    VariantCreate,
-    VariantUpdate,
     PaginatedResponse,
+    VariantCreate,
+    VariantResponse,
+    VariantUpdate,
 )
+from src.routes.serializers import serialize_variant
 
 if TYPE_CHECKING:
     from src.application.services.variant_service import VariantApplicationService
@@ -35,19 +36,23 @@ def get_variant_service(
 
 
 @router.get(
-    "/", summary="List variants", response_model=PaginatedResponse[VariantResponse]
+    "/",
+    summary="List variants",
+    response_model=PaginatedResponse[VariantResponse],
 )
 async def get_variants(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    search: Optional[str] = Query(None, description="Search by variant ID or HGVS"),
+    search: str | None = Query(None, description="Search by variant ID or HGVS"),
     sort_by: str = Query("variant_id", description="Sort field"),
     sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
-    gene_id: Optional[str] = Query(None, description="Filter by gene ID"),
-    clinical_significance: Optional[str] = Query(
-        None, description="Filter by clinical significance"
+    gene_id: str | None = Query(None, description="Filter by gene ID"),
+    clinical_significance: str
+    | None = Query(
+        None,
+        description="Filter by clinical significance",
     ),
-    variant_type: Optional[str] = Query(None, description="Filter by variant type"),
+    variant_type: str | None = Query(None, description="Filter by variant type"),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> PaginatedResponse[VariantResponse]:
     """
@@ -91,12 +96,15 @@ async def get_variants(
         )
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve variants: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve variants: {e!s}",
         )
 
 
 @router.get(
-    "/{variant_id}", summary="Get variant by ID", response_model=VariantResponse
+    "/{variant_id}",
+    summary="Get variant by ID",
+    response_model=VariantResponse,
 )
 async def get_variant(
     variant_id: str,
@@ -117,7 +125,8 @@ async def get_variant(
 
         if variant is None:
             raise HTTPException(
-                status_code=404, detail=f"Variant {variant_id} not found"
+                status_code=404,
+                detail=f"Variant {variant_id} not found",
             )
 
         return VariantResponse.model_validate(serialize_variant(variant))
@@ -125,7 +134,8 @@ async def get_variant(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve variant: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve variant: {e!s}",
         )
 
 
@@ -155,12 +165,16 @@ async def get_variant_by_clinvar_id(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve variant: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve variant: {e!s}",
         )
 
 
 @router.post(
-    "/", summary="Create variant", response_model=VariantResponse, status_code=201
+    "/",
+    summary="Create variant",
+    response_model=VariantResponse,
+    status_code=201,
 )
 async def create_variant(
     variant_data: VariantCreate,
@@ -180,7 +194,9 @@ async def create_variant(
             clinvar_id=getattr(variant_data, "clinvar_id", None),
             variant_type=getattr(variant_data, "variant_type", "unknown"),
             clinical_significance=getattr(
-                variant_data, "clinical_significance", "not_provided"
+                variant_data,
+                "clinical_significance",
+                "not_provided",
             ),
             hgvs_genomic=getattr(variant_data, "hgvs_genomic", None),
             hgvs_protein=getattr(variant_data, "hgvs_protein", None),
@@ -196,7 +212,8 @@ async def create_variant(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to create variant: {str(e)}"
+            status_code=500,
+            detail=f"Failed to create variant: {e!s}",
         )
 
 
@@ -214,7 +231,8 @@ async def update_variant(
         # Validate variant exists
         if not service.validate_variant_exists(variant_id):
             raise HTTPException(
-                status_code=404, detail=f"Variant {variant_id} not found"
+                status_code=404,
+                detail=f"Variant {variant_id} not found",
             )
 
         # Convert to dict for update
@@ -228,7 +246,8 @@ async def update_variant(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to update variant: {str(e)}"
+            status_code=500,
+            detail=f"Failed to update variant: {e!s}",
         )
 
 
@@ -239,9 +258,11 @@ async def update_variant(
 )
 async def update_variant_classification(
     variant_id: int,
-    variant_type: Optional[str] = Query(None, description="New variant type"),
-    clinical_significance: Optional[str] = Query(
-        None, description="New clinical significance"
+    variant_type: str | None = Query(None, description="New variant type"),
+    clinical_significance: str
+    | None = Query(
+        None,
+        description="New clinical significance",
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantResponse:
@@ -269,7 +290,8 @@ async def update_variant_classification(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to update variant classification: {str(e)}"
+            status_code=500,
+            detail=f"Failed to update variant classification: {e!s}",
         )
 
 
@@ -277,7 +299,7 @@ async def update_variant_classification(
 async def get_variant_evidence(
     variant_id: int,
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Get evidence associated with a variant.
     """
@@ -285,7 +307,8 @@ async def get_variant_evidence(
     try:
         if not service.validate_variant_exists(variant_id):
             raise HTTPException(
-                status_code=404, detail=f"Variant {variant_id} not found"
+                status_code=404,
+                detail=f"Variant {variant_id} not found",
             )
 
         # Get evidence conflicts and confidence score
@@ -302,18 +325,23 @@ async def get_variant_evidence(
         raise
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve variant evidence: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve variant evidence: {e!s}",
         )
 
 
 @router.get("/gene/{gene_id}", summary="Get variants by gene")
 async def get_variants_by_gene(
     gene_id: int,
-    limit: Optional[int] = Query(
-        None, ge=1, le=100, description="Maximum number of results"
+    limit: int
+    | None = Query(
+        None,
+        ge=1,
+        le=100,
+        description="Maximum number of results",
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve variants associated with a specific gene.
     """
@@ -329,7 +357,8 @@ async def get_variants_by_gene(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve variants for gene: {str(e)}"
+            status_code=500,
+            detail=f"Failed to retrieve variants for gene: {e!s}",
         )
 
 
@@ -337,12 +366,14 @@ async def get_variants_by_gene(
 async def search_variants(
     q: str = Query(..., description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
-    gene_id: Optional[str] = Query(None, description="Filter by gene ID"),
-    clinical_significance: Optional[str] = Query(
-        None, description="Filter by clinical significance"
+    gene_id: str | None = Query(None, description="Filter by gene ID"),
+    clinical_significance: str
+    | None = Query(
+        None,
+        description="Filter by clinical significance",
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Search variants by query with optional filters.
     """
@@ -366,7 +397,8 @@ async def search_variants(
         }
     except Exception as e:
         raise HTTPException(
-            status_code=500, detail=f"Failed to search variants: {str(e)}"
+            status_code=500,
+            detail=f"Failed to search variants: {e!s}",
         )
 
 
@@ -380,43 +412,24 @@ async def delete_variant(
 
     Note: This operation may be restricted based on data integrity rules.
     """
-
-    try:
-        if not service.validate_variant_exists(variant_id):
-            raise HTTPException(
-                status_code=404, detail=f"Variant {variant_id} not found"
-            )
-
-        # For now, we'll implement soft delete or check for dependencies
-        # In a real implementation, you might want to check for associated evidence
-        # and either prevent deletion or cascade
-
-        # TODO: Implement proper deletion logic with dependency checks
+    if not service.validate_variant_exists(variant_id):
         raise HTTPException(
-            status_code=501,
-            detail="Variant deletion not yet implemented - requires dependency analysis",
+            status_code=404,
+            detail=f"Variant {variant_id} not found",
         )
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to delete variant: {str(e)}"
-        )
+    # TODO: Implement proper deletion logic with dependency checks
+    raise HTTPException(
+        status_code=501,
+        detail="Variant deletion not yet implemented - requires dependency analysis",
+    )
 
 
 @router.get("/stats", summary="Get variant statistics")
 async def get_variant_statistics(
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Retrieve statistical information about variants in the database.
     """
-
-    try:
-        stats = service.get_variant_statistics()
-        return stats
-    except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to retrieve statistics: {str(e)}"
-        )
+    return service.get_variant_statistics()

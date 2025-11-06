@@ -3,17 +3,18 @@ Integration tests for data ingestion coordination.
 Tests parallel execution, error handling, and result aggregation.
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import UTC, datetime
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
+from src.infrastructure.ingest.base_ingestor import IngestionResult, IngestionStatus
 from src.infrastructure.ingest.coordinator import (
     IngestionCoordinator,
-    IngestionTask,
     IngestionPhase,
+    IngestionTask,
 )
-from src.infrastructure.ingest.base_ingestor import IngestionResult, IngestionStatus
-from src.models.value_objects import Provenance, DataSource
+from src.models.value_objects import DataSource, Provenance
 
 
 class TestIngestionCoordinator:
@@ -59,7 +60,7 @@ class TestIngestionCoordinator:
         mock_ingestor_class = MagicMock()
         mock_ingestor_instance = AsyncMock()
         mock_ingestor_instance.__aenter__ = AsyncMock(
-            return_value=mock_ingestor_instance
+            return_value=mock_ingestor_instance,
         )
         mock_ingestor_instance.__aexit__ = AsyncMock(return_value=None)
         mock_ingestor_instance.ingest = AsyncMock(return_value=mock_ingestor_result)
@@ -124,7 +125,9 @@ class TestIngestionCoordinator:
         # Create tasks
         tasks = [
             IngestionTask(
-                source=f"source_{i}", ingestor_class=mock_class, parameters={}
+                source=f"source_{i}",
+                ingestor_class=mock_class,
+                parameters={},
             )
             for i, mock_class in enumerate(mock_classes)
         ]
@@ -180,7 +183,9 @@ class TestIngestionCoordinator:
         # Create tasks
         tasks = [
             IngestionTask(
-                source="clinvar", ingestor_class=success_class, parameters={}
+                source="clinvar",
+                ingestor_class=success_class,
+                parameters={},
             ),
             IngestionTask(source="pubmed", ingestor_class=failure_class, parameters={}),
         ]
@@ -237,7 +242,9 @@ class TestIngestionCoordinator:
         # Create tasks
         tasks = [
             IngestionTask(
-                source=f"source_{i}", ingestor_class=mock_class, parameters={}
+                source=f"source_{i}",
+                ingestor_class=mock_class,
+                parameters={},
             )
             for i, mock_class in enumerate(mock_classes)
         ]
@@ -313,7 +320,9 @@ class TestIngestionCoordinator:
         mock_result.source_results = {}
 
         with patch.object(
-            coordinator, "coordinate_ingestion", return_value=mock_result
+            coordinator,
+            "coordinate_ingestion",
+            return_value=mock_result,
         ) as mock_coord:
             await coordinator.ingest_all_sources("MED13", max_results=100)
 
@@ -337,7 +346,9 @@ class TestIngestionCoordinator:
         mock_result.completed_sources = 2
 
         with patch.object(
-            coordinator, "coordinate_ingestion", return_value=mock_result
+            coordinator,
+            "coordinate_ingestion",
+            return_value=mock_result,
         ) as mock_coord:
             await coordinator.ingest_critical_sources_only("MED13")
 

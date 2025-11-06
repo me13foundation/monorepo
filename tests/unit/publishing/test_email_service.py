@@ -2,7 +2,7 @@
 Unit tests for email service.
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from src.infrastructure.publishing.notification.email_service import EmailService
 

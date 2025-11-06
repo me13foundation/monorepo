@@ -8,62 +8,63 @@ back-end orchestration.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
 class VariantDetailDTO:
     """Clinical context for a variant under review."""
 
-    id: Optional[int]
+    id: int | None
     variant_id: str
-    clinvar_id: Optional[str]
-    gene_symbol: Optional[str]
+    clinvar_id: str | None
+    gene_symbol: str | None
     chromosome: str
     position: int
     clinical_significance: str
     variant_type: str
-    allele_frequency: Optional[float]
-    gnomad_af: Optional[float]
-    hgvs: Mapping[str, Optional[str]] = field(default_factory=dict)
-    condition: Optional[str] = None
-    review_status: Optional[str] = None
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    allele_frequency: float | None
+    gnomad_af: float | None
+    hgvs: Mapping[str, str | None] = field(default_factory=dict)
+    condition: str | None = None
+    review_status: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass(frozen=True)
 class PhenotypeSnapshotDTO:
     """Simplified phenotype representation for curator context."""
 
-    id: Optional[int]
+    id: int | None
     hpo_id: str
     name: str
-    category: Optional[str]
-    definition: Optional[str]
+    category: str | None
+    definition: str | None
     synonyms: tuple[str, ...] = ()
-    frequency: Optional[str] = None
+    frequency: str | None = None
 
 
 @dataclass(frozen=True)
 class EvidenceSnapshotDTO:
     """Structured evidence excerpt surfaced to curators."""
 
-    id: Optional[int]
+    id: int | None
     evidence_level: str
     evidence_type: str
     description: str
-    confidence_score: Optional[float]
-    clinical_significance: Optional[str]
-    source: Optional[str] = None
-    summary: Optional[str] = None
-    publication_id: Optional[int] = None
-    phenotype_id: Optional[int] = None
-    variant_id: Optional[int] = None
+    confidence_score: float | None
+    clinical_significance: str | None
+    source: str | None = None
+    summary: str | None = None
+    publication_id: int | None = None
+    phenotype_id: int | None = None
+    variant_id: int | None = None
     reviewed: bool = False
-    reviewer_notes: Optional[str] = None
+    reviewer_notes: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,7 @@ class ConflictSummaryDTO:
     severity: str
     message: str
     evidence_ids: tuple[int, ...] = ()
-    suggested_action: Optional[str] = None
+    suggested_action: str | None = None
 
 
 @dataclass(frozen=True)
@@ -88,8 +89,8 @@ class ProvenanceDTO:
 class AuditInfoDTO:
     """Audit context for curator actions."""
 
-    last_updated_by: Optional[str] = None
-    last_updated_at: Optional[datetime] = None
+    last_updated_by: str | None = None
+    last_updated_at: datetime | None = None
     pending_actions: tuple[str, ...] = ()
     total_annotations: int = 0
 
@@ -107,8 +108,8 @@ class CuratedRecordDetailDTO:
     phenotypes: tuple[PhenotypeSnapshotDTO, ...]
     evidence: tuple[EvidenceSnapshotDTO, ...]
     conflicts: tuple[ConflictSummaryDTO, ...]
-    provenance: Optional[ProvenanceDTO] = None
-    audit: Optional[AuditInfoDTO] = None
+    provenance: ProvenanceDTO | None = None
+    audit: AuditInfoDTO | None = None
 
     def to_serializable(self) -> Mapping[str, Any]:
         """Convert the DTO to a plain mapping suitable for JSON responses."""
@@ -125,21 +126,34 @@ class CuratedRecordDetailDTO:
             "conflicts": _serialize_iter(self.conflicts),
         }
 
+        if isinstance(self.variant.created_at, datetime):
+            payload["variant"]["created_at"] = self.variant.created_at.isoformat()
+        if isinstance(self.variant.updated_at, datetime):
+            payload["variant"]["updated_at"] = self.variant.updated_at.isoformat()
+
         if self.provenance is not None:
-            payload["provenance"] = self.provenance.__dict__
+            payload["provenance"] = {
+                "sources": [
+                    dict(source) if isinstance(source, Mapping) else source
+                    for source in self.provenance.sources
+                ],
+            }
 
         if self.audit is not None:
-            payload["audit"] = self.audit.__dict__
+            audit_dict = self.audit.__dict__.copy()
+            if isinstance(self.audit.last_updated_at, datetime):
+                audit_dict["last_updated_at"] = self.audit.last_updated_at.isoformat()
+            payload["audit"] = audit_dict
 
         return payload
 
 
 __all__ = [
-    "VariantDetailDTO",
-    "PhenotypeSnapshotDTO",
-    "EvidenceSnapshotDTO",
-    "ConflictSummaryDTO",
-    "ProvenanceDTO",
     "AuditInfoDTO",
+    "ConflictSummaryDTO",
     "CuratedRecordDetailDTO",
+    "EvidenceSnapshotDTO",
+    "PhenotypeSnapshotDTO",
+    "ProvenanceDTO",
+    "VariantDetailDTO",
 ]

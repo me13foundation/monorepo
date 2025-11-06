@@ -4,7 +4,8 @@ Business logic for gene entity operations and validations.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Protocol
+
 from sqlalchemy.orm import Session
 
 from src.domain.entities.gene import Gene
@@ -16,10 +17,6 @@ from src.infrastructure.repositories.variant_repository import (
     SqlAlchemyVariantRepository,
 )
 from src.services.domain.base_service import BaseService
-
-if TYPE_CHECKING:
-    pass
-
 
 StatisticsValue = int | float | bool | str | None | datetime
 
@@ -34,8 +31,8 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
 
     def __init__(
         self,
-        session: Optional[Session] = None,
-        gene_repository: Optional[SqlAlchemyGeneRepository] = None,
+        session: Session | None = None,
+        gene_repository: SqlAlchemyGeneRepository | None = None,
     ):
         super().__init__(session)
         if gene_repository is not None:
@@ -48,20 +45,20 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
     def repository(self) -> SqlAlchemyGeneRepository:
         return self.gene_repo
 
-    def create_gene(
+    def create_gene(  # noqa: PLR0913 - explicit, intentional parameter list
         self,
         symbol: str,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        name: str | None = None,
+        description: str | None = None,
         gene_type: str = "protein_coding",
-        gene_id: Optional[str] = None,
-        chromosome: Optional[str] = None,
-        start_position: Optional[int] = None,
-        end_position: Optional[int] = None,
-        ensembl_id: Optional[str] = None,
-        ncbi_gene_id: Optional[int] = None,
-        uniprot_id: Optional[str] = None,
-        provenance: Optional[Provenance] = None,
+        gene_id: str | None = None,
+        chromosome: str | None = None,
+        start_position: int | None = None,
+        end_position: int | None = None,
+        ensembl_id: str | None = None,
+        ncbi_gene_id: int | None = None,
+        uniprot_id: str | None = None,
+        provenance: Provenance | None = None,
     ) -> Gene:
         """
         Create a new gene with validation.
@@ -88,9 +85,13 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
             DuplicateError: If gene already exists
         """
         # Validate positions if both are provided
-        if start_position is not None and end_position is not None:
-            if end_position < start_position:
-                raise ValueError("End position must be greater than start position")
+        if (
+            start_position is not None
+            and end_position is not None
+            and end_position < start_position
+        ):
+            msg = "End position must be greater than start position"
+            raise ValueError(msg)
 
         normalized_symbol = symbol.upper()
         gene_identifier = gene_id or normalized_symbol
@@ -119,8 +120,8 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        search: Optional[str] = None,
-    ) -> Tuple[List[Gene], int]:
+        search: str | None = None,
+    ) -> tuple[list[Gene], int]:
         """Retrieve paginated genes with optional search."""
         return self.gene_repo.paginate_genes(
             page=page,
@@ -130,15 +131,15 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
             search=search,
         )
 
-    def get_gene_by_id(self, gene_id: str) -> Optional[Gene]:
+    def get_gene_by_id(self, gene_id: str) -> Gene | None:
         """Retrieve a gene by its public gene identifier."""
         return self.gene_repo.find_by_gene_id(gene_id)
 
-    def get_gene_by_symbol(self, symbol: str) -> Optional[Gene]:
+    def get_gene_by_symbol(self, symbol: str) -> Gene | None:
         """Retrieve a gene by its symbol."""
         return self.gene_repo.find_by_symbol(symbol.upper())
 
-    def find_gene_by_identifier(self, identifier: GeneIdentifier) -> Optional[Gene]:
+    def find_gene_by_identifier(self, identifier: GeneIdentifier) -> Gene | None:
         """
         Find a gene by its identifier (supports multiple ID types).
 
@@ -166,7 +167,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
 
         return gene
 
-    def get_gene_with_variants(self, gene_id: int) -> Optional[Gene]:
+    def get_gene_with_variants(self, gene_id: int) -> Gene | None:
         """
         Get a gene with its associated variants loaded.
 
@@ -184,7 +185,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
             ]
         return gene
 
-    def search_genes(self, query: str, limit: int = 10) -> List[Gene]:
+    def search_genes(self, query: str, limit: int = 10) -> list[Gene]:
         """
         Search genes by symbol or name.
 
@@ -197,7 +198,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
         """
         return self.gene_repo.search_by_name_or_symbol(query, limit)
 
-    def update_gene(self, gene_id: str, updates: Dict[str, object]) -> Gene:
+    def update_gene(self, gene_id: str, updates: dict[str, object]) -> Gene:
         """Update mutable gene fields by gene identifier."""
         gene = self.gene_repo.find_by_gene_id_or_fail(gene_id)
 
@@ -218,7 +219,8 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
         }
 
         if not sanitized_updates:
-            raise ValueError("No valid fields provided for update")
+            msg = "No valid fields provided for update"
+            raise ValueError(msg)
 
         gene_db_id = self._require_gene_db_id(gene)
         return self.repository.update(gene_db_id, sanitized_updates)
@@ -226,9 +228,9 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
     def update_gene_locations(
         self,
         gene_id: int,
-        chromosome: Optional[str] = None,
-        start_position: Optional[int] = None,
-        end_position: Optional[int] = None,
+        chromosome: str | None = None,
+        start_position: int | None = None,
+        end_position: int | None = None,
     ) -> Gene:
         """
         Update gene genomic location information.
@@ -247,11 +249,15 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
             NotFoundError: If gene not found
         """
         # Validate positions
-        if start_position is not None and end_position is not None:
-            if end_position < start_position:
-                raise ValueError("End position must be greater than start position")
+        if (
+            start_position is not None
+            and end_position is not None
+            and end_position < start_position
+        ):
+            msg = "End position must be greater than start position"
+            raise ValueError(msg)
 
-        updates: Dict[str, object] = {}
+        updates: dict[str, object] = {}
         if chromosome is not None:
             updates["chromosome"] = chromosome
         if start_position is not None:
@@ -260,7 +266,8 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
             updates["end_position"] = end_position
 
         if not updates:
-            raise ValueError("No location updates provided")
+            msg = "No location updates provided"
+            raise ValueError(msg)
 
         return self.repository.update(gene_id, updates)
 
@@ -270,7 +277,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
         gene_db_id = self._require_gene_db_id(gene)
         self.repository.delete(gene_db_id)
 
-    def get_gene_variants(self, gene_id: str) -> List[VariantSummary]:
+    def get_gene_variants(self, gene_id: str) -> list[VariantSummary]:
         """Return serialized variants associated with a gene."""
         gene = self.gene_repo.find_by_gene_id(gene_id)
         if gene is None:
@@ -280,7 +287,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
         variant_models = self.variant_repo.find_by_gene(gene_db_id)
         return [self._build_variant_summary(variant) for variant in variant_models]
 
-    def get_gene_phenotypes(self, gene_id: str) -> List[Dict[str, str]]:
+    def get_gene_phenotypes(self, _gene_id: str) -> list[dict[str, str]]:
         """Return related phenotypes for a gene (placeholder implementation)."""
         # Phenotype relationships are not yet modeled; return empty list for now.
         return []
@@ -295,8 +302,9 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
         return bool(variants)
 
     def get_gene_statistics(
-        self, gene_id: Optional[str] = None
-    ) -> Dict[str, StatisticsValue]:
+        self,
+        gene_id: str | None = None,
+    ) -> dict[str, StatisticsValue]:
         """
         Get comprehensive statistics about genes.
 
@@ -314,11 +322,12 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
                 "has_location": gene.chromosome is not None,
             }
 
-        stats_raw: Dict[str, object] = self.gene_repo.get_gene_statistics()
-        stats: Dict[str, StatisticsValue] = {}
-        for key, value in stats_raw.items():
-            if isinstance(value, (int, float, bool, str, datetime)) or value is None:
-                stats[key] = value
+        stats_raw: dict[str, object] = self.gene_repo.get_gene_statistics()
+        stats: dict[str, StatisticsValue] = {
+            key: value
+            for key, value in stats_raw.items()
+            if isinstance(value, (int, float, bool, str, datetime)) or value is None
+        }
 
         total_genes = self._coerce_int(stats_raw.get("total_genes"))
         stats["total_genes"] = total_genes
@@ -331,7 +340,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
                     g
                     for g in self.repository.find_all(limit=1000)
                     if g.chromosome is not None
-                ]
+                ],
             )
             stats["genes_with_location"] = genes_with_location
             stats["location_coverage"] = genes_with_location / float(total_genes)
@@ -350,7 +359,7 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
         """
         return bool(self.repository.exists(gene_id))
 
-    def get_gene_summary(self, gene_id: int) -> Optional[Dict[str, StatisticsValue]]:
+    def get_gene_summary(self, gene_id: int) -> dict[str, StatisticsValue] | None:
         """
         Get a summary of gene information including variant counts.
 
@@ -382,16 +391,38 @@ class GeneService(BaseService[SqlAlchemyGeneRepository]):
 
     def _require_gene_db_id(self, gene: Gene) -> int:
         if gene.id is None:
-            raise ValueError("Gene is not persisted and lacks a database id")
+            msg = "Gene is not persisted and lacks a database id"
+            raise ValueError(msg)
         return gene.id
 
-    def _build_variant_summary(self, variant_model: object) -> VariantSummary:
+    class _VariantLike(Protocol):
+        @property
+        def variant_id(self) -> str:
+            ...
+
+        @property
+        def chromosome(self) -> str:
+            ...
+
+        @property
+        def position(self) -> int:
+            ...
+
+        @property
+        def clinvar_id(self) -> str | None:
+            ...
+
+        @property
+        def clinical_significance(self) -> str | None:
+            ...
+
+    def _build_variant_summary(self, variant_model: _VariantLike) -> VariantSummary:
         return VariantSummary(
-            variant_id=getattr(variant_model, "variant_id"),
-            clinvar_id=getattr(variant_model, "clinvar_id", None),
-            chromosome=getattr(variant_model, "chromosome"),
-            position=getattr(variant_model, "position"),
-            clinical_significance=getattr(variant_model, "clinical_significance", None),
+            variant_id=variant_model.variant_id,
+            clinvar_id=variant_model.clinvar_id,
+            chromosome=variant_model.chromosome,
+            position=variant_model.position,
+            clinical_significance=variant_model.clinical_significance,
         )
 
     @staticmethod

@@ -5,12 +5,12 @@ Templates provide reusable configurations for common biomedical data sources,
 enabling users to quickly set up sources with proven configurations.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .user_data_source import SourceType
 
@@ -32,8 +32,9 @@ class ValidationRule(BaseModel):
 
     field: str = Field(..., description="Field name to validate")
     rule_type: str = Field(..., description="Type of validation rule")
-    parameters: Dict[str, Any] = Field(
-        default_factory=dict, description="Rule parameters"
+    parameters: dict[str, Any] = Field(
+        default_factory=dict,
+        description="Rule parameters",
     )
     error_message: str = Field(..., description="Error message if validation fails")
 
@@ -52,31 +53,36 @@ class ValidationRule(BaseModel):
             "format",
         ]
         if v not in allowed_types:
-            raise ValueError(f"Rule type must be one of: {allowed_types}")
+            msg = f"Rule type must be one of: {allowed_types}"
+            raise ValueError(msg)
         return v
 
 
 class TemplateUIConfig(BaseModel):
     """UI configuration for template forms."""
 
-    sections: List[Dict[str, Any]] = Field(
-        default_factory=list, description="Form sections"
+    sections: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Form sections",
     )
-    fields: Dict[str, Dict[str, Any]] = Field(
-        default_factory=dict, description="Field configurations"
+    fields: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Field configurations",
     )
-    help_text: Dict[str, str] = Field(
-        default_factory=dict, description="Help text for fields"
+    help_text: dict[str, str] = Field(
+        default_factory=dict,
+        description="Help text for fields",
     )
-    examples: Dict[str, str] = Field(default_factory=dict, description="Example values")
+    examples: dict[str, str] = Field(default_factory=dict, description="Example values")
 
     @field_validator("sections")
     @classmethod
-    def validate_sections(cls, v: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def validate_sections(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Validate section configurations."""
         for section in v:
             if "name" not in section:
-                raise ValueError("Each section must have a 'name' field")
+                msg = "Each section must have a 'name' field"
+                raise ValueError(msg)
         return v
 
 
@@ -98,37 +104,45 @@ class SourceTemplate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200, description="Template name")
     description: str = Field("", max_length=1000, description="Detailed description")
     category: TemplateCategory = Field(
-        default=TemplateCategory.OTHER, description="Template category"
+        default=TemplateCategory.OTHER,
+        description="Template category",
     )
 
     # Template definition
     source_type: SourceType = Field(
-        ..., description="Type of source this template supports"
+        ...,
+        description="Type of source this template supports",
     )
-    schema_definition: Dict[str, Any] = Field(..., description="Expected data schema")
-    validation_rules: List[ValidationRule] = Field(
-        default_factory=list, description="Validation rules"
+    schema_definition: dict[str, Any] = Field(..., description="Expected data schema")
+    validation_rules: list[ValidationRule] = Field(
+        default_factory=list,
+        description="Validation rules",
     )
 
     # UI configuration
     ui_config: TemplateUIConfig = Field(
-        default_factory=TemplateUIConfig, description="UI form configuration"
+        default_factory=TemplateUIConfig,
+        description="UI form configuration",
     )
 
     # Governance
     is_public: bool = Field(
-        default=False, description="Whether template is publicly available"
+        default=False,
+        description="Whether template is publicly available",
     )
     is_approved: bool = Field(
-        default=False, description="Whether template has been approved"
+        default=False,
+        description="Whether template has been approved",
     )
     approval_required: bool = Field(
-        default=True, description="Whether approval is required for use"
+        default=True,
+        description="Whether approval is required for use",
     )
 
     # Usage statistics
     usage_count: int = Field(
-        default=0, description="Number of times template has been used"
+        default=0,
+        description="Number of times template has been used",
     )
     success_rate: float = Field(
         default=0.0,
@@ -139,24 +153,27 @@ class SourceTemplate(BaseModel):
 
     # Timestamps
     created_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When template was created",
     )
     updated_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="When template was last updated",
     )
-    approved_at: Optional[datetime] = Field(
-        None, description="When template was approved"
+    approved_at: datetime | None = Field(
+        None,
+        description="When template was approved",
     )
 
     # Metadata
-    tags: List[str] = Field(
-        default_factory=list, description="Tags for template discovery"
+    tags: list[str] = Field(
+        default_factory=list,
+        description="Tags for template discovery",
     )
     version: str = Field(default="1.0", description="Template version")
     compatibility_version: str = Field(
-        default="1.0", description="Minimum system version required"
+        default="1.0",
+        description="Minimum system version required",
     )
 
     @field_validator("name")
@@ -164,71 +181,68 @@ class SourceTemplate(BaseModel):
     def validate_name(cls, v: str) -> str:
         """Validate template name."""
         if not v.strip():
-            raise ValueError("Template name cannot be empty or whitespace")
+            msg = "Template name cannot be empty or whitespace"
+            raise ValueError(msg)
         return v.strip()
 
     @field_validator("tags")
     @classmethod
-    def validate_tags(cls, v: List[str]) -> List[str]:
+    def validate_tags(cls, v: list[str]) -> list[str]:
         """Validate tags."""
-        if len(v) > 10:
-            raise ValueError("Maximum 10 tags allowed")
+        max_tags = 10
+        if len(v) > max_tags:
+            msg = "Maximum 10 tags allowed"
+            raise ValueError(msg)
         return [tag.strip().lower() for tag in v if tag.strip()]
 
     @field_validator("schema_definition")
     @classmethod
-    def validate_schema(cls, v: Dict[str, Any]) -> Dict[str, Any]:
+    def validate_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate schema definition has required structure."""
-        if not isinstance(v, dict):
-            raise ValueError("Schema definition must be a dictionary")
         return v
 
-    def is_available(self, user_id: Optional[UUID] = None) -> bool:
+    def is_available(self, user_id: UUID | None = None) -> bool:
         """Check if template is available for use by a specific user."""
         if not self.is_approved and self.approval_required:
             return False
-
-        if not self.is_public and user_id != self.created_by:
-            return False
-
-        return True
+        return self.is_public or (user_id == self.created_by)
 
     def increment_usage(self) -> "SourceTemplate":
         """Create new instance with incremented usage count."""
         return self.model_copy(
             update={
                 "usage_count": self.usage_count + 1,
-                "updated_at": datetime.now(timezone.utc),
-            }
+                "updated_at": datetime.now(UTC),
+            },
         )
 
     def update_success_rate(self, new_rate: float) -> "SourceTemplate":
         """Create new instance with updated success rate."""
         return self.model_copy(
-            update={"success_rate": new_rate, "updated_at": datetime.now(timezone.utc)}
+            update={"success_rate": new_rate, "updated_at": datetime.now(UTC)},
         )
 
-    def approve(self, approved_by: UUID) -> "SourceTemplate":
+    def approve(self, _approved_by: UUID) -> "SourceTemplate":
         """Create new instance with approval status."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return self.model_copy(
-            update={"is_approved": True, "approved_at": now, "updated_at": now}
+            update={"is_approved": True, "approved_at": now, "updated_at": now},
         )
 
     def make_public(self) -> "SourceTemplate":
         """Create new instance as publicly available."""
         return self.model_copy(
-            update={"is_public": True, "updated_at": datetime.now(timezone.utc)}
+            update={"is_public": True, "updated_at": datetime.now(UTC)},
         )
 
-    def update_schema(self, schema: Dict[str, Any]) -> "SourceTemplate":
+    def update_schema(self, schema: dict[str, Any]) -> "SourceTemplate":
         """Create new instance with updated schema."""
         return self.model_copy(
             update={
                 "schema_definition": schema,
-                "updated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(UTC),
                 "version": self._increment_version(),
-            }
+            },
         )
 
     def _increment_version(self) -> str:
@@ -249,7 +263,6 @@ class SourceTemplate(BaseModel):
         """Get human-readable approval status."""
         if self.is_approved:
             return "Approved"
-        elif self.approval_required:
+        if self.approval_required:
             return "Pending Approval"
-        else:
-            return "No Approval Required"
+        return "No Approval Required"

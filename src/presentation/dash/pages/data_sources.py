@@ -9,8 +9,8 @@ Main dashboard for managing user-configured data sources, including:
 """
 
 import dash_bootstrap_components as dbc
-from dash import dash_table, dcc, html
 
+from dash import dash_table, dcc, html
 from src.presentation.dash.components.theme import COLORS
 
 
@@ -119,7 +119,8 @@ def create_data_sources_page() -> html.Div:
                                     dbc.CardHeader(
                                         [
                                             html.H5(
-                                                "My Data Sources", className="mb-0"
+                                                "My Data Sources",
+                                                className="mb-0",
                                             ),
                                             dbc.Badge(
                                                 "Auto-refresh",
@@ -127,7 +128,7 @@ def create_data_sources_page() -> html.Div:
                                                 color="secondary",
                                                 className="ms-2",
                                             ),
-                                        ]
+                                        ],
                                     ),
                                     dbc.CardBody(
                                         [
@@ -139,15 +140,15 @@ def create_data_sources_page() -> html.Div:
                                                             [
                                                                 dbc.InputGroupText(
                                                                     html.I(
-                                                                        className="fas fa-search"
-                                                                    )
+                                                                        className="fas fa-search",
+                                                                    ),
                                                                 ),
                                                                 dbc.Input(
                                                                     id="sources-search",
                                                                     placeholder="Search sources...",
                                                                     type="text",
                                                                 ),
-                                                            ]
+                                                            ],
                                                         ),
                                                         width=4,
                                                     ),
@@ -280,10 +281,10 @@ def create_data_sources_page() -> html.Div:
                                                         "backgroundColor": COLORS[
                                                             "light"
                                                         ],
-                                                    }
+                                                    },
                                                 ],
                                                 markdown_options={
-                                                    "link_target": "_blank"
+                                                    "link_target": "_blank",
                                                 },
                                             ),
                                             # Bulk actions
@@ -295,7 +296,7 @@ def create_data_sources_page() -> html.Div:
                                                                 {
                                                                     "label": "Select All",
                                                                     "value": "select_all",
-                                                                }
+                                                                },
                                                             ],
                                                             value=[],
                                                             id="select-all-sources",
@@ -326,12 +327,12 @@ def create_data_sources_page() -> html.Div:
                                                         ),
                                                         width=6,
                                                     ),
-                                                ]
+                                                ],
                                             ),
-                                        ]
+                                        ],
                                     ),
-                                ]
-                            )
+                                ],
+                            ),
                         ],
                         width=8,
                     ),
@@ -349,9 +350,9 @@ def create_data_sources_page() -> html.Div:
                                                 html.P(
                                                     "No recent activity",
                                                     className="text-muted",
-                                                )
+                                                ),
                                             ],
-                                        )
+                                        ),
                                     ),
                                 ],
                                 className="mb-3",
@@ -386,7 +387,7 @@ def create_data_sources_page() -> html.Div:
                                                     className="w-100",
                                                 ),
                                             ],
-                                        )
+                                        ),
                                     ),
                                 ],
                                 className="mb-3",
@@ -417,16 +418,16 @@ def create_data_sources_page() -> html.Div:
                                                         " Overall data quality across all sources",
                                                         className="text-muted ms-2",
                                                     ),
-                                                ]
+                                                ],
                                             ),
-                                        ]
+                                        ],
                                     ),
-                                ]
+                                ],
                             ),
                         ],
                         width=4,
                     ),
-                ]
+                ],
             ),
             # Hidden stores for state management
             dcc.Store(id="sources-data-store", data=[]),
@@ -442,7 +443,11 @@ def create_data_sources_page() -> html.Div:
 
 
 def create_stat_card(
-    title: str, value: str, value_id: str, icon: str, color: str
+    title: str,
+    value: str,
+    value_id: str,
+    icon: str,
+    color: str,
 ) -> dbc.Card:
     """Create a statistics card."""
     return dbc.Card(
@@ -455,8 +460,8 @@ def create_stat_card(
                         html.P(title, className="card-text text-muted small"),
                     ],
                     className="text-center",
-                )
-            ]
+                ),
+            ],
         ),
         className="h-100",
     )
@@ -480,7 +485,7 @@ def create_add_source_modal() -> dbc.Modal:
                             children=[
                                 html.H5("Choose Source Type"),
                                 html.P(
-                                    "Select the type of data source you want to add:"
+                                    "Select the type of data source you want to add:",
                                 ),
                                 dbc.Row(
                                     [
@@ -490,7 +495,7 @@ def create_add_source_modal() -> dbc.Modal:
                                                     dbc.CardBody(
                                                         [
                                                             html.I(
-                                                                className="fas fa-globe fa-3x text-primary mb-3"
+                                                                className="fas fa-globe fa-3x text-primary mb-3",
                                                             ),
                                                             html.H5("API Source"),
                                                             html.P(
@@ -505,7 +510,7 @@ def create_add_source_modal() -> dbc.Modal:
                                                             ),
                                                         ],
                                                         className="text-center",
-                                                    )
+                                                    ),
                                                 ],
                                                 className="mb-3",
                                             ),
@@ -517,7 +522,7 @@ def create_add_source_modal() -> dbc.Modal:
                                                     dbc.CardBody(
                                                         [
                                                             html.I(
-                                                                className="fas fa-file-upload fa-3x text-success mb-3"
+                                                                className="fas fa-file-upload fa-3x text-success mb-3",
                                                             ),
                                                             html.H5("File Upload"),
                                                             html.P(
@@ -532,13 +537,13 @@ def create_add_source_modal() -> dbc.Modal:
                                                             ),
                                                         ],
                                                         className="text-center",
-                                                    )
+                                                    ),
                                                 ],
                                                 className="mb-3",
                                             ),
                                             width=6,
                                         ),
-                                    ]
+                                    ],
                                 ),
                             ],
                         ),
@@ -562,7 +567,7 @@ def create_add_source_modal() -> dbc.Modal:
                             ],
                         ),
                     ],
-                )
+                ),
             ),
             dbc.ModalFooter(
                 dbc.ButtonGroup(
@@ -583,8 +588,8 @@ def create_add_source_modal() -> dbc.Modal:
                             id="wizard-cancel-btn",
                             color="light",
                         ),
-                    ]
-                )
+                    ],
+                ),
             ),
         ],
         id="add-source-modal",
@@ -623,10 +628,10 @@ def create_template_browser_modal() -> dbc.Modal:
                         className="mb-3",
                     ),
                     html.Div(id="templates-grid", children=[]),
-                ]
+                ],
             ),
             dbc.ModalFooter(
-                dbc.Button("Close", id="close-templates-btn", color="secondary")
+                dbc.Button("Close", id="close-templates-btn", color="secondary"),
             ),
         ],
         id="template-browser-modal",
@@ -659,8 +664,8 @@ def create_source_details_modal() -> dbc.Modal:
                             id="close-source-details-btn",
                             color="secondary",
                         ),
-                    ]
-                )
+                    ],
+                ),
             ),
         ],
         id="source-details-modal",

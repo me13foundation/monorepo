@@ -1,8 +1,8 @@
-from dash import html, dcc
 import dash_bootstrap_components as dbc
 
-from src.presentation.dash.components.sidebar import create_sidebar
+from dash import dcc, html
 from src.presentation.dash.components.record_viewer import create_data_table
+from src.presentation.dash.components.sidebar import create_sidebar
 
 
 def create_reports_page() -> dbc.Container:
@@ -39,10 +39,10 @@ def create_reports_page() -> dbc.Container:
                                                                                 "Overall quality across all entities",
                                                                                 className="text-muted",
                                                                             ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                         ],
                                                         width=3,
                                                     ),
@@ -64,10 +64,10 @@ def create_reports_page() -> dbc.Container:
                                                                                 "Critical issues requiring attention",
                                                                                 className="text-muted",
                                                                             ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                         ],
                                                         width=3,
                                                     ),
@@ -89,10 +89,10 @@ def create_reports_page() -> dbc.Container:
                                                                                 "Total entities in the system",
                                                                                 className="text-muted",
                                                                             ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                         ],
                                                         width=3,
                                                     ),
@@ -114,10 +114,10 @@ def create_reports_page() -> dbc.Container:
                                                                                 "Established entity relationships",
                                                                                 className="text-muted",
                                                                             ),
-                                                                        ]
-                                                                    )
-                                                                ]
-                                                            )
+                                                                        ],
+                                                                    ),
+                                                                ],
+                                                            ),
                                                         ],
                                                         width=3,
                                                     ),
@@ -131,9 +131,9 @@ def create_reports_page() -> dbc.Container:
                                                             dcc.Graph(
                                                                 id="quality-trends-chart",
                                                                 config={
-                                                                    "displayModeBar": False
+                                                                    "displayModeBar": False,
                                                                 },
-                                                            )
+                                                            ),
                                                         ],
                                                         label="Quality Trends",
                                                         tab_id="trends",
@@ -143,9 +143,9 @@ def create_reports_page() -> dbc.Container:
                                                             dcc.Graph(
                                                                 id="error-distribution-chart",
                                                                 config={
-                                                                    "displayModeBar": False
+                                                                    "displayModeBar": False,
                                                                 },
-                                                            )
+                                                            ),
                                                         ],
                                                         label="Error Distribution",
                                                         tab_id="errors",
@@ -183,9 +183,9 @@ def create_reports_page() -> dbc.Container:
                                                                 data=[],
                                                                 page_size=20,
                                                                 style_table={
-                                                                    "overflowX": "auto"
+                                                                    "overflowX": "auto",
                                                                 },
-                                                            )
+                                                            ),
                                                         ],
                                                         label="Detailed Report",
                                                         tab_id="detailed",
@@ -194,15 +194,15 @@ def create_reports_page() -> dbc.Container:
                                                 id="report-tabs",
                                                 active_tab="trends",
                                             ),
-                                        ]
+                                        ],
                                     ),
-                                ]
-                            )
+                                ],
+                            ),
                         ],
                         width=9,
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         fluid=True,
     )

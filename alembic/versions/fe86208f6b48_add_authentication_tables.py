@@ -5,17 +5,23 @@ Revises: 841d4a55d87e
 Create Date: 2025-11-04 12:24:20.336025
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import sqlalchemy as sa
 
+from alembic import op
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 # revision identifiers, used by Alembic.
 revision: str = "fe86208f6b48"
-down_revision: Union[str, Sequence[str], None] = "841d4a55d87e"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | Sequence[str] | None = "841d4a55d87e"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -25,7 +31,10 @@ def upgrade() -> None:
     op.create_table(
         "users",
         sa.Column(
-            "id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")
+            "id",
+            sa.UUID(),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("username", sa.String(length=50), nullable=False),
@@ -86,7 +95,10 @@ def upgrade() -> None:
     op.create_table(
         "sessions",
         sa.Column(
-            "id", sa.UUID(), nullable=False, server_default=sa.text("gen_random_uuid()")
+            "id",
+            sa.UUID(),
+            nullable=False,
+            server_default=sa.text("gen_random_uuid()"),
         ),
         sa.Column("user_id", sa.UUID(), nullable=False),
         sa.Column("session_token", sa.Text(), nullable=False),
@@ -123,7 +135,9 @@ def upgrade() -> None:
     op.create_index("ix_sessions_status", "sessions", ["status"])
     op.create_index("ix_sessions_expires_at", "sessions", ["expires_at"])
     op.create_index(
-        "ix_sessions_refresh_expires_at", "sessions", ["refresh_expires_at"]
+        "ix_sessions_refresh_expires_at",
+        "sessions",
+        ["refresh_expires_at"],
     )
     op.create_index("ix_sessions_last_activity", "sessions", ["last_activity"])
     op.create_index("ix_sessions_ip_address", "sessions", ["ip_address"])

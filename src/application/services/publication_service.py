@@ -5,7 +5,7 @@ Coordinates domain services and repositories to implement publication management
 use cases while preserving strong typing.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.domain.entities.publication import Publication, PublicationType
 from src.domain.repositories.publication_repository import PublicationRepository
@@ -29,22 +29,22 @@ class PublicationApplicationService:
         """
         self._publication_repository = publication_repository
 
-    def create_publication(
+    def create_publication(  # noqa: PLR0913 - explicit domain fields
         self,
         title: str,
-        authors: List[str],
+        authors: list[str],
         publication_year: int,
         journal: str,
         *,
-        doi: Optional[str] = None,
-        pmid: Optional[str] = None,
-        pmc_id: Optional[str] = None,
-        abstract: Optional[str] = None,
+        doi: str | None = None,
+        pmid: str | None = None,
+        pmc_id: str | None = None,
+        abstract: str | None = None,
         publication_type: str = PublicationType.JOURNAL_ARTICLE,
-        keywords: Optional[List[str]] = None,
+        keywords: list[str] | None = None,
         citation_count: int = 0,
-        impact_factor: Optional[float] = None,
-        relevance_score: Optional[int] = None,
+        impact_factor: float | None = None,
+        relevance_score: int | None = None,
         open_access: bool = False,
     ) -> Publication:
         """
@@ -77,7 +77,7 @@ class PublicationApplicationService:
             publication_year=publication_year,
             publication_type=PublicationType.validate(publication_type),
             abstract=abstract,
-            keywords=tuple(keywords) if keywords else tuple(),
+            keywords=tuple(keywords) if keywords else (),
             citation_count=citation_count,
             impact_factor=impact_factor,
             relevance_score=relevance_score,
@@ -86,27 +86,32 @@ class PublicationApplicationService:
 
         return self._publication_repository.create(publication_entity)
 
-    def get_publication_by_pmid(self, pmid: str) -> Optional[Publication]:
+    def get_publication_by_pmid(self, pmid: str) -> Publication | None:
         """Find a publication by PubMed ID."""
         return self._publication_repository.find_by_pmid(pmid)
 
-    def get_publication_by_doi(self, doi: str) -> Optional[Publication]:
+    def get_publication_by_doi(self, doi: str) -> Publication | None:
         """Find a publication by DOI."""
         return self._publication_repository.find_by_doi(doi)
 
     def search_publications_by_title(
-        self, title: str, fuzzy: bool = False
-    ) -> List[Publication]:
+        self,
+        title: str,
+        *,
+        fuzzy: bool = False,
+    ) -> list[Publication]:
         """Find publications by title."""
-        return self._publication_repository.find_by_title(title, fuzzy)
+        return self._publication_repository.find_by_title(title, fuzzy=fuzzy)
 
-    def search_publications_by_author(self, author_name: str) -> List[Publication]:
+    def search_publications_by_author(self, author_name: str) -> list[Publication]:
         """Find publications by author name."""
         return self._publication_repository.find_by_author(author_name)
 
     def get_publications_by_year_range(
-        self, start_year: int, end_year: int
-    ) -> List[Publication]:
+        self,
+        start_year: int,
+        end_year: int,
+    ) -> list[Publication]:
         """Find publications within a year range."""
         return self._publication_repository.find_by_year_range(start_year, end_year)
 
@@ -114,8 +119,8 @@ class PublicationApplicationService:
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Publication]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Publication]:
         """Search publications with optional filters."""
         return self._publication_repository.search_publications(query, limit, filters)
 
@@ -125,24 +130,30 @@ class PublicationApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Publication], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Publication], int]:
         """Retrieve paginated publications with optional filters."""
         return self._publication_repository.paginate_publications(
-            page, per_page, sort_by, sort_order, filters
+            page,
+            per_page,
+            sort_by,
+            sort_order,
+            filters,
         )
 
     def update_publication(
-        self, publication_id: int, updates: Dict[str, Any]
+        self,
+        publication_id: int,
+        updates: dict[str, Any],
     ) -> Publication:
         """Update publication fields."""
         return self._publication_repository.update(publication_id, updates)
 
-    def get_publication_statistics(self) -> Dict[str, int | float | bool | str | None]:
+    def get_publication_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about publications in the repository."""
         return self._publication_repository.get_publication_statistics()
 
-    def find_recent_publications(self, days: int = 30) -> List[Publication]:
+    def find_recent_publications(self, days: int = 30) -> list[Publication]:
         """Find publications from the last N days."""
         return self._publication_repository.find_recent_publications(days)
 

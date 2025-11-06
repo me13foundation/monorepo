@@ -6,12 +6,19 @@ phenotypes from different data sources, enabling genotype-phenotype
 correlation analysis.
 """
 
-from typing import Dict, List, Any, Optional
+import json
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
-from ..normalizers.variant_normalizer import NormalizedVariant, VariantNormalizer
-from ..normalizers.phenotype_normalizer import NormalizedPhenotype, PhenotypeNormalizer
+from src.domain.transform.normalizers.phenotype_normalizer import (
+    NormalizedPhenotype,
+    PhenotypeNormalizer,
+)
+from src.domain.transform.normalizers.variant_normalizer import (
+    NormalizedVariant,
+    VariantNormalizer,
+)
 
 
 class VariantPhenotypeRelationship(Enum):
@@ -33,10 +40,10 @@ class VariantPhenotypeLink:
     phenotype_id: str
     relationship_type: VariantPhenotypeRelationship
     confidence_score: float
-    evidence_sources: List[str]
-    clinical_significance: Optional[str]
-    inheritance_pattern: Optional[str]
-    penetrance: Optional[str]
+    evidence_sources: list[str]
+    clinical_significance: str | None
+    inheritance_pattern: str | None
+    penetrance: str | None
 
 
 class VariantPhenotypeMapper:
@@ -49,24 +56,24 @@ class VariantPhenotypeMapper:
 
     def __init__(
         self,
-        variant_normalizer: Optional[VariantNormalizer] = None,
-        phenotype_normalizer: Optional[PhenotypeNormalizer] = None,
+        variant_normalizer: VariantNormalizer | None = None,
+        phenotype_normalizer: PhenotypeNormalizer | None = None,
     ):
         self.variant_normalizer = variant_normalizer or VariantNormalizer()
         self.phenotype_normalizer = phenotype_normalizer or PhenotypeNormalizer()
 
         # Mapping cache: variant_id -> list of phenotype links
-        self.variant_to_phenotypes: Dict[str, List[VariantPhenotypeLink]] = {}
+        self.variant_to_phenotypes: dict[str, list[VariantPhenotypeLink]] = {}
 
         # Reverse mapping: phenotype_id -> list of variant links
-        self.phenotype_to_variants: Dict[str, List[VariantPhenotypeLink]] = {}
+        self.phenotype_to_variants: dict[str, list[VariantPhenotypeLink]] = {}
 
     def map_variant_phenotype_relationship(
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: Optional[Dict[str, Any]] = None,
-    ) -> Optional[VariantPhenotypeLink]:
+        evidence_data: dict[str, Any] | None = None,
+    ) -> VariantPhenotypeLink | None:
         """
         Determine the relationship between a variant and phenotype.
 
@@ -80,7 +87,9 @@ class VariantPhenotypeMapper:
         """
         # Extract relationship information from variant data
         relationship = self._determine_relationship_type(
-            variant, phenotype, evidence_data
+            variant,
+            phenotype,
+            evidence_data,
         )
 
         if relationship:
@@ -89,14 +98,19 @@ class VariantPhenotypeMapper:
                 phenotype_id=phenotype.primary_id,
                 relationship_type=relationship,
                 confidence_score=self._calculate_confidence(
-                    variant, phenotype, evidence_data
+                    variant,
+                    phenotype,
+                    evidence_data,
                 ),
                 evidence_sources=self._collect_evidence_sources(
-                    variant, phenotype, evidence_data
+                    variant,
+                    phenotype,
+                    evidence_data,
                 ),
                 clinical_significance=variant.clinical_significance,
                 inheritance_pattern=self._infer_inheritance_pattern(
-                    variant, evidence_data
+                    variant,
+                    evidence_data,
                 ),
                 penetrance=self._infer_penetrance(variant, evidence_data),
             )
@@ -118,8 +132,8 @@ class VariantPhenotypeMapper:
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: Optional[Dict[str, Any]],
-    ) -> Optional[VariantPhenotypeRelationship]:
+        evidence_data: dict[str, Any] | None,
+    ) -> VariantPhenotypeRelationship | None:
         """Determine the type of relationship between variant and phenotype."""
 
         # Check clinical significance from variant
@@ -130,13 +144,13 @@ class VariantPhenotypeMapper:
             if any(term in sig_lower for term in ["pathogenic", "likely pathogenic"]):
                 return VariantPhenotypeRelationship.CAUSATIVE
 
-            elif "benign" in sig_lower or "likely benign" in sig_lower:
+            if "benign" in sig_lower or "likely benign" in sig_lower:
                 return VariantPhenotypeRelationship.PROTECTIVE
 
-            elif "uncertain" in sig_lower:
+            if "uncertain" in sig_lower:
                 return VariantPhenotypeRelationship.UNCERTAIN
 
-            elif "risk" in sig_lower:
+            if "risk" in sig_lower:
                 return VariantPhenotypeRelationship.RISK_FACTOR
 
         # Check evidence data
@@ -145,11 +159,11 @@ class VariantPhenotypeMapper:
 
             if "causative" in evidence_type or "pathogenic" in evidence_type:
                 return VariantPhenotypeRelationship.CAUSATIVE
-            elif "association" in evidence_type:
+            if "association" in evidence_type:
                 return VariantPhenotypeRelationship.ASSOCIATED
-            elif "protective" in evidence_type:
+            if "protective" in evidence_type:
                 return VariantPhenotypeRelationship.PROTECTIVE
-            elif "modifier" in evidence_type:
+            if "modifier" in evidence_type:
                 return VariantPhenotypeRelationship.MODIFIER
 
         # Default to associated if we have any evidence
@@ -162,7 +176,7 @@ class VariantPhenotypeMapper:
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: Optional[Dict[str, Any]],
+        evidence_data: dict[str, Any] | None,
     ) -> float:
         """Calculate confidence score for variant-phenotype relationship."""
         confidence = 0.3  # Base confidence
@@ -193,8 +207,8 @@ class VariantPhenotypeMapper:
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: Optional[Dict[str, Any]],
-    ) -> List[str]:
+        evidence_data: dict[str, Any] | None,
+    ) -> list[str]:
         """Collect evidence sources for the relationship."""
         sources = [variant.source, phenotype.source]
 
@@ -204,23 +218,28 @@ class VariantPhenotypeMapper:
         return list(set(sources))
 
     def _infer_inheritance_pattern(
-        self, variant: NormalizedVariant, evidence_data: Optional[Dict[str, Any]]
-    ) -> Optional[str]:
+        self,
+        _variant: NormalizedVariant,
+        _evidence_data: dict[str, Any] | None,
+    ) -> str | None:
         """Infer inheritance pattern from available data."""
         # This would typically require more sophisticated analysis
         # For now, return None as inheritance patterns are complex to infer
         return None
 
     def _infer_penetrance(
-        self, variant: NormalizedVariant, evidence_data: Optional[Dict[str, Any]]
-    ) -> Optional[str]:
+        self,
+        _variant: NormalizedVariant,
+        _evidence_data: dict[str, Any] | None,
+    ) -> str | None:
         """Infer penetrance from available data."""
         # This would require detailed analysis of clinical data
         return None
 
     def find_phenotypes_for_variant(
-        self, variant_id: str
-    ) -> List[VariantPhenotypeLink]:
+        self,
+        variant_id: str,
+    ) -> list[VariantPhenotypeLink]:
         """
         Find all phenotypes associated with a variant.
 
@@ -233,8 +252,9 @@ class VariantPhenotypeMapper:
         return self.variant_to_phenotypes.get(variant_id, [])
 
     def find_variants_for_phenotype(
-        self, phenotype_id: str
-    ) -> List[VariantPhenotypeLink]:
+        self,
+        phenotype_id: str,
+    ) -> list[VariantPhenotypeLink]:
         """
         Find all variants associated with a phenotype.
 
@@ -247,8 +267,9 @@ class VariantPhenotypeMapper:
         return self.phenotype_to_variants.get(phenotype_id, [])
 
     def get_pathogenic_variants_for_phenotype(
-        self, phenotype_id: str
-    ) -> List[VariantPhenotypeLink]:
+        self,
+        phenotype_id: str,
+    ) -> list[VariantPhenotypeLink]:
         """
         Find pathogenic variants associated with a phenotype.
 
@@ -269,22 +290,24 @@ class VariantPhenotypeMapper:
             ]
         ]
 
-    def get_relationship_statistics(self) -> Dict[str, Any]:
+    def get_relationship_statistics(self) -> dict[str, Any]:
         """Compute aggregate statistics for mapped relationships."""
 
         total_relationships = 0
-        relationship_types: Dict[str, int] = {}
+        relationship_types: dict[str, int] = {}
         confidence_distribution = {"high": 0, "medium": 0, "low": 0}
 
+        high_confidence_threshold = 0.8
+        medium_confidence_threshold = 0.5
         for links in self.variant_to_phenotypes.values():
             total_relationships += len(links)
             for link in links:
                 rel_type = link.relationship_type.value
                 relationship_types[rel_type] = relationship_types.get(rel_type, 0) + 1
 
-                if link.confidence_score >= 0.8:
+                if link.confidence_score >= high_confidence_threshold:
                     confidence_distribution["high"] += 1
-                elif link.confidence_score >= 0.5:
+                elif link.confidence_score >= medium_confidence_threshold:
                     confidence_distribution["medium"] += 1
                 else:
                     confidence_distribution["low"] += 1
@@ -297,7 +320,7 @@ class VariantPhenotypeMapper:
             "confidence_distribution": confidence_distribution,
         }
 
-    def validate_mapping(self, link: VariantPhenotypeLink) -> List[str]:
+    def validate_mapping(self, link: VariantPhenotypeLink) -> list[str]:
         """
         Validate a variant-phenotype mapping.
 
@@ -327,9 +350,8 @@ class VariantPhenotypeMapper:
         """Merge duplicate variant-phenotype links."""
         # This would remove duplicates and merge evidence
         # Simplified implementation
-        pass
 
-    def export_mappings(self, format: str = "json") -> str:
+    def export_mappings(self, output_format: str = "json") -> str:
         """
         Export variant-phenotype mappings in specified format.
 
@@ -339,9 +361,7 @@ class VariantPhenotypeMapper:
         Returns:
             Formatted string representation of mappings
         """
-        if format == "json":
-            import json
-
+        if output_format == "json":
             mappings = {
                 "variant_to_phenotypes": {
                     variant_id: [
@@ -355,7 +375,7 @@ class VariantPhenotypeMapper:
                         for link in links
                     ]
                     for variant_id, links in self.variant_to_phenotypes.items()
-                }
+                },
             }
             return json.dumps(mappings, indent=2)
 

@@ -1,36 +1,33 @@
-from typing import List
-
-from dash import html, dcc
 import dash_bootstrap_components as dbc
+
+from dash import dcc, html
 from dash.dcc import Checklist, Dropdown
-
 from src.presentation.dash.components.sidebar import create_sidebar
-
 
 DropdownOption = Dropdown.Options
 ChecklistOption = Checklist.Options
 
-IMPORT_TYPE_OPTIONS: List[DropdownOption] = [
+IMPORT_TYPE_OPTIONS: list[DropdownOption] = [
     {"label": "ClinVar Data", "value": "clinvar"},
     {"label": "HPO Data", "value": "hpo"},
     {"label": "PubMed Data", "value": "pubmed"},
     {"label": "UniProt Data", "value": "uniprot"},
 ]
 
-EXPORT_ENTITY_OPTIONS: List[ChecklistOption] = [
+EXPORT_ENTITY_OPTIONS: list[ChecklistOption] = [
     {"label": "Genes", "value": "genes"},
     {"label": "Variants", "value": "variants"},
     {"label": "Phenotypes", "value": "phenotypes"},
     {"label": "Publications", "value": "publications"},
 ]
 
-EXPORT_FORMAT_OPTIONS: List[DropdownOption] = [
+EXPORT_FORMAT_OPTIONS: list[DropdownOption] = [
     {"label": "JSON", "value": "json"},
     {"label": "CSV", "value": "csv"},
     {"label": "TSV", "value": "tsv"},
 ]
 
-BATCH_OPERATION_OPTIONS: List[DropdownOption] = [
+BATCH_OPERATION_OPTIONS: list[DropdownOption] = [
     {"label": "Validate All", "value": "validate"},
     {"label": "Normalize IDs", "value": "normalize"},
     {"label": "Cross-reference", "value": "cross_ref"},
@@ -68,8 +65,8 @@ def create_bulk_page() -> dbc.Container:
                                                                                 id="upload-data",
                                                                                 children=html.Div(
                                                                                     [
-                                                                                        "Drag and drop or click to select files"
-                                                                                    ]
+                                                                                        "Drag and drop or click to select files",
+                                                                                    ],
                                                                                 ),
                                                                                 style={
                                                                                     "width": "100%",
@@ -82,14 +79,14 @@ def create_bulk_page() -> dbc.Container:
                                                                                     "margin": "10px",
                                                                                 },
                                                                                 multiple=True,
-                                                                            )
+                                                                            ),
                                                                         ],
                                                                         width=6,
                                                                     ),
                                                                     dbc.Col(
                                                                         [
                                                                             dbc.Label(
-                                                                                "Import Type"
+                                                                                "Import Type",
                                                                             ),
                                                                             dcc.Dropdown(
                                                                                 id="import-type",
@@ -105,7 +102,7 @@ def create_bulk_page() -> dbc.Container:
                                                                         ],
                                                                         width=6,
                                                                     ),
-                                                                ]
+                                                                ],
                                                             ),
                                                         ],
                                                         label="Import",
@@ -122,13 +119,13 @@ def create_bulk_page() -> dbc.Container:
                                                                     dbc.Col(
                                                                         [
                                                                             dbc.Label(
-                                                                                "Entity Types"
+                                                                                "Entity Types",
                                                                             ),
                                                                             dcc.Checklist(
                                                                                 id="export-types",
                                                                                 options=EXPORT_ENTITY_OPTIONS,
                                                                                 value=[
-                                                                                    "genes"
+                                                                                    "genes",
                                                                                 ],
                                                                             ),
                                                                         ],
@@ -137,7 +134,7 @@ def create_bulk_page() -> dbc.Container:
                                                                     dbc.Col(
                                                                         [
                                                                             dbc.Label(
-                                                                                "Format"
+                                                                                "Format",
                                                                             ),
                                                                             dcc.Dropdown(
                                                                                 id="export-format",
@@ -154,11 +151,11 @@ def create_bulk_page() -> dbc.Container:
                                                                                 id="export-data-btn",
                                                                                 color="success",
                                                                                 className="mt-4",
-                                                                            )
+                                                                            ),
                                                                         ],
                                                                         width=4,
                                                                     ),
-                                                                ]
+                                                                ],
                                                             ),
                                                         ],
                                                         label="Export",
@@ -175,7 +172,7 @@ def create_bulk_page() -> dbc.Container:
                                                                     dbc.Col(
                                                                         [
                                                                             dbc.Label(
-                                                                                "Operation"
+                                                                                "Operation",
                                                                             ),
                                                                             dcc.Dropdown(
                                                                                 id="batch-operation",
@@ -192,11 +189,11 @@ def create_bulk_page() -> dbc.Container:
                                                                                 id="start-batch-btn",
                                                                                 color="warning",
                                                                                 className="mt-4",
-                                                                            )
+                                                                            ),
                                                                         ],
                                                                         width=6,
                                                                     ),
-                                                                ]
+                                                                ],
                                                             ),
                                                             html.Div(
                                                                 id="batch-progress-container",
@@ -209,16 +206,16 @@ def create_bulk_page() -> dbc.Container:
                                                 ],
                                                 id="bulk-tabs",
                                                 active_tab="import",
-                                            )
-                                        ]
+                                            ),
+                                        ],
                                     ),
-                                ]
-                            )
+                                ],
+                            ),
                         ],
                         width=9,
                     ),
-                ]
-            )
+                ],
+            ),
         ],
         fluid=True,
     )

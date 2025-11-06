@@ -4,22 +4,19 @@ Business logic for clinical phenotype operations.
 """
 
 from dataclasses import dataclass
-from typing import List, Optional, TYPE_CHECKING
+
 from sqlalchemy.orm import Session
 
 from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
 from src.infrastructure.repositories import SqlAlchemyPhenotypeRepository
 from src.services.domain.base_service import BaseService
 
-if TYPE_CHECKING:
-    pass
-
 
 @dataclass
 class PhenotypeHierarchy:
     phenotype: Phenotype
-    children: List[Phenotype]
-    parent_hpo_id: Optional[str]
+    children: list[Phenotype]
+    parent_hpo_id: str | None
 
 
 class PhenotypeService(BaseService[SqlAlchemyPhenotypeRepository]):
@@ -32,8 +29,8 @@ class PhenotypeService(BaseService[SqlAlchemyPhenotypeRepository]):
 
     def __init__(
         self,
-        session: Optional[Session] = None,
-        phenotype_repository: Optional[SqlAlchemyPhenotypeRepository] = None,
+        session: Session | None = None,
+        phenotype_repository: SqlAlchemyPhenotypeRepository | None = None,
     ):
         super().__init__(session)
         self.phenotype_repo = (
@@ -47,8 +44,10 @@ class PhenotypeService(BaseService[SqlAlchemyPhenotypeRepository]):
         return self.phenotype_repo
 
     def find_phenotypes_by_category(
-        self, category: str, limit: Optional[int] = None
-    ) -> List[Phenotype]:
+        self,
+        category: str,
+        limit: int | None = None,
+    ) -> list[Phenotype]:
         """
         Find phenotypes in a specific clinical category.
 
@@ -62,7 +61,7 @@ class PhenotypeService(BaseService[SqlAlchemyPhenotypeRepository]):
         normalized_category = PhenotypeCategory.validate(category)
         return self.phenotype_repo.find_by_category(normalized_category, limit)
 
-    def get_phenotype_hierarchy(self, hpo_id: str) -> Optional[PhenotypeHierarchy]:
+    def get_phenotype_hierarchy(self, hpo_id: str) -> PhenotypeHierarchy | None:
         """
         Get the phenotype hierarchy for an HPO term.
 
@@ -84,7 +83,7 @@ class PhenotypeService(BaseService[SqlAlchemyPhenotypeRepository]):
             parent_hpo_id=phenotype.parent_hpo_id,
         )
 
-    def search_phenotypes(self, query: str, limit: int = 20) -> List[Phenotype]:
+    def search_phenotypes(self, query: str, limit: int = 20) -> list[Phenotype]:
         """
         Search phenotypes by name, definition, or synonyms.
 

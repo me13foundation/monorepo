@@ -120,7 +120,7 @@ lint: ## Run all linting tools (warnings only)
 	-$(USE_PYTHON) -m ruff check src tests || echo "⚠️  Ruff found linting issues (non-blocking)"
 	@echo "Running mypy..."
 	-$(USE_PYTHON) -m mypy src || echo "⚠️  MyPy found type issues (non-blocking)"
-	@echo "Running bandit..."
+	@echo "Running bandit (non-blocking)..."
 	-$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || echo "⚠️  Bandit found security issues (non-blocking)"
 
 format: ## Format code with Black and sort imports with ruff
@@ -141,7 +141,7 @@ type-check-report: ## Generate mypy type checking report
 	$(call check_venv)
 	$(USE_PYTHON) -m mypy src --html-report mypy-report
 
-security-audit: ## Run comprehensive security audit (pip-audit, safety, bandit)
+security-audit: ## Run comprehensive security audit (pip-audit, bandit) [blocking on MEDIUM/HIGH]
 	$(call check_venv)
 	@echo "Running pip-audit..."
 	$(USE_PIP) install pip-audit --quiet || true
@@ -150,8 +150,8 @@ security-audit: ## Run comprehensive security audit (pip-audit, safety, bandit)
 	@echo "⚠️  Safety CLI now requires authentication. Using pip-audit for vulnerability scanning instead."
 	@echo "   To enable Safety CLI in the future, set SAFETY_API_KEY environment variable."
 	# SAFETY_API_KEY="" safety --stage development scan --save-as json safety-results.json --use-server-matching || true
-	@echo "Running bandit..."
-	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || true
+	@echo "Running bandit (blocking on MEDIUM/HIGH)..."
+	$(USE_PYTHON) -m bandit -r src -s medium,high -f json -o bandit-results.json
 
 security-full: security-audit ## Full security assessment with all tools
 

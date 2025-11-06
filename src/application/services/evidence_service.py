@@ -6,7 +6,7 @@ use cases while preserving domain purity and strong typing.
 """
 
 from datetime import date
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from src.domain.entities.evidence import Evidence, EvidenceType
 from src.domain.repositories.evidence_repository import EvidenceRepository
@@ -37,7 +37,7 @@ class EvidenceApplicationService:
         self._evidence_repository = evidence_repository
         self._evidence_domain_service = evidence_domain_service
 
-    def create_evidence(
+    def create_evidence(  # noqa: PLR0913 - request fields kept explicit for clarity
         self,
         *,
         variant_id: int,
@@ -45,16 +45,16 @@ class EvidenceApplicationService:
         description: str,
         evidence_type: str = EvidenceType.LITERATURE_REVIEW,
         evidence_level: EvidenceLevel = EvidenceLevel.SUPPORTING,
-        publication_id: Optional[int] = None,
-        summary: Optional[str] = None,
-        confidence_score: Optional[float] = None,
-        quality_score: Optional[int] = None,
-        sample_size: Optional[int] = None,
-        study_type: Optional[str] = None,
-        statistical_significance: Optional[str] = None,
+        publication_id: int | None = None,
+        summary: str | None = None,
+        confidence_score: float | None = None,
+        quality_score: int | None = None,
+        sample_size: int | None = None,
+        study_type: str | None = None,
+        statistical_significance: str | None = None,
         reviewed: bool = False,
-        review_date: Optional[date] = None,
-        reviewer_notes: Optional[str] = None,
+        review_date: date | None = None,
+        reviewer_notes: str | None = None,
     ) -> Evidence:
         """
         Create new evidence with validation and business rules.
@@ -109,46 +109,51 @@ class EvidenceApplicationService:
 
         # Apply domain business logic
         evidence_entity = self._evidence_domain_service.apply_business_logic(
-            evidence_entity, "create"
+            evidence_entity,
+            "create",
         )
 
         # Validate business rules
         errors = self._evidence_domain_service.validate_business_rules(
-            evidence_entity, "create"
+            evidence_entity,
+            "create",
         )
         if errors:
-            raise ValueError(f"Business rule violations: {', '.join(errors)}")
+            msg = "Business rule violations: " + ", ".join(errors)
+            raise ValueError(msg)
 
         # Persist the entity
         return self._evidence_repository.create(evidence_entity)
 
-    def get_evidence_by_variant(self, variant_id: int) -> List[Evidence]:
+    def get_evidence_by_variant(self, variant_id: int) -> list[Evidence]:
         """Find evidence records for a variant."""
         return self._evidence_repository.find_by_variant(variant_id)
 
-    def get_evidence_by_gene(self, gene_id: int) -> List[Evidence]:
+    def get_evidence_by_gene(self, gene_id: int) -> list[Evidence]:
         """Find evidence records for a gene."""
         return self._evidence_repository.find_by_gene(gene_id)
 
-    def get_evidence_by_phenotype(self, phenotype_id: int) -> List[Evidence]:
+    def get_evidence_by_phenotype(self, phenotype_id: int) -> list[Evidence]:
         """Find evidence records for a phenotype."""
         return self._evidence_repository.find_by_phenotype(phenotype_id)
 
-    def get_evidence_by_publication(self, publication_id: int) -> List[Evidence]:
+    def get_evidence_by_publication(self, publication_id: int) -> list[Evidence]:
         """Find evidence records for a publication."""
         return self._evidence_repository.find_by_publication(publication_id)
 
-    def get_evidence_by_level(self, level: EvidenceLevel) -> List[Evidence]:
+    def get_evidence_by_level(self, level: EvidenceLevel) -> list[Evidence]:
         """Find evidence records by evidence level."""
         return self._evidence_repository.find_by_evidence_level(level.value)
 
     def get_evidence_by_confidence_range(
-        self, min_score: float, max_score: float
-    ) -> List[Evidence]:
+        self,
+        min_score: float,
+        max_score: float,
+    ) -> list[Evidence]:
         """Find evidence records within confidence score range."""
         return self._evidence_repository.find_by_confidence_score(min_score, max_score)
 
-    def get_evidence_by_source(self, source: str) -> List[Evidence]:
+    def get_evidence_by_source(self, source: str) -> list[Evidence]:
         """Find evidence records from a specific source."""
         return self._evidence_repository.find_by_source(source)
 
@@ -156,8 +161,8 @@ class EvidenceApplicationService:
         self,
         query: str,
         limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> List[Evidence]:
+        filters: dict[str, Any] | None = None,
+    ) -> list[Evidence]:
         """Search evidence with optional filters."""
         return self._evidence_repository.search_evidence(query, limit, filters)
 
@@ -167,25 +172,27 @@ class EvidenceApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[List[Evidence], int]:
+        filters: dict[str, Any] | None = None,
+    ) -> tuple[list[Evidence], int]:
         """Retrieve paginated evidence with optional filters."""
         return self._evidence_repository.paginate_evidence(
-            page, per_page, sort_by, sort_order, filters
+            page,
+            per_page,
+            sort_by,
+            sort_order,
+            filters,
         )
 
-    def update_evidence(self, evidence_id: int, updates: Dict[str, Any]) -> Evidence:
+    def update_evidence(self, evidence_id: int, updates: dict[str, Any]) -> Evidence:
         """Update evidence fields."""
         updated_evidence = self._evidence_repository.update(evidence_id, updates)
-
-        # Apply domain business logic to updated entity
-        updated_evidence = self._evidence_domain_service.apply_business_logic(
-            updated_evidence, "update"
+        # Apply domain business logic to updated entity and return
+        return self._evidence_domain_service.apply_business_logic(
+            updated_evidence,
+            "update",
         )
 
-        return updated_evidence
-
-    def detect_evidence_conflicts(self, variant_id: int) -> List[Dict[str, Any]]:
+    def detect_evidence_conflicts(self, variant_id: int) -> list[dict[str, Any]]:
         """
         Detect conflicts between evidence records for a variant.
 
@@ -198,7 +205,7 @@ class EvidenceApplicationService:
         evidence_list = self._evidence_repository.find_by_variant(variant_id)
         return self._evidence_domain_service.detect_evidence_conflicts(evidence_list)
 
-    def calculate_evidence_consensus(self, variant_id: int) -> Dict[str, Any]:
+    def calculate_evidence_consensus(self, variant_id: int) -> dict[str, Any]:
         """
         Calculate consensus from multiple evidence records for a variant.
 
@@ -227,11 +234,11 @@ class EvidenceApplicationService:
 
         return self._evidence_domain_service.score_evidence_quality(evidence)
 
-    def get_evidence_statistics(self) -> Dict[str, int | float | bool | str | None]:
+    def get_evidence_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about evidence in the repository."""
         return self._evidence_repository.get_evidence_statistics()
 
-    def find_conflicting_evidence(self, variant_id: int) -> List[Evidence]:
+    def find_conflicting_evidence(self, variant_id: int) -> list[Evidence]:
         """Find conflicting evidence records for a variant."""
         return self._evidence_repository.find_conflicting_evidence(variant_id)
 

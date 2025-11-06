@@ -2,9 +2,17 @@
 Unit tests for provenance value object.
 """
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, UTC
-from src.models.value_objects.provenance import Provenance, DataSource
+from pydantic import ValidationError
+
+from src.models.value_objects.provenance import DataSource, Provenance
+
+QUALITY_SCORE_VALID = 0.95
+QUALITY_SCORE_UPDATE = 0.85
+QUALITY_SCORE_ABOVE_MAX = 1.5
+QUALITY_SCORE_BELOW_MIN = -0.5
 
 
 class TestProvenance:
@@ -20,7 +28,7 @@ class TestProvenance:
             acquired_by="test_system",
             acquired_at=acquired_at,
             processing_steps=["normalized", "validated"],
-            quality_score=0.95,
+            quality_score=QUALITY_SCORE_VALID,
             validation_status="validated",
             metadata={"key": "value"},
         )
@@ -31,7 +39,7 @@ class TestProvenance:
         assert provenance.acquired_by == "test_system"
         assert provenance.acquired_at == acquired_at
         assert provenance.processing_steps == ["normalized", "validated"]
-        assert provenance.quality_score == 0.95
+        assert provenance.quality_score == QUALITY_SCORE_VALID
         assert provenance.validation_status == "validated"
         assert provenance.metadata == {"key": "value"}
 
@@ -58,9 +66,9 @@ class TestProvenance:
         """Test updating quality score."""
         provenance = Provenance(source=DataSource.CLINVAR, acquired_by="test_system")
 
-        new_provenance = provenance.update_quality_score(0.85)
+        new_provenance = provenance.update_quality_score(QUALITY_SCORE_UPDATE)
 
-        assert new_provenance.quality_score == 0.85
+        assert new_provenance.quality_score == QUALITY_SCORE_UPDATE
         assert provenance.quality_score is None  # Original unchanged
 
     def test_mark_validated(self):
@@ -133,22 +141,29 @@ class TestProvenance:
         provenance = Provenance(source=DataSource.CLINVAR, acquired_by="test_system")
 
         with pytest.raises(
-            Exception
-        ):  # Pydantic raises ValidationError for frozen instances
+            ValidationError,
+            match="Instance is frozen",
+        ):
             provenance.source = DataSource.PUBMED
 
     def test_invalid_quality_score(self):
         """Test invalid quality score."""
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValidationError,
+            match="less than or equal to 1",
+        ):
             Provenance(
                 source=DataSource.CLINVAR,
                 acquired_by="test_system",
-                quality_score=1.5,  # Invalid: > 1.0
+                quality_score=QUALITY_SCORE_ABOVE_MAX,
             )
 
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValidationError,
+            match="greater than or equal to 0",
+        ):
             Provenance(
                 source=DataSource.CLINVAR,
                 acquired_by="test_system",
-                quality_score=-0.5,  # Invalid: < 0.0
+                quality_score=QUALITY_SCORE_BELOW_MIN,
             )

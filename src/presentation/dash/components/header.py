@@ -1,5 +1,6 @@
-from dash import html
 import dash_bootstrap_components as dbc
+
+from dash import html
 
 
 def create_header() -> dbc.Navbar:
@@ -21,35 +22,45 @@ def create_header() -> dbc.Navbar:
                             [
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Dashboard", href="/dashboard", active="exact"
-                                    )
+                                        "Dashboard",
+                                        href="/dashboard",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Review Queue", href="/review", active="exact"
-                                    )
+                                        "Review Queue",
+                                        href="/review",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Bulk Operations", href="/bulk", active="exact"
-                                    )
+                                        "Bulk Operations",
+                                        href="/bulk",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Reports", href="/reports", active="exact"
-                                    )
+                                        "Reports",
+                                        href="/reports",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
                                         "Data Sources",
                                         href="/data-sources",
                                         active="exact",
-                                    )
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Settings", href="/settings", active="exact"
-                                    )
+                                        "Settings",
+                                        href="/settings",
+                                        active="exact",
+                                    ),
                                 ),
                             ],
                             navbar=True,
@@ -62,7 +73,7 @@ def create_header() -> dbc.Navbar:
                     id="navbar-collapse",
                     navbar=True,
                 ),
-            ]
+            ],
         ),
         color="dark",
         dark=True,

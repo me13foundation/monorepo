@@ -1,7 +1,7 @@
 from src.application.curation.repositories.review_repository import (
     SqlAlchemyReviewRepository,
 )
-from src.application.curation.services.review_service import ReviewService, ReviewQuery
+from src.application.curation.services.review_service import ReviewQuery, ReviewService
 from src.database.session import SessionLocal, engine
 from src.models.database.base import Base
 
@@ -17,11 +17,15 @@ def test_review_service_submit_and_list():
 
     with SessionLocal() as db:  # type: Session
         created = service.submit(
-            db, entity_type="genes", entity_id="GENE2", priority="low"
+            db,
+            entity_type="genes",
+            entity_id="GENE2",
+            priority="low",
         )
         assert created.id is not None
 
         items = service.list_queue(
-            db, ReviewQuery(entity_type="genes", status="pending")
+            db,
+            ReviewQuery(entity_type="genes", status="pending"),
         )
         assert any(it.id == created.id for it in items)

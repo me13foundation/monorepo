@@ -10,7 +10,8 @@ feature-specific validation workflows.
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Optional
+from collections.abc import Iterable
+from typing import Any
 
 from .base_rules import (
     ValidationLevel,
@@ -19,7 +20,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = Dict[str, Any]
+IssueDict = dict[str, Any]
 
 
 class GeneValidationRules:
@@ -79,7 +80,8 @@ class GeneValidationRules:
                 return True, "", None  # Optional field
 
             if not isinstance(
-                value, str
+                value,
+                str,
             ) or not GeneValidationRules._HGNC_ID_PATTERN.fullmatch(value):
                 return (
                     False,
@@ -141,8 +143,8 @@ class GeneValidationRules:
     @staticmethod
     def validate_genomic_coordinates(
         field: str,
-        _default_start: Optional[int] = None,
-        _default_end: Optional[int] = None,
+        _default_start: int | None = None,
+        _default_end: int | None = None,
     ) -> ValidationRule:
         def validator(value: Any) -> ValidationOutcome:
             if value in (None, {}):
@@ -204,14 +206,14 @@ class GeneValidationRules:
             GeneValidationRules.validate_hgnc_nomenclature("symbol"),
             GeneValidationRules.validate_hgnc_id_format("hgnc_id"),
             GeneValidationRules.validate_cross_reference_consistency(
-                "cross_references"
+                "cross_references",
             ),
             GeneValidationRules.validate_genomic_coordinates("genomic_coordinates"),
         )
 
     @staticmethod
-    def validate_gene_comprehensively(gene: Dict[str, Any]) -> List[IssueDict]:
-        issues: List[IssueDict] = []
+    def validate_gene_comprehensively(gene: dict[str, Any]) -> list[IssueDict]:
+        issues: list[IssueDict] = []
 
         for rule in GeneValidationRules.get_all_rules():
             is_valid, message, suggestion = rule.validator(gene.get(rule.field))
@@ -223,7 +225,7 @@ class GeneValidationRules:
                         "message": message,
                         "suggestion": suggestion,
                         "severity": rule.severity.name.lower(),
-                    }
+                    },
                 )
 
         # Basic presence checks to keep the comprehensive validation useful
@@ -234,7 +236,7 @@ class GeneValidationRules:
                     rule="gene_name_required",
                     message="Gene name is required",
                     severity=ValidationSeverity.WARNING,
-                )
+                ),
             )
 
         return issues
@@ -250,7 +252,7 @@ class GeneValidationRules:
         rule: str,
         message: str,
         severity: ValidationSeverity,
-        suggestion: Optional[str] = None,
+        suggestion: str | None = None,
     ) -> IssueDict:
         return {
             "field": field,

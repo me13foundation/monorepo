@@ -6,11 +6,10 @@ ensuring users can only perform actions they're authorized for.
 """
 
 from enum import Enum
-from typing import Dict, Optional
 from uuid import UUID
 
-from src.domain.entities.user_data_source import UserDataSource
 from src.domain.entities.source_template import SourceTemplate
+from src.domain.entities.user_data_source import UserDataSource
 
 
 class DataSourcePermission(Enum):
@@ -65,7 +64,7 @@ class DataSourceAuthorizationService:
         """Initialize the authorization service."""
         self._role_permissions = self._build_role_permissions()
 
-    def _build_role_permissions(self) -> Dict[UserRole, set[DataSourcePermission]]:
+    def _build_role_permissions(self) -> dict[UserRole, set[DataSourcePermission]]:
         """Build the permission matrix for each role."""
         return {
             UserRole.ANONYMOUS: {
@@ -114,7 +113,10 @@ class DataSourceAuthorizationService:
         }
 
     def has_permission(
-        self, user_id: Optional[UUID], role: str, permission: DataSourcePermission
+        self,
+        _user_id: UUID | None,
+        role: str,
+        permission: DataSourcePermission,
     ) -> bool:
         """
         Check if a user has a specific permission.
@@ -136,7 +138,7 @@ class DataSourceAuthorizationService:
 
     def can_manage_source(
         self,
-        user_id: Optional[UUID],
+        user_id: UUID | None,
         role: str,
         source: UserDataSource,
         permission: DataSourcePermission,
@@ -184,7 +186,7 @@ class DataSourceAuthorizationService:
 
     def can_manage_template(
         self,
-        user_id: Optional[UUID],
+        user_id: UUID | None,
         role: str,
         template: SourceTemplate,
         permission: DataSourcePermission,
@@ -234,7 +236,7 @@ class DataSourceAuthorizationService:
 
         return True
 
-    def can_create_source(self, user_id: Optional[UUID], role: str) -> bool:
+    def can_create_source(self, user_id: UUID | None, role: str) -> bool:
         """
         Check if a user can create data sources.
 
@@ -247,7 +249,7 @@ class DataSourceAuthorizationService:
         """
         return self.has_permission(user_id, role, DataSourcePermission.CREATE_SOURCE)
 
-    def can_create_template(self, user_id: Optional[UUID], role: str) -> bool:
+    def can_create_template(self, user_id: UUID | None, role: str) -> bool:
         """
         Check if a user can create templates.
 
@@ -261,7 +263,10 @@ class DataSourceAuthorizationService:
         return self.has_permission(user_id, role, DataSourcePermission.CREATE_TEMPLATE)
 
     def can_trigger_ingestion(
-        self, user_id: Optional[UUID], role: str, source: UserDataSource
+        self,
+        user_id: UUID | None,
+        role: str,
+        source: UserDataSource,
     ) -> bool:
         """
         Check if a user can trigger ingestion for a source.
@@ -275,7 +280,9 @@ class DataSourceAuthorizationService:
             True if the user can trigger ingestion, False otherwise
         """
         if not self.has_permission(
-            user_id, role, DataSourcePermission.TRIGGER_INGESTION
+            user_id,
+            role,
+            DataSourcePermission.TRIGGER_INGESTION,
         ):
             return False
 
@@ -286,7 +293,10 @@ class DataSourceAuthorizationService:
         )
 
     def filter_accessible_sources(
-        self, user_id: Optional[UUID], role: str, sources: list[UserDataSource]
+        self,
+        user_id: UUID | None,
+        role: str,
+        sources: list[UserDataSource],
     ) -> list[UserDataSource]:
         """
         Filter a list of sources to only those the user can access.
@@ -299,16 +309,22 @@ class DataSourceAuthorizationService:
         Returns:
             Filtered list of accessible sources
         """
-        accessible = []
-        for source in sources:
+        return [
+            source
+            for source in sources
             if self.can_manage_source(
-                user_id, role, source, DataSourcePermission.READ_SOURCE
-            ):
-                accessible.append(source)
-        return accessible
+                user_id,
+                role,
+                source,
+                DataSourcePermission.READ_SOURCE,
+            )
+        ]
 
     def filter_accessible_templates(
-        self, user_id: Optional[UUID], role: str, templates: list[SourceTemplate]
+        self,
+        user_id: UUID | None,
+        role: str,
+        templates: list[SourceTemplate],
     ) -> list[SourceTemplate]:
         """
         Filter a list of templates to only those the user can access.
@@ -321,13 +337,16 @@ class DataSourceAuthorizationService:
         Returns:
             Filtered list of accessible templates
         """
-        accessible = []
-        for template in templates:
+        return [
+            template
+            for template in templates
             if self.can_manage_template(
-                user_id, role, template, DataSourcePermission.READ_TEMPLATE
-            ):
-                accessible.append(template)
-        return accessible
+                user_id,
+                role,
+                template,
+                DataSourcePermission.READ_TEMPLATE,
+            )
+        ]
 
     def _parse_role(self, role: str) -> UserRole:
         """
@@ -350,7 +369,9 @@ class DataSourceAuthorizationService:
         return role_mapping.get(role.lower(), UserRole.ANONYMOUS)
 
     def get_user_permissions(
-        self, user_id: Optional[UUID], role: str
+        self,
+        _user_id: UUID | None,
+        role: str,
     ) -> set[DataSourcePermission]:
         """
         Get all permissions for a user.

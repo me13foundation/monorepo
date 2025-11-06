@@ -6,10 +6,11 @@ for FAIR data packaging and distribution.
 """
 
 import json
+import shutil
 import uuid
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 
 class ROCrateBuilder:
@@ -20,14 +21,15 @@ class ROCrateBuilder:
     their metadata in a machine-readable way. See: https://www.researchobject.org/ro-crate/
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - constructor takes crate metadata options
         self,
         base_path: Path,
         name: str = "MED13 Resource Library Dataset",
-        description: Optional[str] = None,
+        description: str | None = None,
         version: str = "1.0.0",
-        license: str = "CC-BY-4.0",
-        author: Optional[str] = None,
+        license_id: str | None = None,
+        author: str | None = None,
+        **legacy_kwargs: Any,
     ):
         """
         Initialize RO-Crate builder.
@@ -37,9 +39,16 @@ class ROCrateBuilder:
             name: Dataset name
             description: Dataset description
             version: Dataset version
-            license: License identifier (default: CC-BY-4.0)
+            license_id: License identifier (default: CC-BY-4.0)
             author: Author/organization name
+            legacy_kwargs: Additional compatibility parameters (e.g., legacy license)
         """
+        legacy_license = legacy_kwargs.pop("license", None)
+        if legacy_kwargs:
+            unexpected = ", ".join(sorted(legacy_kwargs))
+            msg = f"Unexpected keyword arguments: {unexpected}"
+            raise TypeError(msg)
+
         self.base_path = Path(base_path)
         self.name = name
         self.description = description or (
@@ -47,7 +56,15 @@ class ROCrateBuilder:
             "phenotypes, and supporting evidence"
         )
         self.version = version
-        self.license = license
+        if (
+            legacy_license is not None
+            and license_id is not None
+            and legacy_license != license_id
+        ):
+            msg = "license and license_id parameters must match when both provided"
+            raise ValueError(msg)
+        resolved_license = license_id or legacy_license or "CC-BY-4.0"
+        self.license_id = resolved_license
         self.author = author or "MED13 Foundation"
         self.crate_id = str(uuid.uuid4())
         self.created_at = datetime.now(UTC).isoformat()
@@ -55,7 +72,17 @@ class ROCrateBuilder:
         # Ensure base path exists
         self.base_path.mkdir(parents=True, exist_ok=True)
 
-    def create_crate_structure(self) -> Dict[str, Any]:
+    @property
+    def license(self) -> str:
+        """Backward-compatible access to the crate license identifier."""
+        return self.license_id
+
+    @license.setter
+    def license(self, value: str) -> None:
+        """Update the crate license identifier."""
+        self.license_id = value
+
+    def create_crate_structure(self) -> dict[str, Any]:
         """
         Create RO-Crate directory structure.
 
@@ -75,8 +102,8 @@ class ROCrateBuilder:
     def add_data_file(
         self,
         source_path: Path,
-        target_name: Optional[str] = None,
-        description: Optional[str] = None,
+        target_name: str | None = None,
+        _description: str | None = None,
     ) -> str:
         """
         Add a data file to the RO-Crate package.
@@ -96,17 +123,15 @@ class ROCrateBuilder:
         target_path = data_dir / target_name
 
         # Copy file
-        import shutil
-
         shutil.copy2(source_path, target_path)
 
         return f"data/{target_name}"
 
     def generate_metadata(
         self,
-        data_files: List[Dict[str, Any]],
-        provenance_info: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        data_files: list[dict[str, Any]],
+        provenance_info: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Generate RO-Crate metadata.json.
 
@@ -126,16 +151,16 @@ class ROCrateBuilder:
         }
 
         # Root dataset entity
-        root_dataset: Dict[str, Any] = {
+        root_dataset: dict[str, Any] = {
             "@id": root_dataset_id,
             "@type": "Dataset",
             "name": self.name,
             "description": self.description,
             "version": self.version,
             "license": {
-                "@id": f"https://spdx.org/licenses/{self.license}.html",
+                "@id": f"https://spdx.org/licenses/{self.license_id}.html",
                 "@type": "CreativeWork",
-                "name": self.license,
+                "name": self.license_id,
             },
             "creator": {
                 "@type": "Organization",
@@ -152,22 +177,24 @@ class ROCrateBuilder:
             ],
         }
 
-        has_part: List[Dict[str, Any]] = []
+        has_part: list[dict[str, Any]] = []
 
         # Add provenance if available
         if provenance_info:
-            for source in provenance_info.get("sources", []):
-                has_part.append(
+            has_part.extend(
+                [
                     {
                         "@type": "DataDownload",
                         "name": source.get("name"),
                         "contentUrl": source.get("url"),
                         "datePublished": source.get("date"),
                     }
-                )
+                    for source in provenance_info.get("sources", [])
+                ],
+            )
 
         # Build file entities
-        file_entities: List[Dict[str, Any]] = []
+        file_entities: list[dict[str, Any]] = []
         for file_info in data_files:
             file_entity = {
                 "@id": file_info["path"],
@@ -193,17 +220,15 @@ class ROCrateBuilder:
             root_dataset["hasPart"] = has_part
 
         # Build complete metadata structure
-        metadata = {
+        return {
             "@context": context,
-            "@graph": [root_dataset] + file_entities,
+            "@graph": [root_dataset, *file_entities],
         }
-
-        return metadata
 
     def build(
         self,
-        data_files: List[Dict[str, Any]],
-        provenance_info: Optional[Dict[str, Any]] = None,
+        data_files: list[dict[str, Any]],
+        provenance_info: dict[str, Any] | None = None,
     ) -> Path:
         """
         Build complete RO-Crate package.
@@ -223,12 +248,12 @@ class ROCrateBuilder:
 
         # Write metadata file
         metadata_path = self.base_path / "ro-crate-metadata.json"
-        with open(metadata_path, "w", encoding="utf-8") as f:
+        with metadata_path.open("w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, ensure_ascii=False)
 
         return self.base_path
 
-    def validate(self) -> Dict[str, Any]:
+    def validate(self) -> dict[str, Any]:
         """
         Validate RO-Crate structure and metadata.
 
@@ -246,7 +271,7 @@ class ROCrateBuilder:
         # Validate metadata structure
         if metadata_file.exists():
             try:
-                with open(metadata_file, "r", encoding="utf-8") as f:
+                with metadata_file.open(encoding="utf-8") as f:
                     metadata = json.load(f)
 
                 # Check required fields

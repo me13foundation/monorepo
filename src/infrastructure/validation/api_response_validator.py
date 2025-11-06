@@ -6,10 +6,11 @@ helping prevent runtime errors from malformed external data.
 """
 
 import time
-from typing import Any, Dict, List, Optional
-from ...type_definitions.external_apis import (
-    ValidationIssue,
+from typing import Any
+
+from src.type_definitions.external_apis import (
     APIResponseValidationResult,
+    ValidationIssue,
 )
 
 
@@ -23,25 +24,27 @@ class APIResponseValidator:
 
     @staticmethod
     def validate_clinvar_search_response(
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> APIResponseValidationResult:
         """Validate ClinVar search API response."""
         start_time = time.time()
 
-        issues: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
 
         # Check required top-level fields
         required_fields = ["esearchresult", "header"]
-        for field in required_fields:
-            if field not in data:
-                issues.append(
-                    ValidationIssue(
-                        field=field,
-                        issue_type="missing",
-                        message=f"Required field '{field}' is missing",
-                        severity="error",
-                    )
+        missing = [field for field in required_fields if field not in data]
+        issues.extend(
+            [
+                ValidationIssue(
+                    field=field,
+                    issue_type="missing",
+                    message=f"Required field '{field}' is missing",
+                    severity="error",
                 )
+                for field in missing
+            ],
+        )
 
         # Check esearchresult structure
         if "esearchresult" in data:
@@ -53,28 +56,27 @@ class APIResponseValidator:
                         issue_type="invalid",
                         message="esearchresult must be an object",
                         severity="error",
-                    )
+                    ),
                 )
-            else:
-                # Check for idlist
-                if "idlist" not in esearchresult:
-                    issues.append(
-                        ValidationIssue(
-                            field="esearchresult.idlist",
-                            issue_type="missing",
-                            message="idlist is required in esearchresult",
-                            severity="error",
-                        )
-                    )
-                elif not isinstance(esearchresult["idlist"], list):
-                    issues.append(
-                        ValidationIssue(
-                            field="esearchresult.idlist",
-                            issue_type="invalid",
-                            message="idlist must be an array",
-                            severity="error",
-                        )
-                    )
+            # Check for idlist
+            elif "idlist" not in esearchresult:
+                issues.append(
+                    ValidationIssue(
+                        field="esearchresult.idlist",
+                        issue_type="missing",
+                        message="idlist is required in esearchresult",
+                        severity="error",
+                    ),
+                )
+            elif not isinstance(esearchresult["idlist"], list):
+                issues.append(
+                    ValidationIssue(
+                        field="esearchresult.idlist",
+                        issue_type="invalid",
+                        message="idlist must be an array",
+                        severity="error",
+                    ),
+                )
 
         # Calculate data quality score
         error_count = sum(1 for issue in issues if issue["severity"] == "error")
@@ -87,18 +89,20 @@ class APIResponseValidator:
             is_valid=len([i for i in issues if i["severity"] == "error"]) == 0,
             issues=issues,
             data_quality_score=data_quality_score,
-            sanitized_data=data if data_quality_score > 0.5 else None,
+            sanitized_data=(
+                data if data_quality_score > APIResponseValidator.QUALITY_LOW else None
+            ),
             validation_time_ms=validation_time,
         )
 
     @staticmethod
     def validate_clinvar_variant_response(
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> APIResponseValidationResult:
         """Validate ClinVar variant details API response."""
         start_time = time.time()
 
-        issues: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
 
         # Check required fields
         if "result" not in data:
@@ -108,7 +112,7 @@ class APIResponseValidator:
                     issue_type="missing",
                     message="result field is required",
                     severity="error",
-                )
+                ),
             )
 
         if "header" not in data:
@@ -118,7 +122,7 @@ class APIResponseValidator:
                     issue_type="missing",
                     message="header field is required",
                     severity="warning",  # Header is less critical
-                )
+                ),
             )
 
         # Check result structure
@@ -131,7 +135,7 @@ class APIResponseValidator:
                         issue_type="invalid",
                         message="result object is empty",
                         severity="warning",
-                    )
+                    ),
                 )
         elif "result" in data:
             issues.append(
@@ -140,7 +144,7 @@ class APIResponseValidator:
                     issue_type="invalid",
                     message="result must be an object",
                     severity="error",
-                )
+                ),
             )
 
         # Calculate data quality score
@@ -155,19 +159,21 @@ class APIResponseValidator:
             issues=issues,
             data_quality_score=data_quality_score,
             sanitized_data=(
-                data if data_quality_score > 0.8 else None
+                data
+                if data_quality_score > APIResponseValidator.QUALITY_VERY_HIGH
+                else None
             ),  # Higher threshold for variant data
             validation_time_ms=validation_time,
         )
 
     @staticmethod
     def validate_pubmed_search_response(
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> APIResponseValidationResult:
         """Validate PubMed search API response."""
         start_time = time.time()
 
-        issues: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
 
         # Check required fields
         if "esearchresult" not in data:
@@ -177,7 +183,7 @@ class APIResponseValidator:
                     issue_type="missing",
                     message="esearchresult field is required",
                     severity="error",
-                )
+                ),
             )
 
         # Check esearchresult structure
@@ -190,19 +196,18 @@ class APIResponseValidator:
                         issue_type="invalid",
                         message="esearchresult must be an object",
                         severity="error",
-                    )
+                    ),
                 )
-            else:
-                # Check for idlist
-                if "idlist" not in esearchresult:
-                    issues.append(
-                        ValidationIssue(
-                            field="esearchresult.idlist",
-                            issue_type="missing",
-                            message="idlist is required in esearchresult",
-                            severity="error",
-                        )
-                    )
+            # Check for idlist
+            elif "idlist" not in esearchresult:
+                issues.append(
+                    ValidationIssue(
+                        field="esearchresult.idlist",
+                        issue_type="missing",
+                        message="idlist is required in esearchresult",
+                        severity="error",
+                    ),
+                )
 
         # Calculate data quality score
         error_count = sum(1 for issue in issues if issue["severity"] == "error")
@@ -215,18 +220,20 @@ class APIResponseValidator:
             is_valid=len([i for i in issues if i["severity"] == "error"]) == 0,
             issues=issues,
             data_quality_score=data_quality_score,
-            sanitized_data=data if data_quality_score > 0.5 else None,
+            sanitized_data=(
+                data if data_quality_score > APIResponseValidator.QUALITY_LOW else None
+            ),
             validation_time_ms=validation_time,
         )
 
     @staticmethod
     def validate_pubmed_article_response(
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ) -> APIResponseValidationResult:
         """Validate PubMed article details API response."""
         start_time = time.time()
 
-        issues: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
 
         # PubMed ESummary returns a result object with article details
         if "result" not in data:
@@ -236,7 +243,7 @@ class APIResponseValidator:
                     issue_type="missing",
                     message="result field is required",
                     severity="error",
-                )
+                ),
             )
 
         # Check result structure
@@ -249,19 +256,18 @@ class APIResponseValidator:
                         issue_type="invalid",
                         message="result object is empty",
                         severity="warning",
-                    )
+                    ),
                 )
-            else:
-                # Check for uids array
-                if "uids" not in result:
-                    issues.append(
-                        ValidationIssue(
-                            field="result.uids",
-                            issue_type="missing",
-                            message="uids array is required",
-                            severity="warning",
-                        )
-                    )
+            # Check for uids array
+            elif "uids" not in result:
+                issues.append(
+                    ValidationIssue(
+                        field="result.uids",
+                        issue_type="missing",
+                        message="uids array is required",
+                        severity="warning",
+                    ),
+                )
         elif "result" in data:
             issues.append(
                 ValidationIssue(
@@ -269,7 +275,7 @@ class APIResponseValidator:
                     issue_type="invalid",
                     message="result must be an object",
                     severity="error",
-                )
+                ),
             )
 
         # Calculate data quality score
@@ -283,15 +289,17 @@ class APIResponseValidator:
             is_valid=len([i for i in issues if i["severity"] == "error"]) == 0,
             issues=issues,
             data_quality_score=data_quality_score,
-            sanitized_data=data if data_quality_score > 0.7 else None,
+            sanitized_data=(
+                data if data_quality_score > APIResponseValidator.QUALITY_HIGH else None
+            ),
             validation_time_ms=validation_time,
         )
 
     @staticmethod
     def validate_generic_api_response(
         data: Any,
-        required_fields: List[str],
-        field_types: Optional[Dict[str, type]] = None,
+        required_fields: list[str],
+        field_types: dict[str, type] | None = None,
     ) -> APIResponseValidationResult:
         """
         Generic validation for any API response.
@@ -306,7 +314,7 @@ class APIResponseValidator:
         """
         start_time = time.time()
 
-        issues: List[ValidationIssue] = []
+        issues: list[ValidationIssue] = []
 
         # Check data is a dict
         if not isinstance(data, dict):
@@ -316,7 +324,7 @@ class APIResponseValidator:
                     issue_type="invalid",
                     message="Response must be an object",
                     severity="error",
-                )
+                ),
             )
             return APIResponseValidationResult(
                 is_valid=False,
@@ -327,31 +335,35 @@ class APIResponseValidator:
             )
 
         # Check required fields
-        for field in required_fields:
-            if field not in data:
-                issues.append(
-                    ValidationIssue(
-                        field=field,
-                        issue_type="missing",
-                        message=f"Required field '{field}' is missing",
-                        severity="error",
-                    )
+        issues.extend(
+            [
+                ValidationIssue(
+                    field=field,
+                    issue_type="missing",
+                    message=f"Required field '{field}' is missing",
+                    severity="error",
                 )
+                for field in required_fields
+                if field not in data
+            ],
+        )
 
         # Check field types if specified
         if field_types:
-            for field, expected_type in field_types.items():
-                if field in data:
-                    actual_value = data[field]
-                    if not isinstance(actual_value, expected_type):
-                        issues.append(
-                            ValidationIssue(
-                                field=field,
-                                issue_type="invalid",
-                                message=f"Field '{field}' must be of type {expected_type.__name__}",
-                                severity="error",
-                            )
-                        )
+            issues.extend(
+                [
+                    ValidationIssue(
+                        field=field,
+                        issue_type="invalid",
+                        message=(
+                            f"Field '{field}' must be of type {expected_type.__name__}"
+                        ),
+                        severity="error",
+                    )
+                    for field, expected_type in field_types.items()
+                    if (field in data and not isinstance(data[field], expected_type))
+                ],
+            )
 
         # Calculate data quality score
         error_count = sum(1 for issue in issues if issue["severity"] == "error")
@@ -364,6 +376,16 @@ class APIResponseValidator:
             is_valid=len([i for i in issues if i["severity"] == "error"]) == 0,
             issues=issues,
             data_quality_score=data_quality_score,
-            sanitized_data=data if data_quality_score > 0.6 else None,
+            sanitized_data=(
+                data
+                if data_quality_score > APIResponseValidator.QUALITY_MEDIUM
+                else None
+            ),
             validation_time_ms=validation_time,
         )
+
+    # Quality thresholds
+    QUALITY_LOW: float = 0.5
+    QUALITY_MEDIUM: float = 0.6
+    QUALITY_HIGH: float = 0.7
+    QUALITY_VERY_HIGH: float = 0.8

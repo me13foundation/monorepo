@@ -4,9 +4,10 @@ Phenotype Hierarchy Domain Service.
 Encapsulates business logic for HPO phenotype hierarchy navigation.
 """
 
-from typing import List, Dict, Optional
+from typing import ClassVar
 
 from src.domain.entities.phenotype import Phenotype
+from src.domain.value_objects.identifiers import PhenotypeIdentifier
 
 
 class PhenotypeHierarchyService:
@@ -17,7 +18,7 @@ class PhenotypeHierarchyService:
     """
 
     # Clinical categories and their associated HPO terms (simplified mapping)
-    CLINICAL_CATEGORIES = {
+    CLINICAL_CATEGORIES: ClassVar[dict[str, list[str]]] = {
         "congenital": ["HP:0000118"],  # Phenotypic abnormality
         "developmental": ["HP:0000118"],  # Phenotypic abnormality (broad)
         "neurological": ["HP:0000707"],  # Nervous system abnormality
@@ -29,7 +30,7 @@ class PhenotypeHierarchyService:
         "other": ["HP:0000118"],  # Phenotypic abnormality (broad)
     }
 
-    def __init__(self, phenotype_hierarchy: Optional[Dict[str, List[str]]] = None):
+    def __init__(self, phenotype_hierarchy: dict[str, list[str]] | None = None):
         """
         Initialize the hierarchy service.
 
@@ -37,14 +38,16 @@ class PhenotypeHierarchyService:
             phenotype_hierarchy: Optional pre-loaded hierarchy mapping
         """
         self._hierarchy = phenotype_hierarchy or {}
-        self._reverse_hierarchy: Dict[str, List[str]] = {}
-        self._category_cache: Dict[str, str] = {}
+        self._reverse_hierarchy: dict[str, list[str]] = {}
+        self._category_cache: dict[str, str] = {}
 
         self._build_reverse_hierarchy()
 
     def get_ancestors(
-        self, phenotype: Phenotype, max_depth: Optional[int] = None
-    ) -> List[Phenotype]:
+        self,
+        phenotype: Phenotype,
+        max_depth: int | None = None,
+    ) -> list[Phenotype]:
         """
         Get all ancestors of a phenotype in the hierarchy.
 
@@ -73,11 +76,9 @@ class PhenotypeHierarchyService:
             # For simplicity, take the first parent (HPO can have multiple inheritance)
             parent_id = parents[0]
 
-            # Create parent phenotype using identifier
-            from src.domain.value_objects.identifiers import PhenotypeIdentifier
-
             parent_identifier = PhenotypeIdentifier(
-                hpo_id=parent_id, hpo_term=f"Parent of {phenotype.name}"
+                hpo_id=parent_id,
+                hpo_term=f"Parent of {phenotype.name}",
             )
             parent_phenotype = Phenotype(
                 identifier=parent_identifier,
@@ -117,8 +118,9 @@ class PhenotypeHierarchyService:
         return category
 
     def assess_phenotype_severity(
-        self, phenotypes: List[Phenotype]
-    ) -> Dict[str, float]:
+        self,
+        phenotypes: list[Phenotype],
+    ) -> dict[str, float]:
         """
         Assess the overall severity based on phenotype categories.
 
@@ -128,7 +130,7 @@ class PhenotypeHierarchyService:
         Returns:
             Dictionary with severity scores by category
         """
-        category_counts: Dict[str, int] = {}
+        category_counts: dict[str, int] = {}
 
         # Count phenotypes by category
         for phenotype in phenotypes:

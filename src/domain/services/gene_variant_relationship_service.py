@@ -47,7 +47,8 @@ class GeneVariantRelationshipService:
 
         # Basic validation
         is_valid = GeneVariantRelationshipService._is_basic_association_valid(
-            gene, variant
+            gene,
+            variant,
         )
 
         if not is_valid:
@@ -98,24 +99,20 @@ class GeneVariantRelationshipService:
         variant_chromosome = getattr(variant, "chromosome", None)
         variant_position = getattr(variant, "position", None)
 
-        if not variant_chromosome or variant_position is None:
-            return False
-
         # Must be on same chromosome
         if gene.chromosome != variant_chromosome:
             return False
 
-        # Variant position should be within gene boundaries (with some tolerance)
-        # We know these are not None due to the checks above
-        assert gene.start_position is not None
-        assert gene.end_position is not None
-
         gene_start = gene.start_position
         gene_end = gene.end_position
 
+        # Ensure type safety for comparisons
+        if not isinstance(variant_position, int):
+            return False
+
         # Allow variants within gene boundaries or in regulatory regions (extend by 5kb)
-        regulatory_padding = 5000
+        regulatory_padding = 5_000
         extended_start = gene_start - regulatory_padding
         extended_end = gene_end + regulatory_padding
 
-        return extended_start <= variant_position <= extended_end  # type: ignore
+        return extended_start <= variant_position <= extended_end

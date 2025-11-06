@@ -4,50 +4,48 @@ User management service for MED13 Resource Library.
 Handles user lifecycle operations including registration, profile management, and administration.
 """
 
-from typing import Optional
+import logging
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
-from datetime import datetime, timedelta, timezone
 
-from ...domain.entities.user import User, UserRole, UserStatus
-from ...domain.repositories.user_repository import UserRepository
-from ...infrastructure.security.password_hasher import PasswordHasher
-from ..dto.auth_requests import (
+from src.application.dto.auth_requests import (
+    AdminUpdateUserRequest,
+    CreateUserRequest,
     RegisterUserRequest,
     UpdateUserRequest,
-    CreateUserRequest,
-    AdminUpdateUserRequest,
 )
-from ..dto.auth_responses import UserPublic, UserListResponse, UserStatisticsResponse
+from src.application.dto.auth_responses import (
+    UserListResponse,
+    UserPublic,
+    UserStatisticsResponse,
+)
+from src.domain.entities.user import User, UserRole, UserStatus
+from src.domain.repositories.user_repository import UserRepository
+from src.infrastructure.security.password_hasher import PasswordHasher
+
+logger = logging.getLogger(__name__)
+
+MIN_LOCAL_VISIBLE = 2
 
 
 class UserManagementError(Exception):
     """Base exception for user management errors."""
 
-    pass
-
 
 class UserAlreadyExistsError(UserManagementError):
     """Raised when attempting to create user that already exists."""
-
-    pass
 
 
 class UserNotFoundError(UserManagementError):
     """Raised when user doesn't exist."""
 
-    pass
-
 
 class InvalidPasswordError(UserManagementError):
     """Raised when password is invalid."""
 
-    pass
-
 
 class EmailVerificationError(UserManagementError):
     """Raised when email verification fails."""
-
-    pass
 
 
 class UserManagementService:
@@ -58,7 +56,9 @@ class UserManagementService:
     """
 
     def __init__(
-        self, user_repository: UserRepository, password_hasher: PasswordHasher
+        self,
+        user_repository: UserRepository,
+        password_hasher: PasswordHasher,
     ):
         """
         Initialize user management service.
@@ -84,32 +84,35 @@ class UserManagementService:
             UserAlreadyExistsError: If email or username already exists
             ValueError: If password doesn't meet requirements
         """
-        print(f"DEBUG: Starting register_user for {request.email}")
+        logger.debug("Starting register_user for %s", request.email)
 
         # Check for existing users
-        print("DEBUG: Checking for existing email")
+        logger.debug("Checking for existing email")
         email_exists = await self.user_repository.exists_by_email(request.email)
-        print(f"DEBUG: Email exists: {email_exists}")
+        logger.debug("Email exists: %s", email_exists)
         if email_exists:
-            raise UserAlreadyExistsError("User with this email already exists")
+            msg = "User with this email already exists"
+            raise UserAlreadyExistsError(msg)
 
-        print("DEBUG: Checking for existing username")
+        logger.debug("Checking for existing username")
         username_exists = await self.user_repository.exists_by_username(
-            request.username
+            request.username,
         )
-        print(f"DEBUG: Username exists: {username_exists}")
+        logger.debug("Username exists: %s", username_exists)
         if username_exists:
-            raise UserAlreadyExistsError("User with this username already exists")
+            msg = "User with this username already exists"
+            raise UserAlreadyExistsError(msg)
 
         # Validate password strength
-        print("DEBUG: Validating password strength")
+        logger.debug("Validating password strength")
         password_strong = self.password_hasher.is_password_strong(request.password)
-        print(f"DEBUG: Password strong: {password_strong}")
+        logger.debug("Password strong: %s", password_strong)
         if not password_strong:
-            raise ValueError("Password does not meet security requirements")
+            msg = "Password does not meet security requirements"
+            raise ValueError(msg)
 
         # Create user
-        print("DEBUG: Creating user entity")
+        logger.debug("Creating user entity")
         user = User(
             email=request.email,
             username=request.username,
@@ -118,26 +121,23 @@ class UserManagementService:
             role=request.role,
             status=UserStatus.PENDING_VERIFICATION,
         )
-        print(f"DEBUG: User created: {user.id}")
+        logger.debug("User created: %s", user.id)
 
         # Generate email verification token
-        print("DEBUG: Generating email verification token")
+        logger.debug("Generating email verification token")
         user.generate_email_verification_token()
-        print(f"DEBUG: Token generated: {user.email_verification_token}")
+        logger.debug("Token generated for user: %s", user.id)
 
         # Save user
-        print("DEBUG: Saving user to database")
-        print(f"DEBUG: User repository: {self.user_repository}")
-        print(f"DEBUG: User to save: {user}")
+        logger.debug("Saving user to database")
+        logger.debug("User repository: %s", self.user_repository)
+        logger.debug("User to save: %s", user)
         created_user = await self.user_repository.create(user)
-        print(f"DEBUG: User saved: {created_user.id}")
-
-        # TODO: Send verification email
-        # await self.email_service.send_verification_email(created_user, user.email_verification_token)
+        logger.debug("User saved: %s", created_user.id)
 
         return created_user
 
-    async def create_user(self, request: CreateUserRequest, created_by: UUID) -> User:
+    async def create_user(self, request: CreateUserRequest, _created_by: UUID) -> User:
         """
         Create a user account (administrative operation).
 
@@ -153,10 +153,12 @@ class UserManagementService:
         """
         # Check for existing users
         if await self.user_repository.exists_by_email(request.email):
-            raise UserAlreadyExistsError("User with this email already exists")
+            msg = "User with this email already exists"
+            raise UserAlreadyExistsError(msg)
 
         if await self.user_repository.exists_by_username(request.username):
-            raise UserAlreadyExistsError("User with this username already exists")
+            msg = "User with this username already exists"
+            raise UserAlreadyExistsError(msg)
 
         # Create user (admin-created users are active by default)
         user = User(
@@ -175,7 +177,7 @@ class UserManagementService:
         self,
         user_id: UUID,
         request: UpdateUserRequest,
-        updated_by: Optional[UUID] = None,
+        updated_by: UUID | None = None,
     ) -> User:
         """
         Update user profile.
@@ -193,7 +195,8 @@ class UserManagementService:
         """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
-            raise UserNotFoundError("User not found")
+            msg = "User not found"
+            raise UserNotFoundError(msg)
 
         # Apply updates
         if request.full_name is not None:
@@ -205,12 +208,14 @@ class UserManagementService:
             if admin_user and admin_user.role == UserRole.ADMIN:
                 user.role = request.role
 
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(UTC)
 
         return await self.user_repository.update(user)
 
     async def admin_update_user(
-        self, user_id: UUID, request: AdminUpdateUserRequest
+        self,
+        user_id: UUID,
+        request: AdminUpdateUserRequest,
     ) -> User:
         """
         Update user as administrator.
@@ -227,7 +232,8 @@ class UserManagementService:
         """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
-            raise UserNotFoundError("User not found")
+            msg = "User not found"
+            raise UserNotFoundError(msg)
 
         # Apply admin updates
         if request.full_name is not None:
@@ -241,14 +247,18 @@ class UserManagementService:
             try:
                 user.status = UserStatus(request.status.lower())
             except ValueError:
-                raise ValueError(f"Invalid status: {request.status}")
+                msg = f"Invalid status: {request.status}"
+                raise ValueError(msg) from None
 
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(UTC)
 
         return await self.user_repository.update(user)
 
     async def change_password(
-        self, user_id: UUID, old_password: str, new_password: str
+        self,
+        user_id: UUID,
+        old_password: str,
+        new_password: str,
     ) -> None:
         """
         Change user's password.
@@ -265,24 +275,26 @@ class UserManagementService:
         """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
-            raise UserNotFoundError("User not found")
+            msg = "User not found"
+            raise UserNotFoundError(msg)
 
         # Verify old password
         if not self.password_hasher.verify_password(old_password, user.hashed_password):
-            raise InvalidPasswordError("Current password is incorrect")
+            msg = "Current password is incorrect"
+            raise InvalidPasswordError(msg)
 
         # Validate new password
         if not self.password_hasher.is_password_strong(new_password):
-            raise ValueError("New password does not meet security requirements")
+            msg = "New password does not meet security requirements"
+            raise ValueError(msg)
 
         # Update password
         user.hashed_password = self.password_hasher.hash_password(new_password)
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(UTC)
 
         await self.user_repository.update(user)
 
         # TODO: Send password changed notification
-        # await self.email_service.send_password_changed_notification(user)
 
     async def request_password_reset(self, email: str) -> str:
         """
@@ -307,7 +319,6 @@ class UserManagementService:
         await self.user_repository.update(user)
 
         # TODO: Send password reset email
-        # await self.email_service.send_password_reset_email(user, user.password_reset_token)
 
         return self._mask_email(email)
 
@@ -335,22 +346,24 @@ class UserManagementService:
             if (
                 u.password_reset_token == token
                 and u.password_reset_expires
-                and u.password_reset_expires > datetime.now(timezone.utc)
+                and u.password_reset_expires > datetime.now(UTC)
             ):
                 user = u
                 break
 
         if not user:
-            raise ValueError("Invalid or expired reset token")
+            msg = "Invalid or expired reset token"
+            raise ValueError(msg)
 
         # Validate password
         if not self.password_hasher.is_password_strong(new_password):
-            raise ValueError("Password does not meet security requirements")
+            msg = "Password does not meet security requirements"
+            raise ValueError(msg)
 
         # Update password and clear reset token
         user.hashed_password = self.password_hasher.hash_password(new_password)
         user.clear_password_reset_token()
-        user.updated_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(UTC)
 
         await self.user_repository.update(user)
 
@@ -358,7 +371,6 @@ class UserManagementService:
         # TODO: await self.session_repository.revoke_all_user_sessions(user.id)
 
         # TODO: Send confirmation email
-        # await self.email_service.send_password_reset_confirmation(user)
 
     async def verify_email(self, token: str) -> None:
         """
@@ -381,14 +393,14 @@ class UserManagementService:
                 break
 
         if not user:
-            raise EmailVerificationError("Invalid verification token")
+            msg = "Invalid verification token"
+            raise EmailVerificationError(msg)
 
         # Verify email
         user.mark_email_verified()
         await self.user_repository.update(user)
 
         # TODO: Send welcome email
-        # await self.email_service.send_welcome_email(user)
 
     async def delete_user(self, user_id: UUID) -> None:
         """
@@ -402,19 +414,17 @@ class UserManagementService:
         """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
-            raise UserNotFoundError("User not found")
+            msg = "User not found"
+            raise UserNotFoundError(msg)
 
         # TODO: Soft delete instead of hard delete for compliance
-        # user.status = UserStatus.DELETED
-        # await self.user_repository.update(user)
 
         # For now, hard delete
         await self.user_repository.delete(user_id)
 
         # TODO: Clean up related data (sessions, audit logs)
-        # await self.session_repository.revoke_all_user_sessions(user_id)
 
-    async def get_user(self, user_id: UUID) -> Optional[User]:
+    async def get_user(self, user_id: UUID) -> User | None:
         """
         Get user by ID.
 
@@ -430,8 +440,8 @@ class UserManagementService:
         self,
         skip: int = 0,
         limit: int = 100,
-        role: Optional[UserRole] = None,
-        status: Optional[UserStatus] = None,
+        role: UserRole | None = None,
+        status: UserStatus | None = None,
     ) -> UserListResponse:
         """
         List users with filtering and pagination.
@@ -446,11 +456,15 @@ class UserManagementService:
             Paginated user list response
         """
         users = await self.user_repository.list_users(
-            skip=skip, limit=limit, role=role.value if role else None, status=status
+            skip=skip,
+            limit=limit,
+            role=role.value if role else None,
+            status=status,
         )
 
         total = await self.user_repository.count_users(
-            role=role.value if role else None, status=status
+            role=role.value if role else None,
+            status=status,
         )
 
         return UserListResponse(
@@ -469,16 +483,16 @@ class UserManagementService:
         """
         # Count by status
         active_count = await self.user_repository.count_users_by_status(
-            UserStatus.ACTIVE
+            UserStatus.ACTIVE,
         )
         inactive_count = await self.user_repository.count_users_by_status(
-            UserStatus.INACTIVE
+            UserStatus.INACTIVE,
         )
         suspended_count = await self.user_repository.count_users_by_status(
-            UserStatus.SUSPENDED
+            UserStatus.SUSPENDED,
         )
         pending_count = await self.user_repository.count_users_by_status(
-            UserStatus.PENDING_VERIFICATION
+            UserStatus.PENDING_VERIFICATION,
         )
 
         total_users = active_count + inactive_count + suspended_count + pending_count
@@ -505,7 +519,9 @@ class UserManagementService:
         )
 
     async def lock_user_account(
-        self, user_id: UUID, reason: str = "Administrative action"
+        self,
+        user_id: UUID,
+        _reason: str = "Administrative action",
     ) -> None:
         """
         Lock a user account.
@@ -516,7 +532,7 @@ class UserManagementService:
         """
         await self.user_repository.lock_account(
             user_id,
-            datetime.utcnow() + timedelta(days=30),  # 30 day lock
+            datetime.now(UTC) + timedelta(days=30),  # 30 day lock
         )
 
         # TODO: Log security event
@@ -546,11 +562,15 @@ class UserManagementService:
         """
         try:
             local, domain = email.split("@", 1)
-            if len(local) > 2:
-                masked_local = local[0] + "*" * (len(local) - 2) + local[-1]
-            else:
-                masked_local = local[0] + "*" * (len(local) - 1)
-
-            return f"{masked_local}@{domain}"
-        except Exception:
+        except ValueError:
             return "***@***.***"
+
+        if not local or not domain:
+            return "***@***.***"
+
+        if len(local) > MIN_LOCAL_VISIBLE:
+            masked_local = local[0] + "*" * (len(local) - MIN_LOCAL_VISIBLE) + local[-1]
+        else:
+            masked_local = local[0] + "*" * (len(local) - 1)
+
+        return f"{masked_local}@{domain}"

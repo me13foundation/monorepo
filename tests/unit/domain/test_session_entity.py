@@ -4,19 +4,20 @@ Unit tests for Session domain entity.
 Tests session entity behavior, validation, and lifecycle management.
 """
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from src.domain.entities.session import UserSession, SessionStatus
+import pytest
+
+from src.domain.entities.session import SessionStatus, UserSession
 
 
 class TestUserSessionEntity:
     def test_session_creation_valid(self):
         """Test successful session creation with valid data."""
         user_id = uuid4()
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
-        refresh_expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        expires_at = datetime.now(UTC) + timedelta(minutes=15)
+        refresh_expires_at = datetime.now(UTC) + timedelta(days=7)
 
         session = UserSession(
             user_id=user_id,
@@ -41,12 +42,13 @@ class TestUserSessionEntity:
     def test_session_creation_invalid_timing(self):
         """Test session creation fails with invalid timing."""
         user_id = uuid4()
-        past_time = datetime.now(timezone.utc) - timedelta(hours=1)
-        future_time = datetime.now(timezone.utc) + timedelta(days=1)
+        past_time = datetime.now(UTC) - timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(days=1)
 
         # Refresh token expires before access token
         with pytest.raises(
-            ValueError, match="Refresh token must expire after access token"
+            ValueError,
+            match="Refresh token must expire after access token",
         ):
             UserSession(
                 user_id=user_id,
@@ -68,7 +70,7 @@ class TestUserSessionEntity:
 
     def test_session_status_methods(self):
         """Test session status checking methods."""
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
 
         # Active session
         active_session = UserSession(
@@ -89,8 +91,8 @@ class TestUserSessionEntity:
             user_id=uuid4(),
             session_token="token",
             refresh_token="refresh",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         original_activity = session.last_activity
@@ -110,8 +112,8 @@ class TestUserSessionEntity:
             user_id=uuid4(),
             session_token="token",
             refresh_token="refresh",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         assert session.status == SessionStatus.ACTIVE
@@ -128,9 +130,8 @@ class TestUserSessionEntity:
             user_id=uuid4(),
             session_token="token",
             refresh_token="refresh",
-            expires_at=datetime.now(timezone.utc)
-            + timedelta(minutes=5),  # Short expiry
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(minutes=5),  # Short expiry
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         original_expires = session.expires_at
@@ -151,8 +152,8 @@ class TestUserSessionEntity:
             user_id=uuid4(),
             session_token="token",
             refresh_token="refresh",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         ip_address = "192.168.1.100"
@@ -178,16 +179,20 @@ class TestUserSessionEntity:
             user_id=uuid4(),
             session_token="token",
             refresh_token="refresh",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         fingerprint1 = session.generate_device_fingerprint(
-            "192.168.1.1", "Mozilla/5.0", {"screen": "1920x1080"}
+            "192.168.1.1",
+            "Mozilla/5.0",
+            {"screen": "1920x1080"},
         )
 
         fingerprint2 = session.generate_device_fingerprint(
-            "192.168.1.1", "Mozilla/5.0", {"screen": "2560x1440"}
+            "192.168.1.1",
+            "Mozilla/5.0",
+            {"screen": "2560x1440"},
         )
 
         assert fingerprint1 != fingerprint2
@@ -200,13 +205,14 @@ class TestUserSessionEntity:
             refresh_token="refresh",
             ip_address="192.168.1.100",
             user_agent="Mozilla/5.0 (Windows)",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         # Same IP and user agent - not suspicious
         assert not session.is_suspicious_activity(
-            "192.168.1.100", "Mozilla/5.0 (Windows)"
+            "192.168.1.100",
+            "Mozilla/5.0 (Windows)",
         )
 
         # Different IP - suspicious
@@ -225,8 +231,8 @@ class TestUserSessionEntity:
             session_token="token",
             refresh_token="refresh",
             # No IP or user agent set
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         # No baseline data - cannot determine suspicious activity
@@ -234,7 +240,7 @@ class TestUserSessionEntity:
 
     def test_time_calculations(self):
         """Test time-based calculations."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         session = UserSession(
             user_id=uuid4(),
             session_token="token",
@@ -246,7 +252,7 @@ class TestUserSessionEntity:
         # Time until expiry
         time_until_expiry = session.time_until_expiry()
         assert time_until_expiry > timedelta(
-            minutes=29
+            minutes=29,
         )  # Should be close to 30 minutes
         assert time_until_expiry < timedelta(minutes=31)
 
@@ -264,7 +270,7 @@ class TestUserSessionEntity:
         """Test string representations for logging/debugging."""
         session_id = uuid4()
         user_id = uuid4()
-        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
+        future_time = datetime.now(UTC) + timedelta(hours=1)
         session = UserSession(
             id=session_id,
             user_id=user_id,
@@ -287,8 +293,8 @@ class TestUserSessionEntity:
     def test_session_with_minimal_data(self):
         """Test session creation with minimal required data."""
         user_id = uuid4()
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
-        refresh_expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        expires_at = datetime.now(UTC) + timedelta(minutes=15)
+        refresh_expires_at = datetime.now(UTC) + timedelta(days=7)
 
         session = UserSession(
             user_id=user_id,
@@ -310,8 +316,8 @@ class TestUserSessionEntity:
             user_id=uuid4(),
             session_token="token",
             refresh_token="refresh",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-            refresh_expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=1),
         )
 
         # Start as active

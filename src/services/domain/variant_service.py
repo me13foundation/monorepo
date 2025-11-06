@@ -3,7 +3,6 @@ Variant service for MED13 Resource Library.
 Business logic for genetic variant operations.
 """
 
-from typing import Dict, List, Optional, TYPE_CHECKING
 from sqlalchemy.orm import Session
 
 from src.domain.entities.evidence import Evidence
@@ -13,9 +12,6 @@ from src.infrastructure.repositories import (
     SqlAlchemyVariantRepository,
 )
 from src.services.domain.base_service import BaseService
-
-if TYPE_CHECKING:
-    pass
 
 VariantStatisticsValue = int | float | bool | str | None
 
@@ -30,8 +26,8 @@ class VariantService(BaseService[SqlAlchemyVariantRepository]):
 
     def __init__(
         self,
-        session: Optional[Session] = None,
-        variant_repository: Optional[SqlAlchemyVariantRepository] = None,
+        session: Session | None = None,
+        variant_repository: SqlAlchemyVariantRepository | None = None,
     ):
         super().__init__(session)
         self.variant_repo = (
@@ -45,7 +41,7 @@ class VariantService(BaseService[SqlAlchemyVariantRepository]):
     def repository(self) -> SqlAlchemyVariantRepository:
         return self.variant_repo
 
-    def get_pathogenic_variants(self, limit: Optional[int] = None) -> List[Variant]:
+    def get_pathogenic_variants(self, limit: int | None = None) -> list[Variant]:
         """
         Get variants classified as pathogenic or likely pathogenic.
 
@@ -57,7 +53,7 @@ class VariantService(BaseService[SqlAlchemyVariantRepository]):
         """
         return self.variant_repo.find_pathogenic_variants(limit)
 
-    def get_variant_with_evidence(self, variant_id: int) -> Optional[Variant]:
+    def get_variant_with_evidence(self, variant_id: int) -> Variant | None:
         """
         Get a variant with its associated evidence loaded.
 
@@ -78,15 +74,16 @@ class VariantService(BaseService[SqlAlchemyVariantRepository]):
         variant.evidence_count = len(variant.evidence)
         return variant
 
-    def get_variant_statistics(self) -> Dict[str, VariantStatisticsValue]:
+    def get_variant_statistics(self) -> dict[str, VariantStatisticsValue]:
         """
         Get comprehensive statistics about variants.
 
         Returns:
             Dictionary with variant statistics
         """
-        raw_stats: Dict[
-            str, VariantStatisticsValue
+        raw_stats: dict[
+            str,
+            VariantStatisticsValue,
         ] = self.variant_repo.get_variant_statistics()
         return dict(raw_stats)
 

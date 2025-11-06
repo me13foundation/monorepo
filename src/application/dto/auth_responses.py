@@ -2,10 +2,11 @@
 Response Data Transfer Objects for authentication operations.
 """
 
-from pydantic import BaseModel, ConfigDict
-from typing import Optional
 from datetime import datetime
-from ...domain.entities.user import User, UserRole, UserStatus
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from src.domain.entities.user import User, UserRole, UserStatus
 
 
 class UserPublic(BaseModel):
@@ -18,7 +19,7 @@ class UserPublic(BaseModel):
     role: UserRole
     status: UserStatus
     email_verified: bool
-    last_login: Optional[datetime]
+    last_login: datetime | None
     created_at: datetime
 
     @classmethod
@@ -42,7 +43,7 @@ class LoginResponse(BaseModel):
 
     access_token: str
     refresh_token: str
-    token_type: str = "bearer"
+    token_type: str = Field(default_factory=lambda: "bearer")
     expires_in: int  # seconds
     user: UserPublic
 
@@ -64,8 +65,8 @@ class LoginResponse(BaseModel):
                     "last_login": "2025-01-04T10:30:00Z",
                     "created_at": "2024-12-01T08:00:00Z",
                 },
-            }
-        }
+            },
+        },
     )
 
 
@@ -74,7 +75,7 @@ class TokenRefreshResponse(BaseModel):
 
     access_token: str
     refresh_token: str
-    token_type: str = "bearer"
+    token_type: str = Field(default_factory=lambda: "bearer")
     expires_in: int
 
     model_config = ConfigDict(
@@ -84,8 +85,8 @@ class TokenRefreshResponse(BaseModel):
                 "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
                 "token_type": "bearer",
                 "expires_in": 900,
-            }
-        }
+            },
+        },
     )
 
 
@@ -107,9 +108,9 @@ class UserProfileResponse(BaseModel):
                     "email_verified": True,
                     "last_login": "2025-01-04T10:30:00Z",
                     "created_at": "2024-12-01T08:00:00Z",
-                }
-            }
-        }
+                },
+            },
+        },
     )
 
 
@@ -135,13 +136,13 @@ class UserListResponse(BaseModel):
                         "email_verified": True,
                         "last_login": "2025-01-04T10:30:00Z",
                         "created_at": "2024-12-01T08:00:00Z",
-                    }
+                    },
                 ],
                 "total": 1,
                 "skip": 0,
                 "limit": 10,
-            }
-        }
+            },
+        },
     )
 
 
@@ -168,8 +169,8 @@ class UserStatisticsResponse(BaseModel):
                 "by_role": {"admin": 5, "curator": 15, "researcher": 80, "viewer": 50},
                 "recent_registrations": 12,
                 "recent_logins": 45,
-            }
-        }
+            },
+        },
     )
 
 
@@ -184,8 +185,8 @@ class PasswordResetResponse(BaseModel):
             "example": {
                 "message": "Password reset email sent",
                 "email": "user@example.com",
-            }
-        }
+            },
+        },
     )
 
 
@@ -195,7 +196,7 @@ class GenericSuccessResponse(BaseModel):
     message: str
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"message": "Operation completed successfully"}}
+        json_schema_extra={"example": {"message": "Operation completed successfully"}},
     )
 
 
@@ -203,8 +204,8 @@ class ErrorResponse(BaseModel):
     """Standard error response."""
 
     error: str
-    detail: Optional[str] = None
-    code: Optional[str] = None
+    detail: str | None = None
+    code: str | None = None
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -212,8 +213,8 @@ class ErrorResponse(BaseModel):
                 "error": "Authentication failed",
                 "detail": "Invalid email or password",
                 "code": "AUTH_INVALID_CREDENTIALS",
-            }
-        }
+            },
+        },
     )
 
 
@@ -231,6 +232,6 @@ class ValidationErrorResponse(BaseModel):
                     "email": ["Invalid email format"],
                     "password": ["Password too short", "Missing number"],
                 },
-            }
-        }
+            },
+        },
     )

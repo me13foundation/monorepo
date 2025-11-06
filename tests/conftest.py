@@ -6,14 +6,14 @@ across unit, integration, and end-to-end tests.
 """
 
 import os
+from collections.abc import Generator
+
 import pytest
-from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.models.database.base import Base
-
 
 # Test database configuration
 TEST_DATABASE_URL = "sqlite:///./test_med13.db"
@@ -112,7 +112,8 @@ def sample_phenotype_data():
 def sample_provenance():
     """Provide sample provenance data for testing."""
     from datetime import UTC, datetime
-    from src.models.value_objects.provenance import Provenance, DataSource
+
+    from src.models.value_objects.provenance import DataSource, Provenance
 
     return Provenance(
         source=DataSource.CLINVAR,
@@ -148,7 +149,8 @@ def mock_api_response():
 def pytest_configure(config):
     """Configure pytest with custom markers."""
     config.addinivalue_line(
-        "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"
+        "markers",
+        "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     )
     config.addinivalue_line("markers", "integration: marks tests as integration tests")
     config.addinivalue_line("markers", "e2e: marks tests as end-to-end tests")

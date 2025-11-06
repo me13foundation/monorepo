@@ -7,13 +7,13 @@ and minting DOIs.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, cast
 
 import httpx
 
-from ....type_definitions.external_apis import (
-    ZenodoMetadata,
+from src.type_definitions.external_apis import (
     ZenodoDepositResponse,
+    ZenodoMetadata,
     ZenodoPublishResponse,
 )
 
@@ -30,6 +30,7 @@ class ZenodoClient:
     def __init__(
         self,
         access_token: str,
+        *,
         sandbox: bool = True,
         timeout: int = 30,
     ):
@@ -54,7 +55,7 @@ class ZenodoClient:
     async def create_deposit(
         self,
         metadata: ZenodoMetadata,
-        files: Optional[List[Path]] = None,
+        files: list[Path] | None = None,
     ) -> ZenodoDepositResponse:
         """
         Create a new deposit on Zenodo.
@@ -70,10 +71,12 @@ class ZenodoClient:
             # Create deposit
             create_url = f"{self.base_url}/deposit/depositions"
             response = await client.post(
-                create_url, headers=self.headers, json=metadata
+                create_url,
+                headers=self.headers,
+                json=metadata,
             )
             response.raise_for_status()
-            deposit = cast(Dict[str, Any], response.json())
+            deposit = cast("dict[str, Any]", response.json())
 
             bucket_url = deposit["links"]["bucket"]
 
@@ -81,13 +84,13 @@ class ZenodoClient:
             if files:
                 await self._upload_files(client, bucket_url, files)
 
-            return cast(ZenodoDepositResponse, deposit)
+            return cast("ZenodoDepositResponse", deposit)
 
     async def _upload_files(
         self,
         client: httpx.AsyncClient,
         bucket_url: str,
-        files: List[Path],
+        files: list[Path],
     ) -> None:
         """
         Upload files to Zenodo deposit bucket.
@@ -97,15 +100,15 @@ class ZenodoClient:
             bucket_url: Zenodo bucket URL
             files: List of file paths to upload
         """
-        for file_path in files:
-            file_path = Path(file_path)
+        for path_item in files:
+            file_path = Path(path_item)
             if not file_path.exists():
-                logger.warning(f"File not found: {file_path}")
+                logger.warning("File not found: %s", file_path)
                 continue
 
             upload_url = f"{bucket_url}/{file_path.name}"
 
-            with open(file_path, "rb") as f:
+            with file_path.open("rb") as f:
                 upload_headers = {"Authorization": f"Bearer {self.access_token}"}
                 response = await client.put(
                     upload_url,
@@ -130,9 +133,9 @@ class ZenodoClient:
             )
             response = await client.post(publish_url, headers=self.headers)
             response.raise_for_status()
-            return cast(ZenodoPublishResponse, response.json())
+            return cast("ZenodoPublishResponse", response.json())
 
-    async def get_deposit(self, deposit_id: int) -> Dict[str, Any]:
+    async def get_deposit(self, deposit_id: int) -> dict[str, Any]:
         """
         Get deposit information.
 
@@ -146,11 +149,13 @@ class ZenodoClient:
             url = f"{self.base_url}/deposit/depositions/{deposit_id}"
             response = await client.get(url, headers=self.headers)
             response.raise_for_status()
-            return cast(Dict[str, Any], response.json())
+            return cast("dict[str, Any]", response.json())
 
     async def update_deposit(
-        self, deposit_id: int, metadata: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self,
+        deposit_id: int,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Update deposit metadata.
 
@@ -165,9 +170,9 @@ class ZenodoClient:
             url = f"{self.base_url}/deposit/depositions/{deposit_id}"
             response = await client.put(url, headers=self.headers, json=metadata)
             response.raise_for_status()
-            return cast(Dict[str, Any], response.json())
+            return cast("dict[str, Any]", response.json())
 
-    def extract_doi(self, deposit: Dict[str, Any]) -> Optional[str]:
+    def extract_doi(self, deposit: dict[str, Any]) -> str | None:
         """
         Extract DOI from deposit response.
 

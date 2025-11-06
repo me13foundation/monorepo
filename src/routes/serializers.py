@@ -4,17 +4,21 @@ Helper functions for serializing domain entities into API-facing dictionaries.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any, Dict, Iterable, Mapping, Optional
+from typing import TYPE_CHECKING, Any
 
-from src.domain.entities.evidence import Evidence
-from src.domain.entities.gene import Gene
-from src.domain.entities.phenotype import Phenotype
-from src.domain.entities.publication import Publication
-from src.domain.entities.variant import EvidenceSummary, Variant, VariantSummary
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+    from datetime import datetime
+
+if TYPE_CHECKING:
+    from src.domain.entities.evidence import Evidence
+    from src.domain.entities.gene import Gene
+    from src.domain.entities.phenotype import Phenotype
+    from src.domain.entities.publication import Publication
+    from src.domain.entities.variant import EvidenceSummary, Variant, VariantSummary
 
 
-def serialize_variant_summary(summary: VariantSummary) -> Dict[str, Any]:
+def serialize_variant_summary(summary: VariantSummary) -> dict[str, Any]:
     """Convert a VariantSummary into a plain dictionary suitable for JSON."""
     return {
         "variant_id": summary.variant_id,
@@ -25,9 +29,9 @@ def serialize_variant_summary(summary: VariantSummary) -> Dict[str, Any]:
     }
 
 
-def serialize_variant(variant: Variant) -> Dict[str, Any]:
+def serialize_variant(variant: Variant) -> dict[str, Any]:
     """Serialize a Variant aggregate."""
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "id": variant.id,
         "variant_id": variant.variant_id,
         "clinvar_id": variant.clinvar_id,
@@ -67,11 +71,11 @@ def serialize_gene(
     gene: Gene,
     *,
     include_variants: bool = False,
-    variants: Optional[Iterable[VariantSummary]] = None,
+    variants: Iterable[VariantSummary] | None = None,
     include_phenotypes: bool = False,
-    phenotypes: Optional[Iterable[Mapping[str, Any]]] = None,
-) -> Dict[str, Any]:
-    payload: Dict[str, Any] = {
+    phenotypes: Iterable[Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
         "id": gene.id,
         "gene_id": gene.gene_id,
         "symbol": gene.symbol,
@@ -90,10 +94,7 @@ def serialize_gene(
 
     variant_summaries: Iterable[VariantSummary]
     if include_variants:
-        if variants is not None:
-            variant_summaries = variants
-        else:
-            variant_summaries = gene.variants
+        variant_summaries = variants if variants is not None else gene.variants
         serialized_variants = [
             serialize_variant_summary(summary) for summary in variant_summaries
         ]
@@ -111,7 +112,7 @@ def serialize_gene(
     return payload
 
 
-def serialize_phenotype(phenotype: Phenotype) -> Dict[str, Any]:
+def serialize_phenotype(phenotype: Phenotype) -> dict[str, Any]:
     return {
         "id": phenotype.id,
         "hpo_id": phenotype.identifier.hpo_id,
@@ -129,7 +130,7 @@ def serialize_phenotype(phenotype: Phenotype) -> Dict[str, Any]:
     }
 
 
-def serialize_publication(publication: Publication) -> Dict[str, Any]:
+def serialize_publication(publication: Publication) -> dict[str, Any]:
     return {
         "id": publication.id,
         "pubmed_id": publication.identifier.pubmed_id,
@@ -162,7 +163,7 @@ def serialize_publication(publication: Publication) -> Dict[str, Any]:
     }
 
 
-def serialize_evidence_brief(evidence: EvidenceSummary) -> Dict[str, Any]:
+def serialize_evidence_brief(evidence: EvidenceSummary) -> dict[str, Any]:
     return {
         "id": evidence.evidence_id,
         "evidence_level": evidence.evidence_level,
@@ -172,7 +173,7 @@ def serialize_evidence_brief(evidence: EvidenceSummary) -> Dict[str, Any]:
     }
 
 
-def serialize_evidence(evidence: Evidence) -> Dict[str, Any]:
+def serialize_evidence(evidence: Evidence) -> dict[str, Any]:
     return {
         "id": evidence.id,
         "variant_id": evidence.variant_id,
@@ -196,7 +197,7 @@ def serialize_evidence(evidence: Evidence) -> Dict[str, Any]:
     }
 
 
-def _serialize_datetime(value: Optional[datetime]) -> Optional[str]:
+def _serialize_datetime(value: datetime | None) -> str | None:
     return value.isoformat() if value else None
 
 
@@ -206,7 +207,7 @@ def build_dashboard_summary(
     pending_count: int,
     approved_count: int,
     rejected_count: int,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     total_items = sum(entity_counts.values())
     summary = {
         "pending_count": pending_count,
@@ -223,8 +224,8 @@ def build_activity_feed_item(
     *,
     category: str,
     timestamp: datetime,
-    icon: Optional[str] = None,
-) -> Dict[str, Any]:
+    icon: str | None = None,
+) -> dict[str, Any]:
     return {
         "message": message,
         "category": category,
@@ -234,13 +235,13 @@ def build_activity_feed_item(
 
 
 __all__ = [
-    "serialize_variant_summary",
-    "serialize_variant",
+    "build_activity_feed_item",
+    "build_dashboard_summary",
+    "serialize_evidence",
+    "serialize_evidence_brief",
     "serialize_gene",
     "serialize_phenotype",
     "serialize_publication",
-    "serialize_evidence",
-    "serialize_evidence_brief",
-    "build_dashboard_summary",
-    "build_activity_feed_item",
+    "serialize_variant",
+    "serialize_variant_summary",
 ]

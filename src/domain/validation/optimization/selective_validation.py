@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 
@@ -16,9 +16,9 @@ class SelectionStrategy(Enum):
 
 @dataclass
 class _ValidationProfile:
-    entity_types: List[str]
-    required_rules: List[str]
-    skip_conditions: List[Dict[str, str]]
+    entity_types: list[str]
+    required_rules: list[str]
+    skip_conditions: list[dict[str, str]]
 
 
 class SelectiveValidator:
@@ -29,13 +29,15 @@ class SelectiveValidator:
     ) -> None:
         self.rule_engine = rule_engine
         self.strategy = strategy
-        self._confidence: Dict[str, float] = {}
-        self._stats: Dict[str, int] = {"attempted": 0, "skipped": 0}
-        self._profiles: Dict[str, _ValidationProfile] = {}
-        self._active_profile: Optional[str] = None
+        self._confidence: dict[str, float] = {}
+        self._stats: dict[str, int] = {"attempted": 0, "skipped": 0}
+        self._profiles: dict[str, _ValidationProfile] = {}
+        self._active_profile: str | None = None
 
     def validate_selectively(
-        self, entity_type: str, payload: Dict[str, Any]
+        self,
+        entity_type: str,
+        payload: dict[str, Any],
     ) -> ValidationResult:
         self._stats["attempted"] += 1
 
@@ -46,12 +48,15 @@ class SelectiveValidator:
         return self.rule_engine.validate_entity(entity_type, payload)
 
     def update_confidence_score(
-        self, entity_type: str, payload: Dict[str, Any], score: float
+        self,
+        entity_type: str,
+        payload: dict[str, Any],
+        score: float,
     ) -> None:
         key = self._cache_key(entity_type, payload)
         self._confidence[key] = score
 
-    def get_selectivity_stats(self) -> Dict[str, float]:
+    def get_selectivity_stats(self) -> dict[str, float]:
         attempted = self._stats["attempted"]
         skipped = self._stats["skipped"]
         avg_selectivity = skipped / attempted if attempted else 0.0
@@ -64,27 +69,30 @@ class SelectiveValidator:
     def create_validation_profile(
         self,
         name: str,
-        entity_types: List[str],
-        required_rules: List[str],
-        skip_conditions: List[Dict[str, str]],
+        entity_types: list[str],
+        required_rules: list[str],
+        skip_conditions: list[dict[str, str]],
     ) -> None:
         self._profiles[name] = _ValidationProfile(
-            entity_types, required_rules, skip_conditions
+            entity_types,
+            required_rules,
+            skip_conditions,
         )
 
-    def set_active_profile(self, name: Optional[str]) -> None:
+    def set_active_profile(self, name: str | None) -> None:
         if name is None:
             self._active_profile = None
         elif name in self._profiles:
             self._active_profile = name
         else:
-            raise ValueError(f"Unknown validation profile: {name}")
+            message = f"Unknown validation profile: {name}"
+            raise ValueError(message)
 
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
 
-    def _should_skip(self, entity_type: str, payload: Dict[str, Any]) -> bool:
+    def _should_skip(self, entity_type: str, payload: dict[str, Any]) -> bool:
         profile = (
             self._profiles.get(self._active_profile) if self._active_profile else None
         )
@@ -96,16 +104,18 @@ class SelectiveValidator:
                 if field and operator == "equals" and payload.get(field) == expected:
                     return True
 
+        default_confidence_skip = 0.9
         if self.strategy is SelectionStrategy.CONFIDENCE_BASED:
             confidence = self._confidence.get(
-                self._cache_key(entity_type, payload), 0.0
+                self._cache_key(entity_type, payload),
+                0.0,
             )
-            return confidence >= 0.9
+            return confidence >= default_confidence_skip
 
         return False
 
     @staticmethod
-    def _cache_key(entity_type: str, payload: Dict[str, Any]) -> str:
+    def _cache_key(entity_type: str, payload: dict[str, Any]) -> str:
         key_fields = (entity_type, tuple(sorted(payload.items())))
         return str(key_fields)
 

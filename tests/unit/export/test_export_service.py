@@ -9,20 +9,25 @@ Follows type safety examples from type_examples.md:
 
 import gzip
 import json
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 from src.application.export.export_service import (
     BulkExportService,
-    ExportFormat,
     CompressionFormat,
+    ExportFormat,
+)
+from tests.test_types.fixtures import (
+    TEST_EVIDENCE_PATHOGENIC as TEST_EVIDENCE_CLINICAL_REPORT,
 )
 from tests.test_types.fixtures import (
     TEST_GENE_MED13,
     TEST_GENE_TP53,
     TEST_VARIANT_PATHOGENIC,
+)
+from tests.test_types.fixtures import (
     TEST_PHENOTYPE_AUTISM as TEST_PHENOTYPE_NEUROLOGICAL,
-    TEST_EVIDENCE_PATHOGENIC as TEST_EVIDENCE_CLINICAL_REPORT,
 )
 
 
@@ -82,7 +87,7 @@ class TestBulkExportService:
                 entity_type="genes",
                 export_format=ExportFormat.JSON,
                 compression=CompressionFormat.NONE,
-            )
+            ),
         )
 
         # Assert: Verify result structure and types
@@ -103,7 +108,8 @@ class TestBulkExportService:
             assert "gene_type" in gene_data
 
     def test_export_variants_csv_format(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test exporting variants in CSV format with type safety."""
         # Act: Export variants as CSV
@@ -112,7 +118,7 @@ class TestBulkExportService:
                 entity_type="variants",
                 export_format=ExportFormat.CSV,
                 compression=CompressionFormat.NONE,
-            )
+            ),
         )
 
         # Assert: Verify CSV structure
@@ -141,7 +147,8 @@ class TestBulkExportService:
             assert field in header
 
     def test_export_phenotypes_compressed_json(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test exporting phenotypes with gzip compression."""
         # Act: Export phenotypes as compressed JSON
@@ -150,7 +157,7 @@ class TestBulkExportService:
                 entity_type="phenotypes",
                 export_format=ExportFormat.JSON,
                 compression=CompressionFormat.GZIP,
-            )
+            ),
         )
 
         # Assert: Verify compression
@@ -164,7 +171,8 @@ class TestBulkExportService:
         assert isinstance(data["phenotypes"], list)
 
     def test_export_evidence_jsonl_format(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test exporting evidence in JSON Lines format."""
         # Act: Export evidence as JSONL
@@ -173,7 +181,7 @@ class TestBulkExportService:
                 entity_type="evidence",
                 export_format=ExportFormat.JSONL,
                 compression=CompressionFormat.NONE,
-            )
+            ),
         )
 
         # Assert: Verify JSONL structure
@@ -203,7 +211,7 @@ class TestBulkExportService:
                 export_format=ExportFormat.JSON,
                 compression=CompressionFormat.NONE,
                 filters={"limit": 1},  # Filters are passed but not currently used
-            )
+            ),
         )
 
         # Assert: Verify export still works (returns all data since filtering not implemented)
@@ -213,7 +221,8 @@ class TestBulkExportService:
         assert len(data["genes"]) == 2  # Returns all mock data
 
     def test_invalid_entity_type_raises_error(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test that invalid entity types raise appropriate errors."""
         # Act & Assert: Invalid entity type should raise ValueError
@@ -223,11 +232,12 @@ class TestBulkExportService:
                     entity_type="invalid_entity",
                     export_format=ExportFormat.JSON,
                     compression=CompressionFormat.NONE,
-                )
+                ),
             )
 
     def test_get_export_info_returns_typed_structure(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test get_export_info returns properly typed structure."""
         # Act: Get export info for genes
@@ -262,7 +272,8 @@ class TestBulkExportService:
         assert CompressionFormat.GZIP.value == "gzip"
 
     def test_csv_field_mappings_are_correct(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test that CSV field mappings include all expected fields."""
         # Test gene fields
@@ -311,7 +322,8 @@ class TestBulkExportService:
         assert variant_fields == expected_variant_fields
 
     def test_serialization_handles_complex_objects(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test that serialization handles complex nested objects correctly."""
         # Create a mock object with nested structure
@@ -333,7 +345,8 @@ class TestBulkExportService:
         assert serialized["tags"] == ["tag1", "tag2"]
 
     def test_csv_row_conversion_handles_missing_fields(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test CSV row conversion handles missing fields gracefully."""
         # Create object missing some fields
@@ -341,7 +354,8 @@ class TestBulkExportService:
 
         # Act: Convert to CSV row
         row = export_service._item_to_csv_row(
-            incomplete_obj, ["id", "name", "missing_field"]
+            incomplete_obj,
+            ["id", "name", "missing_field"],
         )
 
         # Assert: Missing fields become empty strings
@@ -350,7 +364,8 @@ class TestBulkExportService:
         assert row["missing_field"] == ""
 
     def test_csv_row_conversion_handles_complex_types(
-        self, export_service: BulkExportService
+        self,
+        export_service: BulkExportService,
     ) -> None:
         """Test CSV row conversion properly handles lists and None values."""
         # Create object with complex types
@@ -363,7 +378,8 @@ class TestBulkExportService:
 
         # Act: Convert to CSV row
         row = export_service._item_to_csv_row(
-            complex_obj, ["id", "tags", "optional_field", "number"]
+            complex_obj,
+            ["id", "tags", "optional_field", "number"],
         )
 
         # Assert: Complex types are converted appropriately

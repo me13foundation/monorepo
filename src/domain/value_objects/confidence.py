@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class EvidenceLevel(str, Enum):
@@ -20,21 +20,25 @@ class EvidenceLevel(str, Enum):
 class Confidence:
     score: float
     level: EvidenceLevel
-    sample_size: Optional[int] = None
-    p_value: Optional[float] = None
-    study_count: Optional[int] = None
+    sample_size: int | None = None
+    p_value: float | None = None
+    study_count: int | None = None
     peer_reviewed: bool = False
     replicated: bool = False
 
     def __post_init__(self) -> None:
         if not (0.0 <= self.score <= 1.0):
-            raise ValueError("score must be between 0.0 and 1.0")
+            message = "score must be between 0.0 and 1.0"
+            raise ValueError(message)
         if self.sample_size is not None and self.sample_size < 1:
-            raise ValueError("sample_size must be positive")
+            message = "sample_size must be positive"
+            raise ValueError(message)
         if self.p_value is not None and not (0.0 <= self.p_value <= 1.0):
-            raise ValueError("p_value must be between 0.0 and 1.0")
+            message = "p_value must be between 0.0 and 1.0"
+            raise ValueError(message)
         if self.study_count is not None and self.study_count < 0:
-            raise ValueError("study_count cannot be negative")
+            message = "study_count cannot be negative"
+            raise ValueError(message)
 
     @classmethod
     def from_score(cls, score: float, **kwargs: Any) -> Confidence:
@@ -43,15 +47,20 @@ class Confidence:
 
     @staticmethod
     def _infer_level(score: float) -> EvidenceLevel:
-        if score >= 0.9:
+        definitive_threshold = 0.9
+        strong_threshold = 0.8
+        moderate_threshold = 0.6
+        supporting_threshold = 0.4
+        weak_threshold = 0.2
+        if score >= definitive_threshold:
             return EvidenceLevel.DEFINITIVE
-        if score >= 0.8:
+        if score >= strong_threshold:
             return EvidenceLevel.STRONG
-        if score >= 0.6:
+        if score >= moderate_threshold:
             return EvidenceLevel.MODERATE
-        if score >= 0.4:
+        if score >= supporting_threshold:
             return EvidenceLevel.SUPPORTING
-        if score >= 0.2:
+        if score >= weak_threshold:
             return EvidenceLevel.WEAK
         return EvidenceLevel.DISPROVEN
 
@@ -59,22 +68,27 @@ class Confidence:
         return replace(self, level=level)
 
     def is_significant(self) -> bool:
-        return self.score >= 0.6 and self.level in {
+        significant_threshold = 0.6
+        return self.score >= significant_threshold and self.level in {
             EvidenceLevel.DEFINITIVE,
             EvidenceLevel.STRONG,
             EvidenceLevel.MODERATE,
         }
 
     def requires_validation(self) -> bool:
-        return self.score < 0.7 or not self.peer_reviewed
+        min_confidence = 0.7
+        return self.score < min_confidence or not self.peer_reviewed
 
     @property
     def quality_description(self) -> str:
-        if self.score >= 0.8:
+        strong_threshold = 0.8
+        moderate_threshold = 0.6
+        supporting_threshold = 0.4
+        if self.score >= strong_threshold:
             return f"Strong evidence ({self.score:.2f})"
-        if self.score >= 0.6:
+        if self.score >= moderate_threshold:
             return f"Moderate evidence ({self.score:.2f})"
-        if self.score >= 0.4:
+        if self.score >= supporting_threshold:
             return f"Supporting evidence ({self.score:.2f})"
         return f"Weak evidence ({self.score:.2f})"
 

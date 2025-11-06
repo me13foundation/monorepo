@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+
 import pytest
 
 from src.domain.entities.gene import Gene, GeneType

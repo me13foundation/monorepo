@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from statistics import mean
-from typing import Dict, List, Optional, Sequence
 
 from ..rules.base_rules import ValidationResult, ValidationSeverity
 
@@ -20,9 +20,9 @@ class GateStatus(Enum):
 class GateResult:
     status: GateStatus
     quality_score: float
-    issue_counts: Dict[str, int]
+    issue_counts: dict[str, int]
     evaluation_time: float
-    actions: List[str] = field(default_factory=list)
+    actions: list[str] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
@@ -32,7 +32,7 @@ class GateResult:
 class QualityGate:
     """Evaluate a batch of validation results using a simple policy."""
 
-    def __init__(self, name: str, actions: Optional[List[str]] = None) -> None:
+    def __init__(self, name: str, actions: list[str] | None = None) -> None:
         self.name = name
         self.actions = actions or []
 
@@ -98,7 +98,7 @@ __all__ = [
     "GateResult",
     "GateStatus",
     "QualityGate",
-    "create_parsing_gate",
     "create_normalization_gate",
+    "create_parsing_gate",
     "create_relationship_gate",
 ]

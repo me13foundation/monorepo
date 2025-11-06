@@ -6,7 +6,6 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Dict, List, Optional
 
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 
@@ -23,8 +22,8 @@ class TestCase:
     description: str
     test_type: TestType
     entity_type: str
-    input_data: Dict[str, object]
-    expected_result: Dict[str, object]
+    input_data: dict[str, object]
+    expected_result: dict[str, object]
 
 
 @dataclass
@@ -32,7 +31,7 @@ class TestResult:
     test_case: TestCase
     status: str
     execution_time: float
-    actual_result: Optional[ValidationResult]
+    actual_result: ValidationResult | None
     timestamp: datetime
 
 
@@ -41,42 +40,43 @@ class TestSuite:
     suite_id: str
     name: str
     description: str
-    test_cases: List[TestCase]
+    test_cases: list[TestCase]
 
 
 @dataclass
 class SuiteResult:
     suite: TestSuite
-    test_results: List[TestResult]
+    test_results: list[TestResult]
     execution_time: float
 
 
 class ValidationTestFramework:
-    def __init__(self, rule_engine: Optional[ValidationRuleEngine] = None) -> None:
+    def __init__(self, rule_engine: ValidationRuleEngine | None = None) -> None:
         self.rule_engine = rule_engine or ValidationRuleEngine()
-        self._suites: Dict[str, TestSuite] = {}
+        self._suites: dict[str, TestSuite] = {}
 
     def register_suite(self, suite: TestSuite) -> None:
         self._suites[suite.suite_id] = suite
 
     def create_unit_test_suite(
-        self, entity_type: str, cases: List[TestCase]
+        self,
+        entity_type: str,
+        cases: list[TestCase],
     ) -> TestSuite:
         suite_id = f"unit_{entity_type}_{int(time.time())}"
-        suite = TestSuite(
+        return TestSuite(
             suite_id=suite_id,
             name=f"Unit Tests - {entity_type}",
             description=f"Unit tests for {entity_type} validation",
             test_cases=cases,
         )
-        return suite
 
-    def run_test_suite(self, suite_id: str) -> Optional[SuiteResult]:
+    def run_test_suite(self, suite_id: str) -> SuiteResult | None:
         suite = self._suites.get(suite_id)
         if suite is None:
             return None
 
-        results: List[TestResult] = []
+        results: list[TestResult] = []
         start = time.perf_counter()
 
         for case in suite.test_cases:
@@ -90,7 +90,7 @@ class ValidationTestFramework:
                     execution_time=time.perf_counter() - case_start,
                     actual_result=actual,
                     timestamp=datetime.now(UTC),
-                )
+                ),
             )
 
         return SuiteResult(
@@ -115,10 +115,10 @@ class ValidationTestFramework:
 
 
 __all__ = [
+    "SuiteResult",
     "TestCase",
     "TestResult",
     "TestSuite",
-    "SuiteResult",
     "TestType",
     "ValidationTestFramework",
 ]

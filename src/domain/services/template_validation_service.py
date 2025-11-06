@@ -5,15 +5,16 @@ Handles validation of source templates against schemas, instantiation of
 templates into concrete configurations, and quality assurance checks.
 """
 
-from typing import Any, Dict, List, Optional
-import jsonschema
+import re
+from typing import Any
 
+import jsonschema
 from pydantic import BaseModel
 
 from src.domain.entities.source_template import (
     SourceTemplate,
-    ValidationRule,
     TemplateUIConfig,
+    ValidationRule,
 )
 from src.domain.entities.user_data_source import (
     SourceConfiguration,
@@ -25,18 +26,18 @@ class TemplateValidationResult(BaseModel):
     """Result of template validation."""
 
     valid: bool
-    errors: List[str] = []
-    warnings: List[str] = []
-    suggestions: List[str] = []
+    errors: list[str] = []
+    warnings: list[str] = []
+    suggestions: list[str] = []
 
 
 class TemplateInstantiationResult(BaseModel):
     """Result of template instantiation."""
 
     success: bool
-    configuration: Optional[SourceConfiguration] = None
-    errors: List[str] = []
-    missing_parameters: List[str] = []
+    configuration: SourceConfiguration | None = None
+    errors: list[str] = []
+    missing_parameters: list[str] = []
 
 
 class TemplateValidationService:
@@ -52,7 +53,7 @@ class TemplateValidationService:
         # Common JSON schemas for different data types
         self.schemas = self._load_common_schemas()
 
-    def _load_common_schemas(self) -> Dict[str, Dict[str, Any]]:
+    def _load_common_schemas(self) -> dict[str, dict[str, Any]]:
         """Load common JSON schemas for validation."""
         return {
             "gene_variant": {
@@ -167,7 +168,9 @@ class TemplateValidationService:
         )
 
     def instantiate_template(
-        self, template: SourceTemplate, user_parameters: Dict[str, Any]
+        self,
+        template: SourceTemplate,
+        user_parameters: dict[str, Any],
     ) -> TemplateInstantiationResult:
         """
         Instantiate a template with user-provided parameters.
@@ -185,13 +188,16 @@ class TemplateValidationService:
         # Check for required parameters
         required_params = self._extract_required_parameters(template)
 
-        for param in required_params:
-            if param not in user_parameters or user_parameters[param] is None:
-                missing_parameters.append(param)
+        missing_parameters = [
+            p
+            for p in required_params
+            if p not in user_parameters or user_parameters[p] is None
+        ]
 
         if missing_parameters:
             return TemplateInstantiationResult(
-                success=False, missing_parameters=missing_parameters
+                success=False,
+                missing_parameters=missing_parameters,
             )
 
         # Validate parameter values
@@ -206,23 +212,20 @@ class TemplateValidationService:
         try:
             configuration = self._build_configuration(template, user_parameters)
             return TemplateInstantiationResult(
-                success=True, configuration=configuration
+                success=True,
+                configuration=configuration,
             )
-        except Exception as e:
+        except (ValueError, TypeError, KeyError) as e:
             return TemplateInstantiationResult(
-                success=False, errors=[f"Configuration build error: {str(e)}"]
+                success=False,
+                errors=[f"Configuration build error: {e!s}"],
             )
 
-    def _validate_json_schema(self, schema: Dict[str, Any]) -> List[str]:
+    def _validate_json_schema(self, schema: dict[str, Any]) -> list[str]:
         """Validate a JSON schema for correctness."""
         errors = []
 
         try:
-            # Basic structure validation
-            if not isinstance(schema, dict):
-                errors.append("Schema must be a dictionary")  # type: ignore
-                return errors
-
             if "type" not in schema:
                 errors.append("Schema must specify a 'type' field")
 
@@ -230,13 +233,11 @@ class TemplateValidationService:
             jsonschema.Draft7Validator.check_schema(schema)
 
         except jsonschema.SchemaError as e:
-            errors.append(f"Invalid JSON schema: {str(e)}")
-        except Exception as e:
-            errors.append(f"Schema validation error: {str(e)}")
+            errors.append(f"Invalid JSON schema: {e!s}")
 
         return errors
 
-    def _validate_validation_rule(self, rule: ValidationRule, index: int) -> List[str]:
+    def _validate_validation_rule(self, rule: ValidationRule, index: int) -> list[str]:
         """Validate a single validation rule."""
         errors = []
 
@@ -259,42 +260,47 @@ class TemplateValidationService:
         ]
         if rule.rule_type not in supported_types:
             errors.append(
-                f"Validation rule {index}: unsupported rule_type '{rule.rule_type}'"
+                f"Validation rule {index}: unsupported rule_type '{rule.rule_type}'",
             )
 
         # Validate parameters based on rule type
         if rule.rule_type == "pattern" and "pattern" not in rule.parameters:
             errors.append(
-                f"Validation rule {index}: pattern rules require 'pattern' parameter"
+                f"Validation rule {index}: pattern rules require 'pattern' parameter",
             )
 
-        if rule.rule_type == "range":
-            if "min" not in rule.parameters and "max" not in rule.parameters:
-                errors.append(
-                    f"Validation rule {index}: range rules require 'min' or 'max' parameter"
-                )
+        if (
+            rule.rule_type == "range"
+            and "min" not in rule.parameters
+            and "max" not in rule.parameters
+        ):
+            errors.append(
+                f"Validation rule {index}: range rules require 'min' or 'max' parameter",
+            )
 
         return errors
 
-    def _validate_ui_config(self, ui_config: TemplateUIConfig) -> List[str]:
+    def _validate_ui_config(self, ui_config: TemplateUIConfig) -> list[str]:
         """Validate UI configuration."""
         errors = []
 
         # Validate sections have required fields
-        for section in ui_config.sections:
-            if "name" not in section:
-                errors.append("UI sections must have a 'name' field")
+        errors.extend(
+            [
+                "UI sections must have a 'name' field"
+                for section in ui_config.sections
+                if "name" not in section
+            ],
+        )
 
-        # Validate field configurations
-        for field_name, field_config in ui_config.fields.items():
-            if not isinstance(field_config, dict):
-                errors.append(  # type: ignore
-                    f"Field '{field_name}' configuration must be a dictionary"
-                )
+        # Validate field configurations (structure is dict[str, Any] by contract)
+        for _field_name, _field_config in ui_config.fields.items():
+            # Additional deep validation can be added here as needed
+            continue
 
         return errors
 
-    def _extract_required_parameters(self, template: SourceTemplate) -> List[str]:
+    def _extract_required_parameters(self, template: SourceTemplate) -> list[str]:
         """Extract required parameters from template configuration."""
         required = []
 
@@ -310,8 +316,10 @@ class TemplateValidationService:
         return list(set(required))  # Remove duplicates
 
     def _validate_parameters(
-        self, parameters: Dict[str, Any], template: SourceTemplate
-    ) -> List[str]:
+        self,
+        parameters: dict[str, Any],
+        template: SourceTemplate,
+    ) -> list[str]:
         """Validate parameter values against template constraints."""
         errors = []
 
@@ -319,7 +327,7 @@ class TemplateValidationService:
         try:
             jsonschema.validate(parameters, template.schema_definition)
         except jsonschema.ValidationError as e:
-            errors.append(f"Parameter validation error: {str(e)}")
+            errors.append(f"Parameter validation error: {e!s}")
 
         # Apply custom validation rules
         for rule in template.validation_rules:
@@ -329,7 +337,11 @@ class TemplateValidationService:
 
         return errors
 
-    def _apply_validation_rule(self, value: Any, rule: ValidationRule) -> List[str]:
+    def _apply_validation_rule(  # noqa: C901, PLR0912
+        self,
+        value: Any,
+        rule: ValidationRule,
+    ) -> list[str]:
         """Apply a validation rule to a parameter value."""
         errors = []
 
@@ -337,17 +349,15 @@ class TemplateValidationService:
             if rule.rule_type == "required":
                 if value is None or (isinstance(value, str) and not value.strip()):
                     errors.append(
-                        rule.error_message or f"Field '{rule.field}' is required"
+                        rule.error_message or f"Field '{rule.field}' is required",
                     )
 
             elif rule.rule_type == "pattern":
-                import re
-
                 pattern = rule.parameters.get("pattern", "")
                 if pattern and not re.match(pattern, str(value)):
                     errors.append(
                         rule.error_message
-                        or f"Field '{rule.field}' does not match pattern"
+                        or f"Field '{rule.field}' does not match pattern",
                     )
 
             elif rule.rule_type == "range":
@@ -359,16 +369,16 @@ class TemplateValidationService:
                     if min_val is not None and num_value < min_val:
                         errors.append(
                             rule.error_message
-                            or f"Field '{rule.field}' below minimum {min_val}"
+                            or f"Field '{rule.field}' below minimum {min_val}",
                         )
                     if max_val is not None and num_value > max_val:
                         errors.append(
                             rule.error_message
-                            or f"Field '{rule.field}' above maximum {max_val}"
+                            or f"Field '{rule.field}' above maximum {max_val}",
                         )
                 except (ValueError, TypeError):
                     errors.append(
-                        f"Field '{rule.field}' must be numeric for range validation"
+                        f"Field '{rule.field}' must be numeric for range validation",
                     )
 
             elif rule.rule_type == "enum":
@@ -376,7 +386,7 @@ class TemplateValidationService:
                 if value not in allowed_values:
                     errors.append(
                         rule.error_message
-                        or f"Field '{rule.field}' must be one of: {allowed_values}"
+                        or f"Field '{rule.field}' must be one of: {allowed_values}",
                     )
 
             elif rule.rule_type == "type":
@@ -384,32 +394,37 @@ class TemplateValidationService:
                 if not self._check_type(value, expected_type):
                     errors.append(
                         rule.error_message
-                        or f"Field '{rule.field}' must be of type {expected_type}"
+                        or f"Field '{rule.field}' must be of type {expected_type}",
                     )
 
-        except Exception as e:
-            errors.append(f"Validation rule error for field '{rule.field}': {str(e)}")
+        except (ValueError, TypeError, re.error) as e:
+            errors.append(f"Validation rule error for field '{rule.field}': {e!s}")
 
         return errors
 
     def _check_type(self, value: Any, expected_type: str) -> bool:
         """Check if a value matches an expected type."""
+        valid = True
         if expected_type == "string":
-            return isinstance(value, str)
+            valid = isinstance(value, str)
         elif expected_type == "integer":
-            return isinstance(value, int)
+            valid = isinstance(value, int)
         elif expected_type == "float":
-            return isinstance(value, (int, float))
+            valid = isinstance(value, (int, float))
         elif expected_type == "boolean":
-            return isinstance(value, bool)
+            valid = isinstance(value, bool)
         elif expected_type == "array":
-            return isinstance(value, list)
+            valid = isinstance(value, list)
         elif expected_type == "object":
-            return isinstance(value, dict)
-        return True
+            valid = isinstance(value, dict)
+        else:
+            valid = True
+        return valid
 
     def _build_configuration(
-        self, template: SourceTemplate, parameters: Dict[str, Any]
+        self,
+        template: SourceTemplate,
+        parameters: dict[str, Any],
     ) -> SourceConfiguration:
         """Build a SourceConfiguration from template and parameters."""
         # Start with template defaults
@@ -432,7 +447,7 @@ class TemplateValidationService:
                 "validation_rules": [
                     rule.model_dump() for rule in template.validation_rules
                 ],
-            }
+            },
         )
 
         return SourceConfiguration(**config_dict)

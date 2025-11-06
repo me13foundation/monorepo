@@ -3,12 +3,21 @@ Unit tests for identifier value objects.
 """
 
 import pytest
+from pydantic import ValidationError
+
 from src.models.value_objects.identifiers import (
     GeneIdentifier,
-    VariantIdentifier,
     PhenotypeIdentifier,
     PublicationIdentifier,
+    VariantIdentifier,
 )
+
+VALID_NCBI_GENE_ID = 12345
+INVALID_ENSEMBL_ID = "INVALID"
+INVALID_CLINVAR_ID = "INVALID"
+INVALID_HPO_ID = "INVALID"
+SHORT_HPO_ID = "HP:123"
+INVALID_DOI = "invalid-doi"
 
 
 class TestGeneIdentifier:
@@ -20,14 +29,14 @@ class TestGeneIdentifier:
             gene_id="GENE123",
             symbol="TEST",
             ensembl_id="ENSG000001",
-            ncbi_gene_id=12345,
+            ncbi_gene_id=VALID_NCBI_GENE_ID,
             uniprot_id="P12345",
         )
 
         assert identifier.gene_id == "GENE123"
         assert identifier.symbol == "TEST"  # Should be uppercased
         assert identifier.ensembl_id == "ENSG000001"
-        assert identifier.ncbi_gene_id == 12345
+        assert identifier.ncbi_gene_id == VALID_NCBI_GENE_ID
         assert identifier.uniprot_id == "P12345"
 
     def test_gene_symbol_uppercase_validation(self):
@@ -44,16 +53,21 @@ class TestGeneIdentifier:
 
     def test_invalid_ensembl_id(self):
         """Test invalid Ensembl ID format."""
-        with pytest.raises(ValueError):
-            GeneIdentifier(gene_id="GENE123", symbol="TEST", ensembl_id="INVALID")
+        with pytest.raises(ValidationError, match="ENSG"):
+            GeneIdentifier(
+                gene_id="GENE123",
+                symbol="TEST",
+                ensembl_id=INVALID_ENSEMBL_ID,
+            )
 
     def test_immutable(self):
         """Test that GeneIdentifier is immutable."""
         identifier = GeneIdentifier(gene_id="GENE123", symbol="TEST")
 
         with pytest.raises(
-            Exception
-        ):  # Pydantic raises ValidationError for frozen instances
+            ValidationError,
+            match="Instance is frozen",
+        ):
             identifier.symbol = "NEW"
 
     def test_string_representation(self):
@@ -82,16 +96,17 @@ class TestVariantIdentifier:
 
     def test_invalid_clinvar_id(self):
         """Test invalid ClinVar ID format."""
-        with pytest.raises(ValueError):
-            VariantIdentifier(variant_id="VAR001", clinvar_id="INVALID")
+        with pytest.raises(ValidationError, match="VCV"):
+            VariantIdentifier(variant_id="VAR001", clinvar_id=INVALID_CLINVAR_ID)
 
     def test_immutable(self):
         """Test that VariantIdentifier is immutable."""
         identifier = VariantIdentifier(variant_id="VAR001")
 
         with pytest.raises(
-            Exception
-        ):  # Pydantic raises ValidationError for frozen instances
+            ValidationError,
+            match="Instance is frozen",
+        ):
             identifier.variant_id = "NEW"
 
     def test_string_representation(self):
@@ -113,21 +128,22 @@ class TestPhenotypeIdentifier:
 
     def test_invalid_hpo_id_format(self):
         """Test invalid HPO ID format."""
-        with pytest.raises(ValueError):
-            PhenotypeIdentifier(hpo_id="INVALID", hpo_term="Test")
+        with pytest.raises(ValidationError, match="HP:"):
+            PhenotypeIdentifier(hpo_id=INVALID_HPO_ID, hpo_term="Test")
 
     def test_invalid_hpo_id_length(self):
         """Test HPO ID with wrong length."""
-        with pytest.raises(ValueError):
-            PhenotypeIdentifier(hpo_id="HP:123", hpo_term="Test")
+        with pytest.raises(ValidationError, match="HP:"):
+            PhenotypeIdentifier(hpo_id=SHORT_HPO_ID, hpo_term="Test")
 
     def test_immutable(self):
         """Test that PhenotypeIdentifier is immutable."""
         identifier = PhenotypeIdentifier(hpo_id="HP:0001234", hpo_term="Test")
 
         with pytest.raises(
-            Exception
-        ):  # Pydantic raises ValidationError for frozen instances
+            ValidationError,
+            match="Instance is frozen",
+        ):
             identifier.hpo_term = "New"
 
     def test_string_representation(self):
@@ -143,7 +159,9 @@ class TestPublicationIdentifier:
     def test_create_publication_identifier(self):
         """Test creating a valid PublicationIdentifier."""
         identifier = PublicationIdentifier(
-            pubmed_id="12345678", pmc_id="PMC123456", doi="10.1234/test.12345"
+            pubmed_id="12345678",
+            pmc_id="PMC123456",
+            doi="10.1234/test.12345",
         )
 
         assert identifier.pubmed_id == "12345678"
@@ -153,7 +171,8 @@ class TestPublicationIdentifier:
     def test_get_primary_id_pubmed(self):
         """Test getting primary ID when PubMed ID is available."""
         identifier = PublicationIdentifier(
-            pubmed_id="12345678", doi="10.1234/test.12345"
+            pubmed_id="12345678",
+            doi="10.1234/test.12345",
         )
 
         assert identifier.get_primary_id() == "12345678"
@@ -172,16 +191,17 @@ class TestPublicationIdentifier:
 
     def test_invalid_doi_format(self):
         """Test invalid DOI format."""
-        with pytest.raises(ValueError):
-            PublicationIdentifier(doi="invalid-doi")
+        with pytest.raises(ValidationError, match="DOI must be in standard format"):
+            PublicationIdentifier(doi=INVALID_DOI)
 
     def test_immutable(self):
         """Test that PublicationIdentifier is immutable."""
         identifier = PublicationIdentifier(pubmed_id="12345678")
 
         with pytest.raises(
-            Exception
-        ):  # Pydantic raises ValidationError for frozen instances
+            ValidationError,
+            match="Instance is frozen",
+        ):
             identifier.pubmed_id = "NEW"
 
     def test_string_representation(self):

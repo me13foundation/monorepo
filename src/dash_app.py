@@ -8,8 +8,8 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from datetime import UTC, datetime
+from typing import Any, cast
 
 import dash
 import dash_bootstrap_components as dbc
@@ -18,36 +18,37 @@ from dash import Input, Output, State, dcc, html
 from dash.development.base_component import Component
 from dash.exceptions import PreventUpdate
 
-# Presentation layer imports (progressive extraction)
-from src.presentation.dash.components.header import (
-    create_header as layout_create_header,
+from src.presentation.dash.callbacks.approval_callbacks import (
+    register_callbacks as register_bulk_callbacks,
 )
 from src.presentation.dash.callbacks.dashboard_callbacks import (
     register_callbacks as register_dashboard_callbacks,
 )
-from src.presentation.dash.callbacks.review_callbacks import (
-    register_callbacks as register_review_callbacks,
-)
-from src.presentation.dash.callbacks.approval_callbacks import (
-    register_callbacks as register_bulk_callbacks,
+from src.presentation.dash.callbacks.data_sources_callbacks import (
+    register_callbacks as register_data_sources_callbacks,
 )
 from src.presentation.dash.callbacks.reports_callbacks import (
     register_callbacks as register_reports_callbacks,
 )
+from src.presentation.dash.callbacks.review_callbacks import (
+    register_callbacks as register_review_callbacks,
+)
 from src.presentation.dash.callbacks.settings_callbacks import (
     register_callbacks as register_settings_callbacks,
 )
-from src.presentation.dash.callbacks.data_sources_callbacks import (
-    register_callbacks as register_data_sources_callbacks,
+
+# Presentation layer imports (progressive extraction)
+from src.presentation.dash.components.header import (
+    create_header as layout_create_header,
 )
 
 # Import shared components for backward compatibility
 from src.presentation.dash.components.theme import COLORS
 
-FigureDict = Dict[str, Any]
-SettingsDict = Dict[str, Any]
-TableRow = Dict[str, Any]
-ComponentValue = Union[Component, str]
+FigureDict = dict[str, Any]
+SettingsDict = dict[str, Any]
+TableRow = dict[str, Any]
+ComponentValue = Component | str
 
 # Configure logging first
 logging.basicConfig(level=logging.INFO)
@@ -62,15 +63,15 @@ try:
 
     DASH_TABLE_AVAILABLE = True
 except ImportError:
-    logger.error("dash_table not available. Please install dash-table package.")
-    dash_table = None  # type: ignore
+    logger.exception("dash_table not available. Please install dash-table package.")
+    dash_table: Any | None = None
     DASH_TABLE_AVAILABLE = False
 
 # Check for WebSocket support
 try:
     import asyncio
+
     import websockets
-    import socketio  # type: ignore
 
     WEBSOCKET_SUPPORT = True
 except ImportError:
@@ -123,28 +124,38 @@ def create_header() -> dbc.Navbar:
                             [
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Dashboard", href="/dashboard", active="exact"
-                                    )
+                                        "Dashboard",
+                                        href="/dashboard",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Review Queue", href="/review", active="exact"
-                                    )
+                                        "Review Queue",
+                                        href="/review",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Bulk Operations", href="/bulk", active="exact"
-                                    )
+                                        "Bulk Operations",
+                                        href="/bulk",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Reports", href="/reports", active="exact"
-                                    )
+                                        "Reports",
+                                        href="/reports",
+                                        active="exact",
+                                    ),
                                 ),
                                 dbc.NavItem(
                                     dbc.NavLink(
-                                        "Settings", href="/settings", active="exact"
-                                    )
+                                        "Settings",
+                                        href="/settings",
+                                        active="exact",
+                                    ),
                                 ),
                             ],
                             navbar=True,
@@ -157,7 +168,7 @@ def create_header() -> dbc.Navbar:
                     id="navbar-collapse",
                     navbar=True,
                 ),
-            ]
+            ],
         ),
         color="dark",
         dark=True,
@@ -198,7 +209,8 @@ app.layout = html.Div(
         ),
         # Store for real-time client state
         dcc.Store(
-            id="realtime-status-store", data={"connected": False, "last_update": None}
+            id="realtime-status-store",
+            data={"connected": False, "last_update": None},
         ),
         # Store for WebSocket connection attempts
         dcc.Store(id="websocket-store", data={"attempts": 0, "last_attempt": None}),
@@ -206,7 +218,7 @@ app.layout = html.Div(
         html.Div(id="refresh-notification"),
         html.Div(id="export-notification"),
         html.Div(id="clear-filters-notification"),
-    ]
+    ],
 )
 
 
@@ -230,8 +242,9 @@ register_data_sources_callbacks(app)
     State("settings-store", "data"),
 )
 def update_count_badges(
-    n: int, settings: Optional[SettingsDict]
-) -> Tuple[str, str, str]:
+    _n: int,
+    settings: SettingsDict | None,
+) -> tuple[str, str, str]:
     """Update count badges in real-time (visible on all pages)."""
     settings = settings or {}
 
@@ -245,8 +258,8 @@ def update_count_badges(
         if rt_client:
             try:
                 realtime_data = rt_client.get_latest_update()
-            except Exception as e:
-                logger.debug(f"Real-time client error: {e}")
+            except Exception as err:
+                logger.debug("Real-time client error: %s", err)
 
         if realtime_data:
             # Use real-time data if available
@@ -267,8 +280,8 @@ def update_count_badges(
 
         return pending, approved, rejected
 
-    except Exception as e:
-        logger.error(f"Error updating count badges: {e}")
+    except Exception:
+        logger.exception("Error updating count badges")
         return "0", "0", "0"
 
 
@@ -280,11 +293,13 @@ def update_count_badges(
     prevent_initial_call="initial_duplicate",
 )
 def update_activity_feed(
-    n: int, pathname: str, settings: Optional[SettingsDict]
-) -> List[Component]:
+    _n: int,
+    pathname: str,
+    settings: SettingsDict | None,
+) -> list[Component]:
     """Update activity feed (only visible on dashboard page)."""
     # Only update if we're on the dashboard page
-    if pathname != "/" and pathname != "/dashboard":
+    if pathname not in {"/", "/dashboard"}:
         raise PreventUpdate
 
     try:
@@ -295,8 +310,8 @@ def update_activity_feed(
         if rt_client:
             try:
                 realtime_data = rt_client.get_latest_update()
-            except Exception as e:
-                logger.debug(f"Real-time client error: {e}")
+            except Exception as err:
+                logger.debug("Real-time client error: %s", err)
 
         if realtime_data:
             # Use real-time data if available
@@ -304,7 +319,8 @@ def update_activity_feed(
         else:
             # Fallback to API polling
             activities_response = api_request(
-                "/stats/activities/recent", settings=settings
+                "/stats/activities/recent",
+                settings=settings,
             )
             activities_data = (
                 activities_response.get("activities", [])
@@ -333,7 +349,7 @@ def update_activity_feed(
                 ]
 
         # Create activity feed
-        activities: List[Component] = []
+        activities: list[Component] = []
         for activity in activities_data[-5:]:  # Show last 5 activities
             color_class = {
                 "success": "text-success",
@@ -356,7 +372,7 @@ def update_activity_feed(
                         ),
                     ],
                     className="mb-2",
-                )
+                ),
             )
 
         # Add connection status indicator
@@ -388,8 +404,8 @@ def update_activity_feed(
 
         return activities
 
-    except Exception as e:
-        logger.error(f"Error updating activity feed: {e}")
+    except Exception:
+        logger.exception("Error updating activity feed")
         return [html.Div("Error loading data")]
 
 
@@ -402,7 +418,7 @@ def update_activity_feed(
     ],
     Input("interval-component", "n_intervals"),
 )
-def update_dashboard_charts(n: int) -> Tuple[FigureDict, FigureDict, FigureDict]:
+def update_dashboard_charts(_n: int) -> tuple[FigureDict, FigureDict, FigureDict]:
     """Update dashboard page charts."""
     try:
         # Quality overview chart
@@ -422,7 +438,7 @@ def update_dashboard_charts(n: int) -> Tuple[FigureDict, FigureDict, FigureDict]
                             {"range": [75, 100], "color": COLORS["success"]},
                         ],
                     },
-                }
+                },
             ],
             "layout": {"margin": {"t": 0, "b": 0, "l": 0, "r": 0}},
         }
@@ -440,9 +456,9 @@ def update_dashboard_charts(n: int) -> Tuple[FigureDict, FigureDict, FigureDict]
                             COLORS["success"],
                             COLORS["warning"],
                             COLORS["info"],
-                        ]
+                        ],
                     },
-                }
+                },
             ],
             "layout": {"title": "Entity Distribution"},
         }
@@ -460,17 +476,17 @@ def update_dashboard_charts(n: int) -> Tuple[FigureDict, FigureDict, FigureDict]
                             COLORS["warning"],
                             COLORS["danger"],
                             COLORS["secondary"],
-                        ]
+                        ],
                     },
-                }
+                },
             ],
             "layout": {"title": "Validation Status"},
         }
 
         return quality_fig, entity_fig, validation_fig
 
-    except Exception as e:
-        logger.error(f"Error updating dashboard charts: {e}")
+    except Exception:
+        logger.exception("Error updating dashboard charts")
         # Return empty figures on error
         empty_fig: FigureDict = {"data": [], "layout": {}}
         return empty_fig, empty_fig, empty_fig
@@ -485,7 +501,7 @@ def update_dashboard_charts(n: int) -> Tuple[FigureDict, FigureDict, FigureDict]
     [Input("interval-component", "n_intervals"), Input("url", "pathname")],
     prevent_initial_call="initial_duplicate",
 )
-def update_reports_charts(n: int, pathname: str) -> Tuple[FigureDict, FigureDict]:
+def update_reports_charts(_n: int, pathname: str) -> tuple[FigureDict, FigureDict]:
     """Update reports page charts."""
     # Only update if we're on the reports page
     if pathname != "/reports":
@@ -501,7 +517,7 @@ def update_reports_charts(n: int, pathname: str) -> Tuple[FigureDict, FigureDict
                     "x": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
                     "y": [75, 78, 82, 85, 87, 87],
                     "line": {"color": COLORS["primary"]},
-                }
+                },
             ],
             "layout": {"title": "Quality Trends Over Time"},
         }
@@ -520,15 +536,15 @@ def update_reports_charts(n: int, pathname: str) -> Tuple[FigureDict, FigureDict
                     ],
                     "y": [8, 6, 4, 3, 2],
                     "marker": {"color": COLORS["danger"]},
-                }
+                },
             ],
             "layout": {"title": "Error Distribution by Type"},
         }
 
         return trends_fig, error_fig
 
-    except Exception as e:
-        logger.error(f"Error updating reports charts: {e}")
+    except Exception:
+        logger.exception("Error updating reports charts")
         # Return empty figures on error
         empty_fig: FigureDict = {"data": [], "layout": {}}
         return empty_fig, empty_fig
@@ -542,7 +558,8 @@ def update_reports_charts(n: int, pathname: str) -> Tuple[FigureDict, FigureDict
     prevent_initial_call=True,
 )
 def handle_batch_operation(
-    n_clicks: Optional[int], operation: Optional[str]
+    n_clicks: int | None,
+    operation: str | None,
 ) -> ComponentValue:
     """Handle batch operations."""
     if not n_clicks or not operation:
@@ -556,13 +573,14 @@ def handle_batch_operation(
         )
 
         status_text = html.P(
-            f"Processing {operation} operation... 75% complete", className="text-muted"
+            f"Processing {operation} operation... 75% complete",
+            className="text-muted",
         )
 
         return html.Div([progress, status_text])
 
-    except Exception as e:
-        logger.error(f"Error in batch operation: {e}")
+    except Exception as err:
+        logger.exception("Error in batch operation: %s", err)
         return html.Div("Error processing batch operation", className="text-danger")
 
 
@@ -580,14 +598,14 @@ def handle_batch_operation(
     prevent_initial_call=True,
 )
 def save_settings(
-    n_clicks: Optional[int],
-    api_endpoint: Optional[str],
-    api_key: Optional[str],
-    refresh_interval: Optional[int],
-    page_size: Optional[int],
-    theme: Optional[str],
-    language: Optional[str],
-    current_settings: Optional[SettingsDict],
+    n_clicks: int | None,
+    api_endpoint: str | None,
+    api_key: str | None,
+    refresh_interval: int | None,
+    page_size: int | None,
+    theme: str | None,
+    language: str | None,
+    current_settings: SettingsDict | None,
 ) -> SettingsDict:
     """Save dashboard settings."""
     if not n_clicks:
@@ -604,14 +622,14 @@ def save_settings(
         }
 
         # Update the interval component
-        interval_component = cast(dcc.Interval, app.layout.children[4])
+        interval_component = cast("dcc.Interval", app.layout.children[4])
         if refresh_interval is not None:
-            setattr(interval_component, "interval", refresh_interval * 1000)
+            interval_component.interval = refresh_interval * 1000
 
         return new_settings
 
-    except Exception as e:
-        logger.error(f"Error saving settings: {e}")
+    except Exception as err:
+        logger.exception("Error saving settings: %s", err)
         return current_settings or {}
 
 
@@ -636,15 +654,15 @@ def save_settings(
     prevent_initial_call=True,
 )
 def handle_bulk_operations(
-    approve_clicks: Optional[int],
-    reject_clicks: Optional[int],
-    quarantine_clicks: Optional[int],
-    select_all_clicks: Optional[int],
-    selected_rows: Optional[List[int]],
-    table_data: Optional[List[TableRow]],
-    entity_type: Optional[str],
-    settings: Optional[SettingsDict],
-) -> Tuple[Optional[List[int]], ComponentValue]:
+    approve_clicks: int | None,
+    reject_clicks: int | None,
+    quarantine_clicks: int | None,
+    select_all_clicks: int | None,
+    selected_rows: list[int] | None,
+    table_data: list[TableRow] | None,
+    entity_type: str | None,
+    settings: SettingsDict | None,
+) -> tuple[list[int] | None, ComponentValue]:
     """Handle bulk approve/reject/quarantine operations."""
     ctx: Any = dash.callback_context
     if not ctx.triggered:
@@ -663,10 +681,11 @@ def handle_bulk_operations(
 
         if not selected_rows:
             return selected_rows, dbc.Alert(
-                "No items selected for operation", color="warning"
+                "No items selected for operation",
+                color="warning",
             )
 
-        operation: Optional[str] = None
+        operation: str | None = None
         if trigger_id == "bulk-approve-btn":
             operation = "approve"
         elif trigger_id == "bulk-reject-btn":
@@ -703,8 +722,8 @@ def handle_bulk_operations(
                     else:
                         failed_count += 1
 
-                except Exception as e:
-                    logger.error(f"Error processing item {item_id}: {e}")
+                except Exception:
+                    logger.exception("Error processing item %s", item_id)
                     failed_count += 1
 
         # Create result message
@@ -723,10 +742,10 @@ def handle_bulk_operations(
         # Clear selection after operation
         return [], result_alert
 
-    except Exception as e:
-        logger.error(f"Error in bulk operation: {e}")
+    except Exception:
+        logger.exception("Error in bulk operation")
         error_alert = dbc.Alert(
-            f"Error performing bulk operation: {str(e)}",
+            "Error performing bulk operation",
             color="danger",
             dismissable=True,
         )
@@ -741,17 +760,22 @@ class RealTimeClient:
         self.api_endpoint = api_endpoint.replace("http", "ws")
         self.api_key = api_key
         self.connected: bool = False
-        self.last_update: Dict[str, Any] = {}
+        self.last_update: dict[str, Any] = {}
 
-        self.sio: Optional[Any]
+        self.sio: Any | None
         if WEBSOCKET_SUPPORT:
-            self.sio = socketio.Client()
-            # Set up event handlers
-            self.sio.on("connect", self.on_connect)
-            self.sio.on("disconnect", self.on_disconnect)
-            self.sio.on("data_update", self.on_data_update)
-            self.sio.on("validation_complete", self.on_validation_complete)
-            self.sio.on("ingestion_progress", self.on_ingestion_progress)
+            try:
+                import socketio  # type: ignore[import-not-found]
+            except Exception:
+                self.sio = None
+            else:
+                self.sio = socketio.Client()
+                # Set up event handlers
+                self.sio.on("connect", self.on_connect)
+                self.sio.on("disconnect", self.on_disconnect)
+                self.sio.on("data_update", self.on_data_update)
+                self.sio.on("validation_complete", self.on_validation_complete)
+                self.sio.on("ingestion_progress", self.on_ingestion_progress)
         else:
             self.sio = None
 
@@ -765,19 +789,19 @@ class RealTimeClient:
         logger.info("Disconnected from real-time server")
         self.connected = False
 
-    def on_data_update(self, data: Dict[str, Any]) -> None:
+    def on_data_update(self, data: dict[str, Any]) -> None:
         """Handle data update events."""
-        logger.info(f"Received data update: {data}")
+        logger.info("Received data update: %s", data)
         self.last_update = data
 
-    def on_validation_complete(self, data: Dict[str, Any]) -> None:
+    def on_validation_complete(self, data: dict[str, Any]) -> None:
         """Handle validation completion events."""
-        logger.info(f"Validation completed: {data}")
+        logger.info("Validation completed: %s", data)
         self.last_update = data
 
-    def on_ingestion_progress(self, data: Dict[str, Any]) -> None:
+    def on_ingestion_progress(self, data: dict[str, Any]) -> None:
         """Handle ingestion progress events."""
-        logger.info(f"Ingestion progress: {data}")
+        logger.info("Ingestion progress: %s", data)
         self.last_update = data
 
     async def connect_async(self) -> None:
@@ -815,8 +839,8 @@ class RealTimeClient:
                     f"{self.api_endpoint.replace('ws', 'http')}",
                     headers={"X-API-Key": self.api_key},
                 )
-        except Exception as e:
-            logger.warning(f"Socket.IO connection failed, trying WebSocket: {e}")
+        except Exception as err:
+            logger.warning("Socket.IO connection failed, trying WebSocket: %s", err)
             # Fallback to asyncio WebSocket
             asyncio.run(self.connect_async())
 
@@ -826,18 +850,18 @@ class RealTimeClient:
             self.sio.disconnect()
         self.connected = False
 
-    def get_latest_update(self) -> Dict[str, Any]:
+    def get_latest_update(self) -> dict[str, Any]:
         """Get the latest update data."""
         return self.last_update.copy()
 
 
 # Global real-time client instance
-realtime_client: Optional[RealTimeClient] = None
+realtime_client: RealTimeClient | None = None
 
 
 def get_realtime_client(
-    settings: Optional[SettingsDict],
-) -> Optional[RealTimeClient]:
+    settings: SettingsDict | None,
+) -> RealTimeClient | None:
     """Get or create real-time client instance."""
     global realtime_client
     settings = settings or {}
@@ -852,8 +876,8 @@ def get_realtime_client(
                 threading.Thread(target=realtime_client.connect, daemon=True).start()
                 # Give it a moment to attempt connection
                 threading.Event().wait(0.5)
-        except Exception as e:
-            logger.warning(f"Failed to initialize real-time client: {e}")
+        except Exception as err:
+            logger.warning("Failed to initialize real-time client: %s", err)
             return None
 
     return realtime_client
@@ -863,9 +887,9 @@ def get_realtime_client(
 def api_request(
     endpoint: str,
     method: str = "GET",
-    data: Optional[SettingsDict] = None,
-    settings: Optional[SettingsDict] = None,
-) -> Dict[str, Any]:
+    data: SettingsDict | None = None,
+    settings: SettingsDict | None = None,
+) -> dict[str, Any]:
     """Make API request to FastAPI backend."""
     if not settings:
         settings = {"api_endpoint": API_BASE_URL, "api_key": API_KEY}
@@ -883,15 +907,16 @@ def api_request(
         elif method == "DELETE":
             response = requests.delete(url, headers=headers, timeout=10)
         else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
+            msg = f"Unsupported HTTP method: {method}"
+            raise ValueError(msg)
 
         response.raise_for_status()
-        return cast(Dict[str, Any], response.json())
+        return cast("dict[str, Any]", response.json())
 
     except requests.RequestException as e:
         # Log as debug since we gracefully fall back to mock data
         # Connection errors are expected when API server isn't running
-        logger.debug(f"API request failed (falling back to mock data): {e}")
+        logger.debug("API request failed (falling back to mock data): %s", e)
         return {"error": str(e)}
 
 
@@ -901,13 +926,13 @@ def api_request(
     Input("refresh-btn", "n_clicks"),
     prevent_initial_call=True,
 )
-def handle_refresh(n_clicks: Optional[int]) -> Any:
+def handle_refresh(n_clicks: int | None) -> Any:
     """Handle refresh button click."""
     if not n_clicks:
         return dash.no_update
 
     # Trigger a refresh by updating the timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     return dbc.Toast(
         f"Data refreshed at {timestamp}",
@@ -929,10 +954,10 @@ def handle_refresh(n_clicks: Optional[int]) -> Any:
     prevent_initial_call=True,
 )
 def handle_export(
-    n_clicks: Optional[int],
-    entity_type: Optional[str],
-    status: Optional[str],
-    priority: Optional[str],
+    n_clicks: int | None,
+    entity_type: str | None,
+    status: str | None,
+    priority: str | None,
 ) -> Any:
     """Handle export button click."""
     if not n_clicks:
@@ -987,7 +1012,7 @@ def handle_export(
     Input("clear-filters-btn", "n_clicks"),
     prevent_initial_call=True,
 )
-def handle_clear_filters(n_clicks: Optional[int]) -> Tuple[Any, Any, Any, Any, Any]:
+def handle_clear_filters(n_clicks: int | None) -> tuple[Any, Any, Any, Any, Any]:
     """Handle clear filters button click."""
     if not n_clicks:
         return (

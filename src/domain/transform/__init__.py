@@ -15,32 +15,28 @@ Architecture follows clean architecture principles with separation of concerns
 and comprehensive error handling.
 """
 
-from .parsers import ClinVarParser, PubMedParser, HPOParser, UniProtParser
+from .mappers import CrossReferenceMapper, GeneVariantMapper, VariantPhenotypeMapper
 from .normalizers import (
     GeneNormalizer,
-    VariantNormalizer,
     PhenotypeNormalizer,
     PublicationNormalizer,
+    VariantNormalizer,
 )
-from .mappers import GeneVariantMapper, VariantPhenotypeMapper, CrossReferenceMapper
+from .parsers import ClinVarParser, HPOParser, PubMedParser, UniProtParser
 from .transformers import ETLTransformer, TransformationPipeline
 
 __all__ = [
-    # Parsers
     "ClinVarParser",
-    "PubMedParser",
-    "HPOParser",
-    "UniProtParser",
-    # Normalizers
-    "GeneNormalizer",
-    "VariantNormalizer",
-    "PhenotypeNormalizer",
-    "PublicationNormalizer",
-    # Mappers
-    "GeneVariantMapper",
-    "VariantPhenotypeMapper",
     "CrossReferenceMapper",
-    # Transformers
     "ETLTransformer",
+    "GeneNormalizer",
+    "GeneVariantMapper",
+    "HPOParser",
+    "PhenotypeNormalizer",
+    "PubMedParser",
+    "PublicationNormalizer",
     "TransformationPipeline",
+    "UniProtParser",
+    "VariantNormalizer",
+    "VariantPhenotypeMapper",
 ]

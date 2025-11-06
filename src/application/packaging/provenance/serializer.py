@@ -8,10 +8,11 @@ FAIR compliance and semantic web integration.
 from __future__ import annotations
 
 import json
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
 
-from src.models.value_objects.provenance import Provenance
+if TYPE_CHECKING:
+    from src.models.value_objects.provenance import Provenance
 
 
 @dataclass
@@ -19,7 +20,7 @@ class ProvenanceSerializer:
     """Serializer for converting provenance data to JSON-LD."""
 
     @staticmethod
-    def get_jsonld_context() -> Dict[str, Any]:
+    def get_jsonld_context() -> dict[str, Any]:
         """Get the JSON-LD context for provenance metadata."""
         return {
             "@context": {
@@ -48,16 +49,16 @@ class ProvenanceSerializer:
                 "processingStep": "https://med13.org/terms/processingStep",
                 "qualityScore": "https://med13.org/terms/qualityScore",
                 "validationStatus": "https://med13.org/terms/validationStatus",
-            }
+            },
         }
 
-    def serialize_provenance(self, provenance: Provenance) -> Dict[str, Any]:
+    def serialize_provenance(self, provenance: Provenance) -> dict[str, Any]:
         """Serialize a single provenance record to JSON-LD."""
         context = self.get_jsonld_context()
         source_name = provenance.source.value
 
         entity_id = f"urn:med13:dataset:{source_name}"
-        dataset_node: Dict[str, Any] = {
+        dataset_node: dict[str, Any] = {
             "@id": entity_id,
             "@type": "prov:Entity",
             "title": f"MED13 Dataset from {source_name}",
@@ -73,11 +74,11 @@ class ProvenanceSerializer:
         if provenance.metadata:
             dataset_node["prov:qualifiedAttribution"] = provenance.metadata
 
-        jsonld_data: Dict[str, Any] = {**context, "@graph": [dataset_node]}
+        jsonld_data: dict[str, Any] = {**context, "@graph": [dataset_node]}
 
         # Add acquisition activity node
         activity_id = f"urn:med13:activity:acquisition:{source_name}"
-        acquisition_activity: Dict[str, Any] = {
+        acquisition_activity: dict[str, Any] = {
             "@id": activity_id,
             "@type": "prov:Activity",
             "prov:label": f"Data acquisition from {source_name}",
@@ -102,7 +103,7 @@ class ProvenanceSerializer:
             step_activity_id = (
                 f"urn:med13:activity:processing:{source_name}:{step_index}"
             )
-            step_activity: Dict[str, Any] = {
+            step_activity: dict[str, Any] = {
                 "@id": step_activity_id,
                 "@type": "prov:Activity",
                 "prov:label": f"Processing step: {step}",
@@ -113,14 +114,14 @@ class ProvenanceSerializer:
                 step_activity["prov:used"] = {"@id": entity_id}
             else:
                 prev_step_entity_id = (
-                    f"urn:med13:entity:processed:{source_name}:{step_index-1}"
+                    f"urn:med13:entity:processed:{source_name}:{step_index - 1}"
                 )
                 step_activity["prov:used"] = {"@id": prev_step_entity_id}
 
             jsonld_data["@graph"].append(step_activity)
 
             output_entity_id = f"urn:med13:entity:processed:{source_name}:{step_index}"
-            output_entity: Dict[str, Any] = {
+            output_entity: dict[str, Any] = {
                 "@id": output_entity_id,
                 "@type": "prov:Entity",
                 "prov:label": f"Dataset after {step}",
@@ -136,8 +137,9 @@ class ProvenanceSerializer:
         return jsonld_data
 
     def serialize_provenance_chain(
-        self, provenance_records: List[Provenance]
-    ) -> Dict[str, Any]:
+        self,
+        provenance_records: list[Provenance],
+    ) -> dict[str, Any]:
         """Serialize multiple provenance records as a chain."""
         context = self.get_jsonld_context()
 
@@ -151,11 +153,11 @@ class ProvenanceSerializer:
 
         return {**context, "@graph": graph}
 
-    def to_json(self, data: Dict[str, Any], indent: Optional[int] = 2) -> str:
+    def to_json(self, data: dict[str, Any], indent: int | None = 2) -> str:
         """Convert JSON-LD data to JSON string."""
         return json.dumps(data, indent=indent, ensure_ascii=False)
 
-    def validate_jsonld(self, jsonld_data: Dict[str, Any]) -> List[str]:
+    def validate_jsonld(self, jsonld_data: dict[str, Any]) -> list[str]:
         """Validate JSON-LD structure and content."""
         issues = []
 
@@ -196,10 +198,10 @@ class FAIRMetadataSerializer:
 
     def create_fair_metadata_bundle(
         self,
-        dataset_metadata: Dict[str, Any],
+        dataset_metadata: dict[str, Any],
         provenance: Provenance,
-        license_info: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        license_info: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Create a complete FAIR metadata bundle."""
         context = {
             "@context": {
@@ -208,11 +210,11 @@ class FAIRMetadataSerializer:
                 "license": "dct:license",
                 "accessRights": "dct:accessRights",
                 "conformsTo": "dct:conformsTo",
-            }
+            },
         }
 
         # Combine all metadata
-        graph_nodes: List[Dict[str, Any]] = [
+        graph_nodes: list[dict[str, Any]] = [
             {
                 "@id": "urn:med13:dataset:main",
                 "@type": ["prov:Entity", "dct:Dataset"],
@@ -223,7 +225,7 @@ class FAIRMetadataSerializer:
                     {"@id": "fair:interoperable"},
                     {"@id": "fair:reusable"},
                 ],
-            }
+            },
         ]
 
         bundle = {**context, "@graph": graph_nodes}
@@ -240,10 +242,10 @@ class FAIRMetadataSerializer:
 
         # Link main dataset to provenance
         graph_nodes[0]["prov:wasDerivedFrom"] = {
-            "@id": f"urn:med13:dataset:{provenance.source.value}"
+            "@id": f"urn:med13:dataset:{provenance.source.value}",
         }
 
         return bundle
 
 
-__all__ = ["ProvenanceSerializer", "FAIRMetadataSerializer"]
+__all__ = ["FAIRMetadataSerializer", "ProvenanceSerializer"]

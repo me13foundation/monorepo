@@ -11,7 +11,10 @@ DATABASE_URL = os.getenv(
 
 engine = create_engine(DATABASE_URL, future=True, pool_pre_ping=True)
 SessionLocal = sessionmaker(
-    bind=engine, autoflush=False, autocommit=False, class_=Session
+    bind=engine,
+    autoflush=False,
+    autocommit=False,
+    class_=Session,
 )
 
 

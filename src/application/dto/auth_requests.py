@@ -2,9 +2,9 @@
 Request Data Transfer Objects for authentication operations.
 """
 
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
-from typing import Optional
-from ...domain.entities.user import UserRole
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from src.domain.entities.user import UserRole
 
 
 class LoginRequest(BaseModel):
@@ -15,8 +15,8 @@ class LoginRequest(BaseModel):
 
     model_config = ConfigDict(
         json_schema_extra={
-            "example": {"email": "user@example.com", "password": "SecurePassword123!"}
-        }
+            "example": {"email": "user@example.com", "password": "SecurePassword123!"},
+        },
     )
 
 
@@ -37,19 +37,19 @@ class RegisterUserRequest(BaseModel):
                 "full_name": "New User",
                 "password": "SecurePassword123!",
                 "role": "researcher",
-            }
-        }
+            },
+        },
     )
 
 
 class UpdateUserRequest(BaseModel):
     """Request for updating user profile."""
 
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    role: Optional[UserRole] = None
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    role: UserRole | None = None
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"full_name": "Updated Name", "role": "curator"}}
+        json_schema_extra={"example": {"full_name": "Updated Name", "role": "curator"}},
     )
 
 
@@ -64,8 +64,8 @@ class ChangePasswordRequest(BaseModel):
             "example": {
                 "old_password": "OldPassword123!",
                 "new_password": "NewSecurePassword456!",
-            }
-        }
+            },
+        },
     )
 
 
@@ -75,7 +75,7 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"email": "user@example.com"}}
+        json_schema_extra={"example": {"email": "user@example.com"}},
     )
 
 
@@ -90,18 +90,18 @@ class ResetPasswordRequest(BaseModel):
             "example": {
                 "token": "reset-token-from-email",
                 "new_password": "NewSecurePassword456!",
-            }
-        }
+            },
+        },
     )
 
 
 class UpdateProfileRequest(BaseModel):
     """Request for updating user profile."""
 
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    full_name: str | None = Field(None, min_length=1, max_length=100)
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"full_name": "Updated Full Name"}}
+        json_schema_extra={"example": {"full_name": "Updated Full Name"}},
     )
 
 
@@ -122,17 +122,17 @@ class CreateUserRequest(BaseModel):
                 "full_name": "Admin Created User",
                 "password": "SecurePassword123!",
                 "role": "researcher",
-            }
-        }
+            },
+        },
     )
 
 
 class AdminUpdateUserRequest(BaseModel):
     """Request for admin updating a user."""
 
-    full_name: Optional[str] = Field(None, min_length=1, max_length=100)
-    role: Optional[UserRole] = None
-    status: Optional[str] = None  # Will be validated by service
+    full_name: str | None = Field(None, min_length=1, max_length=100)
+    role: UserRole | None = None
+    status: str | None = None  # Will be validated by service
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -140,6 +140,6 @@ class AdminUpdateUserRequest(BaseModel):
                 "full_name": "Updated by Admin",
                 "role": "admin",
                 "status": "active",
-            }
-        }
+            },
+        },
     )

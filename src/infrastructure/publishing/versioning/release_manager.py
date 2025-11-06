@@ -2,19 +2,19 @@
 Release management and orchestration.
 """
 
-from datetime import datetime, UTC
-from pathlib import Path
-from typing import Dict, Any, Optional, List, cast
 import logging
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any, cast
 
 from src.application.packaging import PackageStorage
-from src.infrastructure.publishing.zenodo.client import ZenodoClient
-from src.infrastructure.publishing.zenodo.uploader import ZenodoUploader
-from src.infrastructure.publishing.zenodo.doi_service import DOIService
 from src.infrastructure.publishing.versioning.semantic_versioner import (
     SemanticVersioner,
     VersionType,
 )
+from src.infrastructure.publishing.zenodo.client import ZenodoClient
+from src.infrastructure.publishing.zenodo.doi_service import DOIService
+from src.infrastructure.publishing.zenodo.uploader import ZenodoUploader
 from src.type_definitions.external_apis import ZenodoMetadata
 
 logger = logging.getLogger(__name__)
@@ -47,11 +47,11 @@ class ReleaseManager:
     async def create_release(
         self,
         package_path: Path,
-        version: Optional[str],
-        release_notes: Optional[str] = None,
-        version_type: Optional[VersionType] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        version: str | None,
+        release_notes: str | None = None,
+        version_type: VersionType | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """
         Create and publish a new release.
 
@@ -76,28 +76,36 @@ class ReleaseManager:
                     version = self.versioner.increment_version(latest, version_type)
                 else:
                     version = self.versioner.increment_version(
-                        latest, VersionType.PATCH
+                        latest,
+                        VersionType.PATCH,
                     )
             else:
                 version = "1.0.0"
 
         # Validate version
         if not self.versioner.validate_version(version):
-            raise ValueError(f"Invalid version format: {version}")
+            message = f"Invalid version format: {version}"
+            raise ValueError(message)
 
         # Archive package
         archive_path = self.storage.archive_package(
-            package_path, version, self.package_name
+            package_path,
+            version,
+            self.package_name,
         )
 
         # Create ZIP archive
         zip_path = self.storage.create_zip_archive(
-            package_path, version, self.package_name
+            package_path,
+            version,
+            self.package_name,
         )
 
         # Prepare Zenodo metadata
         zenodo_metadata = self._prepare_zenodo_metadata(
-            version, release_notes, metadata
+            version,
+            release_notes,
+            metadata,
         )
 
         # Upload to Zenodo
@@ -119,15 +127,19 @@ class ReleaseManager:
             "release_notes": release_notes,
         }
 
-        logger.info(f"Release {version} created successfully: {doi_result['doi']}")
+        logger.info(
+            "Release %s created successfully: %s",
+            version,
+            doi_result["doi"],
+        )
 
         return release_info
 
     def _prepare_zenodo_metadata(
         self,
         version: str,
-        release_notes: Optional[str],
-        additional_metadata: Optional[Dict[str, Any]],
+        release_notes: str | None,
+        additional_metadata: dict[str, Any] | None,
     ) -> ZenodoMetadata:
         """
         Prepare metadata for Zenodo deposit.
@@ -150,7 +162,7 @@ class ReleaseManager:
                     {
                         "name": "MED13 Foundation",
                         "affiliation": "MED13 Foundation",
-                    }
+                    },
                 ],
                 "license": {"id": "cc-by-4.0"},
                 "keywords": [
@@ -163,16 +175,16 @@ class ReleaseManager:
                 ],
                 "upload_type": "dataset",
                 "publication_date": datetime.now(UTC).date().isoformat(),
-            }
+            },
         }
 
         # Merge additional metadata
         if additional_metadata:
             metadata["metadata"].update(additional_metadata)
 
-        return cast(ZenodoMetadata, metadata)
+        return cast("ZenodoMetadata", metadata)
 
-    def list_releases(self) -> List[str]:
+    def list_releases(self) -> list[str]:
         """
         List all release versions.
 
@@ -181,7 +193,7 @@ class ReleaseManager:
         """
         return self.storage.list_versions(self.package_name)
 
-    def get_latest_release(self) -> Optional[str]:
+    def get_latest_release(self) -> str | None:
         """
         Get latest release version.
 

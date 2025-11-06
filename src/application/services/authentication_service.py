@@ -4,42 +4,37 @@ Authentication service for MED13 Resource Library.
 Handles user authentication, session management, and security operations.
 """
 
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
-from datetime import datetime, timedelta
 
-from ...domain.entities.user import User, UserStatus
-from ...domain.entities.session import UserSession
-from ...domain.repositories.user_repository import UserRepository
-from ...domain.repositories.session_repository import SessionRepository
-from ...infrastructure.security.jwt_provider import JWTProvider
-from ...infrastructure.security.password_hasher import PasswordHasher
-from ..dto.auth_requests import LoginRequest
-from ..dto.auth_responses import LoginResponse, TokenRefreshResponse, UserPublic
+from src.application.dto.auth_requests import LoginRequest
+from src.application.dto.auth_responses import (
+    LoginResponse,
+    TokenRefreshResponse,
+    UserPublic,
+)
+from src.domain.entities.session import UserSession
+from src.domain.entities.user import User, UserStatus
+from src.domain.repositories.session_repository import SessionRepository
+from src.domain.repositories.user_repository import UserRepository
+from src.infrastructure.security.jwt_provider import JWTProvider
+from src.infrastructure.security.password_hasher import PasswordHasher
 
 
 class AuthenticationError(Exception):
     """Base exception for authentication errors."""
 
-    pass
-
 
 class InvalidCredentialsError(AuthenticationError):
     """Raised when login credentials are invalid."""
-
-    pass
 
 
 class AccountLockedError(AuthenticationError):
     """Raised when account is locked due to security policy."""
 
-    pass
-
 
 class AccountInactiveError(AuthenticationError):
     """Raised when account is not active."""
-
-    pass
 
 
 class AuthenticationService:
@@ -73,8 +68,8 @@ class AuthenticationService:
     async def authenticate_user(
         self,
         request: LoginRequest,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> LoginResponse:
         """
         Authenticate user with email and password.
@@ -99,23 +94,25 @@ class AuthenticationService:
         password_valid = False
         if user:
             password_valid = self.password_hasher.verify_password(
-                request.password, user.hashed_password
+                request.password,
+                user.hashed_password,
             )
 
         if not user or not password_valid:
             # Record failed attempt for security monitoring
             if user:
                 await self._record_failed_login_attempt(user)
-            raise InvalidCredentialsError("Invalid email or password")
+            msg = "Invalid email or password"
+            raise InvalidCredentialsError(msg)
 
         # Check account status
         if not user.can_authenticate():
             if user.is_locked():
-                raise AccountLockedError(
-                    "Account is locked due to multiple failed login attempts"
-                )
-            elif user.status != UserStatus.ACTIVE:
-                raise AccountInactiveError("Account is not active")
+                msg = "Account is locked due to multiple failed login attempts"
+                raise AccountLockedError(msg)
+            if user.status != UserStatus.ACTIVE:
+                msg = "Account is not active"
+                raise AccountInactiveError(msg)
 
         # Update login tracking
         user.record_login_attempt(success=True)
@@ -156,30 +153,33 @@ class AuthenticationService:
         try:
             # Get active session by refresh token
             session = await self.session_repository.get_active_by_refresh_token(
-                refresh_token
+                refresh_token,
             )
 
             if not session:
-                raise AuthenticationError("Invalid refresh token")
+                msg = "Invalid refresh token"
+                raise AuthenticationError(msg)  # noqa: TRY301
 
             # Get user
             user = await self.user_repository.get_by_id(session.user_id)
             if not user or not user.can_authenticate():
                 # Revoke session if user is invalid
                 await self.session_repository.revoke_session(session.id)
-                raise AuthenticationError("User session invalid")
+                msg = "User session invalid"
+                raise AuthenticationError(msg)  # noqa: TRY301
 
             # Generate new tokens
             new_access_token = self.jwt_provider.create_access_token(
-                user.id, user.role.value
+                user.id,
+                user.role.value,
             )
             new_refresh_token = self.jwt_provider.create_refresh_token(user.id)
 
             # Update session
             session.session_token = new_access_token
             session.refresh_token = new_refresh_token
-            session.expires_at = datetime.utcnow() + timedelta(minutes=15)
-            session.refresh_expires_at = datetime.utcnow() + timedelta(days=7)
+            session.expires_at = datetime.now(UTC) + timedelta(minutes=15)
+            session.refresh_expires_at = datetime.now(UTC) + timedelta(days=7)
             session.update_activity()
 
             await self.session_repository.update(session)
@@ -189,9 +189,11 @@ class AuthenticationService:
                 refresh_token=new_refresh_token,
                 expires_in=900,
             )
-
-        except Exception as e:
-            raise AuthenticationError(f"Token refresh failed: {str(e)}")
+        except AuthenticationError:
+            raise
+        except Exception as exc:
+            msg = f"Token refresh failed: {exc!s}"
+            raise AuthenticationError(msg) from exc
 
     async def logout(self, access_token: str) -> None:
         """
@@ -222,17 +224,20 @@ class AuthenticationService:
             payload = self.jwt_provider.decode_token(token)
 
             if payload.get("type") != "access":
-                raise AuthenticationError("Invalid token type")
+                msg = "Invalid token type"
+                raise AuthenticationError(msg)  # noqa: TRY301
 
             # Get user
             user_id = UUID(payload["sub"])
             user = await self.user_repository.get_by_id(user_id)
 
             if not user:
-                raise AuthenticationError("User not found")
+                msg = "User not found"
+                raise AuthenticationError(msg)  # noqa: TRY301
 
             if not user.can_authenticate():
-                raise AuthenticationError("User account not active")
+                msg = "User account not active"
+                raise AuthenticationError(msg)  # noqa: TRY301
 
             # Update session activity if session exists
             session = await self.session_repository.get_by_access_token(token)
@@ -240,10 +245,12 @@ class AuthenticationService:
                 session.update_activity()
                 await self.session_repository.update(session)
 
-            return user
-
-        except Exception as e:
-            raise AuthenticationError(f"Token validation failed: {str(e)}")
+            return user  # noqa: TRY300
+        except AuthenticationError:
+            raise
+        except Exception as exc:
+            msg = f"Token validation failed: {exc!s}"
+            raise AuthenticationError(msg) from exc
 
     async def get_user_sessions(self, user_id: UUID) -> list[UserSession]:
         """
@@ -292,7 +299,10 @@ class AuthenticationService:
         return await self.session_repository.cleanup_expired_sessions()
 
     async def _create_session(
-        self, user: User, ip_address: Optional[str], user_agent: Optional[str]
+        self,
+        user: User,
+        ip_address: str | None,
+        user_agent: str | None,
     ) -> UserSession:
         """
         Create a new session for user.
@@ -312,7 +322,8 @@ class AuthenticationService:
         if active_sessions >= max_sessions:
             # Remove oldest session
             sessions = await self.session_repository.get_user_sessions(
-                user.id, include_expired=False
+                user.id,
+                include_expired=False,
             )
             if sessions:
                 oldest_session = min(sessions, key=lambda s: s.created_at)
@@ -323,8 +334,8 @@ class AuthenticationService:
             user_id=user.id,
             ip_address=ip_address,
             user_agent=user_agent,
-            expires_at=datetime.utcnow() + timedelta(minutes=15),
-            refresh_expires_at=datetime.utcnow() + timedelta(days=7),
+            expires_at=datetime.now(UTC) + timedelta(minutes=15),
+            refresh_expires_at=datetime.now(UTC) + timedelta(days=7),
         )
 
         # Generate device fingerprint
@@ -342,17 +353,13 @@ class AuthenticationService:
         """
         current_attempts = await self.user_repository.increment_login_attempts(user.id)
 
-        # Log security event (would integrate with audit service)
-        # await self.audit_service.log_security_event(
-        #     "failed_login_attempt",
-        #     user.id,
-        #     details={"attempts": current_attempts}
-        # )
+        # Log security event (integration point for audit service)
 
         # Lock account after max attempts
         max_attempts = 5
         if current_attempts >= max_attempts:
             lockout_duration = timedelta(minutes=30)
             await self.user_repository.lock_account(
-                user.id, datetime.utcnow() + lockout_duration
+                user.id,
+                datetime.now(UTC) + lockout_duration,
             )

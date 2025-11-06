@@ -4,12 +4,12 @@ Unit tests for Permission value objects and role-based access control.
 Tests permission definitions, role mappings, and authorization logic.
 """
 
+from src.domain.entities.user import UserRole
 from src.domain.value_objects.permission import (
     Permission,
-    RolePermissions,
     PermissionChecker,
+    RolePermissions,
 )
-from src.domain.entities.user import UserRole
 
 
 class TestPermissionEnum:
@@ -88,7 +88,7 @@ class TestRolePermissions:
 
             # Higher roles should have at least as many permissions
             assert next_permissions.issuperset(
-                current_permissions
+                current_permissions,
             ), f"Role {next_role} missing permissions from {role}"
 
     def test_viewer_has_minimal_permissions(self):
@@ -102,7 +102,7 @@ class TestRolePermissions:
     def test_researcher_permissions(self):
         """Test researcher role permissions."""
         researcher_permissions = RolePermissions.get_permissions_for_role(
-            UserRole.RESEARCHER
+            UserRole.RESEARCHER,
         )
 
         # Researcher should have read and create permissions for data sources
@@ -136,24 +136,29 @@ class TestRolePermissions:
 
         # Curator cannot manage other curators or admins
         assert not RolePermissions.can_role_manage_role(
-            UserRole.CURATOR, UserRole.CURATOR
+            UserRole.CURATOR,
+            UserRole.CURATOR,
         )
         assert not RolePermissions.can_role_manage_role(
-            UserRole.CURATOR, UserRole.ADMIN
+            UserRole.CURATOR,
+            UserRole.ADMIN,
         )
 
         # Curator can manage researchers and viewers
         assert RolePermissions.can_role_manage_role(
-            UserRole.CURATOR, UserRole.RESEARCHER
+            UserRole.CURATOR,
+            UserRole.RESEARCHER,
         )
         assert RolePermissions.can_role_manage_role(UserRole.CURATOR, UserRole.VIEWER)
 
         # Researchers cannot manage anyone
         assert not RolePermissions.can_role_manage_role(
-            UserRole.RESEARCHER, UserRole.VIEWER
+            UserRole.RESEARCHER,
+            UserRole.VIEWER,
         )
         assert not RolePermissions.can_role_manage_role(
-            UserRole.RESEARCHER, UserRole.CURATOR
+            UserRole.RESEARCHER,
+            UserRole.CURATOR,
         )
 
     def test_permission_validation(self):
@@ -182,13 +187,16 @@ class TestPermissionChecker:
 
         assert PermissionChecker.has_permission(user_permissions, Permission.USER_READ)
         assert PermissionChecker.has_permission(
-            user_permissions, Permission.DATASOURCE_READ
+            user_permissions,
+            Permission.DATASOURCE_READ,
         )
         assert not PermissionChecker.has_permission(
-            user_permissions, Permission.USER_CREATE
+            user_permissions,
+            Permission.USER_CREATE,
         )
         assert not PermissionChecker.has_permission(
-            user_permissions, Permission.SYSTEM_ADMIN
+            user_permissions,
+            Permission.SYSTEM_ADMIN,
         )
 
     def test_has_any_permission(self):
@@ -197,12 +205,14 @@ class TestPermissionChecker:
 
         # Has at least one from the list
         assert PermissionChecker.has_any_permission(
-            user_permissions, [Permission.USER_READ, Permission.USER_CREATE]
+            user_permissions,
+            [Permission.USER_READ, Permission.USER_CREATE],
         )
 
         # Doesn't have any from the list
         assert not PermissionChecker.has_any_permission(
-            user_permissions, [Permission.USER_CREATE, Permission.SYSTEM_ADMIN]
+            user_permissions,
+            [Permission.USER_CREATE, Permission.SYSTEM_ADMIN],
         )
 
     def test_has_all_permissions(self):
@@ -215,12 +225,14 @@ class TestPermissionChecker:
 
         # Has all permissions in the list
         assert PermissionChecker.has_all_permissions(
-            user_permissions, [Permission.USER_READ, Permission.DATASOURCE_READ]
+            user_permissions,
+            [Permission.USER_READ, Permission.DATASOURCE_READ],
         )
 
         # Missing one permission
         assert not PermissionChecker.has_all_permissions(
-            user_permissions, [Permission.USER_READ, Permission.SYSTEM_ADMIN]
+            user_permissions,
+            [Permission.USER_READ, Permission.SYSTEM_ADMIN],
         )
 
     def test_get_missing_permissions(self):
@@ -234,7 +246,8 @@ class TestPermissionChecker:
         ]
 
         missing = PermissionChecker.get_missing_permissions(
-            user_permissions, required_permissions
+            user_permissions,
+            required_permissions,
         )
 
         expected_missing = {Permission.USER_UPDATE, Permission.SYSTEM_ADMIN}
@@ -294,7 +307,7 @@ class TestRolePermissionIntegration:
     def test_admin_role_comprehensive_access(self):
         """Test that admin role truly has comprehensive access."""
         admin_permissions = set(
-            RolePermissions.get_permissions_for_role(UserRole.ADMIN)
+            RolePermissions.get_permissions_for_role(UserRole.ADMIN),
         )
         all_permissions = set(Permission)
 

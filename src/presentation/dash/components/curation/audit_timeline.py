@@ -4,16 +4,18 @@ Enhanced Audit Timeline Component for MED13 Curation Dashboard.
 Provides sophisticated visualization of curation history and decision trails.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+
+from dash import dcc, html
 
 
 def create_enhanced_audit_timeline(
-    variant_id: str, audit_events: Optional[List[Dict[str, Any]]] = None
+    variant_id: str,
+    audit_events: list[dict[str, Any]] | None = None,
 ) -> dbc.Card:
     """
     Create an enhanced audit timeline showing detailed curation history.
@@ -34,7 +36,7 @@ def create_enhanced_audit_timeline(
                 [
                     html.H5("Audit Timeline", className="mb-0"),
                     html.Small(f"Variant: {variant_id}", className="text-muted ms-2"),
-                ]
+                ],
             ),
             dbc.CardBody(
                 [
@@ -52,13 +54,17 @@ def create_enhanced_audit_timeline(
                                                 id="view-timeline",
                                             ),
                                             dbc.Button(
-                                                "Graph", size="sm", id="view-graph"
+                                                "Graph",
+                                                size="sm",
+                                                id="view-graph",
                                             ),
                                             dbc.Button(
-                                                "Table", size="sm", id="view-table"
+                                                "Table",
+                                                size="sm",
+                                                id="view-table",
                                             ),
-                                        ]
-                                    )
+                                        ],
+                                    ),
                                 ],
                                 width=4,
                             ),
@@ -84,7 +90,7 @@ def create_enhanced_audit_timeline(
                                         id="timeline-filter",
                                         clearable=False,
                                         className="mb-0",
-                                    )
+                                    ),
                                 ],
                                 width=4,
                             ),
@@ -95,10 +101,10 @@ def create_enhanced_audit_timeline(
                                             html.Small(
                                                 f"{len(audit_events)} total events",
                                                 className="text-muted",
-                                            )
+                                            ),
                                         ],
                                         className="text-end",
-                                    )
+                                    ),
                                 ],
                                 width=4,
                             ),
@@ -115,17 +121,17 @@ def create_enhanced_audit_timeline(
                         [dbc.Col(create_timeline_stats(audit_events), width=12)],
                         className="mt-4",
                     ),
-                ]
+                ],
             ),
-        ]
+        ],
     )
 
 
-def create_timeline_view(audit_events: List[Dict[str, Any]]) -> html.Div:
+def create_timeline_view(audit_events: list[dict[str, Any]]) -> html.Div:
     """Create the main timeline view with enhanced visualization."""
     if not audit_events:
         return html.Div(
-            [dbc.Alert("No audit events available for this variant.", color="info")]
+            [dbc.Alert("No audit events available for this variant.", color="info")],
         )
 
     # Sort events by timestamp (most recent first for timeline)
@@ -143,7 +149,9 @@ def create_timeline_view(audit_events: List[Dict[str, Any]]) -> html.Div:
 
 
 def _create_timeline_item(
-    event: Dict[str, Any], event_type: str, index: int
+    event: dict[str, Any],
+    event_type: str,
+    index: int,
 ) -> html.Div:
     """Create a single timeline item with enhanced styling."""
     icon_class, color_class = _get_event_styling(event_type)
@@ -166,15 +174,16 @@ def _create_timeline_item(
                                     html.Div(
                                         [
                                             html.I(
-                                                className=f"{icon_class} timeline-icon {color_class}"
+                                                className=f"{icon_class} timeline-icon {color_class}",
                                             ),
                                             html.Strong(
-                                                event["action"], className="ms-2"
+                                                event["action"],
+                                                className="ms-2",
                                             ),
                                             impact_indicator,
                                         ],
                                         className="d-flex align-items-center",
-                                    )
+                                    ),
                                 ],
                                 width=8,
                             ),
@@ -183,7 +192,7 @@ def _create_timeline_item(
                                     html.Small(
                                         _format_timestamp(event["timestamp"]),
                                         className="text-muted text-end d-block",
-                                    )
+                                    ),
                                 ],
                                 width=4,
                             ),
@@ -218,7 +227,7 @@ def _create_timeline_item(
                                 width=2,
                                 className="text-end",
                             ),
-                        ]
+                        ],
                     ),
                 ],
                 className="timeline-content",
@@ -228,25 +237,24 @@ def _create_timeline_item(
     )
 
 
-def _classify_event_type(event: Dict[str, Any]) -> str:
+def _classify_event_type(event: dict[str, Any]) -> str:
     """Classify event type for styling and filtering."""
     action = event.get("action", "").lower()
 
     if "conflict" in action or "resolve" in action:
         return "conflict"
-    elif "annotat" in action or "comment" in action:
+    if "annotat" in action or "comment" in action:
         return "annotation"
-    elif "approve" in action or "reject" in action or "decis" in action:
+    if "approve" in action or "reject" in action or "decis" in action:
         return "decision"
-    elif "review" in action or "flag" in action:
+    if "review" in action or "flag" in action:
         return "review"
-    elif "update" in action or "change" in action:
+    if "update" in action or "change" in action:
         return "update"
-    else:
-        return "system"
+    return "system"
 
 
-def _get_event_styling(event_type: str) -> Tuple[str, str]:
+def _get_event_styling(event_type: str) -> tuple[str, str]:
     """Get icon and color styling for event type."""
     styling_map = {
         "conflict": ("fas fa-exclamation-triangle", "text-warning"),
@@ -260,7 +268,7 @@ def _get_event_styling(event_type: str) -> Tuple[str, str]:
     return styling_map.get(event_type, ("fas fa-circle", "text-muted"))
 
 
-def _get_decision_impact(event: Dict[str, Any]) -> Optional[html.Span]:
+def _get_decision_impact(event: dict[str, Any]) -> html.Span | None:
     """Create impact indicator for significant decisions."""
     action = event.get("action", "").lower()
     impact_level = None
@@ -283,7 +291,7 @@ def _get_decision_impact(event: Dict[str, Any]) -> Optional[html.Span]:
     return None
 
 
-def _create_event_metadata(event: Dict[str, Any]) -> html.Div:
+def _create_event_metadata(event: dict[str, Any]) -> html.Div:
     """Create metadata display for event details."""
     metadata_items = []
 
@@ -291,28 +299,30 @@ def _create_event_metadata(event: Dict[str, Any]) -> html.Div:
     if "confidence_change" in event:
         metadata_items.append(
             html.Small(
-                f"🎯 Confidence: {event['confidence_change']}", className="d-block"
-            )
+                f"🎯 Confidence: {event['confidence_change']}",
+                className="d-block",
+            ),
         )
 
     # Add evidence strength if present
     if "evidence_level" in event:
         metadata_items.append(
-            html.Small(f"📊 Evidence: {event['evidence_level']}", className="d-block")
+            html.Small(f"📊 Evidence: {event['evidence_level']}", className="d-block"),
         )
 
     # Add related conflicts if present
     if "related_conflicts" in event:
         metadata_items.append(
             html.Small(
-                f"⚠️ Conflicts: {event['related_conflicts']}", className="d-block"
-            )
+                f"⚠️ Conflicts: {event['related_conflicts']}",
+                className="d-block",
+            ),
         )
 
     return html.Div(metadata_items) if metadata_items else html.Div()
 
 
-def _create_event_actions(event: Dict[str, Any], index: int) -> html.Div:
+def _create_event_actions(event: dict[str, Any], index: int) -> html.Div:
     """Create action buttons for timeline events."""
     actions = []
 
@@ -325,7 +335,7 @@ def _create_event_actions(event: Dict[str, Any], index: int) -> html.Div:
                 color="outline-secondary",
                 id=f"undo-event-{index}",
                 title="Undo this action",
-            )
+            ),
         )
 
     # View details action
@@ -336,23 +346,23 @@ def _create_event_actions(event: Dict[str, Any], index: int) -> html.Div:
             color="outline-info",
             id=f"view-event-{index}",
             title="View full details",
-        )
+        ),
     )
 
     return html.Div(actions, className="btn-group-vertical btn-group-sm")
 
 
-def create_graph_view(audit_events: List[Dict[str, Any]]) -> dcc.Graph:
+def create_graph_view(audit_events: list[dict[str, Any]]) -> dcc.Graph:
     """Create a graph view of audit events over time."""
     if not audit_events:
         return dcc.Graph(config={"displayModeBar": False})
 
     # Group events by date and type
-    events_by_date: Dict[str, Dict[str, int]] = {}
+    events_by_date: dict[str, dict[str, int]] = {}
     for event in audit_events:
         if isinstance(event["timestamp"], str):
             try:
-                dt = datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
+                dt = datetime.fromisoformat(event["timestamp"])
                 date_str = dt.date().isoformat()
             except (ValueError, TypeError):
                 date_str = "unknown"
@@ -375,11 +385,11 @@ def create_graph_view(audit_events: List[Dict[str, Any]]) -> dcc.Graph:
     event_types = ["decision", "conflict", "annotation", "review", "update", "system"]
     colors = ["#28a745", "#ffc107", "#17a2b8", "#dc3545", "#007bff", "#6c757d"]
 
-    for event_type, color in zip(event_types, colors):
+    for event_type, color in zip(event_types, colors, strict=False):
         counts = [events_by_date.get(date, {}).get(event_type, 0) for date in dates]
         if any(counts):  # Only add trace if there are events
             traces.append(
-                go.Bar(name=event_type.title(), x=dates, y=counts, marker_color=color)
+                go.Bar(name=event_type.title(), x=dates, y=counts, marker_color=color),
             )
 
     fig = go.Figure(data=traces)
@@ -390,13 +400,13 @@ def create_graph_view(audit_events: List[Dict[str, Any]]) -> dcc.Graph:
         yaxis_title="Number of Events",
         barmode="stack",
         height=400,
-        margin=dict(l=20, r=20, t=40, b=20),
+        margin={"l": 20, "r": 20, "t": 40, "b": 20},
     )
 
     return dcc.Graph(figure=fig, config={"displayModeBar": False})
 
 
-def create_table_view(audit_events: List[Dict[str, Any]]) -> dbc.Table:
+def create_table_view(audit_events: list[dict[str, Any]]) -> dbc.Table:
     """Create a tabular view of audit events."""
     if not audit_events:
         return dbc.Table()
@@ -424,9 +434,9 @@ def create_table_view(audit_events: List[Dict[str, Any]]) -> dbc.Table:
                     dbc.Badge(
                         event_type.title(),
                         className=color_class.replace("text-", "badge-"),
-                    )
+                    ),
                 ),
-            ]
+            ],
         )
         rows.append(row)
 
@@ -439,14 +449,14 @@ def create_table_view(audit_events: List[Dict[str, Any]]) -> dbc.Table:
     )
 
 
-def create_timeline_stats(audit_events: List[Dict[str, Any]]) -> dbc.Card:
+def create_timeline_stats(audit_events: list[dict[str, Any]]) -> dbc.Card:
     """Create statistics summary for the audit timeline."""
     if not audit_events:
         return dbc.Card()
 
     # Calculate statistics
     total_events = len(audit_events)
-    event_types: Dict[str, int] = {}
+    event_types: dict[str, int] = {}
 
     for event in audit_events:
         event_type = _classify_event_type(event)
@@ -468,7 +478,7 @@ def create_timeline_stats(audit_events: List[Dict[str, Any]]) -> dbc.Card:
         days_span = 0
 
     # Most active user
-    user_counts: Dict[str, int] = {}
+    user_counts: dict[str, int] = {}
     for event in audit_events:
         user = event.get("user", "System")
         user_counts[user] = user_counts.get(user, 0) + 1
@@ -491,10 +501,11 @@ def create_timeline_stats(audit_events: List[Dict[str, Any]]) -> dbc.Card:
                                             html.Strong(f"{total_events}"),
                                             html.Br(),
                                             html.Small(
-                                                "Total Events", className="text-muted"
+                                                "Total Events",
+                                                className="text-muted",
                                             ),
-                                        ]
-                                    )
+                                        ],
+                                    ),
                                 ],
                                 width=3,
                             ),
@@ -505,10 +516,11 @@ def create_timeline_stats(audit_events: List[Dict[str, Any]]) -> dbc.Card:
                                             html.Strong(f"{len(event_types)}"),
                                             html.Br(),
                                             html.Small(
-                                                "Event Types", className="text-muted"
+                                                "Event Types",
+                                                className="text-muted",
                                             ),
-                                        ]
-                                    )
+                                        ],
+                                    ),
                                 ],
                                 width=3,
                             ),
@@ -519,10 +531,11 @@ def create_timeline_stats(audit_events: List[Dict[str, Any]]) -> dbc.Card:
                                             html.Strong(f"{days_span}"),
                                             html.Br(),
                                             html.Small(
-                                                "Days Span", className="text-muted"
+                                                "Days Span",
+                                                className="text-muted",
                                             ),
-                                        ]
-                                    )
+                                        ],
+                                    ),
                                 ],
                                 width=3,
                             ),
@@ -536,23 +549,23 @@ def create_timeline_stats(audit_events: List[Dict[str, Any]]) -> dbc.Card:
                                                 f"{most_active_user[1]} events",
                                                 className="text-muted",
                                             ),
-                                        ]
-                                    )
+                                        ],
+                                    ),
                                 ],
                                 width=3,
                             ),
                         ],
                         className="text-center",
                     ),
-                ]
-            )
-        ]
+                ],
+            ),
+        ],
     )
 
 
-def _get_mock_audit_events(variant_id: str) -> List[Dict[str, Any]]:
+def _get_mock_audit_events(variant_id: str) -> list[dict[str, Any]]:
     """Generate mock audit events for demonstration."""
-    base_time = datetime.now()
+    base_time = datetime.now(UTC)
 
     return [
         {
@@ -623,7 +636,7 @@ def _format_timestamp(timestamp: Any) -> str:
     """Format timestamp for display."""
     if isinstance(timestamp, str):
         try:
-            dt = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            dt = datetime.fromisoformat(timestamp)
         except (ValueError, TypeError):
             return timestamp
     elif isinstance(timestamp, datetime):
@@ -634,19 +647,20 @@ def _format_timestamp(timestamp: Any) -> str:
     return dt.strftime("%Y-%m-%d %H:%M")
 
 
-def _is_recent_event(event: Dict[str, Any]) -> bool:
+def _is_recent_event(event: dict[str, Any]) -> bool:
     """Check if event is recent (within last 24 hours)."""
     if isinstance(event["timestamp"], str):
-        event_time = datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
+        event_time = datetime.fromisoformat(event["timestamp"])
     elif isinstance(event["timestamp"], datetime):
         event_time = event["timestamp"]
     else:
         return False
 
-    return (datetime.now() - event_time).total_seconds() < 86400  # 24 hours
+    seconds_in_day: int = 86400
+    return (datetime.now(UTC) - event_time).total_seconds() < seconds_in_day
 
 
-def _is_reversible_action(event: Dict[str, Any]) -> bool:
+def _is_reversible_action(event: dict[str, Any]) -> bool:
     """Check if the action can be reversed."""
     reversible_actions = ["Approved", "Rejected", "Flagged", "Updated"]
     return any(action in event.get("action", "") for action in reversible_actions)
@@ -654,8 +668,8 @@ def _is_reversible_action(event: Dict[str, Any]) -> bool:
 
 __all__ = [
     "create_enhanced_audit_timeline",
-    "create_timeline_view",
     "create_graph_view",
     "create_table_view",
     "create_timeline_stats",
+    "create_timeline_view",
 ]

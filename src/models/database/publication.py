@@ -3,8 +3,10 @@ Publication SQLAlchemy model for MED13 Resource Library.
 Database representation of scientific publications and citations.
 """
 
-from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import String, Text, Integer, Float, Date, Enum as SQLEnum
+from typing import TYPE_CHECKING
+
+from sqlalchemy import Date, Float, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -39,11 +41,13 @@ class PublicationModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 
     # PubMed identifiers
-    pubmed_id: Mapped[Optional[str]] = mapped_column(
-        String(20), unique=True, index=True
+    pubmed_id: Mapped[str | None] = mapped_column(
+        String(20),
+        unique=True,
+        index=True,
     )
-    pmc_id: Mapped[Optional[str]] = mapped_column(String(20), unique=True, index=True)
-    doi: Mapped[Optional[str]] = mapped_column(String(100), unique=True, index=True)
+    pmc_id: Mapped[str | None] = mapped_column(String(20), unique=True, index=True)
+    doi: Mapped[str | None] = mapped_column(String(100), unique=True, index=True)
 
     # Citation information
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -52,39 +56,43 @@ class PublicationModel(Base):
     publication_year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
     # Detailed citation
-    volume: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    issue: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
-    pages: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
-    publication_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
+    volume: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    issue: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    pages: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    publication_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
 
     # Publication metadata
     publication_type: Mapped[str] = mapped_column(
-        String(30), default="journal_article", nullable=False
+        String(30),
+        default="journal_article",
+        nullable=False,
     )
-    abstract: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    keywords: Mapped[Optional[str]] = mapped_column(
-        Text, nullable=True
+    abstract: Mapped[str | None] = mapped_column(Text, nullable=True)
+    keywords: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
     )  # JSON array of keywords
 
     # Quality metrics
-    citation_count: Mapped[Optional[int]] = mapped_column(
-        Integer, nullable=True, default=0
+    citation_count: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        default=0,
     )
-    impact_factor: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    impact_factor: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Review status
     reviewed: Mapped[bool] = mapped_column(default=False, nullable=False)
-    relevance_score: Mapped[Optional[int]] = mapped_column(
-        Integer, nullable=True
+    relevance_score: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
     )  # 1-5 scale for MED13 relevance
 
     # Full text access
-    full_text_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    full_text_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     open_access: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     # Relationships
-    evidence: Mapped[List["EvidenceModel"]] = relationship(back_populates="publication")
+    evidence: Mapped[list["EvidenceModel"]] = relationship(back_populates="publication")
 
-    __table_args__ = {
-        "sqlite_autoincrement": True,
-    }
+    __table_args__ = {"sqlite_autoincrement": True}  # noqa: RUF012

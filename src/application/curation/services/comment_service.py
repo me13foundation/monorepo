@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING
 
-from sqlalchemy.orm import Session
-
-from src.application.curation.repositories.audit_repository import AuditRepository
 from src.models.database.audit import AuditLog
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+    from src.application.curation.repositories.audit_repository import AuditRepository
 
 
 class CommentService:
@@ -18,7 +20,7 @@ class CommentService:
         entity_type: str,
         entity_id: str,
         comment: str,
-        user: Optional[str] = None,
+        user: str | None = None,
     ) -> int:
         log = AuditLog(
             action="comment",

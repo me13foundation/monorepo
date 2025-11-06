@@ -3,22 +3,22 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from src.domain.entities.variant import Variant
-from src.services.domain.variant_service import VariantService
 from src.models.database import (
     Base,
-    GeneModel,
-    VariantModel,
-    PhenotypeModel,
     EvidenceModel,
+    GeneModel,
+    PhenotypeModel,
+    VariantModel,
 )
+from src.services.domain.variant_service import VariantService
 
 
 @pytest.fixture
 def session():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    SessionLocal = sessionmaker(bind=engine)
-    db_session = SessionLocal()
+    session_local = sessionmaker(bind=engine)
+    db_session = session_local()
     try:
         yield db_session
     finally:

@@ -3,12 +3,14 @@ Publication repository for MED13 Resource Library.
 Data access layer for scientific publication entities with citation queries.
 """
 
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 from sqlalchemy import and_, or_, select
 
-from .base import BaseRepository, NotFoundError
 from src.models.database import PublicationModel, PublicationType
+
+from .base import BaseRepository, NotFoundError
 
 
 class PublicationRepository(BaseRepository[PublicationModel, int]):
@@ -23,7 +25,7 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
     def model_class(self) -> type[PublicationModel]:
         return PublicationModel
 
-    def find_by_pubmed_id(self, pubmed_id: str) -> Optional[PublicationModel]:
+    def find_by_pubmed_id(self, pubmed_id: str) -> PublicationModel | None:
         """
         Find a publication by its PubMed ID.
 
@@ -36,7 +38,7 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         stmt = select(PublicationModel).where(PublicationModel.pubmed_id == pubmed_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def find_by_pmc_id(self, pmc_id: str) -> Optional[PublicationModel]:
+    def find_by_pmc_id(self, pmc_id: str) -> PublicationModel | None:
         """
         Find a publication by its PMC ID.
 
@@ -49,7 +51,7 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         stmt = select(PublicationModel).where(PublicationModel.pmc_id == pmc_id)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def find_by_doi(self, doi: str) -> Optional[PublicationModel]:
+    def find_by_doi(self, doi: str) -> PublicationModel | None:
         """
         Find a publication by its DOI.
 
@@ -62,7 +64,7 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         stmt = select(PublicationModel).where(PublicationModel.doi == doi)
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def find_by_pmid(self, pmid: str) -> Optional[PublicationModel]:
+    def find_by_pmid(self, pmid: str) -> PublicationModel | None:
         """
         Alias for find_by_pubmed_id to align with domain terminology.
 
@@ -74,7 +76,7 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         """
         return self.find_by_pubmed_id(pmid)
 
-    def find_by_external_id(self, external_id: str) -> Optional[PublicationModel]:
+    def find_by_external_id(self, external_id: str) -> PublicationModel | None:
         """
         Find a publication by any external identifier (PubMed, PMC, DOI).
 
@@ -89,13 +91,15 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
                 PublicationModel.pubmed_id == external_id,
                 PublicationModel.pmc_id == external_id,
                 PublicationModel.doi == external_id,
-            )
+            ),
         )
         return self.session.execute(stmt).scalar_one_or_none()
 
     def find_by_year(
-        self, year: int, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+        self,
+        year: int,
+        limit: int | None = None,
+    ) -> list[PublicationModel]:
         """
         Find publications from a specific year.
 
@@ -112,8 +116,10 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def find_by_year_range(
-        self, start_year: int, end_year: int
-    ) -> List[PublicationModel]:
+        self,
+        start_year: int,
+        end_year: int,
+    ) -> list[PublicationModel]:
         """
         Find publications between two publication years (inclusive).
 
@@ -130,15 +136,17 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
                 and_(
                     PublicationModel.publication_year >= start_year,
                     PublicationModel.publication_year <= end_year,
-                )
+                ),
             )
             .order_by(PublicationModel.publication_year.asc())
         )
         return list(self.session.execute(stmt).scalars())
 
     def find_by_author(
-        self, author_name: str, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+        self,
+        author_name: str,
+        limit: int | None = None,
+    ) -> list[PublicationModel]:
         """
         Find publications by author name (partial match).
 
@@ -151,15 +159,17 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         """
         search_pattern = f"%{author_name}%"
         stmt = select(PublicationModel).where(
-            PublicationModel.authors.ilike(search_pattern)
+            PublicationModel.authors.ilike(search_pattern),
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
     def find_by_journal(
-        self, journal_name: str, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+        self,
+        journal_name: str,
+        limit: int | None = None,
+    ) -> list[PublicationModel]:
         """
         Find publications in a specific journal.
 
@@ -171,15 +181,17 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
             List of PublicationModel instances in the journal
         """
         stmt = select(PublicationModel).where(
-            PublicationModel.journal.ilike(f"%{journal_name}%")
+            PublicationModel.journal.ilike(f"%{journal_name}%"),
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
     def find_by_type(
-        self, pub_type: PublicationType, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+        self,
+        pub_type: PublicationType,
+        limit: int | None = None,
+    ) -> list[PublicationModel]:
         """
         Find publications of a specific type.
 
@@ -191,13 +203,13 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
             List of PublicationModel instances of the specified type
         """
         stmt = select(PublicationModel).where(
-            PublicationModel.publication_type == pub_type
+            PublicationModel.publication_type == pub_type,
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
-    def find_open_access(self, limit: Optional[int] = None) -> List[PublicationModel]:
+    def find_open_access(self, limit: int | None = None) -> list[PublicationModel]:
         """
         Find open access publications.
 
@@ -213,8 +225,10 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         return list(self.session.execute(stmt).scalars())
 
     def search_publications(
-        self, query: str, limit: int = 20
-    ) -> List[PublicationModel]:
+        self,
+        query: str,
+        limit: int = 20,
+    ) -> list[PublicationModel]:
         """
         Search publications by title, authors, or abstract.
 
@@ -234,15 +248,17 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
                     PublicationModel.authors.ilike(search_pattern),
                     PublicationModel.abstract.ilike(search_pattern),
                     PublicationModel.keywords.ilike(search_pattern),
-                )
+                ),
             )
             .limit(limit)
         )
         return list(self.session.execute(stmt).scalars())
 
     def find_high_impact(
-        self, min_citations: int = 50, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+        self,
+        min_citations: int = 50,
+        limit: int | None = None,
+    ) -> list[PublicationModel]:
         """
         Find high-impact publications based on citation count.
 
@@ -254,15 +270,17 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
             List of high-impact PublicationModel instances
         """
         stmt = select(PublicationModel).where(
-            PublicationModel.citation_count >= min_citations
+            PublicationModel.citation_count >= min_citations,
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
     def find_med13_relevant(
-        self, min_relevance: int = 3, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+        self,
+        min_relevance: int = 3,
+        limit: int | None = None,
+    ) -> list[PublicationModel]:
         """
         Find publications relevant to MED13 research.
 
@@ -277,13 +295,13 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
             and_(
                 PublicationModel.relevance_score >= min_relevance,
                 PublicationModel.relevance_score.isnot(None),
-            )
+            ),
         )
         if limit:
             stmt = stmt.limit(limit)
         return list(self.session.execute(stmt).scalars())
 
-    def get_publication_statistics(self) -> Dict[str, Any]:
+    def get_publication_statistics(self) -> dict[str, Any]:
         """
         Get statistics about publications in the database.
 
@@ -300,8 +318,10 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         }
 
     def find_recent_publications(
-        self, days: int = 30, limit: Optional[int] = None
-    ) -> List[PublicationModel]:
+        self,
+        days: int = 30,
+        limit: int | None = None,
+    ) -> list[PublicationModel]:
         """
         Find publications created within the last N days.
 
@@ -312,7 +332,7 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         Returns:
             List of recently created PublicationModel instances
         """
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
         stmt = (
             select(PublicationModel)
             .where(PublicationModel.created_at >= cutoff)
@@ -337,5 +357,6 @@ class PublicationRepository(BaseRepository[PublicationModel, int]):
         """
         publication = self.find_by_pubmed_id(pubmed_id)
         if publication is None:
-            raise NotFoundError(f"Publication with PubMed ID '{pubmed_id}' not found")
+            message = f"Publication with PubMed ID '{pubmed_id}' not found"
+            raise NotFoundError(message)
         return publication

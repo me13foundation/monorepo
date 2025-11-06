@@ -5,10 +5,11 @@ Pydantic models for variant-related API requests and responses.
 """
 
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from pydantic_core.core_schema import ValidationInfo
 from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core.core_schema import ValidationInfo
 
 
 class VariantType(str, Enum):
@@ -47,58 +48,86 @@ class VariantCreate(BaseModel):
     chromosome: str = Field(..., min_length=1, max_length=10, description="Chromosome")
     position: int = Field(..., ge=1, description="Genomic position")
     reference_allele: str = Field(
-        ..., min_length=1, max_length=1000, description="Reference allele"
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="Reference allele",
     )
     alternate_allele: str = Field(
-        ..., min_length=1, max_length=1000, description="Alternate allele"
+        ...,
+        min_length=1,
+        max_length=1000,
+        description="Alternate allele",
     )
 
     # Optional identifiers
-    clinvar_id: Optional[str] = Field(
-        None, max_length=20, description="ClinVar accession"
+    clinvar_id: str | None = Field(
+        None,
+        max_length=20,
+        description="ClinVar accession",
     )
-    variant_id: Optional[str] = Field(
-        None, max_length=100, description="Custom variant ID"
+    variant_id: str | None = Field(
+        None,
+        max_length=100,
+        description="Custom variant ID",
     )
 
     # HGVS notation
-    hgvs_genomic: Optional[str] = Field(
-        None, max_length=500, description="Genomic HGVS notation"
+    hgvs_genomic: str | None = Field(
+        None,
+        max_length=500,
+        description="Genomic HGVS notation",
     )
-    hgvs_protein: Optional[str] = Field(
-        None, max_length=500, description="Protein HGVS notation"
+    hgvs_protein: str | None = Field(
+        None,
+        max_length=500,
+        description="Protein HGVS notation",
     )
-    hgvs_cdna: Optional[str] = Field(
-        None, max_length=500, description="cDNA HGVS notation"
+    hgvs_cdna: str | None = Field(
+        None,
+        max_length=500,
+        description="cDNA HGVS notation",
     )
 
     # Classification
     variant_type: VariantType = Field(
-        default=VariantType.UNKNOWN, description="Variant type"
+        default=VariantType.UNKNOWN,
+        description="Variant type",
     )
     clinical_significance: ClinicalSignificance = Field(
-        default=ClinicalSignificance.NOT_PROVIDED, description="Clinical significance"
+        default=ClinicalSignificance.NOT_PROVIDED,
+        description="Clinical significance",
     )
 
     # Clinical information
-    condition: Optional[str] = Field(
-        None, max_length=500, description="Associated condition"
+    condition: str | None = Field(
+        None,
+        max_length=500,
+        description="Associated condition",
     )
-    review_status: Optional[str] = Field(
-        None, max_length=100, description="Review status"
+    review_status: str | None = Field(
+        None,
+        max_length=100,
+        description="Review status",
     )
 
     # Population frequency
-    allele_frequency: Optional[float] = Field(
-        None, ge=0, le=1, description="Allele frequency"
+    allele_frequency: float | None = Field(
+        None,
+        ge=0,
+        le=1,
+        description="Allele frequency",
     )
-    gnomad_af: Optional[float] = Field(
-        None, ge=0, le=1, description="gnomAD allele frequency"
+    gnomad_af: float | None = Field(
+        None,
+        ge=0,
+        le=1,
+        description="gnomAD allele frequency",
     )
 
     @field_validator("variant_id", mode="before")
     @classmethod
-    def generate_variant_id(cls, v: Optional[str], info: ValidationInfo) -> str:
+    def generate_variant_id(cls, v: str | None, info: ValidationInfo) -> str:
         """Generate variant ID if not provided."""
         if v is None:
             data = info.data
@@ -120,24 +149,24 @@ class VariantUpdate(BaseModel):
     model_config = ConfigDict(strict=True)
 
     # Identifiers (typically not updated)
-    clinvar_id: Optional[str] = Field(None, max_length=20)
+    clinvar_id: str | None = Field(None, max_length=20)
 
     # HGVS notation
-    hgvs_genomic: Optional[str] = Field(None, max_length=500)
-    hgvs_protein: Optional[str] = Field(None, max_length=500)
-    hgvs_cdna: Optional[str] = Field(None, max_length=500)
+    hgvs_genomic: str | None = Field(None, max_length=500)
+    hgvs_protein: str | None = Field(None, max_length=500)
+    hgvs_cdna: str | None = Field(None, max_length=500)
 
     # Classification
-    variant_type: Optional[VariantType] = None
-    clinical_significance: Optional[ClinicalSignificance] = None
+    variant_type: VariantType | None = None
+    clinical_significance: ClinicalSignificance | None = None
 
     # Clinical information
-    condition: Optional[str] = Field(None, max_length=500)
-    review_status: Optional[str] = Field(None, max_length=100)
+    condition: str | None = Field(None, max_length=500)
+    review_status: str | None = Field(None, max_length=100)
 
     # Population frequency
-    allele_frequency: Optional[float] = Field(None, ge=0, le=1)
-    gnomad_af: Optional[float] = Field(None, ge=0, le=1)
+    allele_frequency: float | None = Field(None, ge=0, le=1)
+    gnomad_af: float | None = Field(None, ge=0, le=1)
 
 
 class VariantResponse(BaseModel):
@@ -152,7 +181,7 @@ class VariantResponse(BaseModel):
     # Primary identifiers
     id: int = Field(..., description="Database primary key")
     variant_id: str = Field(..., description="Unique variant identifier")
-    clinvar_id: Optional[str] = Field(None, description="ClinVar accession")
+    clinvar_id: str | None = Field(None, description="ClinVar accession")
 
     # Gene relationship
     gene_id: str = Field(..., description="Associated gene identifier")
@@ -165,23 +194,24 @@ class VariantResponse(BaseModel):
     alternate_allele: str = Field(..., description="Alternate allele")
 
     # HGVS notation
-    hgvs_genomic: Optional[str] = Field(None, description="Genomic HGVS notation")
-    hgvs_protein: Optional[str] = Field(None, description="Protein HGVS notation")
-    hgvs_cdna: Optional[str] = Field(None, description="cDNA HGVS notation")
+    hgvs_genomic: str | None = Field(None, description="Genomic HGVS notation")
+    hgvs_protein: str | None = Field(None, description="Protein HGVS notation")
+    hgvs_cdna: str | None = Field(None, description="cDNA HGVS notation")
 
     # Classification
     variant_type: VariantType = Field(..., description="Variant type")
     clinical_significance: ClinicalSignificance = Field(
-        ..., description="Clinical significance"
+        ...,
+        description="Clinical significance",
     )
 
     # Clinical information
-    condition: Optional[str] = Field(None, description="Associated condition")
-    review_status: Optional[str] = Field(None, description="Review status")
+    condition: str | None = Field(None, description="Associated condition")
+    review_status: str | None = Field(None, description="Review status")
 
     # Population frequency
-    allele_frequency: Optional[float] = Field(None, description="Allele frequency")
-    gnomad_af: Optional[float] = Field(None, description="gnomAD allele frequency")
+    allele_frequency: float | None = Field(None, description="Allele frequency")
+    gnomad_af: float | None = Field(None, description="gnomAD allele frequency")
 
     # Metadata
     created_at: datetime = Field(..., description="Record creation timestamp")
@@ -189,15 +219,17 @@ class VariantResponse(BaseModel):
 
     # Computed fields
     evidence_count: int = Field(
-        default=0, description="Number of associated evidence records"
+        default=0,
+        description="Number of associated evidence records",
     )
 
     # Optional relationships (included based on query parameters)
-    gene: Optional[Dict[str, Any]] = Field(None, description="Gene details (optional)")
-    evidence: Optional[List[Dict[str, Any]]] = Field(
-        None, description="Associated evidence (optional)"
+    gene: dict[str, Any] | None = Field(None, description="Gene details (optional)")
+    evidence: list[dict[str, Any]] | None = Field(
+        None,
+        description="Associated evidence (optional)",
     )
 
 
 # Type aliases for API documentation
-VariantList = List[VariantResponse]
+VariantList = list[VariantResponse]

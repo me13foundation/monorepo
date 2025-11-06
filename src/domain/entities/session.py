@@ -4,11 +4,13 @@ Session entity for MED13 Resource Library authentication system.
 Manages user sessions, JWT token tracking, and session lifecycle.
 """
 
-from pydantic import BaseModel, Field, model_validator, ConfigDict
-from typing import Optional, Dict, Any
-from uuid import UUID, uuid4
-from datetime import datetime, timedelta, timezone
+import hashlib
+from datetime import UTC, datetime, timedelta
 from enum import Enum
+from typing import Any
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class SessionStatus(str, Enum):
@@ -30,20 +32,20 @@ class UserSession(BaseModel):
     user_id: UUID
 
     # JWT tokens
-    session_token: Optional[str] = None  # Access token
-    refresh_token: Optional[str] = None
+    session_token: str | None = None  # Access token
+    refresh_token: str | None = None
 
     # Session metadata
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    device_fingerprint: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
+    device_fingerprint: str | None = None
 
     # Session lifecycle
     status: SessionStatus = SessionStatus.ACTIVE
     expires_at: datetime
     refresh_expires_at: datetime
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_activity: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_activity: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -52,22 +54,24 @@ class UserSession(BaseModel):
         """Validate session timing constraints."""
         # Refresh token must expire after access token
         if self.refresh_expires_at <= self.expires_at:
-            raise ValueError("Refresh token must expire after access token")
+            msg = "Refresh token must expire after access token"
+            raise ValueError(msg)
 
         # Session should not be created with expired tokens
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if self.expires_at <= now:
-            raise ValueError("Cannot create session with already expired access token")
+            msg = "Cannot create session with already expired access token"
+            raise ValueError(msg)
 
         return self
 
     def is_expired(self) -> bool:
         """Check if access token is expired."""
-        return datetime.now(timezone.utc) > self.expires_at
+        return datetime.now(UTC) > self.expires_at
 
     def is_refresh_expired(self) -> bool:
         """Check if refresh token is expired."""
-        return datetime.now(timezone.utc) > self.refresh_expires_at
+        return datetime.now(UTC) > self.refresh_expires_at
 
     def is_active(self) -> bool:
         """Check if session is active (not expired or revoked)."""
@@ -79,7 +83,7 @@ class UserSession(BaseModel):
 
     def update_activity(self) -> None:
         """Update last activity timestamp."""
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
 
     def revoke(self) -> None:
         """Revoke the session (logout)."""
@@ -91,7 +95,7 @@ class UserSession(BaseModel):
         refresh_token_expiry: timedelta = timedelta(days=7),
     ) -> None:
         """Extend session with new tokens."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         self.expires_at = now + access_token_expiry
         self.refresh_expires_at = now + refresh_token_expiry
         self.update_activity()
@@ -100,10 +104,9 @@ class UserSession(BaseModel):
         self,
         ip_address: str,
         user_agent: str,
-        additional_data: Optional[Dict[str, Any]] = None,
+        additional_data: dict[str, Any] | None = None,
     ) -> str:
         """Generate a device fingerprint for session tracking."""
-        import hashlib
 
         # Create fingerprint from device characteristics
         fingerprint_data = f"{ip_address}|{user_agent}"
@@ -122,30 +125,20 @@ class UserSession(BaseModel):
         if not self.ip_address or not self.user_agent:
             return False  # Cannot determine without baseline
 
-        # Check for IP address changes (basic heuristic)
-        if self.ip_address != new_ip:
-            # Could be legitimate (VPN, mobile network change)
-            # More sophisticated logic could be added here
-            return True
-
-        # Check for user agent changes
-        if self.user_agent != new_user_agent:
-            # Could indicate different device/browser
-            return True
-
-        return False
+        # Basic heuristic: IP or user agent changed
+        return (self.ip_address != new_ip) or (self.user_agent != new_user_agent)
 
     def time_since_activity(self) -> timedelta:
         """Calculate time since last activity."""
-        return datetime.now(timezone.utc) - self.last_activity
+        return datetime.now(UTC) - self.last_activity
 
     def time_until_expiry(self) -> timedelta:
         """Calculate time until access token expires."""
-        return self.expires_at - datetime.now(timezone.utc)
+        return self.expires_at - datetime.now(UTC)
 
     def time_until_refresh_expiry(self) -> timedelta:
         """Calculate time until refresh token expires."""
-        return self.refresh_expires_at - datetime.now(timezone.utc)
+        return self.refresh_expires_at - datetime.now(UTC)
 
     def __str__(self) -> str:
         """String representation for logging."""

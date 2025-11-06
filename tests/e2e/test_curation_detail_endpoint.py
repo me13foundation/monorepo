@@ -2,21 +2,21 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from src.main import create_app
 from src.database.session import SessionLocal, engine
+from src.main import create_app
 from src.models.database import (
     Base,
-    GeneModel,
-    VariantModel,
-    PhenotypeModel,
     EvidenceModel,
+    GeneModel,
+    PhenotypeModel,
+    VariantModel,
 )
-from src.models.database.review import ReviewRecord
 from src.models.database.audit import AuditLog
+from src.models.database.review import ReviewRecord
 from tests.test_types.fixtures import (
     create_test_gene,
-    create_test_variant,
     create_test_phenotype,
+    create_test_variant,
 )
 
 
@@ -129,7 +129,8 @@ def test_curation_detail_endpoint_returns_clinical_context() -> None:
     client = TestClient(app)
 
     response = client.get(
-        "/curation/variants/VCV-E2E-1", headers={"X-API-Key": "read-key-456"}
+        "/curation/variants/VCV-E2E-1",
+        headers={"X-API-Key": "read-key-456"},
     )
 
     assert response.status_code == 200

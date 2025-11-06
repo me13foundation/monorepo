@@ -7,34 +7,43 @@ in the Data Sources module.
 
 import csv
 import json
-import os
+import logging
+import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-import xml.etree.ElementTree as ET
+from typing import Any
 
 from pydantic import BaseModel
 
 from src.domain.entities.user_data_source import SourceConfiguration
+
+# Prefer defusedxml for safe XML parsing; fall back disabled
+try:  # pragma: no cover - import guard
+    from defusedxml.ElementTree import fromstring as xml_fromstring
+
+    DEFUSED_XML_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):  # pragma: no cover - best-effort fallback
+    xml_fromstring = None  # type: ignore[assignment]
+    DEFUSED_XML_AVAILABLE = False
 
 
 class FileUploadResult(BaseModel):
     """Result of a file upload operation."""
 
     success: bool
-    file_path: Optional[str] = None
+    file_path: str | None = None
     record_count: int = 0
     file_size: int = 0
-    detected_format: Optional[str] = None
-    errors: List[str] = []
-    metadata: Dict[str, Any] = {}
+    detected_format: str | None = None
+    errors: list[str] = []
+    metadata: dict[str, Any] = {}
 
 
 class DataRecord(BaseModel):
     """Represents a single data record from uploaded files."""
 
-    data: Dict[str, Any]
-    line_number: Optional[int] = None
-    validation_errors: List[str] = []
+    data: dict[str, Any]
+    line_number: int | None = None
+    validation_errors: list[str] = []
 
     @property
     def is_valid(self) -> bool:
@@ -67,6 +76,7 @@ class FileUploadService:
             "xml": ["application/xml", "text/xml"],
             "tsv": ["text/tab-separated-values"],
         }
+        self._logger = logging.getLogger(__name__)
 
     def process_uploaded_file(
         self,
@@ -87,66 +97,65 @@ class FileUploadService:
         Returns:
             FileUploadResult with processing details
         """
-        try:
-            # Validate file size (100MB limit)
-            file_size = len(file_content)
-            if file_size > 100 * 1024 * 1024:  # 100MB
-                return FileUploadResult(
-                    success=False,
-                    errors=["File too large (max 100MB)"],
-                    file_size=file_size,
-                )
-
-            # Detect format
-            detected_format = self._detect_format(filename, file_content)
-            if not detected_format:
-                return FileUploadResult(
-                    success=False,
-                    errors=["Unsupported file format"],
-                    file_size=file_size,
-                )
-
-            # Save file temporarily
-            file_path = self._save_file(file_content, filename)
-
-            # Parse and validate records
-            records = self._parse_file(file_content, detected_format, max_records)
-
-            # Validate records against configuration
-            validation_errors = self._validate_records(records, configuration)
-
-            # Calculate metadata
-            metadata = {
-                "columns": self._extract_columns(records),
-                "data_types": self._infer_data_types(records),
-                "sample_records": records[:5],  # First 5 records as samples
-            }
-
-            success = len(validation_errors) == 0
-            all_errors = validation_errors
-
-            if len(records) == 0:
-                success = False
-                all_errors.append("No valid records found in file")
-
-            return FileUploadResult(
-                success=success,
-                file_path=str(file_path),
-                record_count=len(records),
-                file_size=file_size,
-                detected_format=detected_format,
-                errors=all_errors,
-                metadata=metadata,
-            )
-
-        except Exception as e:
+        # Validate file size (100MB limit)
+        file_size = len(file_content)
+        if file_size > 100 * 1024 * 1024:  # 100MB
             return FileUploadResult(
                 success=False,
-                errors=[f"Processing error: {str(e)}"],
-                file_size=len(file_content),
+                errors=["File too large (max 100MB)"],
+                file_size=file_size,
             )
 
-    def _detect_format(self, filename: str, content: bytes) -> Optional[str]:
+        # Detect format
+        detected_format = self._detect_format(filename, file_content)
+        if not detected_format:
+            return FileUploadResult(
+                success=False,
+                errors=["Unsupported file format"],
+                file_size=file_size,
+            )
+
+        # Save file temporarily (may raise OSError)
+        try:
+            file_path = self._save_file(file_content, filename)
+        except OSError as e:
+            return FileUploadResult(
+                success=False,
+                errors=[f"Failed to save file: {e!s}"],
+                file_size=file_size,
+            )
+
+        # Parse and validate records
+        records = self._parse_file(file_content, detected_format, max_records)
+
+        # Validate records against configuration
+        validation_errors = self._validate_records(records, configuration)
+
+        # Calculate metadata
+        metadata = {
+            "columns": self._extract_columns(records),
+            "data_types": self._infer_data_types(records),
+            "sample_records": records[:5],  # First 5 records as samples
+        }
+
+        success = len(validation_errors) == 0
+        all_errors = validation_errors
+
+        if len(records) == 0:
+            success = False
+            all_errors.append("No valid records found in file")
+
+        return FileUploadResult(
+            success=success,
+            file_path=str(file_path),
+            record_count=len(records),
+            file_size=file_size,
+            detected_format=detected_format,
+            errors=all_errors,
+            metadata=metadata,
+        )
+
+    def _detect_format(self, filename: str, content: bytes) -> str | None:
         """
         Detect the file format based on filename and content.
 
@@ -158,7 +167,7 @@ class FileUploadService:
             Detected format or None
         """
         # Check filename extension
-        _, ext = os.path.splitext(filename.lower())
+        ext = Path(filename.lower()).suffix
 
         format_map = {
             ".csv": "csv",
@@ -173,11 +182,11 @@ class FileUploadService:
         # Try to detect from content
         try:
             content_str = content.decode("utf-8").strip()
-            if content_str.startswith("{") or content_str.startswith("["):
+            if content_str.startswith(("{", "[")):
                 return "json"
-            elif "<" in content_str[:100]:
+            if "<" in content_str[:100]:
                 return "xml"
-            elif "," in content_str[:100]:
+            if "," in content_str[:100]:
                 return "csv"
         except UnicodeDecodeError:
             pass
@@ -196,19 +205,20 @@ class FileUploadService:
             Path to saved file
         """
         # Generate unique filename
-        import uuid
-
         unique_name = f"{uuid.uuid4()}_{filename}"
         file_path = self.upload_dir / unique_name
 
-        with open(file_path, "wb") as f:
+        with file_path.open("wb") as f:
             f.write(content)
 
         return file_path
 
     def _parse_file(
-        self, content: bytes, format_type: str, max_records: int
-    ) -> List[DataRecord]:
+        self,
+        content: bytes,
+        format_type: str,
+        max_records: int,
+    ) -> list[DataRecord]:
         """
         Parse file content based on format.
 
@@ -227,18 +237,17 @@ class FileUploadService:
 
         if format_type == "csv":
             return self._parse_csv(content_str, max_records)
-        elif format_type == "json":
+        if format_type == "json":
             return self._parse_json(content_str, max_records)
-        elif format_type == "xml":
+        if format_type == "xml":
             return self._parse_xml(content_str, max_records)
-        elif format_type == "tsv":
+        if format_type == "tsv":
             return self._parse_tsv(content_str, max_records)
-        else:
-            return []
+        return []
 
-    def _parse_csv(self, content: str, max_records: int) -> List[DataRecord]:
+    def _parse_csv(self, content: str, max_records: int) -> list[DataRecord]:
         """Parse CSV content."""
-        records: List[DataRecord] = []
+        records: list[DataRecord] = []
         try:
             lines = content.splitlines()
             if not lines:
@@ -250,19 +259,20 @@ class FileUploadService:
 
             reader = csv.DictReader(lines, delimiter=delimiter)
             for i, row in enumerate(
-                reader, start=2
+                reader,
+                start=2,
             ):  # Start at 2 because line 1 is header
                 if len(records) >= max_records:
                     break
                 records.append(DataRecord(data=row, line_number=i))
-        except Exception:
-            pass
+        except Exception as exc:
+            self._logger.exception("Failed to parse CSV content", exc_info=exc)
 
         return records
 
-    def _parse_json(self, content: str, max_records: int) -> List[DataRecord]:
+    def _parse_json(self, content: str, max_records: int) -> list[DataRecord]:
         """Parse JSON content."""
-        records: List[DataRecord] = []
+        records: list[DataRecord] = []
         try:
             data = json.loads(content)
 
@@ -275,16 +285,20 @@ class FileUploadService:
             elif isinstance(data, dict):
                 # Single record
                 records.append(DataRecord(data=data))
-        except Exception:
-            pass
+        except Exception as exc:
+            self._logger.exception("Failed to parse JSON content", exc_info=exc)
 
         return records
 
-    def _parse_xml(self, content: str, max_records: int) -> List[DataRecord]:
-        """Parse XML content."""
-        records: List[DataRecord] = []
+    def _parse_xml(self, content: str, max_records: int) -> list[DataRecord]:
+        """Parse XML content using defusedxml when available."""
+        records: list[DataRecord] = []
+        if not DEFUSED_XML_AVAILABLE or xml_fromstring is None:
+            # XML parsing disabled without defusedxml for safety
+            return records
+
         try:
-            root = ET.fromstring(content)
+            root = xml_fromstring(content)
 
             for i, child in enumerate(root):
                 if len(records) >= max_records:
@@ -293,19 +307,20 @@ class FileUploadService:
                 # Convert XML element to dict
                 record_data = self._xml_element_to_dict(child)
                 records.append(DataRecord(data=record_data, line_number=i + 1))
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001
+            # If XML is malformed, return what we have (empty list)
+            return []
 
         return records
 
-    def _parse_tsv(self, content: str, max_records: int) -> List[DataRecord]:
+    def _parse_tsv(self, content: str, max_records: int) -> list[DataRecord]:
         """Parse TSV content."""
         # TSV is essentially CSV with tab delimiter
         return self._parse_csv(content.replace("\t", ","), max_records)
 
-    def _xml_element_to_dict(self, element: ET.Element) -> Dict[str, Any]:
+    def _xml_element_to_dict(self, element: Any) -> dict[str, Any]:
         """Convert XML element to dictionary."""
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         # Add attributes
         if element.attrib:
@@ -331,8 +346,10 @@ class FileUploadService:
         return result
 
     def _validate_records(
-        self, records: List[DataRecord], configuration: SourceConfiguration
-    ) -> List[str]:
+        self,
+        records: list[DataRecord],
+        configuration: SourceConfiguration,
+    ) -> list[str]:
         """
         Validate records against configuration requirements.
 
@@ -343,7 +360,7 @@ class FileUploadService:
         Returns:
             List of validation error messages
         """
-        errors = []
+        errors: list[str] = []
 
         if not records:
             errors.append("No records to validate")
@@ -352,19 +369,40 @@ class FileUploadService:
         # Check required fields if specified
         required_fields = configuration.metadata.get("required_fields", [])
         if required_fields:
-            for record in records:
-                missing_fields = []
-                for field in required_fields:
-                    if field not in record.data or not record.data[field]:
-                        missing_fields.append(field)
-                if missing_fields:
-                    record.validation_errors.extend(
-                        [f"Missing required fields: {missing_fields}"]
-                    )
-                    errors.append(f"Record missing required fields: {missing_fields}")
+            errors.extend(self._check_required_fields(records, required_fields))
 
         # Validate data types if specified
         expected_types = configuration.metadata.get("expected_types", {})
+        if expected_types:
+            errors.extend(self._check_expected_types(records, expected_types))
+
+        return errors
+
+    def _check_required_fields(
+        self,
+        records: list[DataRecord],
+        required_fields: list[str],
+    ) -> list[str]:
+        """Check that required fields are present in each record."""
+        errors: list[str] = []
+        for record in records:
+            missing_fields = [
+                field for field in required_fields if not record.data.get(field)
+            ]
+            if missing_fields:
+                record.validation_errors.append(
+                    f"Missing required fields: {missing_fields}",
+                )
+                errors.append(f"Record missing required fields: {missing_fields}")
+        return errors
+
+    def _check_expected_types(
+        self,
+        records: list[DataRecord],
+        expected_types: dict[str, str],
+    ) -> list[str]:
+        """Validate expected data types for fields present in records."""
+        errors: list[str] = []
         for record in records:
             for field, expected_type in expected_types.items():
                 if field in record.data:
@@ -375,43 +413,45 @@ class FileUploadService:
                         )
                         record.validation_errors.append(error)
                         errors.append(error)
-
         return errors
 
     def _validate_data_type(self, value: Any, expected_type: str) -> bool:
         """Validate a value against an expected data type."""
+        valid = True
         if expected_type == "string":
-            return isinstance(value, str)
+            valid = isinstance(value, str)
         elif expected_type == "integer":
             try:
                 int(value)
-                return True
+                valid = True
             except (ValueError, TypeError):
-                return False
+                valid = False
         elif expected_type == "float":
             try:
                 float(value)
-                return True
+                valid = True
             except (ValueError, TypeError):
-                return False
+                valid = False
         elif expected_type == "boolean":
-            return isinstance(value, bool) or value.lower() in (
-                "true",
-                "false",
-                "1",
-                "0",
-            )
+            if isinstance(value, bool):
+                valid = True
+            elif isinstance(value, str):
+                valid = value.lower() in ("true", "false", "1", "0")
+            else:
+                valid = False
         else:
-            return True  # Unknown type, accept
+            valid = True  # Unknown type, accept
 
-    def _extract_columns(self, records: List[DataRecord]) -> List[str]:
+        return valid
+
+    def _extract_columns(self, records: list[DataRecord]) -> list[str]:
         """Extract column names from records."""
         columns: set[str] = set()
         for record in records:
             columns.update(record.data.keys())
-        return sorted(list(columns))
+        return sorted(columns)
 
-    def _infer_data_types(self, records: List[DataRecord]) -> Dict[str, str]:
+    def _infer_data_types(self, records: list[DataRecord]) -> dict[str, str]:
         """Infer data types for columns."""
         if not records:
             return {}
@@ -447,17 +487,19 @@ class FileUploadService:
         """Check if string represents an integer."""
         try:
             int(value)
-            return True
         except (ValueError, TypeError):
             return False
+        else:
+            return True
 
     def _is_float(self, value: str) -> bool:
         """Check if string represents a float."""
         try:
             float(value)
-            return True
         except (ValueError, TypeError):
             return False
+        else:
+            return True
 
     def _is_boolean(self, value: str) -> bool:
         """Check if string represents a boolean."""

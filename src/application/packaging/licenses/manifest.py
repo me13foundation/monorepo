@@ -2,11 +2,12 @@
 License manifest generation utilities.
 """
 
-from typing import Dict, Any, List, Optional, cast
 from pathlib import Path
+from typing import Any, cast
+
 import yaml  # type: ignore[import-untyped]
 
-from .manager import LicenseManager, LicenseCompatibility
+from .manager import LicenseCompatibility, LicenseManager
 
 
 class LicenseManifestGenerator:
@@ -15,9 +16,9 @@ class LicenseManifestGenerator:
     @staticmethod
     def generate_manifest(
         package_license: str,
-        source_licenses: List[Dict[str, Any]],
-        output_path: Optional[Path] = None,
-    ) -> Dict[str, Any]:
+        source_licenses: list[dict[str, Any]],
+        output_path: Path | None = None,
+    ) -> dict[str, Any]:
         """
         Generate license manifest.
 
@@ -29,7 +30,7 @@ class LicenseManifestGenerator:
         Returns:
             License manifest dictionary
         """
-        manifest: Dict[str, Any] = {
+        manifest: dict[str, Any] = {
             "package_license": package_license,
             "sources": source_licenses,
             "compliance": {
@@ -45,21 +46,22 @@ class LicenseManifestGenerator:
             source_name = license_info.get("source", "unknown")
 
             compatibility = LicenseManager.check_compatibility(
-                source_license, package_license
+                source_license,
+                package_license,
             )
 
             if compatibility == LicenseCompatibility.MISSING:
                 compliance = manifest["compliance"]
-                warnings = cast(List[str], compliance.setdefault("warnings", []))
+                warnings = cast("list[str]", compliance.setdefault("warnings", []))
                 warnings.append(f"Missing license for source: {source_name}")
 
             elif compatibility == LicenseCompatibility.INCOMPATIBLE:
                 compliance = manifest["compliance"]
                 compliance["status"] = "non-compliant"
-                issues_list = cast(List[str], compliance.setdefault("issues", []))
+                issues_list = cast("list[str]", compliance.setdefault("issues", []))
                 issues_list.append(
                     f"Incompatible license '{source_license}' "
-                    f"from source '{source_name}'"
+                    f"from source '{source_name}'",
                 )
 
         # Write to file if path provided
@@ -67,7 +69,7 @@ class LicenseManifestGenerator:
             output_path = Path(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(output_path, "w", encoding="utf-8") as f:
+            with output_path.open("w", encoding="utf-8") as f:
                 yaml.dump(manifest, f, default_flow_style=False, sort_keys=False)
 
         return manifest
@@ -76,9 +78,9 @@ class LicenseManifestGenerator:
     def generate_source_license_info(
         source_name: str,
         license_id: str,
-        license_url: Optional[str] = None,
-        attribution: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        license_url: str | None = None,
+        attribution: str | None = None,
+    ) -> dict[str, Any]:
         """
         Generate source license information dictionary.
 
