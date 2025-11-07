@@ -5,7 +5,9 @@ Database representation of user-managed data sources with relationships
 and constraints for the Data Sources module.
 """
 
-from typing import TYPE_CHECKING, Any, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     JSON,
@@ -23,6 +25,7 @@ from .base import Base
 
 if TYPE_CHECKING:
     from .ingestion_job import IngestionJobModel
+    from .research_space import ResearchSpaceModel
     from .source_template import SourceTemplateModel
 
 
@@ -65,6 +68,13 @@ class UserDataSourceModel(Base):
         nullable=False,
         index=True,
         doc="User who created this source",
+    )
+    research_space_id: Mapped[str | None] = mapped_column(
+        PGUUID(as_uuid=False),
+        ForeignKey("research_spaces.id"),
+        nullable=True,
+        index=True,
+        doc="Research space this source belongs to",
     )
 
     # Basic information
@@ -117,11 +127,15 @@ class UserDataSourceModel(Base):
     version: Mapped[str] = mapped_column(String(20), nullable=False, default="1.0")
 
     # Relationships
-    template: Mapped[Optional["SourceTemplateModel"]] = relationship(
+    template: Mapped[SourceTemplateModel | None] = relationship(
         "SourceTemplateModel",
         back_populates="sources",
     )
-    ingestion_jobs: Mapped[list["IngestionJobModel"]] = relationship(
+    research_space: Mapped[ResearchSpaceModel | None] = relationship(
+        "ResearchSpaceModel",
+        back_populates="data_sources",
+    )
+    ingestion_jobs: Mapped[list[IngestionJobModel]] = relationship(
         "IngestionJobModel",
         back_populates="source",
         cascade="all, delete-orphan",

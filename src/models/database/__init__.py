@@ -16,6 +16,12 @@ from .ingestion_job import (
 )
 from .phenotype import PhenotypeCategory, PhenotypeModel
 from .publication import PublicationModel, PublicationType
+from .research_space import (
+    MembershipRoleEnum,
+    ResearchSpaceMembershipModel,
+    ResearchSpaceModel,
+    SpaceStatusEnum,
+)
 from .review import ReviewRecord
 from .source_template import (
     SourceTemplateModel,
@@ -50,15 +56,19 @@ __all__ = [
     "IngestionJobModel",
     "IngestionStatus",
     "IngestionTrigger",
+    "MembershipRoleEnum",
     "PhenotypeCategory",
     "PhenotypeModel",
     "PublicationModel",
     "PublicationType",
+    "ResearchSpaceMembershipModel",
+    "ResearchSpaceModel",
     "ReviewRecord",
     "SourceStatus",
     "SourceTemplateModel",
     "SourceType",
     "SourceTypeEnum",
+    "SpaceStatusEnum",
     "TemplateCategory",
     "UserDataSourceModel",
     "UserModel",

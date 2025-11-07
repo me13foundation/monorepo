@@ -24,6 +24,7 @@ from src.application.services.source_management_service import (
 from src.application.services.template_management_service import (
     TemplateManagementService,
 )
+from src.database.session import get_session
 from src.domain.entities.user_data_source import (
     IngestionSchedule,
     SourceConfiguration,
@@ -175,36 +176,54 @@ async def list_data_sources(
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     status: SourceStatus | None = Query(None, description="Filter by status"),
     source_type: str | None = Query(None, description="Filter by source type"),
+    research_space_id: UUID
+    | None = Query(
+        None,
+        description="Filter by research space ID",
+    ),
     service: SourceManagementService = Depends(get_source_service),
+    session: Session = Depends(get_session),
 ) -> DataSourceListResponse:
     """List data sources with pagination and filtering."""
     try:
-        # Get data sources (simplified for now - in real implementation would include filtering)
-        # For now, get all sources and filter - TODO: Add proper filtering to service
-        all_sources = service.get_active_sources(0, 1000)  # Get a large batch
+        source_repo = SqlAlchemyUserDataSourceRepository(session)
 
-        # Apply filters (placeholder)
-        data_sources = all_sources
-        if status:
-            data_sources = [ds for ds in data_sources if ds.status == status]
-        if source_type:
-            type_enum = DomainSourceType(source_type)
-            data_sources = [ds for ds in data_sources if ds.source_type == type_enum]
+        # If research_space_id is provided, filter by space
+        if research_space_id:
+            skip = (page - 1) * limit
+            data_sources = source_repo.find_by_research_space(
+                research_space_id,
+                skip=skip,
+                limit=limit,
+            )
+            # TODO: Add count method to repository for accurate total
+            total = len(data_sources)
+        else:
+            # Get all data sources (simplified for now - in real implementation would include filtering)
+            all_sources = service.get_active_sources(0, 1000)  # Get a large batch
 
-        # Pagination
-        total = len(data_sources)
-        start_idx = (page - 1) * limit
-        end_idx = start_idx + limit
-        paginated_sources = data_sources[start_idx:end_idx]
+            # Apply filters (placeholder)
+            data_sources = all_sources
+            if status:
+                data_sources = [ds for ds in data_sources if ds.status == status]
+            if source_type:
+                type_enum = DomainSourceType(source_type)
+                data_sources = [
+                    ds for ds in data_sources if ds.source_type == type_enum
+                ]
+
+            # Pagination
+            total = len(data_sources)
+            start_idx = (page - 1) * limit
+            end_idx = start_idx + limit
+            data_sources = data_sources[start_idx:end_idx]
 
         return DataSourceListResponse(
-            data_sources=[
-                DataSourceResponse.model_validate(ds) for ds in paginated_sources
-            ],
+            data_sources=[DataSourceResponse.model_validate(ds) for ds in data_sources],
             total=total,
             page=page,
             limit=limit,
-            has_next=end_idx < total,
+            has_next=(page * limit) < total,
             has_prev=page > 1,
         )
     except Exception as e:

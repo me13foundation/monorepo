@@ -84,6 +84,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
             "/docs",
             "/openapi.json",
             "/",
+            "/auth/",  # All auth routes use JWT
+            "/research-spaces",  # Research spaces use JWT
+            "/admin/",  # Admin routes use JWT
+            "/dashboard/",  # Dashboard routes use JWT
         ]
 
     async def dispatch(
@@ -101,6 +105,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if any(request.url.path.startswith(path) for path in self.exclude_paths):
             return await call_next(request)
 
+        # Skip if JWT token is present (let JWTAuthMiddleware handle it)
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            return await call_next(request)
+
         # For read operations (GET), allow with any valid key
         # For write operations (POST, PUT, DELETE), require write or admin
         if request.method in ["POST", "PUT", "DELETE"]:
@@ -110,18 +119,49 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         role = await self.auth.authenticate(request)
         if not role:
+            # Add CORS headers to error response
+            origin = request.headers.get("origin")
+            headers = {"WWW-Authenticate": "APIKey"}
+            if origin and origin in [
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://localhost:8050",
+                "http://localhost:8080",
+            ]:
+                headers.update(
+                    {
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Credentials": "true",
+                    },
+                )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="API key required",
-                headers={"WWW-Authenticate": "APIKey"},
+                headers=headers,
             )
 
         # Check role permissions
         role_hierarchy = {"read": 1, "write": 2, "admin": 3}
         if role_hierarchy.get(role, 0) < role_hierarchy.get(required_role, 999):
+            # Add CORS headers to error response
+            origin = request.headers.get("origin")
+            headers = {}
+            if origin and origin in [
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://localhost:8050",
+                "http://localhost:8080",
+            ]:
+                headers.update(
+                    {
+                        "Access-Control-Allow-Origin": origin,
+                        "Access-Control-Allow-Credentials": "true",
+                    },
+                )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Insufficient permissions. Required: {required_role}",
+                headers=headers,
             )
 
         # Add user info to request state

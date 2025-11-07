@@ -1,18 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { signIn, getSession } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { LoginForm } from "@/components/auth/LoginForm"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 
-export default function LoginPage() {
+function LoginContent() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Check if redirected due to session expiration
+    const sessionError = searchParams.get('error')
+    if (sessionError === 'SessionExpired') {
+      setError('Your session has expired. Please log in again.')
+    }
+  }, [searchParams])
 
   const handleLogin = async (email: string, password: string) => {
     setIsLoading(true)
@@ -90,5 +99,31 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-heading font-bold text-foreground">
+              MED13 Admin
+            </h1>
+            <p className="mt-2 text-muted-foreground">
+              Sign in to access the administrative interface
+            </p>
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center text-muted-foreground">Loading...</div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }

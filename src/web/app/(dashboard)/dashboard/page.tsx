@@ -3,11 +3,12 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
-import { useSession, signOut } from 'next-auth/react'
-import { Database, Users, Activity, Plus, Settings, BarChart3, LogOut, User } from 'lucide-react'
+import { useSession } from 'next-auth/react'
+import { Database, Users, Activity, BarChart3 } from 'lucide-react'
 import { useDashboardStats, useRecentActivities } from '@/lib/queries/dashboard'
+import { useSpaceContext } from '@/components/space-context-provider'
+import { useResearchSpaces } from '@/lib/queries/research-spaces'
 
 export default function DashboardPage() {
   return (
@@ -21,47 +22,24 @@ function DashboardContent() {
   const { data: session } = useSession()
   const { data: stats, isLoading: statsLoading } = useDashboardStats()
   const { data: recent, isLoading: recentLoading } = useRecentActivities(5)
+  const { currentSpaceId } = useSpaceContext()
+  const { data } = useResearchSpaces()
 
-  const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/login' })
-  }
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card shadow-sm border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div>
-              <h1 className="text-4xl font-heading font-bold text-foreground">MED13 Admin Dashboard</h1>
-              <p className="mt-2 text-base text-muted-foreground">
-                Welcome back, {session?.user?.full_name || session?.user?.email}
-              </p>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <User className="h-4 w-4" />
-                <span>{session?.user?.role}</span>
-              </div>
-              <ThemeToggle />
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Data Source
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-4xl font-heading font-bold text-foreground">MED13 Admin Dashboard</h1>
+        <p className="mt-2 text-base text-muted-foreground">
+          Welcome back, {session?.user?.full_name || session?.user?.email}
+        </p>
+        {currentSpaceId && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Current space: {data?.spaces?.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
+          </p>
+        )}
+      </div>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -167,7 +145,7 @@ function DashboardContent() {
             </CardContent>
           </Card>
         </div>
-      </main>
+      </div>
     </div>
   )
 }

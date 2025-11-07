@@ -7,6 +7,7 @@ for reliable, self-documenting test data.
 
 from datetime import UTC, datetime
 from typing import NamedTuple
+from uuid import UUID, uuid4
 
 
 # Test data types using NamedTuple for immutable, typed test data
@@ -87,6 +88,36 @@ class TestPublication(NamedTuple):
     doi: str | None
     pmid: str | None
     abstract: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TestResearchSpace(NamedTuple):
+    """Typed test research space data."""
+
+    id: UUID
+    slug: str
+    name: str
+    description: str
+    owner_id: UUID
+    status: str
+    settings: dict[str, object]
+    tags: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+class TestResearchSpaceMembership(NamedTuple):
+    """Typed test research space membership data."""
+
+    id: UUID
+    space_id: UUID
+    user_id: UUID
+    role: str
+    invited_by: UUID | None
+    invited_at: datetime | None
+    joined_at: datetime | None
+    is_active: bool
     created_at: datetime
     updated_at: datetime
 
@@ -373,4 +404,136 @@ TEST_PUBLICATION_REVIEW = create_test_publication(
     publication_year=2022,
     doi="10.1093/hmg/ddac123",
     pmid="35640231",
+)
+
+
+def create_test_research_space(
+    space_id: UUID | None = None,
+    slug: str = "med13-research",
+    name: str = "MED13 Research Space",
+    description: str = "Research space for MED13 syndrome studies",
+    owner_id: UUID | None = None,
+    status: str = "active",
+    settings: dict[str, object] | None = None,
+    tags: list[str] | None = None,
+) -> TestResearchSpace:
+    """
+    Create a typed test research space with sensible defaults.
+
+    Args:
+        space_id: Research space identifier (generated if not provided)
+        slug: URL-safe unique identifier
+        name: Display name
+        description: Space description
+        owner_id: User ID of the space owner (generated if not provided)
+        status: Space status (active, inactive, archived, suspended)
+        settings: Space-specific settings
+        tags: Searchable tags
+
+    Returns:
+        Typed test research space data
+    """
+    if space_id is None:
+        space_id = uuid4()
+    if owner_id is None:
+        owner_id = uuid4()
+    if settings is None:
+        settings = {}
+    if tags is None:
+        tags = ["med13", "research", "syndrome"]
+
+    now = datetime.now(UTC)
+    return TestResearchSpace(
+        id=space_id,
+        slug=slug,
+        name=name,
+        description=description,
+        owner_id=owner_id,
+        status=status,
+        settings=settings,
+        tags=tags,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+def create_test_research_space_membership(
+    membership_id: UUID | None = None,
+    space_id: UUID | None = None,
+    user_id: UUID | None = None,
+    role: str = "viewer",
+    invited_by: UUID | None = None,
+    invited_at: datetime | None = None,
+    joined_at: datetime | None = None,
+    *,
+    is_active: bool = True,
+) -> TestResearchSpaceMembership:
+    """
+    Create a typed test research space membership with sensible defaults.
+
+    Args:
+        membership_id: Membership identifier (generated if not provided)
+        space_id: Research space ID (generated if not provided)
+        user_id: User ID (generated if not provided)
+        role: User's role (owner, admin, curator, researcher, viewer)
+        invited_by: User ID who sent the invitation
+        invited_at: When the invitation was sent
+        joined_at: When the user joined
+        is_active: Whether the membership is active
+
+    Returns:
+        Typed test research space membership data
+    """
+    if membership_id is None:
+        membership_id = uuid4()
+    if space_id is None:
+        space_id = uuid4()
+    if user_id is None:
+        user_id = uuid4()
+
+    now = datetime.now(UTC)
+    return TestResearchSpaceMembership(
+        id=membership_id,
+        space_id=space_id,
+        user_id=user_id,
+        role=role,
+        invited_by=invited_by,
+        invited_at=invited_at,
+        joined_at=joined_at,
+        is_active=is_active,
+        created_at=now,
+        updated_at=now,
+    )
+
+
+# Pre-defined research space test instances
+TEST_RESEARCH_SPACE_MED13 = create_test_research_space(
+    slug="med13-research",
+    name="MED13 Research Space",
+    description="Primary research space for MED13 syndrome",
+    tags=["med13", "syndrome", "research"],
+)
+
+TEST_RESEARCH_SPACE_MED12 = create_test_research_space(
+    slug="med12-research",
+    name="MED12 Research Space",
+    description="Research space for MED12 syndrome",
+    tags=["med12", "syndrome", "research"],
+)
+
+TEST_MEMBERSHIP_OWNER = create_test_research_space_membership(
+    role="owner",
+    is_active=True,
+)
+
+TEST_MEMBERSHIP_ADMIN = create_test_research_space_membership(
+    role="admin",
+    is_active=True,
+)
+
+TEST_MEMBERSHIP_PENDING = create_test_research_space_membership(
+    role="viewer",
+    invited_at=datetime.now(UTC),
+    joined_at=None,
+    is_active=True,
 )

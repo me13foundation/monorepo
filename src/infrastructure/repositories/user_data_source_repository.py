@@ -153,6 +153,23 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         results = self.session.execute(stmt).scalars().all()
         return [UserDataSourceMapper.to_domain(model) for model in results]
 
+    def find_by_research_space(
+        self,
+        research_space_id: UUID,
+        skip: int = 0,
+        limit: int = 50,
+    ) -> list[UserDataSource]:
+        """Find all data sources in a specific research space."""
+        stmt = (
+            select(UserDataSourceModel)
+            .where(UserDataSourceModel.research_space_id == str(research_space_id))
+            .order_by(desc(UserDataSourceModel.updated_at))
+            .offset(skip)
+            .limit(limit)
+        )
+        results = self.session.execute(stmt).scalars().all()
+        return [UserDataSourceMapper.to_domain(model) for model in results]
+
     def search_by_name(
         self,
         query: str,

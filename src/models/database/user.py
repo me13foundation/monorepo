@@ -4,13 +4,13 @@ User database model for MED13 Resource Library.
 SQLAlchemy model for user accounts with security fields and constraints.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from sqlalchemy import TIMESTAMP, Boolean, Index, Integer, String
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.domain.entities.user import UserRole, UserStatus
 
@@ -124,15 +124,34 @@ class UserModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
         doc="Account creation timestamp",
     )
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
         nullable=False,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC),
         doc="Last account update timestamp",
+    )
+
+    # Relationships
+    owned_spaces = relationship(
+        "ResearchSpaceModel",
+        back_populates="owner",
+        foreign_keys="ResearchSpaceModel.owner_id",
+        cascade="all, delete-orphan",
+    )
+    space_memberships = relationship(
+        "ResearchSpaceMembershipModel",
+        back_populates="user",
+        foreign_keys="ResearchSpaceMembershipModel.user_id",
+        cascade="all, delete-orphan",
+    )
+    sent_invitations = relationship(
+        "ResearchSpaceMembershipModel",
+        back_populates="inviter",
+        foreign_keys="ResearchSpaceMembershipModel.invited_by",
     )
 
     __table_args__ = (

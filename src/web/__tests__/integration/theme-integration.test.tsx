@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import DashboardPage from '@/app/dashboard/page'
+import DashboardPage from '@/app/(dashboard)/dashboard/page'
 
 // Mock NextAuth session
 const mockSession = {
@@ -32,6 +32,24 @@ jest.mock('@/components/auth/ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }))
 
+// Mock space context
+jest.mock('@/components/space-context-provider', () => ({
+  useSpaceContext: () => ({
+    currentSpaceId: null,
+    setCurrentSpaceId: jest.fn(),
+    isLoading: false,
+  }),
+  SpaceContextProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+// Mock research spaces query
+jest.mock('@/lib/queries/research-spaces', () => ({
+  useResearchSpaces: () => ({
+    data: { spaces: [] },
+    isLoading: false,
+  }),
+}))
+
 // Mock next-themes for integration testing
 jest.mock('next-themes', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -52,28 +70,7 @@ describe('Theme Integration', () => {
     })
   })
 
-  it('theme toggle button appears on dashboard', () => {
-    render(<DashboardPage />)
-    expect(screen.getByRole('button', { name: /toggle theme/i })).toBeInTheDocument()
-  })
-
-  it('theme toggle can be clicked', async () => {
-    const user = userEvent.setup()
-    const mockSetTheme = jest.fn()
-
-    mockUseTheme.mockReturnValue({
-      theme: 'light',
-      setTheme: mockSetTheme,
-      themes: ['light', 'dark', 'system'],
-    })
-
-    render(<DashboardPage />)
-
-    const toggleButton = screen.getByRole('button', { name: /toggle theme/i })
-    await user.click(toggleButton)
-
-    expect(mockSetTheme).toHaveBeenCalledWith('dark')
-  })
+  // Note: Theme toggle is now in Header component, tested separately
 
   it('dashboard maintains functionality with theme system', () => {
     render(<DashboardPage />)
@@ -83,15 +80,10 @@ describe('Theme Integration', () => {
     expect(screen.getByText('Data Sources')).toBeInTheDocument()
     expect(screen.getByText('Recent Data Sources')).toBeInTheDocument()
     expect(screen.getByText('System Activity')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add data source/i })).toBeInTheDocument()
+    // Note: Action buttons are now in Header component
   })
 
-  it('theme toggle has proper accessibility', () => {
-    render(<DashboardPage />)
-    const toggleButton = screen.getByRole('button', { name: /toggle theme/i })
-    expect(screen.getByText('Toggle theme')).toHaveClass('sr-only')
-  })
+  // Note: Theme toggle accessibility is tested in Header component tests
 })
 // Mock React Query dashboard hooks to avoid QueryClient in tests
 jest.mock('@/lib/queries/dashboard', () => ({

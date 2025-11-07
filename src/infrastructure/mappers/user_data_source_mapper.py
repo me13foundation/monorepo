@@ -57,6 +57,9 @@ class UserDataSourceMapper:
         return UserDataSource(
             id=UUID(model.id),
             owner_id=UUID(model.owner_id),
+            research_space_id=(
+                UUID(model.research_space_id) if model.research_space_id else None
+            ),
             name=model.name,
             description=model.description,
             source_type=SourceType(model.source_type),
@@ -86,6 +89,9 @@ class UserDataSourceMapper:
         return UserDataSourceModel(
             id=str(entity.id),
             owner_id=str(entity.owner_id),
+            research_space_id=(
+                str(entity.research_space_id) if entity.research_space_id else None
+            ),
             name=entity.name,
             description=entity.description,
             source_type=entity.source_type.value,

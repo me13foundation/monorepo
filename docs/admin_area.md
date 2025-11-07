@@ -903,53 +903,53 @@ All API endpoints implement authorization checks:
 ### Phase 1: Backend Foundation (Week 1-2)
 
 **Domain Layer:**
-- [ ] Create `ResearchSpace` domain entity with Pydantic BaseModel, `ConfigDict(frozen=True)`
-- [ ] Create `ResearchSpaceMembership` domain entity with immutability pattern
-- [ ] Create `MembershipRole` and `SpaceStatus` enums (str, Enum)
-- [ ] Add field validators and business logic methods
-- [ ] Create repository interfaces extending `Repository[Entity, UUID]` pattern
-- [ ] Create domain services for business logic (e.g., `ResearchSpaceDomainService`)
-- [ ] Ensure 100% MyPy strict compliance
+- [x] Create `ResearchSpace` domain entity with Pydantic BaseModel, `ConfigDict(frozen=True)`
+- [x] Create `ResearchSpaceMembership` domain entity with immutability pattern
+- [x] Create `MembershipRole` and `SpaceStatus` enums (str, Enum)
+- [x] Add field validators and business logic methods
+- [x] Create repository interfaces extending `Repository[Entity, UUID]` pattern
+- [x] Create domain services for business logic (e.g., `ResearchSpaceDomainService`)
+- [x] Ensure 100% MyPy strict compliance
 
 **Infrastructure Layer:**
-- [ ] Create `ResearchSpaceModel` SQLAlchemy model (extends Base, proper typing)
-- [ ] Create `ResearchSpaceMembershipModel` SQLAlchemy model
-- [ ] Implement `SqlAlchemyResearchSpaceRepository` implementing `ResearchSpaceRepository` interface
-- [ ] Implement `SqlAlchemyResearchSpaceMembershipRepository` implementing `ResearchSpaceMembershipRepository` interface
-- [ ] Create entity-to-model mappers (domain ↔ infrastructure)
-- [ ] Create Alembic migration for new tables
-- [ ] Update `UserDataSourceModel` to include `research_space_id` foreign key
-- [ ] Create migration to add `research_space_id` to `user_data_sources`
-- [ ] Add proper database indexes for performance
+- [x] Create `ResearchSpaceModel` SQLAlchemy model (extends Base, proper typing)
+- [x] Create `ResearchSpaceMembershipModel` SQLAlchemy model
+- [x] Implement `SqlAlchemyResearchSpaceRepository` implementing `ResearchSpaceRepository` interface
+- [x] Implement `SqlAlchemyResearchSpaceMembershipRepository` implementing `ResearchSpaceMembershipRepository` interface
+- [x] Create entity-to-model mappers (domain ↔ infrastructure)
+- [x] Create Alembic migration for new tables
+- [x] Update `UserDataSourceModel` to include `research_space_id` foreign key
+- [x] Create migration to add `research_space_id` to `user_data_sources`
+- [x] Add proper database indexes for performance
 
 **Application Layer:**
-- [ ] Create `ResearchSpaceManagementService` with dependency injection
-- [ ] Create `MembershipManagementService` with dependency injection
-- [ ] Create `SpaceAuthorizationService` for permission checks
-- [ ] Create Request DTOs (`CreateSpaceRequest`, `UpdateSpaceRequest`, etc.) following existing patterns
-- [ ] Create Response DTOs for API contracts
-- [ ] Add dependency injection configuration in `application/container.py`
-- [ ] Implement proper error handling with domain exceptions
-- [ ] Follow existing service patterns (see `SourceManagementService` for reference)
+- [x] Create `ResearchSpaceManagementService` with dependency injection
+- [x] Create `MembershipManagementService` with dependency injection
+- [x] Create `SpaceAuthorizationService` for permission checks
+- [x] Create Request DTOs (`CreateSpaceRequest`, `UpdateSpaceRequest`, etc.) following existing patterns
+- [x] Create Response DTOs for API contracts
+- [x] Add dependency injection configuration in `application/container.py`
+- [x] Implement proper error handling with domain exceptions
+- [x] Follow existing service patterns (see `SourceManagementService` for reference)
 
 **API Layer:**
-- [ ] Create `/api/spaces` route module
-- [ ] Implement CRUD endpoints for research spaces
-- [ ] Implement membership management endpoints
-- [ ] Add space context middleware
-- [ ] Update data source endpoints to require space context
-- [ ] Add OpenAPI documentation
+- [x] Create `/api/spaces` route module
+- [x] Implement CRUD endpoints for research spaces
+- [x] Implement membership management endpoints
+- [x] Add space context middleware
+- [x] Update data source endpoints to require space context
+- [x] Add OpenAPI documentation
 
 **Testing:**
-- [ ] Unit tests for domain entities with typed test fixtures (following `type_examples.md` patterns)
-- [ ] Unit tests for application services with mock repositories
-- [ ] Integration tests for API endpoints
-- [ ] Repository tests with type-safe mocks
-- [ ] Authorization tests with permission scenarios
-- [ ] Use `create_test_research_space()` fixture pattern
-- [ ] Use `MockResearchSpaceRepository` pattern for service tests
-- [ ] Achieve >85% test coverage for new code
-- [ ] All tests must pass MyPy strict type checking
+- [x] Unit tests for domain entities with typed test fixtures (following `type_examples.md` patterns)
+- [x] Unit tests for application services with mock repositories
+- [x] Integration tests for API endpoints
+- [x] Repository tests with type-safe mocks
+- [x] Authorization tests with permission scenarios
+- [x] Use `create_test_research_space()` fixture pattern
+- [x] Use `MockResearchSpaceRepository` pattern for service tests
+- [x] Achieve >85% test coverage for new code
+- [x] All tests must pass MyPy strict type checking
 
 ### Phase 2: Data Migration (Week 2)
 
@@ -963,45 +963,45 @@ All API endpoints implement authorization checks:
 ### Phase 3: Frontend Foundation (Week 3-4)
 
 **Type Definitions:**
-- [ ] Create TypeScript types for research spaces (`src/web/types/research-space.ts`)
-- [ ] Create TypeScript types for memberships
-- [ ] Add Zod schemas for runtime validation (following existing patterns)
-- [ ] Export types from shared types module
-- [ ] Ensure 100% TypeScript coverage, no `any` types
+- [x] Create TypeScript types for research spaces (`src/web/types/research-space.ts`)
+- [x] Create TypeScript types for memberships
+- [x] Add Zod schemas for runtime validation (following existing patterns)
+- [x] Export types from shared types module
+- [x] Ensure 100% TypeScript coverage, no `any` types
 
 **API Client:**
-- [ ] Create `research-spaces.ts` API client module
-- [ ] Implement all API functions
-- [ ] Add error handling
-- [ ] Add request/response types
+- [x] Create `research-spaces.ts` API client module
+- [x] Implement all API functions
+- [x] Add error handling
+- [x] Add request/response types
 
 **React Query Hooks:**
-- [ ] Create query hooks for research spaces (`useResearchSpaces`, `useResearchSpace`)
-- [ ] Create mutation hooks for CRUD operations (`useCreateResearchSpace`, etc.)
-- [ ] Create membership management hooks (`useSpaceMembers`, `useInviteMember`, etc.)
-- [ ] Add query key factories following existing patterns (`researchSpaceKeys`)
-- [ ] Add optimistic updates for better UX
-- [ ] Implement proper error handling and loading states
-- [ ] Follow existing hook patterns (see `lib/queries/dashboard.ts` for reference)
+- [x] Create query hooks for research spaces (`useResearchSpaces`, `useResearchSpace`)
+- [x] Create mutation hooks for CRUD operations (`useCreateResearchSpace`, etc.)
+- [x] Create membership management hooks (`useSpaceMembers`, `useInviteMember`, etc.)
+- [x] Add query key factories following existing patterns (`researchSpaceKeys`)
+- [x] Add optimistic updates for better UX
+- [x] Implement proper error handling and loading states
+- [x] Follow existing hook patterns (see `lib/queries/dashboard.ts` for reference)
 
 **Core Components:**
-- [ ] Create `ResearchSpacesList` component (uses shadcn/ui, React Query)
-- [ ] Create `ResearchSpaceCard` component (composable, accessible)
-- [ ] Create `CreateSpaceForm` component (React Hook Form + Zod validation)
-- [ ] Create `ResearchSpaceDetail` component (tabbed interface, server/client components)
-- [ ] Create `SpaceMembersList` component (shadcn/ui Table component)
-- [ ] Create `InviteMemberDialog` component (shadcn/ui Dialog)
-- [ ] Create `UpdateRoleDialog` component (form validation)
-- [ ] Create `SpaceSelector` component (dropdown, context-aware)
-- [ ] All components must be WCAG AA compliant
-- [ ] All components must have TypeScript types
-- [ ] Follow component composition patterns from `EngenieeringArchitectureNext.md`
+- [x] Create `ResearchSpacesList` component (uses shadcn/ui, React Query)
+- [x] Create `ResearchSpaceCard` component (composable, accessible)
+- [x] Create `CreateSpaceForm` component (React Hook Form + Zod validation)
+- [x] Create `ResearchSpaceDetail` component (tabbed interface, server/client components)
+- [x] Create `SpaceMembersList` component (shadcn/ui Table component)
+- [x] Create `InviteMemberDialog` component (shadcn/ui Dialog)
+- [x] Create `UpdateRoleDialog` component (form validation)
+- [x] Create `SpaceSelector` component (dropdown, context-aware)
+- [x] All components must be WCAG AA compliant
+- [x] All components must have TypeScript types
+- [x] Follow component composition patterns from `EngenieeringArchitectureNext.md`
 
 **Pages:**
-- [ ] Create `/spaces` list page
-- [ ] Create `/spaces/new` create page
-- [ ] Create `/spaces/[spaceId]` detail page
-- [ ] Add navigation links
+- [x] Create `/spaces` list page
+- [x] Create `/spaces/new` create page
+- [x] Create `/spaces/[spaceId]` detail page
+- [x] Add navigation links
 
 **Testing:**
 - [ ] Component unit tests with React Testing Library
@@ -1014,22 +1014,22 @@ All API endpoints implement authorization checks:
 ### Phase 4: Integration & Polish (Week 4-5)
 
 **Data Source Integration:**
-- [ ] Update data source list to filter by space
-- [ ] Update data source create to require space
-- [ ] Add space context to all data source operations
-- [ ] Update data source UI components
+- [x] Update data source list to filter by space
+- [x] Update data source create to require space
+- [x] Add space context to all data source operations
+- [x] Update data source UI components
 
 **Navigation & UX:**
-- [ ] Add space selector to header/navigation
-- [ ] Update dashboard to show space context
-- [ ] Add breadcrumbs
-- [ ] Improve loading states
-- [ ] Add error boundaries
-- [ ] Add success/error toast notifications
+- [x] Add space selector to header/navigation
+- [x] Update dashboard to show space context
+- [x] Add breadcrumbs
+- [x] Improve loading states
+- [x] Add error boundaries
+- [x] Add success/error toast notifications
 
 **Documentation:**
-- [ ] API documentation updates
-- [ ] Component documentation
+- [x] API documentation updates (endpoints documented in code)
+- [ ] Component documentation (JSDoc comments added)
 - [ ] User guide for space management
 - [ ] Admin guide for member management
 

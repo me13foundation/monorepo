@@ -63,15 +63,22 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         """Get CORS headers for the request origin."""
         origin = request.headers.get("origin")
         cors_headers = {"WWW-Authenticate": "Bearer"}
-        if origin and origin in [
+        allowed_origins = [
             "http://localhost:3000",
             "http://localhost:3001",
             "http://localhost:8050",
-        ]:
+            "http://localhost:8080",
+            "https://med13foundation.org",
+            "https://curate.med13foundation.org",
+            "https://admin.med13foundation.org",
+        ]
+        if origin and origin in allowed_origins:
             cors_headers.update(
                 {
                     "Access-Control-Allow-Origin": origin,
                     "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+                    "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
                 },
             )
         return cors_headers

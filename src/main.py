@@ -21,6 +21,7 @@ from src.routes.health import router as health_router
 from src.routes.phenotypes import router as phenotypes_router
 
 # Import models to ensure they're registered with SQLAlchemy
+from src.routes.research_spaces import research_spaces_router
 from src.routes.resources import router as resources_router
 from src.routes.search import router as search_router
 from src.routes.users import users_router
@@ -70,12 +71,14 @@ def create_app() -> FastAPI:
             "https://curate.med13foundation.org",
             "https://admin.med13foundation.org",
             "http://localhost:3000",  # Next.js admin interface
+            "http://localhost:3001",  # Next.js admin interface (alternate port)
             "http://localhost:8050",  # Dash curation interface
             "http://localhost:8080",  # FastAPI backend
         ],
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
         allow_credentials=True,
+        expose_headers=["*"],
     )
 
     # Add legacy API key authentication middleware (runs first)
@@ -130,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(admin_router)
     app.include_router(curation_router)
+    app.include_router(research_spaces_router)
 
     # Authentication routes
     app.include_router(auth_router)

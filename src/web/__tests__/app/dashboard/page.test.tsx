@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import DashboardPage from '@/app/dashboard/page'
+import DashboardPage from '@/app/(dashboard)/dashboard/page'
 import { ThemeProvider } from '@/components/theme-provider'
 // Mock ThemeProvider to avoid DOM prop warnings
 jest.mock('@/components/theme-provider', () => ({
@@ -60,6 +60,24 @@ jest.mock('@/components/auth/ProtectedRoute', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>
 }))
 
+// Mock space context
+jest.mock('@/components/space-context-provider', () => ({
+  useSpaceContext: () => ({
+    currentSpaceId: null,
+    setCurrentSpaceId: jest.fn(),
+    isLoading: false,
+  }),
+  SpaceContextProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+// Mock research spaces query
+jest.mock('@/lib/queries/research-spaces', () => ({
+  useResearchSpaces: () => ({
+    data: { spaces: [] },
+    isLoading: false,
+  }),
+}))
+
 // Test wrapper with providers
 const renderWithProviders = (component: React.ReactElement) => {
   return render(
@@ -86,17 +104,8 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Welcome back, Test Admin')).toBeInTheDocument()
   })
 
-  it('renders theme toggle button', () => {
-    renderWithProviders(<DashboardPage />)
-    const themeButton = screen.getByRole('button', { name: /toggle theme/i })
-    expect(themeButton).toBeInTheDocument()
-  })
-
-  it('renders action buttons', () => {
-    renderWithProviders(<DashboardPage />)
-    expect(screen.getByRole('button', { name: /settings/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /add data source/i })).toBeInTheDocument()
-  })
+  // Note: Theme toggle and action buttons are now in Header component
+  // These are tested separately in Header component tests
 
   describe('Statistics Cards', () => {
     it('renders all metric cards', () => {
@@ -159,29 +168,11 @@ describe('DashboardPage', () => {
   it('has proper semantic structure', () => {
     renderWithProviders(<DashboardPage />)
 
-    // Check for header landmark
-    expect(screen.getByRole('banner')).toBeInTheDocument()
-
-    // Check for main content area
-    expect(screen.getByRole('main')).toBeInTheDocument()
-
     // Check heading hierarchy
     const h1 = screen.getByRole('heading', { level: 1 })
     const h3s = screen.getAllByRole('heading', { level: 3 })
     expect(h1).toBeInTheDocument()
     expect(h3s.length).toBeGreaterThanOrEqual(4) // metric cards present
-  })
-
-  it('applies proper CSS classes', () => {
-    renderWithProviders(<DashboardPage />)
-
-    // Check main container
-    const main = screen.getByRole('main')
-    expect(main).toHaveClass('max-w-7xl', 'mx-auto', 'px-4', 'sm:px-6', 'lg:px-8', 'py-8')
-
-    // Check header styling
-    const header = screen.getByRole('banner')
-    expect(header).toHaveClass('bg-card', 'shadow-sm', 'border-b', 'border-border')
   })
 
   it('is responsive with grid layouts', () => {

@@ -162,6 +162,10 @@ class UserDataSource(BaseModel):
     # Identity
     id: UUID = Field(..., description="Unique identifier for the data source")
     owner_id: UUID = Field(..., description="User who created this source")
+    research_space_id: UUID | None = Field(
+        None,
+        description="Research space this data source belongs to",
+    )
 
     # Basic information
     name: str = Field(

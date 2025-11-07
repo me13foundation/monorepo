@@ -33,6 +33,7 @@ class CreateSourceRequest:
         template_id: UUID | None = None,
         configuration: SourceConfiguration | None = None,
         tags: list[str] | None = None,
+        research_space_id: UUID | None = None,
     ):
         self.owner_id = owner_id
         self.name = name
@@ -50,6 +51,7 @@ class CreateSourceRequest:
             metadata={},
         )
         self.tags = tags or []
+        self.research_space_id = research_space_id
 
 
 class UpdateSourceRequest:
@@ -120,6 +122,7 @@ class SourceManagementService:
         source = UserDataSource(
             id=UUID(),  # Will be set by repository
             owner_id=request.owner_id,
+            research_space_id=request.research_space_id,
             name=request.name,
             description=request.description,
             source_type=request.source_type,
