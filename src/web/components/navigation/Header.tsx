@@ -1,20 +1,18 @@
 "use client"
 
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { SpaceSelector } from '@/components/research-spaces/SpaceSelector'
 import { useSpaceContext } from '@/components/space-context-provider'
-import { Settings, Plus, LogOut, User, LayoutDashboard } from 'lucide-react'
+import { useSignOut } from '@/hooks/use-sign-out'
+import { Settings, Plus, LogOut, User, LayoutDashboard, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 export function Header() {
   const { data: session } = useSession()
   const { currentSpaceId } = useSpaceContext()
-
-  const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/login' })
-  }
+  const { signOut, isSigningOut } = useSignOut()
 
   return (
     <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50">
@@ -25,17 +23,9 @@ export function Header() {
               <LayoutDashboard className="h-6 w-6" />
               <span className="text-xl font-bold">MED13 Admin</span>
             </Link>
-            {currentSpaceId && (
-              <SpaceSelector currentSpaceId={currentSpaceId} />
-            )}
+            <SpaceSelector currentSpaceId={currentSpaceId || undefined} />
           </div>
           <div className="flex items-center space-x-4">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/spaces/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Space
-              </Link>
-            </Button>
             {currentSpaceId && (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/spaces/${currentSpaceId}/data-sources`}>
@@ -55,9 +45,25 @@ export function Header() {
                 Settings
               </Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={handleSignOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={signOut}
+              disabled={isSigningOut}
+              aria-label={isSigningOut ? 'Signing out...' : 'Sign out'}
+              aria-busy={isSigningOut}
+            >
+              {isSigningOut ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Signing out...
+                </>
+              ) : (
+                <>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </>
+              )}
             </Button>
           </div>
         </div>

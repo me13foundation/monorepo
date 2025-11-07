@@ -181,7 +181,7 @@ run-web: ## Run the Next.js admin interface locally (seeds admin user if needed)
 	@echo "Ensuring admin user exists..."
 	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
 	@echo "Starting Next.js admin interface..."
-	cd src/web && NEXTAUTH_SECRET=med13-resource-library-nextauth-secret-key-for-development-2024-secure-random-string NEXTAUTH_URL=http://localhost:3001 NEXT_PUBLIC_API_URL=http://localhost:8080 npm run dev
+	cd src/web && NEXTAUTH_SECRET=med13-resource-library-nextauth-secret-key-for-development-2024-secure-random-string NEXTAUTH_URL=http://localhost:3000 NEXT_PUBLIC_API_URL=http://localhost:8080 npm run dev
 
 stop-local: ## Stop the local FastAPI backend
 	@echo "Stopping FastAPI backend..."
