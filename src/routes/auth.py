@@ -6,11 +6,9 @@ and user registration.
 """
 
 import secrets
-from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.application.container import (
@@ -36,8 +34,11 @@ from src.application.dto.auth_responses import (
     ValidationErrorResponse,
 )
 from src.application.services.authentication_service import (
+    AccountInactiveError,
+    AccountLockedError,
     AuthenticationError,
     AuthenticationService,
+    InvalidCredentialsError,
 )
 from src.application.services.authorization_service import (
     AuthorizationError,
@@ -211,28 +212,47 @@ async def require_role(
 )
 async def login(
     request: LoginRequest,
+    http_request: Request,
+    auth_service: AuthenticationService = Depends(
+        get_authentication_service_dependency,
+    ),
 ) -> LoginResponse:
     """
     Authenticate user and return access/refresh tokens.
     """
-    # TODO: Implement proper authentication logic here (placeholder response)
-    return LoginResponse(
-        user=UserPublic(
-            id=str(uuid4()),
-            email=request.email,
-            username="testuser",
-            full_name="Test User",
-            role=UserRole.VIEWER,
-            status=UserStatus.ACTIVE,
-            email_verified=False,
-            last_login=None,
-            created_at=datetime.now(UTC),
-        ),
-        access_token=secrets.token_urlsafe(24),
-        refresh_token=secrets.token_urlsafe(24),
-        expires_in=3600,
-        token_type="bearer",  # nosec B106 - standard label, not a credential
-    )
+    try:
+        # Extract IP address and user agent from request
+        ip_address = http_request.client.host if http_request.client else None
+        user_agent = http_request.headers.get("user-agent")
+
+        # Use the actual authentication service
+        response = await auth_service.authenticate_user(
+            request,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return response
+    except InvalidCredentialsError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except AccountLockedError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except AccountInactiveError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e),
+        )
+    except AuthenticationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Authentication failed: {e!s}",
+        )
 
 
 @auth_router.post(

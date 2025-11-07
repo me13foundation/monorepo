@@ -118,17 +118,18 @@ class AuthenticationService:
         user.record_login_attempt(success=True)
         await self.user_repository.update(user)
 
-        # Create session
-        session = await self._create_session(user, ip_address, user_agent)
-
-        # Generate tokens
+        # Generate tokens first
         access_token = self.jwt_provider.create_access_token(user.id, user.role.value)
         refresh_token = self.jwt_provider.create_refresh_token(user.id)
 
-        # Update session with tokens
-        session.session_token = access_token
-        session.refresh_token = refresh_token
-        await self.session_repository.update(session)
+        # Create session with tokens
+        await self._create_session(
+            user,
+            ip_address,
+            user_agent,
+            access_token=access_token,
+            refresh_token=refresh_token,
+        )
 
         return LoginResponse(
             access_token=access_token,
@@ -303,6 +304,8 @@ class AuthenticationService:
         user: User,
         ip_address: str | None,
         user_agent: str | None,
+        access_token: str,
+        refresh_token: str,
     ) -> UserSession:
         """
         Create a new session for user.
@@ -329,9 +332,11 @@ class AuthenticationService:
                 oldest_session = min(sessions, key=lambda s: s.created_at)
                 await self.session_repository.revoke_session(oldest_session.id)
 
-        # Create new session
+        # Create new session with tokens
         session = UserSession(
             user_id=user.id,
+            session_token=access_token,
+            refresh_token=refresh_token,
             ip_address=ip_address,
             user_agent=user_agent,
             expires_at=datetime.now(UTC) + timedelta(minutes=15),

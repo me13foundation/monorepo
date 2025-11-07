@@ -230,6 +230,10 @@ db-seed: ## Seed database with test data
 	$(call check_venv)
 	$(USE_PYTHON) scripts/seed_database.py
 
+db-seed-admin: ## Seed admin user (creates admin@med13.org with password admin123)
+	$(call check_venv)
+	$(USE_PYTHON) scripts/seed_admin_user.py
+
 # Deployment
 deploy-staging: ## Deploy to staging environment
 	@echo "Deploying to staging..."

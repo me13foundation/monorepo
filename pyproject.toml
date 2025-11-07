@@ -170,6 +170,13 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
 
 [tool.ruff.lint.per-file-ignores]
 "src/web/**" = ["T20", "ARG", "ERA"]
+"scripts/**" = [
+    "E402",   # allow imports after sys.path manipulation
+    "S107",   # allow hardcoded passwords in seed scripts
+    "TRY400", # allow logging.error in scripts
+    "PLC0415", # allow local imports in scripts
+    "BLE001", # allow broad exceptions in scripts
+]
 "tests/**" = [
     "S101",  # allow assert in tests
     "ARG",   # allow unused fixtures/args

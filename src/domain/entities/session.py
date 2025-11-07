@@ -52,14 +52,24 @@ class UserSession(BaseModel):
     @model_validator(mode="after")
     def validate_session_times(self) -> "UserSession":
         """Validate session timing constraints."""
+        # Ensure timezone-aware datetimes for comparison
+        expires_at = self.expires_at
+        refresh_expires_at = self.refresh_expires_at
+
+        # Convert to UTC if naive
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if refresh_expires_at.tzinfo is None:
+            refresh_expires_at = refresh_expires_at.replace(tzinfo=UTC)
+
         # Refresh token must expire after access token
-        if self.refresh_expires_at <= self.expires_at:
+        if refresh_expires_at <= expires_at:
             msg = "Refresh token must expire after access token"
             raise ValueError(msg)
 
         # Session should not be created with expired tokens
         now = datetime.now(UTC)
-        if self.expires_at <= now:
+        if expires_at <= now:
             msg = "Cannot create session with already expired access token"
             raise ValueError(msg)
 
