@@ -47,7 +47,7 @@ define check_venv
 	fi
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage
 
 # Default target
 help: ## Show this help message
@@ -308,6 +308,9 @@ web-type-check: ## Type check Next.js code
 
 web-test: ## Run Next.js tests
 	cd src/web && npm run test
+
+web-test-coverage: ## Run Next.js tests with coverage report
+	cd src/web && npm run test:coverage
 
 # Quality Assurance
 venv-check: ## Ensure virtual environment is active
