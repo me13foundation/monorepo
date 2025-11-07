@@ -101,8 +101,9 @@ class APISourceService:
                 params = {}
 
                 # Add limit parameter to avoid large responses
+                # Ensure limit is at least 1, but allow larger configured limits
                 if "limit" in configuration.metadata:
-                    params["limit"] = min(int(configuration.metadata["limit"]), 1)
+                    params["limit"] = max(int(configuration.metadata["limit"]), 1)
                 else:
                     params["limit"] = 1
 
