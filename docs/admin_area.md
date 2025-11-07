@@ -1169,6 +1169,8 @@ All API endpoints implement authorization checks:
 - [Next.js Frontend Architecture](./frontend/EngenieeringArchitectureNext.md)
 - [Data Sources Plan](./data_sources_plan.md)
 - [Authentication PRD](./Auth_PRD_FSD.md)
+- [Research Spaces API Documentation](./research-spaces-api.md)
+- [Research Spaces Component Documentation](./research-spaces-components.md)
 
 ### Glossary
 

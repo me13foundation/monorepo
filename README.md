@@ -347,6 +347,7 @@ make deploy-prod       # Deploys all services to production
 - **`docs/goal.md`**: Project objectives and biomedical data model
 - **`docs/infra.md`**: Multi-service infrastructure and deployment guide
 - **`docs/node_js_migration_prd.md`**: Next.js admin interface migration plan
+- **`docs/admin_area.md`**: Research Spaces Management System PRD
 - **`AGENTS.md`**: AI agent development guidelines and architecture
 - **`docs/EngineeringArchitecture.md`**: Current state and growth strategy
 
@@ -354,6 +355,8 @@ make deploy-prod       # Deploys all services to production
 - **OpenAPI/Swagger**: http://localhost:8080/docs (when running)
 - **Alternative Docs**: http://localhost:8080/redoc
 - **Admin API**: `/admin/*` endpoints for data source management
+- **Research Spaces API**: `docs/research-spaces-api.md` - Complete API reference for research spaces endpoints
+- **Research Spaces Components**: `docs/research-spaces-components.md` - React component documentation
 
 ### Development Guides
 - **`docs/type_examples.md`**: Type safety patterns and examples

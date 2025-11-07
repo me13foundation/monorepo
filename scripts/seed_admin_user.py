@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Seed admin user for MED13 Resource Library.
+"""Seed admin user and test users for MED13 Resource Library.
 
-Creates a default admin user for initial system access.
+Creates a default admin user for initial system access and optionally
+creates multiple test users for testing research spaces and memberships.
 Run this script after database migrations to create the first admin account.
 """
 
@@ -82,10 +83,102 @@ def create_admin_user(
         session.close()
 
 
+def create_test_users(
+    count: int = 5,
+    password: str = "test1234",
+    base_email: str = "testuser",
+    base_username: str = "testuser",
+) -> int:
+    """
+    Create multiple test users for testing research spaces.
+
+    Args:
+        count: Number of test users to create (default: 5)
+        password: Password for all test users (default: test123)
+        base_email: Base email prefix (default: testuser)
+        base_username: Base username prefix (default: testuser)
+
+    Returns:
+        Number of users created successfully
+    """
+    session = SessionLocal()
+    password_hasher = PasswordHasher()
+
+    # Test user templates with different roles
+    test_user_templates = [
+        {"role": UserRole.CURATOR, "name": "Curator"},
+        {"role": UserRole.RESEARCHER, "name": "Researcher"},
+        {"role": UserRole.RESEARCHER, "name": "Researcher"},
+        {"role": UserRole.VIEWER, "name": "Viewer"},
+        {"role": UserRole.VIEWER, "name": "Viewer"},
+    ]
+
+    created_count = 0
+    skipped_count = 0
+
+    try:
+        for i in range(count):
+            # Cycle through templates if count > templates length
+            template = test_user_templates[i % len(test_user_templates)]
+            role = template["role"]
+            role_name = template["name"]
+
+            # Generate user data
+            user_num = i + 1
+            email = f"{base_email}{user_num}@med13.org"
+            username = f"{base_username}{user_num}"
+            full_name = f"Test {role_name} {user_num}"
+
+            # Check if user already exists
+            existing = session.query(UserModel).filter(UserModel.email == email).first()
+
+            if existing:
+                logger.debug("User with email %s already exists, skipping", email)
+                skipped_count += 1
+                continue
+
+            # Create test user
+            test_user = UserModel(
+                email=email,
+                username=username,
+                full_name=full_name,
+                hashed_password=password_hasher.hash_password(password),
+                role=role,
+                status=UserStatus.ACTIVE,
+                email_verified=True,
+            )
+
+            session.add(test_user)
+            created_count += 1
+            logger.info(
+                "Created test user: %s (%s) - Role: %s",
+                username,
+                email,
+                role.value,
+            )
+
+        session.commit()
+        logger.info("✅ Created %d test users", created_count)
+        if skipped_count > 0:
+            logger.info("Skipped %d existing users", skipped_count)
+        logger.info("   Password for all test users: %s", password)
+        logger.warning(
+            "   ⚠️  These are test users - change passwords in production!",
+        )
+
+        return created_count  # noqa: TRY300
+    except SQLAlchemyError:
+        session.rollback()
+        logger.exception("Failed to create test users")
+        raise
+    finally:
+        session.close()
+
+
 def main() -> None:
-    """Main entry point for admin user seeding."""
+    """Main entry point for user seeding."""
     parser = argparse.ArgumentParser(
-        description="Create admin user for MED13 Resource Library",
+        description="Create admin and test users for MED13 Resource Library",
     )
     parser.add_argument(
         "--email",
@@ -107,18 +200,57 @@ def main() -> None:
         default="MED13 Administrator",
         help="Admin full name (default: MED13 Administrator)",
     )
+    parser.add_argument(
+        "--create-test-users",
+        action="store_true",
+        help="Create test users for testing research spaces",
+    )
+    parser.add_argument(
+        "--test-user-count",
+        type=int,
+        default=5,
+        help="Number of test users to create (default: 5)",
+    )
+    parser.add_argument(
+        "--test-password",
+        default="test1234",
+        help="Password for test users (default: test1234)",
+    )
+    parser.add_argument(
+        "--skip-admin",
+        action="store_true",
+        help="Skip creating admin user (only create test users)",
+    )
 
     args = parser.parse_args()
 
     try:
-        create_admin_user(
-            email=args.email,
-            username=args.username,
-            password=args.password,
-            full_name=args.full_name,
-        )
+        # Create admin user unless skipped
+        if not args.skip_admin:
+            logger.info("Creating admin user...")
+            create_admin_user(
+                email=args.email,
+                username=args.username,
+                password=args.password,
+                full_name=args.full_name,
+            )
+            logger.info("")
+
+        # Create test users if requested
+        if args.create_test_users:
+            logger.info("Creating test users...")
+            created = create_test_users(
+                count=args.test_user_count,
+                password=args.test_password,
+            )
+            logger.info("")
+            logger.info("Summary:")
+            logger.info("  Test users created: %d", created)
+            logger.info("  Test user password: %s", args.test_password)
+            logger.info("  Test users can be used for research space testing")
+
     except (SQLAlchemyError, ValueError, RuntimeError):
-        logger.exception("Failed to seed admin user")
+        logger.exception("Failed to seed users")
         sys.exit(1)
 
 
