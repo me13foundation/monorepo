@@ -622,7 +622,7 @@ def save_settings(
         }
 
         # Update the interval component
-        interval_component = cast("dcc.Interval", app.layout.children[4])
+        interval_component = cast("dcc.Interval", app.layout.children[6])
         if refresh_interval is not None:
             interval_component.interval = refresh_interval * 1000
 

@@ -1,7 +1,7 @@
 {
   // Python formatting and linting (matches pre-commit hooks exactly)
   // NOTE: Pre-commit hooks handle all formatting and fixing. VS Code shows linting.
-  "python.formatting.provider": "none", // Use Ruff for formatting
+  "python.formatting.provider": "black",
   "python.formatting.blackPath": "black",
   "python.formatting.blackArgs": [],
   "python.linting.enabled": true,
