@@ -18,8 +18,13 @@ function LoginContent() {
   useEffect(() => {
     // Check if redirected due to session expiration
     const sessionError = searchParams.get('error')
+    const errorMessage = searchParams.get('message')
+
     if (sessionError === 'SessionExpired') {
-      setError('Your session has expired. Please log in again.')
+      const message = errorMessage
+        ? `Your session has expired: ${errorMessage}`
+        : 'Your session has expired. Please log in again.'
+      setError(message)
     }
   }, [searchParams])
 

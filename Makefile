@@ -235,7 +235,18 @@ db-seed: ## Seed database with test data
 
 db-seed-admin: ## Seed admin user (creates admin@med13.org with password admin123)
 	$(call check_venv)
-	$(USE_PYTHON) scripts/seed_admin_user.py
+	@echo "Seeding admin user..."
+	@$(USE_PYTHON) scripts/seed_admin_user.py
+
+db-reset-admin-password: ## Reset admin password (default: admin123)
+	$(call check_venv)
+	@echo "Resetting admin password..."
+	@$(USE_PYTHON) scripts/reset_admin_password.py
+
+db-verify-admin: ## Verify admin user exists
+	$(call check_venv)
+	@echo "Verifying admin user..."
+	@$(USE_PYTHON) scripts/reset_admin_password.py --verify-only
 
 # Deployment
 deploy-staging: ## Deploy to staging environment

@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useSession } from 'next-auth/react'
-import { Database, Users, Activity, BarChart3 } from 'lucide-react'
+import { Database, Users, Activity, BarChart3, Plus, FolderPlus } from 'lucide-react'
 import { useDashboardStats, useRecentActivities } from '@/lib/queries/dashboard'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
+import { useRouter } from 'next/navigation'
 
 export default function DashboardPage() {
   return (
@@ -23,21 +24,64 @@ function DashboardContent() {
   const { data: stats, isLoading: statsLoading } = useDashboardStats()
   const { data: recent, isLoading: recentLoading } = useRecentActivities(5)
   const { currentSpaceId } = useSpaceContext()
-  const { data } = useResearchSpaces()
+  const { data, isLoading: spacesLoading } = useResearchSpaces()
+  const router = useRouter()
+
+  const spaces = data?.spaces || []
+  const hasSpaces = spaces.length > 0
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-4xl font-heading font-bold text-foreground">MED13 Admin Dashboard</h1>
-        <p className="mt-2 text-base text-muted-foreground">
-          Welcome back, {session?.user?.full_name || session?.user?.email}
-        </p>
-        {currentSpaceId && (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Current space: {data?.spaces?.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
-          </p>
-        )}
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-heading font-bold text-foreground">MED13 Admin Dashboard</h1>
+            <p className="mt-2 text-base text-muted-foreground">
+              Welcome back, {session?.user?.full_name || session?.user?.email}
+            </p>
+            {currentSpaceId && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Current space: {spaces.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
+              </p>
+            )}
+          </div>
+          {/* Only show Create New Space button when no spaces exist */}
+          {!spacesLoading && !hasSpaces && (
+            <Button
+              onClick={() => router.push('/spaces/new')}
+              size="lg"
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-5 w-5" />
+              Create New Space
+            </Button>
+          )}
+        </div>
       </div>
+
+      {/* Empty State - Show when no spaces exist */}
+      {!spacesLoading && !hasSpaces && (
+        <Card className="mb-8 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12 px-6">
+            <div className="rounded-full bg-muted p-4 mb-4">
+              <FolderPlus className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No Research Spaces Yet</h3>
+            <p className="text-muted-foreground text-center mb-6 max-w-md">
+              Get started by creating your first research space. Research spaces help you organize
+              data sources and collaborate with your team.
+            </p>
+            <Button
+              onClick={() => router.push('/spaces/new')}
+              size="lg"
+              className="flex items-center gap-2"
+            >
+              <Plus className="h-5 w-5" />
+              Create Your First Space
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div>
         {/* Stats Cards */}

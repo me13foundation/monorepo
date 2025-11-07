@@ -23,13 +23,14 @@ export function ProtectedRoute({
     if (status === "loading") return // Still loading
 
     if (!session) {
-      router.push("/auth/login")
+      // Use replace instead of push to prevent back navigation
+      router.replace("/auth/login?error=SessionExpired")
       return
     }
 
     // Check role if required
     if (requiredRole && session.user?.role !== requiredRole) {
-      router.push("/dashboard") // Redirect to dashboard if insufficient permissions
+      router.replace("/dashboard") // Redirect to dashboard if insufficient permissions
       return
     }
   }, [session, status, router, requiredRole])
@@ -37,20 +38,37 @@ export function ProtectedRoute({
   // Show loading spinner while checking authentication
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
     )
   }
 
-  // Show fallback or redirect if not authenticated
+  // Don't render anything if not authenticated - redirect is happening
   if (!session) {
-    return fallback || null
+    return fallback || (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Redirecting to login...</p>
+        </div>
+      </div>
+    )
   }
 
   // Check role permissions
   if (requiredRole && session.user?.role !== requiredRole) {
-    return fallback || null
+    return fallback || (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Checking permissions...</p>
+        </div>
+      </div>
+    )
   }
 
   return <>{children}</>
