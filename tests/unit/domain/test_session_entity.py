@@ -329,3 +329,141 @@ class TestUserSessionEntity:
 
         # Cannot reactivate (once revoked, stays revoked)
         assert session.status == SessionStatus.REVOKED
+
+    def test_datetime_comparison_timezone_aware(self):
+        """Regression test: Ensure datetime comparisons work with timezone-aware datetimes."""
+        user_id = uuid4()
+        expires_at = datetime.now(UTC) + timedelta(minutes=15)
+        refresh_expires_at = datetime.now(UTC) + timedelta(days=7)
+
+        session = UserSession(
+            user_id=user_id,
+            session_token="token",
+            refresh_token="refresh",
+            expires_at=expires_at,
+            refresh_expires_at=refresh_expires_at,
+        )
+
+        # These should not raise TypeError
+        assert session.is_expired() is False
+        assert session.is_refresh_expired() is False
+        assert session.is_active() is True
+        assert isinstance(session.time_until_expiry(), timedelta)
+        assert isinstance(session.time_until_refresh_expiry(), timedelta)
+        assert isinstance(session.time_since_activity(), timedelta)
+
+    def test_datetime_comparison_timezone_naive(self):
+        """Regression test: Ensure datetime comparisons work with timezone-naive datetimes from database."""
+        user_id = uuid4()
+        # Create session with UTC-aware datetimes first (passes validation)
+        base_time = datetime.now(UTC)
+        expires_at = base_time + timedelta(minutes=15)
+        refresh_expires_at = base_time + timedelta(days=7)
+
+        session = UserSession(
+            user_id=user_id,
+            session_token="token",
+            refresh_token="refresh",
+            expires_at=expires_at,
+            refresh_expires_at=refresh_expires_at,
+        )
+
+        # Simulate database load: replace with naive datetimes (removing timezone info)
+        # This simulates what happens when SQLAlchemy loads naive datetimes from DB
+        # Use object.__setattr__ to bypass Pydantic's validation
+        object.__setattr__(session, "expires_at", expires_at.replace(tzinfo=None))
+        object.__setattr__(
+            session,
+            "refresh_expires_at",
+            refresh_expires_at.replace(tzinfo=None),
+        )
+        object.__setattr__(
+            session,
+            "last_activity",
+            session.last_activity.replace(tzinfo=None),
+        )
+
+        # These should not raise TypeError: can't compare offset-naive and offset-aware datetimes
+        assert session.is_expired() is False
+        assert session.is_refresh_expired() is False
+        assert session.is_active() is True
+        assert isinstance(session.time_until_expiry(), timedelta)
+        assert isinstance(session.time_until_refresh_expiry(), timedelta)
+        assert isinstance(session.time_since_activity(), timedelta)
+
+    def test_datetime_comparison_mixed_timezones(self):
+        """Regression test: Handle mixed timezone-aware and naive datetimes."""
+        user_id = uuid4()
+        # Mix of aware and naive datetimes
+        expires_at_aware = datetime.now(UTC) + timedelta(minutes=15)
+        refresh_expires_at_naive = datetime.now() + timedelta(days=7)  # noqa: DTZ005
+
+        session = UserSession(
+            user_id=user_id,
+            session_token="token",
+            refresh_token="refresh",
+            expires_at=expires_at_aware,
+            refresh_expires_at=refresh_expires_at_naive,
+        )
+
+        # Should handle mixed timezones gracefully
+        assert session.is_expired() is False
+        assert session.is_refresh_expired() is False
+        assert session.is_active() is True
+
+    def test_datetime_comparison_expired_naive(self):
+        """Regression test: Check expired status with timezone-naive datetime."""
+        user_id = uuid4()
+        # Create session with valid UTC-aware datetimes first
+        base_time = datetime.now(UTC)
+        expires_at = base_time + timedelta(minutes=15)
+        refresh_expires_at = base_time + timedelta(days=1)
+
+        session = UserSession(
+            user_id=user_id,
+            session_token="token",
+            refresh_token="refresh",
+            expires_at=expires_at,
+            refresh_expires_at=refresh_expires_at,
+        )
+
+        # Simulate database load: replace with expired naive datetime
+        # This tests that comparison methods handle naive datetimes correctly
+        # Use object.__setattr__ to bypass Pydantic's validation
+        past_time_naive = (base_time - timedelta(hours=1)).replace(tzinfo=None)
+        object.__setattr__(session, "expires_at", past_time_naive)
+
+        # Should correctly identify as expired even with naive datetime
+        assert session.is_expired() is True
+        assert session.is_active() is False
+        assert session.is_refresh_expired() is False
+        assert session.can_refresh() is True  # Refresh token still valid
+
+    def test_datetime_comparison_last_activity_naive(self):
+        """Regression test: Handle timezone-naive last_activity datetime."""
+        user_id = uuid4()
+        expires_at = datetime.now(UTC) + timedelta(hours=1)
+        refresh_expires_at = datetime.now(UTC) + timedelta(days=1)
+
+        session = UserSession(
+            user_id=user_id,
+            session_token="token",
+            refresh_token="refresh",
+            expires_at=expires_at,
+            refresh_expires_at=refresh_expires_at,
+        )
+
+        # Simulate database load: replace with naive last_activity
+        # Use object.__setattr__ to bypass Pydantic's validation
+        base_time_utc = datetime.now(UTC)
+        last_activity_naive = (base_time_utc - timedelta(minutes=5)).replace(
+            tzinfo=None,
+        )
+        object.__setattr__(session, "last_activity", last_activity_naive)
+
+        # Should handle naive last_activity without errors
+        time_since = session.time_since_activity()
+        assert isinstance(time_since, timedelta)
+        # Should be approximately 5 minutes (allow some tolerance for test execution time)
+        assert time_since >= timedelta(minutes=4)
+        assert time_since <= timedelta(minutes=6)

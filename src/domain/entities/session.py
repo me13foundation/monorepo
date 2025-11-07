@@ -77,11 +77,21 @@ class UserSession(BaseModel):
 
     def is_expired(self) -> bool:
         """Check if access token is expired."""
-        return datetime.now(UTC) > self.expires_at
+        now = datetime.now(UTC)
+        # Ensure expires_at is timezone-aware for comparison
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        return now > expires_at
 
     def is_refresh_expired(self) -> bool:
         """Check if refresh token is expired."""
-        return datetime.now(UTC) > self.refresh_expires_at
+        now = datetime.now(UTC)
+        # Ensure refresh_expires_at is timezone-aware for comparison
+        refresh_expires_at = self.refresh_expires_at
+        if refresh_expires_at.tzinfo is None:
+            refresh_expires_at = refresh_expires_at.replace(tzinfo=UTC)
+        return now > refresh_expires_at
 
     def is_active(self) -> bool:
         """Check if session is active (not expired or revoked)."""
@@ -140,15 +150,27 @@ class UserSession(BaseModel):
 
     def time_since_activity(self) -> timedelta:
         """Calculate time since last activity."""
-        return datetime.now(UTC) - self.last_activity
+        now = datetime.now(UTC)
+        last_activity = self.last_activity
+        if last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=UTC)
+        return now - last_activity
 
     def time_until_expiry(self) -> timedelta:
         """Calculate time until access token expires."""
-        return self.expires_at - datetime.now(UTC)
+        now = datetime.now(UTC)
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        return expires_at - now
 
     def time_until_refresh_expiry(self) -> timedelta:
         """Calculate time until refresh token expires."""
-        return self.refresh_expires_at - datetime.now(UTC)
+        now = datetime.now(UTC)
+        refresh_expires_at = self.refresh_expires_at
+        if refresh_expires_at.tzinfo is None:
+            refresh_expires_at = refresh_expires_at.replace(tzinfo=UTC)
+        return refresh_expires_at - now
 
     def __str__(self) -> str:
         """String representation for logging."""

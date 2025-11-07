@@ -4,6 +4,7 @@ Authentication service for MED13 Resource Library.
 Handles user authentication, session management, and security operations.
 """
 
+import logging
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -220,36 +221,89 @@ class AuthenticationService:
         Raises:
             AuthenticationError: Invalid token
         """
+        logger = logging.getLogger(__name__)
+
         try:
+            logger.debug(
+                "[validate_token] Starting token validation for token: %s...",
+                token[:20],
+            )
+
             # Decode and validate token
             payload = self.jwt_provider.decode_token(token)
+            logger.debug(
+                "[validate_token] Token decoded successfully, payload keys: %s",
+                list(payload.keys()),
+            )
 
             if payload.get("type") != "access":
                 msg = "Invalid token type"
+                logger.warning(
+                    "[validate_token] Invalid token type: %s",
+                    payload.get("type"),
+                )
                 raise AuthenticationError(msg)  # noqa: TRY301
 
             # Get user
             user_id = UUID(payload["sub"])
+            logger.debug("[validate_token] Extracted user_id: %s", user_id)
             user = await self.user_repository.get_by_id(user_id)
 
             if not user:
                 msg = "User not found"
+                logger.warning("[validate_token] User not found: %s", user_id)
                 raise AuthenticationError(msg)  # noqa: TRY301
 
             if not user.can_authenticate():
                 msg = "User account not active"
+                logger.warning("[validate_token] User account not active: %s", user_id)
                 raise AuthenticationError(msg)  # noqa: TRY301
 
             # Update session activity if session exists
+            logger.debug("[validate_token] Looking up session by access token")
             session = await self.session_repository.get_by_access_token(token)
-            if session and session.is_active():
-                session.update_activity()
-                await self.session_repository.update(session)
 
+            if session:
+                logger.debug(
+                    "[validate_token] Session found: id=%s, status=%s, "
+                    "expires_at=%s (tzinfo=%s), "
+                    "refresh_expires_at=%s (tzinfo=%s)",
+                    session.id,
+                    session.status,
+                    session.expires_at,
+                    session.expires_at.tzinfo,
+                    session.refresh_expires_at,
+                    session.refresh_expires_at.tzinfo,
+                )
+
+                try:
+                    is_active_result = session.is_active()
+                    logger.debug(
+                        "[validate_token] Session is_active() result: %s",
+                        is_active_result,
+                    )
+
+                    if is_active_result:
+                        session.update_activity()
+                        await self.session_repository.update(session)
+                        logger.debug("[validate_token] Session activity updated")
+                except Exception:
+                    logger.exception(
+                        "[validate_token] Error checking session.is_active()",
+                    )
+                    raise
+            else:
+                logger.debug("[validate_token] No session found for token")
+
+            logger.debug(
+                "[validate_token] Token validation successful for user: %s",
+                user_id,
+            )
             return user  # noqa: TRY300
         except AuthenticationError:
             raise
         except Exception as exc:
+            logger.exception("[validate_token] Token validation failed")
             msg = f"Token validation failed: {exc!s}"
             raise AuthenticationError(msg) from exc
 

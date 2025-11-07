@@ -93,6 +93,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         """Process each request through authentication middleware."""
 
+        # Skip authentication for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Skip authentication for excluded paths
         if any(request.url.path.startswith(path) for path in self.exclude_paths):
             return await call_next(request)

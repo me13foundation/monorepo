@@ -4,6 +4,7 @@ JWT Authentication middleware for MED13 Resource Library.
 Provides FastAPI middleware for JWT token validation and user authentication.
 """
 
+import logging
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response, status
@@ -58,6 +59,34 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         ]
         self.auth_service = auth_service
 
+    def _get_cors_headers(self, request: Request) -> dict[str, str]:
+        """Get CORS headers for the request origin."""
+        origin = request.headers.get("origin")
+        cors_headers = {"WWW-Authenticate": "Bearer"}
+        if origin and origin in [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://localhost:8050",
+        ]:
+            cors_headers.update(
+                {
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                },
+            )
+        return cors_headers
+
+    def _get_error_code(self, error_detail: str) -> str:
+        """Determine error code from error detail."""
+        error_lower = error_detail.lower()
+        if "expired" in error_lower:
+            return "AUTH_TOKEN_EXPIRED"
+        if "invalid" in error_lower:
+            return "AUTH_TOKEN_MALFORMED"
+        if "offset-naive" in error_lower or "offset-aware" in error_lower:
+            return "AUTH_TOKEN_DATETIME_ERROR"
+        return "AUTH_TOKEN_INVALID"
+
     async def dispatch(
         self,
         request: Request,
@@ -73,6 +102,10 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         Returns:
             Response from next handler or authentication error
         """
+        # Skip authentication for OPTIONS requests (CORS preflight)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         # Skip authentication for excluded paths
         if self._should_skip_auth(request.url.path):
             return await call_next(request)
@@ -99,12 +132,27 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                     "detail": "No authentication token provided",
                     "code": "AUTH_TOKEN_MISSING",
                 },
-                headers={"WWW-Authenticate": "Bearer"},
+                headers=self._get_cors_headers(request),
             )
 
         # Validate token
+        logger = logging.getLogger(__name__)
+
         try:
+            logger.debug(
+                "[JWTAuthMiddleware] Validating token for path: %s",
+                request.url.path,
+            )
+            logger.debug(
+                "[JWTAuthMiddleware] Token (first 20 chars): %s...",
+                token[:20] if token else None,
+            )
+
             user = await self.auth_service.validate_token(token)
+            logger.debug(
+                "[JWTAuthMiddleware] Token validation successful for user: %s",
+                user.id,
+            )
 
             # Add user to request state for use in route handlers
             request.state.user = user
@@ -112,12 +160,18 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
 
         except AuthenticationError as e:
             error_detail = str(e)
-            error_code = "AUTH_TOKEN_INVALID"
+            error_code = self._get_error_code(error_detail)
 
-            if "expired" in error_detail.lower():
-                error_code = "AUTH_TOKEN_EXPIRED"
-            elif "invalid" in error_detail.lower():
-                error_code = "AUTH_TOKEN_MALFORMED"
+            logger.exception(
+                "[JWTAuthMiddleware] Authentication failed: %s",
+                error_detail,
+            )
+
+            if error_code == "AUTH_TOKEN_DATETIME_ERROR":
+                logger.warning(
+                    "[JWTAuthMiddleware] Datetime comparison error detected: %s",
+                    error_detail,
+                )
 
             return JSONResponse(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -126,7 +180,7 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
                     "detail": error_detail,
                     "code": error_code,
                 },
-                headers={"WWW-Authenticate": "Bearer"},
+                headers=self._get_cors_headers(request),
             )
 
         # Continue with request

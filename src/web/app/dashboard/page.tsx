@@ -18,9 +18,14 @@ export default function DashboardPage() {
 }
 
 function DashboardContent() {
-  const { data: session } = useSession()
+  const { data: session, status: sessionStatus } = useSession()
   const { data: stats, isLoading: statsLoading } = useDashboardStats()
   const { data: recent, isLoading: recentLoading } = useRecentActivities(5)
+
+  // Debug: Log session status
+  if (sessionStatus === 'authenticated' && !session?.user?.access_token) {
+    console.warn('Session authenticated but missing access_token', { session })
+  }
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/auth/login' })

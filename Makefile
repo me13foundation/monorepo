@@ -177,7 +177,10 @@ run-dash: ## Run the Dash curation interface locally
 	$(call check_venv)
 	$(USE_PYTHON) -c "from src.dash_app import app; app.run(host='0.0.0.0', port=8050, debug=True)"
 
-run-web: ## Run the Next.js admin interface locally
+run-web: ## Run the Next.js admin interface locally (seeds admin user if needed)
+	@echo "Ensuring admin user exists..."
+	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
+	@echo "Starting Next.js admin interface..."
 	cd src/web && NEXTAUTH_SECRET=med13-resource-library-nextauth-secret-key-for-development-2024-secure-random-string NEXTAUTH_URL=http://localhost:3001 NEXT_PUBLIC_API_URL=http://localhost:8080 npm run dev
 
 stop-local: ## Stop the local FastAPI backend

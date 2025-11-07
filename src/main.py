@@ -73,7 +73,7 @@ def create_app() -> FastAPI:
             "http://localhost:8050",  # Dash curation interface
             "http://localhost:8080",  # FastAPI backend
         ],
-        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
         allow_credentials=True,
     )
