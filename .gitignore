@@ -160,6 +160,9 @@ safety-results.json
 *.log
 logs/
 
+# QA Reports
+reports/
+
 # Temporary files
 *.tmp
 *.temp

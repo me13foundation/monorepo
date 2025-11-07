@@ -47,7 +47,7 @@ define check_venv
 	fi
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint format format-check type-check type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all
 
 # Default target
 help: ## Show this help message
@@ -123,6 +123,15 @@ lint: ## Run all linting tools (warnings only)
 	@echo "Running bandit (non-blocking)..."
 	-$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || echo "⚠️  Bandit found security issues (non-blocking)"
 
+lint-strict: ## Run all linting tools (fails on error)
+	$(call check_venv)
+	@echo "Running flake8 (strict)..."
+	$(USE_PYTHON) -m flake8 src tests --max-line-length=88 --extend-ignore=E203,W503,E501 --exclude=src/web/node_modules
+	@echo "Running ruff (strict)..."
+	$(USE_PYTHON) -m ruff check src tests
+	@echo "Running bandit (strict)..."
+	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json
+
 format: ## Format code with Black and sort imports with ruff
 	$(call check_venv)
 	$(USE_PYTHON) -m black src tests
@@ -136,6 +145,10 @@ format-check: ## Check code formatting without making changes
 type-check: ## Run mypy type checking with strict settings (warnings only)
 	$(call check_venv)
 	-$(USE_PYTHON) -m mypy src --strict --show-error-codes || echo "⚠️  MyPy found type issues (non-blocking)"
+
+type-check-strict: ## Run mypy type checking with strict settings (fails on error)
+	$(call check_venv)
+	$(USE_PYTHON) -m mypy src --strict --show-error-codes
 
 type-check-report: ## Generate mypy type checking report
 	$(call check_venv)
@@ -271,6 +284,7 @@ clean-all: clean ## Clean everything including build artifacts
 	rm -rf htmlcov/
 	rm -rf .coverage
 	rm -rf pip-audit-results.json
+	rm -rf $(REPORT_DIR)/
 
 # Next.js Admin Interface
 web-install: ## Install Next.js dependencies
@@ -302,7 +316,35 @@ venv-check: ## Ensure virtual environment is active
 		exit 1; \
 	fi
 
-all: venv-check check-env format lint type-check web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (pre-commit checklist)
+# Report directory for QA outputs
+REPORT_DIR := reports
+TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
+QA_REPORT := $(REPORT_DIR)/qa_report_$(TIMESTAMP).txt
+
+all: venv-check check-env format lint-strict type-check-strict web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (fails on first error)
+	@echo ""
+	@echo "✅ All quality checks passed!"
+
+all-report: ## Run complete QA suite with report generation (fails on first error)
+	@mkdir -p $(REPORT_DIR)
+	@echo "=========================================" > $(QA_REPORT)
+	@echo "MED13 Resource Library - QA Report" >> $(QA_REPORT)
+	@echo "Generated: $(shell date)" >> $(QA_REPORT)
+	@echo "=========================================" >> $(QA_REPORT)
+	@echo "" >> $(QA_REPORT)
+	@echo "Running quality assurance suite..." | tee -a $(QA_REPORT)
+	@bash -c 'set -o pipefail; $(MAKE) venv-check check-env format lint-strict type-check-strict web-build web-lint web-type-check web-test test security-audit 2>&1 | tee -a $(QA_REPORT)' || \
+		(echo "" >> $(QA_REPORT); \
+		 echo "❌ QA Suite FAILED at: $(shell date)" >> $(QA_REPORT); \
+		 echo ""; \
+		 echo "❌ QA Suite FAILED - Report saved to: $(QA_REPORT)"; \
+		 exit 1)
+	@echo "" >> $(QA_REPORT)
+	@echo "✅ All quality checks passed!" >> $(QA_REPORT)
+	@echo "Completed at: $(shell date)" >> $(QA_REPORT)
+	@echo ""
+	@echo "✅ All quality checks passed!"
+	@echo "Report saved to: $(QA_REPORT)"
 
 # CI/CD Simulation
 ci: install-dev lint test security-audit ## Run full CI pipeline locally
