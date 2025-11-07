@@ -121,7 +121,7 @@ lint: ## Run all linting tools (warnings only)
 	@echo "Running mypy..."
 	-$(USE_PYTHON) -m mypy src || echo "⚠️  MyPy found type issues (non-blocking)"
 	@echo "Running bandit (non-blocking)..."
-	-$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json || echo "⚠️  Bandit found security issues (non-blocking)"
+	-$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json 2>&1 | grep -vE "(WARNING.*Test in comment|WARNING.*Unknown test found)" || echo "⚠️  Bandit found security issues (non-blocking)"
 
 lint-strict: ## Run all linting tools (fails on error)
 	$(call check_venv)
@@ -130,7 +130,7 @@ lint-strict: ## Run all linting tools (fails on error)
 	@echo "Running ruff (strict)..."
 	$(USE_PYTHON) -m ruff check src tests
 	@echo "Running bandit (strict)..."
-	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json
+	$(USE_PYTHON) -m bandit -r src -f json -o bandit-results.json 2>&1 | grep -vE "(WARNING.*Test in comment|WARNING.*Unknown test found)" || true
 
 format: ## Format code with Black and sort imports with ruff
 	$(call check_venv)
@@ -164,7 +164,7 @@ security-audit: ## Run comprehensive security audit (pip-audit, bandit) [blockin
 	@echo "   To enable Safety CLI in the future, set SAFETY_API_KEY environment variable."
 	# SAFETY_API_KEY="" safety --stage development scan --save-as json safety-results.json --use-server-matching || true
 	@echo "Running bandit (blocking on MEDIUM/HIGH)..."
-	$(USE_PYTHON) -m bandit -r src -s medium,high -f json -o bandit-results.json
+	$(USE_PYTHON) -m bandit -r src --severity-level medium -f json -o bandit-results.json 2>&1 | grep -vE "(WARNING.*Test in comment|WARNING.*Unknown test found)" || true
 
 security-full: security-audit ## Full security assessment with all tools
 

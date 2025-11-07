@@ -19,6 +19,11 @@ from src.models.database.base import Base
 TEST_DATABASE_URL = "sqlite:///./test_med13.db"
 
 
+# Configure pytest-asyncio to use auto mode
+# With asyncio_mode = auto in pytest.ini, pytest-asyncio automatically
+# manages event loops, so we don't need an explicit event_loop fixture
+
+
 @pytest.fixture(scope="session")
 def test_engine():
     """Create a test database engine."""

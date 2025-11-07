@@ -8,7 +8,13 @@ const mockSession = {
     id: 'test-user-id',
     email: 'admin@med13.org',
     name: 'Test Admin',
-    role: 'admin'
+    username: 'admin',
+    full_name: 'Test Admin',
+    role: 'admin',
+    email_verified: true,
+    access_token: 'test-access-token',
+    refresh_token: 'test-refresh-token',
+    expires_at: Date.now() + 3600000, // 1 hour from now
   },
   expires: '2025-12-31T00:00:00.000Z'
 }
