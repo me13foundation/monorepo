@@ -323,6 +323,8 @@ web-test: ## Run Next.js tests
 web-test-coverage: ## Run Next.js tests with coverage report
 	cd src/web && npm run test:coverage
 
+test-web: web-test ## Alias for web-test
+
 # Quality Assurance
 venv-check: ## Ensure virtual environment is active
 	@if [ "$(VENV_ACTIVE)" = "false" ]; then \

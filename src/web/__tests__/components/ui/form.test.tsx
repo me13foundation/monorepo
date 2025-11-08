@@ -150,6 +150,9 @@ describe('Form Components', () => {
         const form = useForm<TestFormData>({
           resolver: zodResolver(testSchema),
           mode: 'onBlur',
+          defaultValues: {
+            email: '',
+          },
         })
 
         return (
@@ -161,7 +164,7 @@ describe('Form Components', () => {
                 <FormItem className="custom-item-class" data-testid="form-item">
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} value={field.value || ''} />
                   </FormControl>
                 </FormItem>
               )}
@@ -180,6 +183,9 @@ describe('Form Components', () => {
         const form = useForm<TestFormData>({
           resolver: zodResolver(testSchema),
           mode: 'onBlur',
+          defaultValues: {
+            email: '',
+          },
         })
 
         return (
@@ -193,7 +199,7 @@ describe('Form Components', () => {
                     Email
                   </FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} value={field.value || ''} />
                   </FormControl>
                 </FormItem>
               )}
@@ -212,6 +218,9 @@ describe('Form Components', () => {
         const form = useForm<TestFormData>({
           resolver: zodResolver(testSchema),
           mode: 'onBlur',
+          defaultValues: {
+            email: '',
+          },
         })
 
         return (
@@ -223,7 +232,7 @@ describe('Form Components', () => {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} value={field.value || ''} />
                   </FormControl>
                   <FormDescription className="custom-desc-class" data-testid="form-desc">
                     Description
@@ -247,6 +256,9 @@ describe('Form Components', () => {
         const form = useForm<TestFormData>({
           resolver: zodResolver(testSchema),
           mode: 'onBlur',
+          defaultValues: {
+            email: '',
+          },
         })
 
         return (
@@ -258,7 +270,7 @@ describe('Form Components', () => {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage className="custom-message-class" data-testid="form-message" />
                 </FormItem>
@@ -288,6 +300,9 @@ describe('Form Components', () => {
         const form = useForm<TestFormData>({
           resolver: zodResolver(testSchema),
           mode: 'onBlur',
+          defaultValues: {
+            email: '',
+          },
         })
 
         return (
@@ -299,7 +314,7 @@ describe('Form Components', () => {
                 <FormItem>
                   <FormLabel data-testid="form-label">Email</FormLabel>
                   <FormControl>
-                    <Input {...field} />
+                    <Input {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -328,6 +343,9 @@ describe('Form Components', () => {
         const form = useForm<TestFormData>({
           resolver: zodResolver(testSchema),
           mode: 'onBlur',
+          defaultValues: {
+            email: '',
+          },
         })
 
         return (
@@ -339,7 +357,7 @@ describe('Form Components', () => {
                 <FormItem>
                   <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input data-testid="form-input" {...field} />
+                    <Input data-testid="form-input" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

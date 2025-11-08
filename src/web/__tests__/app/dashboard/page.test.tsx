@@ -61,21 +61,26 @@ jest.mock('@/components/auth/ProtectedRoute', () => ({
 }))
 
 // Mock space context
+const mockSetCurrentSpaceId = jest.fn()
+const mockUseSpaceContext = jest.fn(() => ({
+  currentSpaceId: null as string | null,
+  setCurrentSpaceId: mockSetCurrentSpaceId,
+  isLoading: false,
+}))
+
 jest.mock('@/components/space-context-provider', () => ({
-  useSpaceContext: () => ({
-    currentSpaceId: null,
-    setCurrentSpaceId: jest.fn(),
-    isLoading: false,
-  }),
+  useSpaceContext: () => mockUseSpaceContext(),
   SpaceContextProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 // Mock research spaces query
+const mockUseResearchSpaces = jest.fn(() => ({
+  data: { spaces: [] as Array<{ id: string; name: string; slug: string }> },
+  isLoading: false,
+}))
+
 jest.mock('@/lib/queries/research-spaces', () => ({
-  useResearchSpaces: () => ({
-    data: { spaces: [] },
-    isLoading: false,
-  }),
+  useResearchSpaces: () => mockUseResearchSpaces(),
 }))
 
 // Test wrapper with providers
@@ -180,9 +185,50 @@ describe('DashboardPage', () => {
 
     // Check responsive grid classes
     const statsGrid = screen.getByText('Data Sources').closest('.grid')
-    expect(statsGrid).toHaveClass('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-4')
+    expect(statsGrid).toHaveClass('grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-4')
 
     const activityGrid = screen.getByText('Recent Data Sources').closest('.grid')
     expect(activityGrid).toHaveClass('grid-cols-1', 'lg:grid-cols-2')
+  })
+
+  describe('Data Sources Button', () => {
+    beforeEach(() => {
+      jest.clearAllMocks()
+    })
+
+    it('shows Data Sources button when space is selected', () => {
+      mockUseSpaceContext.mockReturnValue({
+        currentSpaceId: 'space-123',
+        setCurrentSpaceId: mockSetCurrentSpaceId,
+        isLoading: false,
+      })
+
+      mockUseResearchSpaces.mockReturnValue({
+        data: {
+          spaces: [
+            { id: 'space-123', name: 'Test Space', slug: 'test-space' },
+          ],
+        },
+        isLoading: false,
+      })
+
+      renderWithProviders(<DashboardPage />)
+
+      const dataSourcesLink = screen.getByRole('link', { name: /data sources/i })
+      expect(dataSourcesLink).toBeInTheDocument()
+      expect(dataSourcesLink).toHaveAttribute('href', '/spaces/space-123/data-sources')
+    })
+
+    it('hides Data Sources button when no space is selected', () => {
+      mockUseSpaceContext.mockReturnValue({
+        currentSpaceId: null,
+        setCurrentSpaceId: mockSetCurrentSpaceId,
+        isLoading: false,
+      })
+
+      renderWithProviders(<DashboardPage />)
+
+      expect(screen.queryByRole('link', { name: /data sources/i })).not.toBeInTheDocument()
+    })
   })
 })

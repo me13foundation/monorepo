@@ -33,10 +33,9 @@ export function SpaceSelectorModal({
   const { currentSpaceId, setCurrentSpaceId } = useSpaceContext()
   const [searchQuery, setSearchQuery] = useState('')
 
-  const spaces = data?.spaces || []
-
   // Filter spaces based on search query
   const filteredSpaces = useMemo(() => {
+    const spaces = data?.spaces || []
     if (!searchQuery.trim()) {
       return spaces
     }
@@ -47,7 +46,7 @@ export function SpaceSelectorModal({
         space.slug.toLowerCase().includes(query) ||
         space.description?.toLowerCase().includes(query)
     )
-  }, [spaces, searchQuery])
+  }, [data?.spaces, searchQuery])
 
   const handleSpaceSelect = (spaceId: string) => {
     setCurrentSpaceId(spaceId)
@@ -67,16 +66,16 @@ export function SpaceSelectorModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 [&>button]:hidden">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <div className="flex items-center justify-between">
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 [&>button]:hidden w-[95vw] sm:w-full">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
             <div>
-              <DialogTitle className="text-xl font-semibold">Select a space</DialogTitle>
+              <DialogTitle className="text-lg sm:text-xl font-semibold">Select a space</DialogTitle>
               <DialogDescription className="sr-only">
                 Choose a research space to work with or create a new one
               </DialogDescription>
             </div>
-            <Button onClick={handleCreateNew} size="sm">
+            <Button onClick={handleCreateNew} size="sm" className="w-full sm:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New space
             </Button>
@@ -85,7 +84,7 @@ export function SpaceSelectorModal({
 
         <div className="flex flex-col flex-1 min-h-0">
           {/* Search Bar */}
-          <div className="px-6 pt-4 pb-3 border-b">
+          <div className="px-4 sm:px-6 pt-3 sm:pt-4 pb-2 sm:pb-3 border-b">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -107,8 +106,8 @@ export function SpaceSelectorModal({
                 <span className="ml-2 text-sm text-muted-foreground">Loading spaces...</span>
               </div>
             ) : filteredSpaces.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center px-6">
-                <Folder className="h-12 w-12 text-muted-foreground mb-4" />
+              <div className="flex flex-col items-center justify-center py-12 text-center px-4 sm:px-6">
+                <Folder className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-4" />
                 <p className="text-sm text-muted-foreground">
                   {searchQuery
                     ? 'No spaces found matching your search'
@@ -116,9 +115,9 @@ export function SpaceSelectorModal({
                 </p>
               </div>
             ) : (
-              <div className="px-6 py-2">
-                {/* Table Header */}
-                <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+              <div className="px-4 sm:px-6 py-2">
+                {/* Table Header - Hidden on mobile */}
+                <div className="hidden sm:grid grid-cols-[1fr_auto_auto] gap-4 px-3 py-2 text-xs font-medium text-muted-foreground border-b">
                   <div>Name</div>
                   <div>Type</div>
                   <div className="text-right">ID</div>
@@ -132,12 +131,12 @@ export function SpaceSelectorModal({
                         key={space.id}
                         onClick={() => handleSpaceSelect(space.id)}
                         className={cn(
-                          'w-full grid grid-cols-[1fr_auto_auto] gap-4 px-3 py-3 hover:bg-accent transition-colors text-left',
+                          'w-full flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-4 px-3 py-3 hover:bg-accent transition-colors text-left',
                           isSelected && 'bg-accent/50'
                         )}
                       >
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-col min-w-0 sm:contents">
+                          <div className="flex items-center gap-2 mb-1 sm:mb-0">
                             <span className="text-sm font-medium text-foreground truncate">
                               {space.name}
                             </span>
@@ -148,16 +147,19 @@ export function SpaceSelectorModal({
                             )}
                           </div>
                           {space.description && (
-                            <span className="text-xs text-muted-foreground truncate mt-1">
+                            <span className="text-xs text-muted-foreground truncate mb-2 sm:hidden">
                               {space.description}
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center">
+                        <div className="hidden sm:flex items-center">
                           <span className="text-xs text-muted-foreground">Space</span>
                         </div>
-                        <div className="flex items-center justify-end">
-                          <span className="text-xs text-muted-foreground font-mono">
+                        <div className="flex items-center justify-between sm:justify-end">
+                          <span className="text-xs text-muted-foreground font-mono sm:hidden">
+                            Slug: {space.slug}
+                          </span>
+                          <span className="hidden sm:inline text-xs text-muted-foreground font-mono">
                             {space.slug}
                           </span>
                         </div>
@@ -170,8 +172,8 @@ export function SpaceSelectorModal({
           </div>
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        <DialogFooter className="px-4 sm:px-6 py-3 sm:py-4 border-t">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full sm:w-auto">
             Cancel
           </Button>
         </DialogFooter>

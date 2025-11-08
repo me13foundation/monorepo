@@ -1,0 +1,344 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { UserMenu } from '@/components/navigation/UserMenu'
+import { useSignOut } from '@/hooks/use-sign-out'
+import { useTheme } from 'next-themes'
+
+// Mock dependencies
+jest.mock('next-auth/react', () => ({
+  useSession: jest.fn(),
+}))
+
+jest.mock('@/hooks/use-sign-out', () => ({
+  useSignOut: jest.fn(),
+}))
+
+jest.mock('next-themes', () => ({
+  useTheme: jest.fn(),
+}))
+
+jest.mock('next/link', () => {
+  const React = require('react')
+  return {
+    __esModule: true,
+    default: React.forwardRef(
+      ({ children, href }: { children: React.ReactNode; href: string }, ref: React.Ref<HTMLAnchorElement>) => {
+        return (
+          <a href={href} ref={ref}>
+            {children}
+          </a>
+        )
+      }
+    ),
+  }
+})
+
+import { useSession } from 'next-auth/react'
+
+describe('UserMenu Component', () => {
+  const mockUseSession = useSession as jest.MockedFunction<typeof useSession>
+  const mockUseSignOut = useSignOut as jest.MockedFunction<typeof useSignOut>
+  const mockUseTheme = useTheme as jest.MockedFunction<typeof useTheme>
+
+  const mockSignOut = jest.fn()
+  const mockSetTheme = jest.fn()
+
+  const mockSession = {
+    user: {
+      id: 'user-1',
+      email: 'test@example.com',
+      full_name: 'Test User',
+      role: 'admin',
+    },
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+
+    mockUseSession.mockReturnValue({
+      data: mockSession,
+      status: 'authenticated',
+      update: jest.fn(),
+    } as any)
+
+    mockUseSignOut.mockReturnValue({
+      signOut: mockSignOut,
+      isSigningOut: false,
+    })
+
+    mockUseTheme.mockReturnValue({
+      theme: 'light',
+      setTheme: mockSetTheme,
+      themes: ['light', 'dark', 'system'],
+    } as any)
+  })
+
+  describe('Rendering', () => {
+    it('renders user menu trigger button', () => {
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      expect(triggerButton).toBeInTheDocument()
+    })
+
+    it('renders user avatar icon', () => {
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      expect(triggerButton).toBeInTheDocument()
+      // Check for User icon (lucide-react icon)
+      expect(triggerButton.querySelector('svg')).toBeInTheDocument()
+    })
+
+    it('opens dropdown menu when trigger is clicked', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('User Information Display', () => {
+    it('displays user name in dropdown', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Test User')).toBeInTheDocument()
+      })
+    })
+
+    it('displays user email in dropdown', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('test@example.com')).toBeInTheDocument()
+      })
+    })
+
+    it('displays user role in dropdown', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('admin')).toBeInTheDocument()
+      })
+    })
+
+    it('handles missing full_name gracefully', async () => {
+      const user = userEvent.setup()
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'user-2',
+            email: 'test2@example.com',
+            role: 'researcher',
+          },
+        },
+        status: 'authenticated',
+        update: jest.fn(),
+      } as any)
+
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      // When full_name is missing, userName falls back to email
+      // So email appears as both name and email in the dropdown
+      await waitFor(() => {
+        const emailElements = screen.getAllByText('test2@example.com')
+        expect(emailElements.length).toBeGreaterThan(0)
+      })
+    })
+  })
+
+  describe('Menu Items', () => {
+    it('displays Settings link in dropdown', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        const settingsLink = screen.getByRole('link', { name: /settings/i })
+        expect(settingsLink).toBeInTheDocument()
+        expect(settingsLink).toHaveAttribute('href', '/settings')
+      })
+    })
+
+    it('displays theme toggle option in dropdown', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Dark mode')).toBeInTheDocument()
+      })
+    })
+
+    it('displays Sign out option in dropdown', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Sign out')).toBeInTheDocument()
+      })
+    })
+  })
+
+  describe('Theme Toggle', () => {
+    it('shows Dark mode option when theme is light', async () => {
+      const user = userEvent.setup()
+      mockUseTheme.mockReturnValue({
+        theme: 'light',
+        setTheme: mockSetTheme,
+        themes: ['light', 'dark', 'system'],
+      } as any)
+
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Dark mode')).toBeInTheDocument()
+      })
+    })
+
+    it('shows Light mode option when theme is dark', async () => {
+      const user = userEvent.setup()
+      mockUseTheme.mockReturnValue({
+        theme: 'dark',
+        setTheme: mockSetTheme,
+        themes: ['light', 'dark', 'system'],
+      } as any)
+
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Light mode')).toBeInTheDocument()
+      })
+    })
+
+    it('calls setTheme when theme toggle is clicked', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        const themeToggle = screen.getByText('Dark mode')
+        expect(themeToggle).toBeInTheDocument()
+      })
+
+      const themeMenuItem = screen.getByText('Dark mode').closest('[role="menuitem"]')
+      if (themeMenuItem) {
+        await user.click(themeMenuItem)
+        expect(mockSetTheme).toHaveBeenCalledWith('dark')
+      }
+    })
+  })
+
+  describe('Sign Out Functionality', () => {
+    it('calls signOut when sign out is clicked', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Sign out')).toBeInTheDocument()
+      })
+
+      const signOutMenuItem = screen.getByText('Sign out').closest('[role="menuitem"]')
+      if (signOutMenuItem) {
+        await user.click(signOutMenuItem)
+        expect(mockSignOut).toHaveBeenCalledTimes(1)
+      }
+    })
+
+    it('shows loading state during sign-out', async () => {
+      const user = userEvent.setup()
+      mockUseSignOut.mockReturnValue({
+        signOut: mockSignOut,
+        isSigningOut: true,
+      })
+
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        expect(screen.getByText('Signing out...')).toBeInTheDocument()
+      })
+    })
+
+    it('disables sign out button during sign-out', async () => {
+      const user = userEvent.setup()
+      mockUseSignOut.mockReturnValue({
+        signOut: mockSignOut,
+        isSigningOut: true,
+      })
+
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        const signOutMenuItem = screen.getByText('Signing out...').closest('[role="menuitem"]')
+        expect(signOutMenuItem).toHaveAttribute('aria-disabled', 'true')
+      })
+    })
+  })
+
+  describe('Accessibility', () => {
+    it('has accessible trigger button with aria-label', () => {
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      expect(triggerButton).toHaveAttribute('aria-haspopup', 'menu')
+    })
+
+    it('has proper menu structure when opened', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        const menu = screen.getByRole('menu')
+        expect(menu).toBeInTheDocument()
+      })
+    })
+  })
+})

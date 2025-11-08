@@ -24,8 +24,8 @@ jest.mock('@/components/research-spaces/SpaceSelector', () => ({
   )),
 }))
 
-jest.mock('@/components/theme-toggle', () => ({
-  ThemeToggle: () => <button data-testid="theme-toggle">Theme Toggle</button>,
+jest.mock('@/components/navigation/UserMenu', () => ({
+  UserMenu: () => <button data-testid="user-menu">User Menu</button>,
 }))
 
 import { useSession } from 'next-auth/react'
@@ -71,17 +71,10 @@ describe('Header Component', () => {
 
       expect(screen.getByText('MED13 Admin')).toBeInTheDocument()
       expect(screen.getByTestId('space-selector')).toBeInTheDocument()
-      expect(screen.getByTestId('theme-toggle')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+      expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
 
-    it('displays user role correctly', () => {
-      render(<Header />)
-
-      expect(screen.getByText('admin')).toBeInTheDocument()
-    })
-
-    it('shows Data Sources button when currentSpaceId is set', () => {
+    it('does not show Data Sources button in header (moved to dashboard)', () => {
       mockUseSpaceContext.mockReturnValue({
         currentSpaceId: 'space-123',
         setCurrentSpaceId: jest.fn(),
@@ -90,29 +83,14 @@ describe('Header Component', () => {
 
       render(<Header />)
 
-      const dataSourcesLink = screen.getByRole('link', { name: /data sources/i })
-      expect(dataSourcesLink).toBeInTheDocument()
-      expect(dataSourcesLink).toHaveAttribute('href', '/spaces/space-123/data-sources')
-    })
-
-    it('hides Data Sources button when currentSpaceId is null', () => {
-      mockUseSpaceContext.mockReturnValue({
-        currentSpaceId: null,
-        setCurrentSpaceId: jest.fn(),
-        isLoading: false,
-      })
-
-      render(<Header />)
-
+      // Data Sources button is no longer in the header
       expect(screen.queryByRole('link', { name: /data sources/i })).not.toBeInTheDocument()
     })
 
-    it('renders Settings link', () => {
+    it('renders UserMenu component', () => {
       render(<Header />)
 
-      const settingsLink = screen.getByRole('link', { name: /settings/i })
-      expect(settingsLink).toBeInTheDocument()
-      expect(settingsLink).toHaveAttribute('href', '/settings')
+      expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
 
     it('renders dashboard logo link', () => {
@@ -124,83 +102,11 @@ describe('Header Component', () => {
     })
   })
 
-  describe('Sign Out Functionality', () => {
-    it('handles sign-out flow correctly', async () => {
-      const user = userEvent.setup()
+  describe('UserMenu Integration', () => {
+    it('renders UserMenu component', () => {
       render(<Header />)
 
-      const signOutButton = screen.getByRole('button', { name: /sign out/i })
-      await user.click(signOutButton)
-
-      expect(mockSignOut).toHaveBeenCalledTimes(1)
-    })
-
-    it('shows loading state during sign-out', () => {
-      mockUseSignOut.mockReturnValue({
-        signOut: mockSignOut,
-        isSigningOut: true,
-      })
-
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /signing out/i })
-      expect(signOutButton).toBeInTheDocument()
-      expect(signOutButton).toBeDisabled()
-      expect(signOutButton).toHaveAttribute('aria-busy', 'true')
-    })
-
-    it('shows normal state when not signing out', () => {
-      mockUseSignOut.mockReturnValue({
-        signOut: mockSignOut,
-        isSigningOut: false,
-      })
-
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i })
-      expect(signOutButton).toBeInTheDocument()
-      expect(signOutButton).not.toBeDisabled()
-      expect(signOutButton).toHaveAttribute('aria-busy', 'false')
-    })
-  })
-
-  describe('Accessibility', () => {
-    it('has aria-label on sign out button', () => {
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i })
-      expect(signOutButton).toHaveAttribute('aria-label', 'Sign out')
-    })
-
-    it('updates aria-label during sign-out', () => {
-      mockUseSignOut.mockReturnValue({
-        signOut: mockSignOut,
-        isSigningOut: true,
-      })
-
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /signing out/i })
-      expect(signOutButton).toHaveAttribute('aria-label', 'Signing out...')
-    })
-
-    it('has aria-busy attribute on sign out button', () => {
-      mockUseSignOut.mockReturnValue({
-        signOut: mockSignOut,
-        isSigningOut: true,
-      })
-
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /signing out/i })
-      expect(signOutButton).toHaveAttribute('aria-busy', 'true')
-    })
-
-    it('has aria-busy false when not signing out', () => {
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i })
-      expect(signOutButton).toHaveAttribute('aria-busy', 'false')
+      expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
   })
 
@@ -265,28 +171,8 @@ describe('Header Component', () => {
 
       render(<Header />)
 
-      expect(screen.getByText('researcher')).toBeInTheDocument()
-    })
-  })
-
-  describe('Button States', () => {
-    it('disables sign out button during sign-out', () => {
-      mockUseSignOut.mockReturnValue({
-        signOut: mockSignOut,
-        isSigningOut: true,
-      })
-
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /signing out/i })
-      expect(signOutButton).toBeDisabled()
-    })
-
-    it('enables sign out button when not signing out', () => {
-      render(<Header />)
-
-      const signOutButton = screen.getByRole('button', { name: /sign out/i })
-      expect(signOutButton).not.toBeDisabled()
+      // UserMenu component handles role display now
+      expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
   })
 })

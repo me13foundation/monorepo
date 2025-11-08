@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useSession } from 'next-auth/react'
-import { Database, Users, Activity, BarChart3, Plus, FolderPlus } from 'lucide-react'
+import { Database, Users, Activity, BarChart3, Plus, FolderPlus, ExternalLink } from 'lucide-react'
 import { useDashboardStats, useRecentActivities } from '@/lib/queries/dashboard'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 export default function DashboardPage() {
   return (
@@ -32,17 +33,28 @@ function DashboardContent() {
 
   return (
     <div>
-      <div className="mb-8">
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-heading font-bold text-foreground">MED13 Admin Dashboard</h1>
-            <p className="mt-2 text-base text-muted-foreground">
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-heading font-bold text-foreground">
+              MED13 Admin Dashboard
+            </h1>
+            <p className="mt-2 text-sm sm:text-base text-muted-foreground">
               Welcome back, {session?.user?.full_name || session?.user?.email}
             </p>
             {currentSpaceId && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                Current space: {spaces.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
-              </p>
+              <div className="mt-2 flex flex-col sm:flex-row sm:items-center gap-2">
+                <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                  Current space: {spaces.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
+                </p>
+                <Button variant="outline" size="sm" asChild className="w-fit">
+                  <Link href={`/spaces/${currentSpaceId}/data-sources`}>
+                    <Database className="h-4 w-4 mr-2" />
+                    Data Sources
+                    <ExternalLink className="h-3 w-3 ml-2" />
+                  </Link>
+                </Button>
+              </div>
             )}
           </div>
           {/* Only show Create New Space button when no spaces exist */}
@@ -50,10 +62,11 @@ function DashboardContent() {
             <Button
               onClick={() => router.push('/spaces/new')}
               size="lg"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-full sm:w-auto"
             >
               <Plus className="h-5 w-5" />
-              Create New Space
+              <span className="hidden sm:inline">Create New Space</span>
+              <span className="sm:hidden">New Space</span>
             </Button>
           )}
         </div>
@@ -61,20 +74,20 @@ function DashboardContent() {
 
       {/* Empty State - Show when no spaces exist */}
       {!spacesLoading && !hasSpaces && (
-        <Card className="mb-8 border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-12 px-6">
-            <div className="rounded-full bg-muted p-4 mb-4">
-              <FolderPlus className="h-8 w-8 text-muted-foreground" />
+        <Card className="mb-6 sm:mb-8 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-8 sm:py-12 px-4 sm:px-6">
+            <div className="rounded-full bg-muted p-3 sm:p-4 mb-4">
+              <FolderPlus className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">No Research Spaces Yet</h3>
-            <p className="text-muted-foreground text-center mb-6 max-w-md">
+            <h3 className="text-lg sm:text-xl font-semibold mb-2">No Research Spaces Yet</h3>
+            <p className="text-muted-foreground text-center mb-6 max-w-md text-sm sm:text-base">
               Get started by creating your first research space. Research spaces help you organize
               data sources and collaborate with your team.
             </p>
             <Button
               onClick={() => router.push('/spaces/new')}
               size="lg"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 w-full sm:w-auto"
             >
               <Plus className="h-5 w-5" />
               Create Your First Space
@@ -85,7 +98,7 @@ function DashboardContent() {
 
       <div>
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-heading font-medium">Data Sources</CardTitle>
@@ -148,7 +161,7 @@ function DashboardContent() {
         </div>
 
         {/* Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="font-heading">Recent Data Sources</CardTitle>

@@ -45,7 +45,7 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
       <Button
         variant="outline"
         onClick={() => setModalOpen(true)}
-        className="min-w-[200px] justify-between"
+        className="w-full sm:w-auto sm:min-w-[200px] justify-between"
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Folder className="h-4 w-4 flex-shrink-0" />
@@ -54,7 +54,7 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
               {currentSpace?.name || 'Select a space'}
             </span>
             {currentSpace && (
-              <span className="text-xs text-muted-foreground font-mono truncate w-full">
+              <span className="text-xs text-muted-foreground font-mono truncate w-full hidden sm:block">
                 {currentSpace.slug}
               </span>
             )}
