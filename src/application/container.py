@@ -29,15 +29,24 @@ from src.application.export.export_service import BulkExportService
 from src.application.search.search_service import UnifiedSearchService
 from src.application.services.authentication_service import AuthenticationService
 from src.application.services.authorization_service import AuthorizationService
+from src.application.services.data_discovery_service import DataDiscoveryService
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.publication_service import PublicationApplicationService
+from src.application.services.source_management_service import SourceManagementService
 from src.application.services.user_management_service import UserManagementService
 from src.application.services.variant_service import VariantApplicationService
+from src.database.session import SessionLocal
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.services.variant_domain_service import VariantDomainService
+from src.infrastructure.queries.source_query_client import HTTPQueryClient
+from src.infrastructure.repositories.data_discovery_repository_impl import (
+    SQLAlchemyDataDiscoverySessionRepository,
+    SQLAlchemyQueryTestResultRepository,
+    SQLAlchemySourceCatalogRepository,
+)
 from src.infrastructure.repositories.evidence_repository import (
     SqlAlchemyEvidenceRepository,
 )
@@ -53,6 +62,9 @@ from src.infrastructure.repositories.sqlalchemy_session_repository import (
 )
 from src.infrastructure.repositories.sqlalchemy_user_repository import (
     SqlAlchemyUserRepository,
+)
+from src.infrastructure.repositories.user_data_source_repository import (
+    SqlAlchemyUserDataSourceRepository,
 )
 from src.infrastructure.repositories.variant_repository import (
     SqlAlchemyVariantRepository,
@@ -372,6 +384,41 @@ class DependencyContainer:
             evidence_service=self.create_evidence_application_service(session),
         )
 
+    def create_source_management_service(
+        self,
+        session: Session,
+    ) -> SourceManagementService:
+        """Create a source management service with the given session."""
+        # Create repositories
+        user_data_source_repo = SqlAlchemyUserDataSourceRepository(session)
+
+        return SourceManagementService(
+            user_data_source_repository=user_data_source_repo,
+            source_template_repository=None,
+        )
+
+    def create_data_discovery_service(self, session: Session) -> DataDiscoveryService:
+        """Create a data discovery service with the given session."""
+        # Create repositories
+        session_repo = SQLAlchemyDataDiscoverySessionRepository(session)
+        catalog_repo = SQLAlchemySourceCatalogRepository(session)
+        query_repo = SQLAlchemyQueryTestResultRepository(session)
+
+        # Create query client
+        query_client = HTTPQueryClient()
+
+        # Create source management service
+        source_service = self.create_source_management_service(session)
+
+        return DataDiscoveryService(
+            data_discovery_session_repository=session_repo,
+            source_catalog_repository=catalog_repo,
+            query_result_repository=query_repo,
+            source_query_client=query_client,
+            source_management_service=source_service,
+            source_template_repository=None,  # TODO: Implement when needed
+        )
+
 
 # Global container instance (will be configured in main.py)
 container = DependencyContainer()
@@ -441,3 +488,15 @@ def get_user_management_service_dependency() -> UserManagementService:
 def get_legacy_dependency_container() -> DependencyContainer:
     """Get the legacy dependency container for routes that still use the old system."""
     return container
+
+
+# Data discovery service dependency
+def get_data_discovery_service_dependency() -> DataDiscoveryService:
+    """FastAPI dependency for data discovery service."""
+    # Create a new session for this request
+    session = SessionLocal()
+    try:
+        return container.create_data_discovery_service(session)
+    except Exception:
+        session.close()
+        raise

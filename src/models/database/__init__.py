@@ -3,6 +3,13 @@
 
 from .audit import AuditLog
 from .base import Base
+
+# Data Discovery models
+from .data_discovery import (
+    DataDiscoverySessionModel,
+    QueryTestResultModel,
+    SourceCatalogEntryModel,
+)
 from .evidence import EvidenceLevel, EvidenceModel, EvidenceType
 from .gene import GeneModel, GeneType
 from .ingestion_job import (
@@ -48,6 +55,7 @@ __all__ = [
     "AuditLog",
     "Base",
     "ClinicalSignificance",
+    "DataDiscoverySessionModel",
     "EvidenceLevel",
     "EvidenceModel",
     "EvidenceType",
@@ -61,9 +69,11 @@ __all__ = [
     "PhenotypeModel",
     "PublicationModel",
     "PublicationType",
+    "QueryTestResultModel",
     "ResearchSpaceMembershipModel",
     "ResearchSpaceModel",
     "ReviewRecord",
+    "SourceCatalogEntryModel",
     "SourceStatus",
     "SourceTemplateModel",
     "SourceType",

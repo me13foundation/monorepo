@@ -214,9 +214,9 @@ describe('DashboardPage', () => {
 
       renderWithProviders(<DashboardPage />)
 
-      const dataSourcesLink = screen.getByRole('link', { name: /data sources/i })
+      const dataSourcesLink = screen.getByRole('link', { name: /discover data sources/i })
       expect(dataSourcesLink).toBeInTheDocument()
-      expect(dataSourcesLink).toHaveAttribute('href', '/spaces/space-123/data-sources')
+      expect(dataSourcesLink).toHaveAttribute('href', '/data-discovery')
     })
 
     it('hides Data Sources button when no space is selected', () => {

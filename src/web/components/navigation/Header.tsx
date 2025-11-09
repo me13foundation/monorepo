@@ -3,7 +3,7 @@
 import { SpaceSelector } from '@/components/research-spaces/SpaceSelector'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { UserMenu } from './UserMenu'
-import { LayoutDashboard } from 'lucide-react'
+import { LayoutDashboard, Library } from 'lucide-react'
 import Link from 'next/link'
 
 export function Header() {
@@ -17,6 +17,10 @@ export function Header() {
             <Link href="/dashboard" className="flex items-center gap-2 flex-shrink-0">
               <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6" />
               <span className="text-lg sm:text-xl font-bold">MED13 Admin</span>
+            </Link>
+            <Link href="/data-discovery" className="flex items-center gap-2 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors">
+              <Library className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="text-sm sm:text-base font-medium">Data Discovery</span>
             </Link>
             <div className="min-w-0 flex-1 max-w-xs">
               <SpaceSelector currentSpaceId={currentSpaceId || undefined} />

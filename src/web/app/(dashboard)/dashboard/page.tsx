@@ -50,9 +50,9 @@ function DashboardContent() {
                   Current space: {spaces.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
                 </p>
                 <Button variant="outline" size="sm" asChild className="w-fit">
-                  <Link href={`/spaces/${currentSpaceId}/data-sources`}>
+                  <Link href="/data-discovery">
                     <Database className="h-4 w-4 mr-2" />
-                    Data Sources
+                    Discover Data Sources
                     <ExternalLink className="h-3 w-3 ml-2" />
                   </Link>
                 </Button>

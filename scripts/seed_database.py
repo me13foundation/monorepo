@@ -18,6 +18,7 @@ from src.models.database import (
     VariantModel,
 )
 from src.models.database.audit import AuditLog
+from src.models.database.data_discovery import SourceCatalogEntryModel
 from src.models.database.review import ReviewRecord
 
 if TYPE_CHECKING:
@@ -179,6 +180,82 @@ def ensure_audit_log(session: Session, variant: VariantModel) -> None:
     )
 
 
+def seed_source_catalog(session: Session) -> None:
+    """Seed the source catalog with demo entries."""
+    logger.info("Seeding source catalog...")
+
+    # Check if already seeded
+    if session.query(SourceCatalogEntryModel).count() > 0:
+        logger.info("Source catalog already seeded, skipping")
+        return
+
+    # Sample catalog entries
+    catalog_entries = [
+        {
+            "id": "clinvar",
+            "name": "ClinVar",
+            "description": "Public archive of reports of the relationships among human variations and phenotypes",
+            "category": "Genomic Variant Databases",
+            "param_type": "gene",
+            "url_template": "https://www.ncbi.nlm.nih.gov/clinvar/?term=${gene}[gene]",
+            "tags": ["variants", "genomics", "clinical"],
+            "is_active": True,
+            "requires_auth": False,
+        },
+        {
+            "id": "gnomad",
+            "name": "gnomAD",
+            "description": "Genome Aggregation Database provides allele frequency data from large-scale sequencing projects",
+            "category": "Genomic Variant Databases",
+            "param_type": "gene",
+            "url_template": "https://gnomad.broadinstitute.org/gene/${gene}?dataset=gnomad_r4",
+            "tags": ["variants", "population", "frequency"],
+            "is_active": True,
+            "requires_auth": False,
+        },
+        {
+            "id": "pubmed",
+            "name": "PubMed",
+            "description": "Comprehensive database of biomedical literature from the National Library of Medicine",
+            "category": "Scientific Literature",
+            "param_type": "gene_and_term",
+            "url_template": "https://pubmed.ncbi.nlm.nih.gov/?term=(${gene})+AND+(${term})",
+            "tags": ["literature", "publications", "research"],
+            "is_active": True,
+            "requires_auth": False,
+        },
+        {
+            "id": "hpo",
+            "name": "Human Phenotype Ontology",
+            "description": "Standardized vocabulary for describing human phenotypic abnormalities",
+            "category": "Phenotype Ontologies & Databases",
+            "param_type": "term",
+            "url_template": "https://hpo.jax.org/app/browse/search?q=${term}",
+            "tags": ["phenotypes", "ontology", "clinical"],
+            "is_active": True,
+            "requires_auth": False,
+        },
+        {
+            "id": "variantformer",
+            "name": "VariantFormer",
+            "description": "AI model for predicting variant pathogenicity and functional impact",
+            "category": "AI Predictive Models",
+            "param_type": "api",
+            "api_endpoint": "/api/variantformer",
+            "tags": ["ai", "prediction", "pathogenicity"],
+            "is_active": True,
+            "requires_auth": False,
+        },
+    ]
+
+    for entry_data in catalog_entries:
+        entry = SourceCatalogEntryModel(**entry_data)
+        session.add(entry)
+        logger.info("Added catalog entry: %s", entry.name)
+
+    logger.info("Seeded %s source catalog entries", len(catalog_entries))
+
+
 def main() -> None:
     Base.metadata.create_all(bind=engine)
     logging.basicConfig(level=logging.INFO)
@@ -192,6 +269,7 @@ def main() -> None:
         ensure_evidence(session, variant, phenotype)
         ensure_review(session, variant)
         ensure_audit_log(session, variant)
+        seed_source_catalog(session)
         session.commit()
         logger.info("Seeded MED13 demo data for curation workflows.")
     except (

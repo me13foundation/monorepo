@@ -1,0 +1,329 @@
+"""
+Unit tests for DataDiscoveryService application service.
+
+Following type safety patterns with mock repositories and
+comprehensive business logic testing.
+"""
+
+from unittest.mock import Mock
+from uuid import uuid4
+
+import pytest
+
+from src.application.services.data_discovery_service import (
+    AddSourceToSpaceRequest,
+    CreateDataDiscoverySessionRequest,
+    DataDiscoveryService,
+    ExecuteQueryTestRequest,
+    UpdateSessionParametersRequest,
+)
+from src.domain.entities.data_discovery_session import (
+    QueryParameters,
+    TestResultStatus,
+)
+from tests.test_types.data_discovery_fixtures import (
+    TEST_SESSION_ACTIVE,
+    TEST_SOURCE_CLINVAR,
+    create_test_data_discovery_session,
+)
+from tests.test_types.mocks import (
+    create_mock_data_discovery_repositories,
+    create_mock_query_client,
+)
+
+
+class TestDataDiscoveryService:
+    """Test DataDiscoveryService application service."""
+
+    @pytest.fixture
+    def service(self) -> DataDiscoveryService:
+        """Create a data discovery service with mock dependencies."""
+        mock_repos = create_mock_data_discovery_repositories()
+        mock_client = create_mock_query_client()
+        return DataDiscoveryService(
+            data_discovery_session_repository=mock_repos["session_repo"],
+            source_catalog_repository=mock_repos["catalog_repo"],
+            query_result_repository=mock_repos["query_repo"],
+            source_query_client=mock_client,
+            source_management_service=Mock(),
+            source_template_repository=Mock(),
+        )
+
+    def test_create_session(self, service: DataDiscoveryService) -> None:
+        """Test creating a new data discovery session."""
+        owner_id = uuid4()
+        request = CreateDataDiscoverySessionRequest(
+            owner_id=owner_id,
+            name="Test Session",
+            research_space_id=uuid4(),
+            initial_parameters=QueryParameters(
+                gene_symbol="MED13L",
+                search_term="atrial septal defect",
+            ),
+        )
+
+        # Mock the repository save to return the session
+        service._session_repo.save.side_effect = lambda s: s
+
+        session = service.create_session(request)
+
+        assert session.owner_id == owner_id
+        assert session.name == "Test Session"
+        assert session.research_space_id == request.research_space_id
+        assert session.current_parameters.gene_symbol == "MED13L"
+        assert session.is_active is True
+
+    def test_get_session(self, service: DataDiscoveryService) -> None:
+        """Test retrieving a data discovery session."""
+        session_id = TEST_SESSION_ACTIVE.id
+
+        # Mock the repository to return our test session
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+
+        result = service.get_session(session_id)
+
+        assert result is not None
+        assert result.id == session_id
+        service._session_repo.find_by_id.assert_called_once_with(session_id)
+
+    def test_get_session_not_found(self, service: DataDiscoveryService) -> None:
+        """Test retrieving a non-existent session."""
+        session_id = uuid4()
+
+        # Mock the repository to return None
+        service._session_repo.find_by_id.return_value = None
+
+        result = service.get_session(session_id)
+
+        assert result is None
+
+    def test_update_session_parameters(self, service: DataDiscoveryService) -> None:
+        """Test updating session parameters."""
+        session_id = TEST_SESSION_ACTIVE.id
+        new_params = QueryParameters(gene_symbol="TP53", search_term="cancer")
+
+        # Mock the repository
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        updated_session = create_test_data_discovery_session(
+            id=session_id,
+            current_parameters=new_params,
+        )
+        service._session_repo.save.return_value = updated_session
+
+        request = UpdateSessionParametersRequest(
+            session_id=session_id,
+            parameters=new_params,
+        )
+
+        result = service.update_session_parameters(request)
+
+        assert result is not None
+        assert result.current_parameters.gene_symbol == "TP53"
+        service._session_repo.save.assert_called_once()
+
+    def test_update_session_parameters_not_found(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Test updating parameters for non-existent session."""
+        session_id = uuid4()
+        service._session_repo.find_by_id.return_value = None
+
+        request = UpdateSessionParametersRequest(
+            session_id=session_id,
+            parameters=QueryParameters(),
+        )
+
+        result = service.update_session_parameters(request)
+
+        assert result is None
+
+    def test_toggle_source_selection(self, service: DataDiscoveryService) -> None:
+        """Test toggling source selection."""
+        session_id = TEST_SESSION_ACTIVE.id
+
+        # Mock the repository
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        updated_session = create_test_data_discovery_session(
+            id=session_id,
+            selected_sources=["clinvar"],  # Added clinvar
+        )
+        service._session_repo.save.return_value = updated_session
+
+        result = service.toggle_source_selection(session_id, "clinvar")
+
+        assert result is not None
+        assert "clinvar" in result.selected_sources
+        service._session_repo.save.assert_called_once()
+
+    def test_get_source_catalog(self, service: DataDiscoveryService) -> None:
+        """Test retrieving source catalog."""
+        # Mock the repository
+        service._catalog_repo.find_all_active.return_value = [TEST_SOURCE_CLINVAR]
+
+        result = service.get_source_catalog()
+
+        assert len(result) == 1
+        assert result[0].id == TEST_SOURCE_CLINVAR.id
+        service._catalog_repo.find_all_active.assert_called_once()
+
+    def test_get_source_catalog_filtered(self, service: DataDiscoveryService) -> None:
+        """Test retrieving filtered source catalog."""
+        # Mock the repository
+        service._catalog_repo.search.return_value = [TEST_SOURCE_CLINVAR]
+
+        result = service.get_source_catalog(
+            category="Genomic Variant Databases",
+            search_query="clinvar",
+        )
+
+        assert len(result) == 1
+        service._catalog_repo.search.assert_called_once_with(
+            "clinvar",
+            "Genomic Variant Databases",
+        )
+
+    async def test_execute_query_test_success(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Test executing a successful query test."""
+        session_id = TEST_SESSION_ACTIVE.id
+
+        # Mock dependencies
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        service._catalog_repo.find_by_id.return_value = TEST_SOURCE_CLINVAR
+
+        # Mock successful URL generation (for gene-type sources)
+        service._query_client.validate_parameters.return_value = True
+        service._query_client.generate_url.return_value = (
+            "https://example.com/generated-url"
+        )
+
+        # Mock repository saves
+        mock_result = Mock()
+        mock_result.is_successful.return_value = True
+        service._query_repo.save.return_value = mock_result
+
+        request = ExecuteQueryTestRequest(
+            session_id=session_id,
+            catalog_entry_id=TEST_SOURCE_CLINVAR.id,
+        )
+
+        result = await service.execute_query_test(request)
+
+        assert result is not None
+        service._query_client.generate_url.assert_called_once()
+        service._query_repo.save.assert_called_once()
+
+    async def test_execute_query_test_validation_failure(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Test query test with parameter validation failure."""
+        session_id = TEST_SESSION_ACTIVE.id
+
+        # Mock dependencies
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        service._catalog_repo.find_by_id.return_value = TEST_SOURCE_CLINVAR
+
+        # Mock validation failure
+        service._query_client.validate_parameters.return_value = False
+
+        # Mock repository save to return a proper result
+        mock_result = Mock()
+        mock_result.status = TestResultStatus.VALIDATION_FAILED
+        service._query_repo.save.return_value = mock_result
+
+        request = ExecuteQueryTestRequest(
+            session_id=session_id,
+            catalog_entry_id=TEST_SOURCE_CLINVAR.id,
+        )
+
+        result = await service.execute_query_test(request)
+
+        assert result is not None
+        assert result.status == TestResultStatus.VALIDATION_FAILED
+        service._query_client.execute_query.assert_not_called()
+
+    async def test_execute_query_test_session_not_found(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Test query test with non-existent session."""
+        session_id = uuid4()
+
+        # Mock session not found
+        service._session_repo.find_by_id.return_value = None
+
+        request = ExecuteQueryTestRequest(
+            session_id=session_id,
+            catalog_entry_id="test-source",
+        )
+
+        result = await service.execute_query_test(request)
+
+        assert result is None
+
+    def test_get_session_test_results(self, service: DataDiscoveryService) -> None:
+        """Test retrieving session test results."""
+        session_id = TEST_SESSION_ACTIVE.id
+        mock_results = [Mock()]
+
+        # Mock the repository
+        service._query_repo.find_by_session.return_value = mock_results
+
+        result = service.get_session_test_results(session_id)
+
+        assert result == mock_results
+        service._query_repo.find_by_session.assert_called_once_with(session_id)
+
+    async def test_add_source_to_space(self, service: DataDiscoveryService) -> None:
+        """Test adding a source to a research space."""
+        session_id = TEST_SESSION_ACTIVE.id
+        space_id = uuid4()
+
+        # Mock dependencies
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        service._catalog_repo.find_by_id.return_value = TEST_SOURCE_CLINVAR
+
+        # Mock source management service
+        mock_data_source = Mock()
+        mock_data_source.id = uuid4()
+        service._source_service.create_source.return_value = mock_data_source
+
+        request = AddSourceToSpaceRequest(
+            session_id=session_id,
+            catalog_entry_id=TEST_SOURCE_CLINVAR.id,
+            research_space_id=space_id,
+        )
+
+        result = await service.add_source_to_space(request)
+
+        assert result == mock_data_source.id
+        service._source_service.create_source.assert_called_once()
+
+    def test_delete_session(self, service: DataDiscoveryService) -> None:
+        """Test deleting a workbench session."""
+        session_id = TEST_SESSION_ACTIVE.id
+
+        # Mock successful deletion
+        service._session_repo.delete.return_value = True
+        service._query_repo.delete_session_results.return_value = 5
+
+        result = service.delete_session(session_id)
+
+        assert result is True
+        service._session_repo.delete.assert_called_once_with(session_id)
+        service._query_repo.delete_session_results.assert_called_once_with(session_id)
+
+    def test_delete_session_not_found(self, service: DataDiscoveryService) -> None:
+        """Test deleting a non-existent session."""
+        session_id = uuid4()
+
+        # Mock deletion failure
+        service._session_repo.delete.return_value = False
+
+        result = service.delete_session(session_id)
+
+        assert result is False

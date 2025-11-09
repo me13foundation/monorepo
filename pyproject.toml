@@ -93,6 +93,7 @@ module = [
     "dash.*",
     "dash_bootstrap_components.*",
     "requests.*",
+    "requests",
     "dash_table",
     "dash_table.*",
 ]

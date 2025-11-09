@@ -232,7 +232,7 @@ def get_source_service_for_space(
     """Get source management service instance."""
     source_repository = SqlAlchemyUserDataSourceRepository(session)
     # TODO: Add template repository when needed
-    return SourceManagementService(source_repository, None)  # type: ignore[arg-type]
+    return SourceManagementService(source_repository, None)
 
 
 def verify_space_membership(

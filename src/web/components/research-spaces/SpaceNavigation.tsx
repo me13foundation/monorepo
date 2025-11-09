@@ -38,9 +38,9 @@ export function SpaceNavigation() {
     },
     {
       label: 'Data Sources',
-      href: `${basePath}/data-sources`,
+      href: '/data-discovery',
       icon: Database,
-      description: 'Manage data sources',
+      description: 'Discover and test data sources',
     },
     {
       label: 'Data Curation',

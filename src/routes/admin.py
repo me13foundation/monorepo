@@ -66,7 +66,7 @@ def get_source_service() -> SourceManagementService:
     user_repo = SqlAlchemyUserDataSourceRepository(session)
     # TODO: Create template repository when needed
     # For now, pass None - this will need to be fixed when template functionality is implemented
-    return SourceManagementService(user_repo, None)  # type: ignore[arg-type]
+    return SourceManagementService(user_repo, None)
 
 
 def get_template_service() -> TemplateManagementService:

@@ -83,7 +83,7 @@ class SourceManagementService:
     def __init__(
         self,
         user_data_source_repository: UserDataSourceRepository,
-        source_template_repository: SourceTemplateRepository,
+        source_template_repository: SourceTemplateRepository | None = None,
     ):
         """
         Initialize the source management service.
@@ -94,6 +94,13 @@ class SourceManagementService:
         """
         self._source_repository = user_data_source_repository
         self._template_repository = source_template_repository
+
+    def _require_template_repository(self) -> SourceTemplateRepository:
+        """Ensure the template repository is available."""
+        if self._template_repository is None:
+            msg = "Source template repository is not configured"
+            raise RuntimeError(msg)
+        return self._template_repository
 
     def create_source(self, request: CreateSourceRequest) -> UserDataSource:
         """
@@ -110,7 +117,8 @@ class SourceManagementService:
         """
         # Validate template if provided
         if request.template_id:
-            template = self._template_repository.find_by_id(request.template_id)
+            template_repository = self._require_template_repository()
+            template = template_repository.find_by_id(request.template_id)
             if not template:
                 msg = f"Template {request.template_id} not found"
                 raise ValueError(msg)
@@ -379,7 +387,8 @@ class SourceManagementService:
         Returns:
             List of available templates
         """
-        return self._template_repository.find_available_for_user(user_id, skip, limit)
+        template_repository = self._require_template_repository()
+        return template_repository.find_available_for_user(user_id, skip, limit)
 
     def get_statistics(self) -> dict[str, Any]:
         """
@@ -432,7 +441,8 @@ class SourceManagementService:
 
         # Template validation
         if source.template_id:
-            template = self._template_repository.find_by_id(source.template_id)
+            template_repository = self._require_template_repository()
+            template = template_repository.find_by_id(source.template_id)
             if not template:
                 errors.append(
                     f"Referenced template {source.template_id} does not exist",

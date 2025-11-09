@@ -602,3 +602,116 @@ def create_mock_evidence_service(
     """
     mock_repo = MockEvidenceRepository(evidence_list)
     return EvidenceDomainService(mock_repo)
+
+
+# Data Discovery mock repositories and services
+class MockDataDiscoverySessionRepository:
+    """Mock data discovery session repository for testing."""
+
+    def __init__(self):
+        self.sessions = {}
+        self.save = MagicMock()
+        self.find_by_id = MagicMock()
+        self.find_by_owner = MagicMock(return_value=[])
+        self.find_by_space = MagicMock(return_value=[])
+        self.delete = MagicMock(return_value=True)
+
+    def setup_default_behavior(self):
+        """Set up default mock behaviors."""
+        self.save.side_effect = lambda session: session
+        self.find_by_id.side_effect = lambda session_id: self.sessions.get(session_id)
+        self.find_by_owner.return_value = list(self.sessions.values())
+        self.find_by_space.return_value = list(self.sessions.values())
+
+
+class MockSourceCatalogRepository:
+    """Mock source catalog repository for testing."""
+
+    def __init__(self):
+        self.entries = {}
+        self.save = MagicMock()
+        self.find_by_id = MagicMock()
+        self.find_all_active = MagicMock(return_value=[])
+        self.find_by_category = MagicMock(return_value=[])
+        self.search = MagicMock(return_value=[])
+        self.update_usage_stats = MagicMock(return_value=True)
+
+    def setup_default_behavior(self):
+        """Set up default mock behaviors."""
+        self.save.side_effect = lambda entry: entry
+        self.find_by_id.side_effect = lambda entry_id: self.entries.get(entry_id)
+
+
+class MockQueryTestResultRepository:
+    """Mock query test result repository for testing."""
+
+    def __init__(self):
+        self.results = {}
+        self.save = MagicMock()
+        self.find_by_session = MagicMock(return_value=[])
+        self.find_by_source = MagicMock(return_value=[])
+        self.find_by_id = MagicMock()
+        self.delete_session_results = MagicMock(return_value=0)
+
+    def setup_default_behavior(self):
+        """Set up default mock behaviors."""
+        self.save.side_effect = lambda result: result
+        self.find_by_id.side_effect = lambda result_id: self.results.get(result_id)
+
+
+class MockSourceQueryClient:
+    """Mock source query client for testing."""
+
+    def __init__(self):
+        self.execute_query = MagicMock()
+        self.generate_url = MagicMock()
+        self.validate_parameters = MagicMock(return_value=True)
+
+    def setup_success_behavior(self, response_data: dict[str, Any] | None = None):
+        """Set up successful query behavior."""
+        self.execute_query.return_value = response_data or {"result": "success"}
+        self.generate_url.return_value = "https://example.com/test"
+        self.validate_parameters.return_value = True
+
+    def setup_failure_behavior(self, error_message: str = "Query failed"):
+        """Set up failed query behavior."""
+        from src.infrastructure.queries.source_query_client import QueryExecutionError
+
+        self.execute_query.side_effect = QueryExecutionError(
+            error_message,
+            "test-source",
+        )
+        self.validate_parameters.return_value = False
+
+
+def create_mock_data_discovery_repositories() -> dict[str, Any]:
+    """
+    Create a set of mock data discovery repositories for testing.
+
+    Returns:
+        Dictionary containing mock repositories
+    """
+    session_repo = MockDataDiscoverySessionRepository()
+    catalog_repo = MockSourceCatalogRepository()
+    query_repo = MockQueryTestResultRepository()
+
+    # Don't set up default behaviors - let individual tests configure mocks as needed
+    # This allows tests to have full control over mock behavior
+
+    return {
+        "session_repo": session_repo,
+        "catalog_repo": catalog_repo,
+        "query_repo": query_repo,
+    }
+
+
+def create_mock_query_client() -> MockSourceQueryClient:
+    """
+    Create a mock source query client for testing.
+
+    Returns:
+        Mock query client with success behavior
+    """
+    client = MockSourceQueryClient()
+    client.setup_success_behavior()
+    return client

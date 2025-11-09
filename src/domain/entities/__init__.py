@@ -4,6 +4,15 @@ Domain entities for MED13 Resource Library.
 These entities represent the core business objects and their relationships.
 """
 
+# Data Discovery entities
+from .data_discovery_session import (
+    DataDiscoverySession,
+    QueryParameters,
+    QueryParameterType,
+    QueryTestResult,
+    SourceCatalogEntry,
+    TestResultStatus,
+)
 from .evidence import Evidence
 from .gene import Gene
 
@@ -34,6 +43,7 @@ from .user_data_source import (
 from .variant import Variant
 
 __all__ = [
+    "DataDiscoverySession",
     "Evidence",
     "Gene",
     "IngestionError",
@@ -45,12 +55,17 @@ __all__ = [
     "Phenotype",
     "Publication",
     "QualityMetrics",
+    "QueryParameterType",
+    "QueryParameters",
+    "QueryTestResult",
+    "SourceCatalogEntry",
     "SourceConfiguration",
     "SourceStatus",
     "SourceTemplate",
     "SourceType",
     "TemplateCategory",
     "TemplateUIConfig",
+    "TestResultStatus",
     "UserDataSource",
     "ValidationRule",
     "Variant",

@@ -14,6 +14,7 @@ from src.routes.admin import router as admin_router
 from src.routes.auth import auth_router
 from src.routes.curation import router as curation_router
 from src.routes.dashboard import router as dashboard_router
+from src.routes.data_discovery import router as data_discovery_router
 from src.routes.evidence import router as evidence_router
 from src.routes.export import router as export_router
 from src.routes.genes import router as genes_router
@@ -134,6 +135,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(curation_router)
     app.include_router(research_spaces_router)
+    app.include_router(data_discovery_router)
 
     # Authentication routes
     app.include_router(auth_router)
