@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, Float, Integer, String
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.database.base import Base
@@ -18,6 +19,13 @@ class ReviewRecord(Base):
     priority: Mapped[str] = mapped_column(String(16), default="medium")
     quality_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     issues: Mapped[int] = mapped_column(Integer, default=0)
+    research_space_id: Mapped[str | None] = mapped_column(
+        PGUUID(as_uuid=False),
+        ForeignKey("research_spaces.id"),
+        nullable=True,
+        index=True,
+        doc="Research space this review belongs to",
+    )
     last_updated: Mapped[datetime] = mapped_column(
         DateTime,
         default=lambda: datetime.now(UTC),

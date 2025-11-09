@@ -11,6 +11,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from src.application.curation.repositories.review_repository import (
+    SqlAlchemyReviewRepository,
+)
+from src.application.curation.services.review_service import (
+    ReviewQuery,
+    ReviewService,
+)
 from src.application.services.membership_management_service import (
     InviteMemberRequest,
     MembershipManagementService,
@@ -232,17 +239,29 @@ def verify_space_membership(
     space_id: UUID,
     user_id: UUID,
     membership_service: MembershipManagementService,
+    session: Session,
 ) -> None:
     """
     Verify that a user is a member of a research space.
 
-    Raises HTTPException if user is not a member.
+    Checks both explicit membership and ownership.
+    Raises HTTPException if user is not a member or owner.
     """
-    if not membership_service.is_user_member(space_id, user_id):
-        raise HTTPException(
-            status_code=HTTP_403_FORBIDDEN,
-            detail="User is not a member of this research space",
-        )
+    # Check if user is an explicit member
+    if membership_service.is_user_member(space_id, user_id):
+        return
+
+    # Check if user is the owner of the space
+    space_repository = SqlAlchemyResearchSpaceRepository(session=session)
+    space = space_repository.find_by_id(space_id)
+    if space and space.owner_id == user_id:
+        return
+
+    # User is neither a member nor the owner
+    raise HTTPException(
+        status_code=HTTP_403_FORBIDDEN,
+        detail="User is not a member of this research space",
+    )
 
 
 # Research Space Routes
@@ -659,7 +678,7 @@ def list_space_data_sources(
 ) -> DataSourceListResponse:
     """List all data sources in a research space."""
     # Verify user is a member of the space
-    verify_space_membership(space_id, current_user.id, membership_service)
+    verify_space_membership(space_id, current_user.id, membership_service, session)
 
     # Get data sources for this space
     source_repo = SqlAlchemyUserDataSourceRepository(session)
@@ -686,10 +705,11 @@ def create_space_data_source(
     current_user: User = Depends(get_current_active_user),
     membership_service: MembershipManagementService = Depends(get_membership_service),
     source_service: SourceManagementService = Depends(get_source_service_for_space),
+    session: Session = Depends(get_session),
 ) -> DataSourceResponse:
     """Create a new data source in a research space."""
     # Verify user is a member of the space
-    verify_space_membership(space_id, current_user.id, membership_service)
+    verify_space_membership(space_id, current_user.id, membership_service, session)
 
     try:
         # Create source configuration
@@ -719,4 +739,129 @@ def create_space_data_source(
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create data source: {e!s}",
+        ) from e
+
+
+# Curation Integration Routes
+class CurationStatsResponse(BaseModel):
+    """Response model for curation statistics."""
+
+    total: int
+    pending: int
+    approved: int
+    rejected: int
+
+
+class CurationQueueItemResponse(BaseModel):
+    """Response model for curation queue item."""
+
+    id: int
+    entity_type: str
+    entity_id: str
+    status: str
+    priority: str
+    quality_score: float | None
+    issues: int
+    last_updated: str | None
+
+
+class CurationQueueResponse(BaseModel):
+    """Response model for curation queue."""
+
+    items: list[CurationQueueItemResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+def get_curation_service(session: Session = Depends(get_session)) -> ReviewService:
+    """Get curation review service instance."""
+    repository = SqlAlchemyReviewRepository()
+    return ReviewService(repository)
+
+
+@research_spaces_router.get(
+    "/{space_id}/curation/stats",
+    response_model=CurationStatsResponse,
+    summary="Get curation statistics",
+    description="Get curation statistics for a research space",
+)
+def get_space_curation_stats(
+    space_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    membership_service: MembershipManagementService = Depends(get_membership_service),
+    curation_service: ReviewService = Depends(get_curation_service),
+    session: Session = Depends(get_session),
+) -> CurationStatsResponse:
+    """Get curation statistics for a research space."""
+    # Verify user is a member of the space
+    verify_space_membership(space_id, current_user.id, membership_service, session)
+
+    try:
+        stats = curation_service.get_stats(session, str(space_id))
+        return CurationStatsResponse(**stats)
+    except Exception as e:
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get curation stats: {e!s}",
+        ) from e
+
+
+@research_spaces_router.get(
+    "/{space_id}/curation/queue",
+    response_model=CurationQueueResponse,
+    summary="List curation queue",
+    description="Get curation queue items for a research space",
+)
+def list_space_curation_queue(
+    space_id: UUID,
+    entity_type: str | None = Query(None, description="Filter by entity type"),
+    status: str | None = Query(None, description="Filter by status"),
+    priority: str | None = Query(None, description="Filter by priority"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=100),
+    current_user: User = Depends(get_current_active_user),
+    membership_service: MembershipManagementService = Depends(get_membership_service),
+    curation_service: ReviewService = Depends(get_curation_service),
+    session: Session = Depends(get_session),
+) -> CurationQueueResponse:
+    """List curation queue items for a research space."""
+    # Verify user is a member of the space
+    verify_space_membership(space_id, current_user.id, membership_service, session)
+
+    try:
+        query = ReviewQuery(
+            entity_type=entity_type,
+            status=status,
+            priority=priority,
+            research_space_id=str(space_id),
+            limit=limit,
+            offset=skip,
+        )
+        items = curation_service.list_queue(session, query)
+
+        return CurationQueueResponse(
+            items=[
+                CurationQueueItemResponse(
+                    id=item.id,
+                    entity_type=item.entity_type,
+                    entity_id=item.entity_id,
+                    status=item.status,
+                    priority=item.priority,
+                    quality_score=item.quality_score,
+                    issues=item.issues,
+                    last_updated=(
+                        item.last_updated.isoformat() if item.last_updated else None
+                    ),
+                )
+                for item in items
+            ],
+            total=len(items),
+            skip=skip,
+            limit=limit,
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get curation queue: {e!s}",
         ) from e

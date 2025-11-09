@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { signIn, getSession } from "next-auth/react"
+import { signIn, useSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { LoginForm } from "@/components/auth/LoginForm"
@@ -14,6 +14,7 @@ function LoginContent() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { update: updateSession } = useSession()
 
   useEffect(() => {
     // Check if redirected due to session expiration
@@ -33,25 +34,41 @@ function LoginContent() {
     setError(null)
 
     try {
+      // Get callbackUrl from query params, default to dashboard
+      const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
+
+      // Attempt sign in
       const result = await signIn("credentials", {
         email,
         password,
         redirect: false,
+        callbackUrl,
       })
 
       if (result?.error) {
         setError("Invalid email or password")
-      } else if (result?.ok) {
-        // Get the updated session to check user role
-        const session = await getSession()
-        if (session?.user) {
-          // Redirect based on user role
-          router.push("/dashboard")
-        }
+        setIsLoading(false)
+        return
+      }
+
+      if (result?.ok) {
+        // Force session refresh using NextAuth's update method
+        // This ensures the session is immediately available to all components
+        await updateSession()
+
+        // Small delay to ensure session state propagates through React tree
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        // Navigate using Next.js router (client-side, preserves React state)
+        // The destination component's ProtectedRoute will verify session
+        router.push(callbackUrl)
+
+        // Note: setIsLoading(false) is intentionally omitted here
+        // because we're navigating away, so the component will unmount
       }
     } catch (error) {
+      console.error("Login error:", error)
       setError("An unexpected error occurred")
-    } finally {
       setIsLoading(false)
     }
   }

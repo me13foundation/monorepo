@@ -18,6 +18,7 @@ import { useSession } from 'next-auth/react'
 
 interface ResearchSpaceDetailProps {
   spaceId: string
+  defaultTab?: string
 }
 
 const statusColors: Record<SpaceStatus, string> = {
@@ -34,7 +35,7 @@ const statusLabels: Record<SpaceStatus, string> = {
   [SpaceStatus.SUSPENDED]: 'Suspended',
 }
 
-export function ResearchSpaceDetail({ spaceId }: ResearchSpaceDetailProps) {
+export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: ResearchSpaceDetailProps) {
   const router = useRouter()
   const { data: session } = useSession()
   const { data: space, isLoading } = useResearchSpace(spaceId)
@@ -134,7 +135,7 @@ export function ResearchSpaceDetail({ spaceId }: ResearchSpaceDetailProps) {
         )}
       </div>
 
-      <Tabs defaultValue="overview" className="space-y-4">
+      <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">

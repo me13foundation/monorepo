@@ -169,7 +169,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             error_detail = str(e)
             error_code = self._get_error_code(error_detail)
 
-            logger.exception(
+            # Log expected authentication failures at debug level (no traceback)
+            # These are normal 401 responses for invalid/expired tokens
+            logger.debug(
                 "[JWTAuthMiddleware] Authentication failed: %s",
                 error_detail,
             )

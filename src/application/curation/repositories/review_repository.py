@@ -14,6 +14,7 @@ class ReviewFilter:
     entity_type: str | None = None
     status: str | None = None
     priority: str | None = None
+    research_space_id: str | None = None
 
 
 class ReviewRecordLike(TypedDict, total=False):
@@ -24,6 +25,7 @@ class ReviewRecordLike(TypedDict, total=False):
     priority: str
     quality_score: float | None
     issues: int
+    research_space_id: str | None
     last_updated: object | None
 
 
@@ -56,6 +58,13 @@ class ReviewRepository(Protocol):
     ) -> ReviewRecordLike | None:
         ...
 
+    def get_stats(
+        self,
+        db: Session,
+        research_space_id: str | None = None,
+    ) -> dict[str, int]:
+        ...
+
 
 class SqlAlchemyReviewRepository:
     def list_records(
@@ -72,6 +81,10 @@ class SqlAlchemyReviewRepository:
             query = query.filter(ReviewRecord.status == flt.status)
         if flt.priority:
             query = query.filter(ReviewRecord.priority == flt.priority)
+        if flt.research_space_id:
+            query = query.filter(
+                ReviewRecord.research_space_id == flt.research_space_id,
+            )
         orm_records = list(query.offset(offset).limit(limit).all())
         return [
             {
@@ -82,6 +95,7 @@ class SqlAlchemyReviewRepository:
                 "priority": r.priority,
                 "quality_score": r.quality_score,
                 "issues": r.issues,
+                "research_space_id": r.research_space_id,
                 "last_updated": r.last_updated,
             }
             for r in orm_records
@@ -114,6 +128,7 @@ class SqlAlchemyReviewRepository:
             "priority": record.priority,  # type: ignore[attr-defined]
             "quality_score": getattr(record, "quality_score", None),
             "issues": getattr(record, "issues", 0),
+            "research_space_id": getattr(record, "research_space_id", None),
             "last_updated": getattr(record, "last_updated", None),
         }
 
@@ -142,7 +157,30 @@ class SqlAlchemyReviewRepository:
             "priority": orm.priority,
             "quality_score": orm.quality_score,
             "issues": orm.issues,
+            "research_space_id": orm.research_space_id,
             "last_updated": orm.last_updated,
+        }
+
+    def get_stats(
+        self,
+        db: Session,
+        research_space_id: str | None = None,
+    ) -> dict[str, int]:
+        """Get curation statistics for a research space."""
+        query = db.query(ReviewRecord)
+        if research_space_id:
+            query = query.filter(ReviewRecord.research_space_id == research_space_id)
+
+        total = query.count()
+        pending = query.filter(ReviewRecord.status == "pending").count()
+        approved = query.filter(ReviewRecord.status == "approved").count()
+        rejected = query.filter(ReviewRecord.status == "rejected").count()
+
+        return {
+            "total": total,
+            "pending": pending,
+            "approved": approved,
+            "rejected": rejected,
         }
 
 

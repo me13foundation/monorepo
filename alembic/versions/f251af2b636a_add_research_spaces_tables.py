@@ -5,11 +5,10 @@ Revises: fe86208f6b48
 Create Date: 2025-11-06 22:59:16.906054
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from sqlalchemy import String, Text
-from sqlalchemy.dialects import postgresql
 
 from alembic import op
 from src.models.database.research_space import (
@@ -39,8 +38,8 @@ def upgrade() -> None:
             sa.Enum(SpaceStatusEnum, name="space_status_enum"),
             nullable=False,
         ),
-        sa.Column("settings", postgresql.JSONB(astext_type=Text()), nullable=False),
-        sa.Column("tags", postgresql.ARRAY(String()), nullable=False),
+        sa.Column("settings", sa.JSON(), nullable=False),
+        sa.Column("tags", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(

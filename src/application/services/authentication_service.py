@@ -303,7 +303,12 @@ class AuthenticationService:
         except AuthenticationError:
             raise
         except Exception as exc:
-            logger.exception("[validate_token] Token validation failed")
+            # Log expected token validation failures at debug level (no traceback)
+            # These are normal authentication failures (invalid/expired tokens)
+            logger.debug(
+                "[validate_token] Token validation failed: %s",
+                str(exc),
+            )
             msg = f"Token validation failed: {exc!s}"
             raise AuthenticationError(msg) from exc
 

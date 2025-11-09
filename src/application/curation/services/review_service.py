@@ -20,6 +20,7 @@ class ReviewQuery:
     entity_type: str | None = None
     status: str | None = None
     priority: str | None = None
+    research_space_id: str | None = None
     limit: int = 100
     offset: int = 0
 
@@ -105,6 +106,7 @@ class ReviewService:
                 entity_type=query.entity_type,
                 status=query.status,
                 priority=query.priority,
+                research_space_id=query.research_space_id,
             ),
             limit=query.limit,
             offset=query.offset,
@@ -118,6 +120,7 @@ class ReviewService:
         entity_type: str,
         entity_id: str,
         priority: str = "medium",
+        research_space_id: str | None = None,
     ) -> ReviewQueueItem:
         # Local import to avoid application-layer hard dependency
         from src.models.database.review import ReviewRecord  # noqa: PLC0415
@@ -127,6 +130,7 @@ class ReviewService:
             entity_id=entity_id,
             status="pending",
             priority=priority,
+            research_space_id=research_space_id,
         )
         saved = self._repository.add(db, record)
         return ReviewQueueItem.from_record(saved)
@@ -138,6 +142,14 @@ class ReviewService:
         status: str,
     ) -> int:
         return self._repository.bulk_update_status(db, ids, status)
+
+    def get_stats(
+        self,
+        db: Session,
+        research_space_id: str | None = None,
+    ) -> dict[str, int]:
+        """Get curation statistics for a research space."""
+        return self._repository.get_stats(db, research_space_id)
 
 
 __all__ = ["ReviewQuery", "ReviewQueueItem", "ReviewService"]
