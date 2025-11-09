@@ -2,18 +2,29 @@
 
 import React, { useState, useMemo } from 'react'
 import {
-  Search,
-  Filter,
-  ChevronDown,
-  Database,
-  Check,
+  Activity,
+  BarChart3,
   BookOpenText,
-  TestTube2,
-  Users,
   BrainCircuit,
+  Building2,
+  Check,
+  ChevronDown,
+  CircleDot,
+  ClipboardList,
+  CreditCard,
+  Database,
+  Filter,
+  FlaskConical,
+  Globe,
+  Layers,
   Library,
   Network,
-  ClipboardList,
+  Search,
+  Server,
+  Share2,
+  Target,
+  TestTube2,
+  Users,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useDataDiscoveryStore } from '@/lib/stores/data-discovery-store'
@@ -38,20 +49,60 @@ const CATEGORIES = [
   'Phenotype Ontologies & Databases',
   'Scientific Literature',
   'Knowledge Graphs / Integrated Platforms',
+  'Text-Mined Databases',
+  'Cohort Studies',
+  'Public Health Databases',
+  'Insurance Claims / Billing Data',
+  'Patient Advocacy Registries',
+  'Social Media & Forums (Ethical Use)',
+  'Surveys / PRO Data',
+  'Transcriptomics / RNA-seq',
+  'Epigenomics / Methylation',
+  'Proteomics / Metabolomics',
+  'Single-Cell Data',
+  'Ontologies & Terminologies',
+  'Data Repositories & Storage',
+  'AI / ML Benchmark Datasets',
+  'Institutional Repositories',
+  'Consortia & Initiatives',
+  'Cross-disciplinary Data Hubs',
+  'Causal Models / Simulations',
+  'Integrative Knowledge Graphs',
+  'Computed Feature Stores',
   'AI Predictive Models',
 ]
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   'Genomic Variant Databases': Database,
-  'Gene Expression & Functional Genomics': BrainCircuit,
+  'Gene Expression & Functional Genomics': BarChart3,
   'Model Organism Databases': TestTube2,
   'Protein / Pathway Databases': Network,
   'Electronic Health Records (EHRs)': ClipboardList,
   'Rare Disease Registries': Users,
   'Clinical Trial Databases': TestTube2,
-  'Phenotype Ontologies & Databases': ClipboardList,
+  'Phenotype Ontologies & Databases': Library,
   'Scientific Literature': BookOpenText,
   'Knowledge Graphs / Integrated Platforms': Network,
+  'Text-Mined Databases': BookOpenText,
+  'Cohort Studies': Users,
+  'Public Health Databases': Globe,
+  'Insurance Claims / Billing Data': CreditCard,
+  'Patient Advocacy Registries': Users,
+  'Social Media & Forums (Ethical Use)': Share2,
+  'Surveys / PRO Data': ClipboardList,
+  'Transcriptomics / RNA-seq': Activity,
+  'Epigenomics / Methylation': Layers,
+  'Proteomics / Metabolomics': FlaskConical,
+  'Single-Cell Data': CircleDot,
+  'Ontologies & Terminologies': Library,
+  'Data Repositories & Storage': Database,
+  'AI / ML Benchmark Datasets': Target,
+  'Institutional Repositories': Building2,
+  'Consortia & Initiatives': Users,
+  'Cross-disciplinary Data Hubs': Globe,
+  'Causal Models / Simulations': Activity,
+  'Integrative Knowledge Graphs': Network,
+  'Computed Feature Stores': Server,
   'AI Predictive Models': BrainCircuit,
 }
 
@@ -149,7 +200,7 @@ export function SourceCatalog() {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
       {/* Filter Sidebar */}
-      <div className="lg:col-span-1">
+      <div className="lg:col-span-1 min-w-0 overflow-hidden">
         <Button
           variant="outline"
           onClick={() => setShowFilters(!showFilters)}
@@ -159,7 +210,7 @@ export function SourceCatalog() {
           <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
         </Button>
 
-        <div className={`${showFilters ? 'block' : 'hidden'} lg:block`}>
+        <div className={`${showFilters ? 'block' : 'hidden'} lg:block min-w-0`}>
           <h2 className="text-lg font-semibold mb-3 px-2 text-foreground">Categories</h2>
           <div className="flex flex-col space-y-1">
             {CATEGORIES.map((category) => {
@@ -169,10 +220,10 @@ export function SourceCatalog() {
                   key={category}
                   variant={activeCategory === category ? "default" : "ghost"}
                   onClick={() => setActiveCategory(category)}
-                  className="w-full justify-start h-auto py-2 px-3"
+                  className="w-full justify-start h-auto py-2 px-3 min-w-0"
                 >
                   <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span className="text-left">{category}</span>
+                  <span className="text-left break-words whitespace-normal flex-1 min-w-0">{category}</span>
                 </Button>
               )
             })}

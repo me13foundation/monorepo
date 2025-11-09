@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.application.container import container, initialize_legacy_session
+from src.database.seed import ensure_source_catalog_seeded
 from src.database.session import get_session
 from src.middleware.auth import AuthMiddleware
 from src.middleware.jwt_auth import JWTAuthMiddleware
@@ -37,14 +38,15 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     legacy_session = next(get_session())
     try:
         initialize_legacy_session(legacy_session)
+        ensure_source_catalog_seeded(legacy_session)
+        legacy_session.commit()
+        yield
     except Exception:
-        legacy_session.close()
+        legacy_session.rollback()
         raise
-
-    yield
-    # Shutdown
-    legacy_session.close()
-    await container.engine.dispose()
+    finally:
+        legacy_session.close()
+        await container.engine.dispose()
 
 
 def create_app() -> FastAPI:
