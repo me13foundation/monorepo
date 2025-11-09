@@ -1,13 +1,27 @@
 "use client"
 
 import { useState } from 'react'
-import { ArrowLeft, ExternalLink, Terminal, Loader2, FolderOpen, Database } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Terminal, Loader2, FolderOpen, Database, BrainCircuit, ClipboardList, BookOpenText, TestTube2, Users, Library, Network } from 'lucide-react'
 import { useDataDiscoveryStore } from '@/lib/stores/data-discovery-store'
 import { QueryParameters, QueryTestResult } from '@/lib/types/data-discovery'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SpaceSelectorModal } from '@/components/research-spaces/SpaceSelectorModal'
+
+const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  'Genomic Variant Databases': Database,
+  'Gene Expression & Functional Genomics': BrainCircuit,
+  'Model Organism Databases': TestTube2,
+  'Protein / Pathway Databases': Network,
+  'Electronic Health Records (EHRs)': ClipboardList,
+  'Rare Disease Registries': Users,
+  'Clinical Trial Databases': TestTube2,
+  'Phenotype Ontologies & Databases': ClipboardList,
+  'Scientific Literature': BookOpenText,
+  'Knowledge Graphs / Integrated Platforms': Network,
+  'AI Predictive Models': BrainCircuit,
+}
 
 interface ResultsViewProps {
   parameters: QueryParameters
@@ -114,6 +128,15 @@ interface ResultCardProps {
 function ResultCard({ result, parameters, onAddToSpace }: ResultCardProps) {
   const [isRunningApi, setIsRunningApi] = useState(false)
   const isApiResult = !result.response_url
+  const { catalog } = useDataDiscoveryStore()
+
+  // Find the catalog entry to get the name and category
+  const catalogEntry = catalog.find(entry => entry.id === result.catalog_entry_id)
+  const displayName = catalogEntry?.name || result.catalog_entry_id
+  const category = catalogEntry?.category || 'Unknown'
+
+  // Get the appropriate icon for the category
+  const IconComponent = CATEGORY_ICONS[category] || Database
 
   const handleRunApi = async () => {
     setIsRunningApi(true)
@@ -147,11 +170,11 @@ function ResultCard({ result, parameters, onAddToSpace }: ResultCardProps) {
         <div className="flex flex-col md:flex-row md:items-center justify-between w-full">
           <div className="flex items-center space-x-3 mb-3 md:mb-0">
             <div className="flex-shrink-0">
-              <Database className="w-5 h-5 text-primary" />
+              <IconComponent className="w-5 h-5 text-primary" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-foreground">{result.catalog_entry_id}</h3>
-              <p className="text-xs text-muted-foreground">Test ID: {result.id.slice(-8)}</p>
+              <h3 className="font-semibold text-foreground">{displayName}</h3>
+              <p className="text-xs text-muted-foreground">{category} • Test ID: {result.id.slice(-8)}</p>
             </div>
           </div>
 

@@ -1,64 +1,30 @@
 "use client"
 
-import { useState, useMemo } from 'react'
-import { Search, Filter, ChevronDown, Database, Check } from 'lucide-react'
+import React, { useState, useMemo } from 'react'
+import {
+  Search,
+  Filter,
+  ChevronDown,
+  Database,
+  Check,
+  BookOpenText,
+  TestTube2,
+  Users,
+  BrainCircuit,
+  Library,
+  Network,
+  ClipboardList,
+} from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { useDataDiscoveryStore } from '@/lib/stores/data-discovery-store'
+import { useSourceCatalog } from '@/lib/queries/data-discovery'
+import { SourceCatalogEntry } from '@/lib/types/data-discovery'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-
-// Mock data - in real implementation this would come from API
-const MOCK_CATALOG = [
-  {
-    id: 'clinvar',
-    name: 'ClinVar',
-    category: 'Genomic Variant Databases',
-    description: 'Public archive of reports of the relationships among human variations and phenotypes.',
-    param_type: 'gene' as const,
-    is_active: true,
-    requires_auth: false,
-    usage_count: 1250,
-    success_rate: 0.94,
-    tags: ['variants', 'clinical', 'pathogenic'],
-  },
-  {
-    id: 'gnomad',
-    name: 'gnomAD',
-    category: 'Genomic Variant Databases',
-    description: 'Genome Aggregation Database provides allele frequency data from large-scale sequencing.',
-    param_type: 'gene' as const,
-    is_active: true,
-    requires_auth: false,
-    usage_count: 980,
-    success_rate: 0.91,
-    tags: ['frequency', 'population', 'sequencing'],
-  },
-  {
-    id: 'hpo',
-    name: 'Human Phenotype Ontology',
-    category: 'Phenotype Ontologies & Databases',
-    description: 'Standardized vocabulary for describing human phenotypic abnormalities.',
-    param_type: 'term' as const,
-    is_active: true,
-    requires_auth: false,
-    usage_count: 1450,
-    success_rate: 0.96,
-    tags: ['phenotype', 'ontology', 'standardized'],
-  },
-  {
-    id: 'variantformer',
-    name: 'VariantFormer',
-    category: 'AI Predictive Models',
-    description: 'State-of-the-art AI model for predicting variant pathogenicity.',
-    param_type: 'api' as const,
-    is_active: true,
-    requires_auth: false,
-    usage_count: 320,
-    success_rate: 0.87,
-    tags: ['ai', 'prediction', 'pathogenicity'],
-  },
-]
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, Loader2, LogIn } from 'lucide-react'
 
 const CATEGORIES = [
   'All Sources',
@@ -77,27 +43,41 @@ const CATEGORIES = [
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   'Genomic Variant Databases': Database,
-  'Gene Expression & Functional Genomics': Database,
-  'Model Organism Databases': Database,
-  'Protein / Pathway Databases': Database,
-  'Electronic Health Records (EHRs)': Database,
-  'Rare Disease Registries': Database,
-  'Clinical Trial Databases': Database,
-  'Phenotype Ontologies & Databases': Database,
-  'Scientific Literature': Database,
-  'Knowledge Graphs / Integrated Platforms': Database,
-  'AI Predictive Models': Database,
+  'Gene Expression & Functional Genomics': BrainCircuit,
+  'Model Organism Databases': TestTube2,
+  'Protein / Pathway Databases': Network,
+  'Electronic Health Records (EHRs)': ClipboardList,
+  'Rare Disease Registries': Users,
+  'Clinical Trial Databases': TestTube2,
+  'Phenotype Ontologies & Databases': ClipboardList,
+  'Scientific Literature': BookOpenText,
+  'Knowledge Graphs / Integrated Platforms': Network,
+  'AI Predictive Models': BrainCircuit,
 }
 
 export function SourceCatalog() {
   const [activeCategory, setActiveCategory] = useState('All Sources')
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const { selectedSources, toggleSourceSelection, selectAllInCategory } = useDataDiscoveryStore()
+  const { selectedSources, toggleSourceSelection, selectAllInCategory, catalog: storeCatalog, setCatalog } = useDataDiscoveryStore()
+  const { data: session } = useSession()
+  const { data: apiCatalog, isLoading, error } = useSourceCatalog()
+
+  // Update store catalog when API data loads
+  React.useEffect(() => {
+    if (apiCatalog && apiCatalog.length > 0) {
+      setCatalog(apiCatalog)
+    }
+  }, [apiCatalog, setCatalog])
+
+  // Use store catalog or fallback to API data
+  const catalog = React.useMemo(() => {
+    return storeCatalog.length > 0 ? storeCatalog : (apiCatalog || [])
+  }, [storeCatalog, apiCatalog])
 
   // Filter sources based on category and search
   const filteredSources = useMemo(() => {
-    return MOCK_CATALOG.filter((source) => {
+    return catalog.filter((source) => {
       const categoryMatch =
         activeCategory === 'All Sources' || source.category === activeCategory
 
@@ -109,7 +89,7 @@ export function SourceCatalog() {
 
       return categoryMatch && searchMatch
     })
-  }, [activeCategory, searchQuery])
+  }, [catalog, activeCategory, searchQuery])
 
   const allInCategorySelected = useMemo(() => {
     const categorySourceIds = filteredSources.map(s => s.id)
@@ -120,6 +100,50 @@ export function SourceCatalog() {
   const handleSelectAll = () => {
     const categorySourceIds = filteredSources.map(s => s.id)
     selectAllInCategory(activeCategory)
+  }
+
+  // Show authentication required state
+  if (!session?.user?.access_token) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center max-w-md">
+          <LogIn className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold text-foreground mb-2">
+            Authentication Required
+          </h3>
+          <p className="text-muted-foreground mb-4">
+            You need to be logged in to access the data source catalog.
+          </p>
+          <Button asChild>
+            <a href="/auth/login">Log In</a>
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading data sources...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          Failed to load data sources. Please try refreshing the page.
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
@@ -212,7 +236,7 @@ export function SourceCatalog() {
 }
 
 interface SourceCardProps {
-  source: typeof MOCK_CATALOG[0]
+  source: SourceCatalogEntry
   isSelected: boolean
   onToggle: () => void
 }

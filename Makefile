@@ -344,7 +344,7 @@ REPORT_DIR := reports
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 QA_REPORT := $(REPORT_DIR)/qa_report_$(TIMESTAMP).txt
 
-all: venv-check check-env format lint type-check web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (fails on first error)
+all: venv-check check-env format lint-strict type-check-strict web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (fails on first error)
 	@echo ""
 	@echo "✅ All quality checks passed!"
 

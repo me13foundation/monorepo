@@ -44,6 +44,7 @@ export function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
           id="email"
           type="email"
           placeholder="Enter your email"
+          autoComplete="email"
           {...register("email")}
           disabled={isLoading}
         />
@@ -59,6 +60,7 @@ export function LoginForm({ onSubmit, isLoading }: LoginFormProps) {
             id="password"
             type={showPassword ? "text" : "password"}
             placeholder="Enter your password"
+            autoComplete="current-password"
             {...register("password")}
             disabled={isLoading}
           />

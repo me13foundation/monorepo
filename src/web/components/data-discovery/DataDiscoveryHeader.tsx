@@ -1,13 +1,13 @@
 "use client"
 
-import { Library } from 'lucide-react'
+import { Search } from 'lucide-react'
 
 export function DataDiscoveryHeader() {
   return (
     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-6 border-b border-border">
       <div className="flex items-center space-x-3 mb-4 md:mb-0">
         <div className="p-2 bg-primary rounded-lg">
-          <Library className="w-8 h-8 text-primary-foreground" />
+          <Search className="w-8 h-8 text-primary-foreground" />
         </div>
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
