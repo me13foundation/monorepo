@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { signIn, useSession } from "next-auth/react"
+import { signIn, useSession, getSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { LoginForm } from "@/components/auth/LoginForm"
@@ -56,12 +56,32 @@ function LoginContent() {
         // This ensures the session is immediately available to all components
         await updateSession()
 
-        // Small delay to ensure session state propagates through React tree
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        // Wait for session to be fully established before navigating
+        // This prevents race conditions where queries fire before token is available
+        let sessionReady = false
+        for (let attempt = 0; attempt < 10; attempt++) {
+          // Get fresh session to check if token is available
+          const session = await getSession()
 
-        // Navigate using Next.js router (client-side, preserves React state)
-        // The destination component's ProtectedRoute will verify session
-        router.push(callbackUrl)
+          if (session?.user?.access_token && typeof session.user.access_token === 'string' && session.user.access_token.length > 0) {
+            sessionReady = true
+            break
+          }
+
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+
+        if (sessionReady) {
+          // Navigate using Next.js router (client-side, preserves React state)
+          // The destination component's ProtectedRoute will verify session
+          router.push(callbackUrl)
+        } else {
+          // Fallback: session not ready after retries
+          // Use full page reload as last resort to ensure session is established
+          console.warn('Session not ready after retries, using full page reload')
+          window.location.href = callbackUrl
+        }
 
         // Note: setIsLoading(false) is intentionally omitted here
         // because we're navigating away, so the component will unmount

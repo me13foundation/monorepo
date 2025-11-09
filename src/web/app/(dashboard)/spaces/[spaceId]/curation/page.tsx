@@ -11,6 +11,8 @@ import {
   useSpaceCurationQueue,
 } from '@/lib/queries/research-spaces'
 import { Loader2, FileText, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
+import type { ResearchSpace } from '@/types/research-space'
+import type { CurationQueueResponse, CurationStats } from '@/lib/api/research-spaces'
 
 export default function SpaceCurationPage() {
   const params = useParams()
@@ -28,6 +30,9 @@ export default function SpaceCurationPage() {
     }
   }, [spaceId, setCurrentSpaceId])
 
+  const spaceData = space as ResearchSpace | undefined
+  const statsData = stats as CurationStats | undefined
+  const queueData = queue as CurationQueueResponse | undefined
   const isLoading = spaceLoading || statsLoading
 
   if (isLoading) {
@@ -46,7 +51,7 @@ export default function SpaceCurationPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">Data Curation</h1>
           <p className="text-muted-foreground mt-1">
-            Review and curate data for {space?.name || 'this research space'}
+            Review and curate data for {spaceData?.name || 'this research space'}
           </p>
         </div>
 
@@ -57,7 +62,7 @@ export default function SpaceCurationPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.pending ?? 0}</div>
+              <div className="text-2xl font-bold">{statsData?.pending ?? 0}</div>
               <p className="text-xs text-muted-foreground">Items awaiting review</p>
             </CardContent>
           </Card>
@@ -68,7 +73,7 @@ export default function SpaceCurationPage() {
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.approved ?? 0}</div>
+              <div className="text-2xl font-bold">{statsData?.approved ?? 0}</div>
               <p className="text-xs text-muted-foreground">Approved items</p>
             </CardContent>
           </Card>
@@ -79,7 +84,7 @@ export default function SpaceCurationPage() {
               <AlertCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.rejected ?? 0}</div>
+              <div className="text-2xl font-bold">{statsData?.rejected ?? 0}</div>
               <p className="text-xs text-muted-foreground">Rejected items</p>
             </CardContent>
           </Card>
@@ -90,7 +95,7 @@ export default function SpaceCurationPage() {
               <FileText className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.total ?? 0}</div>
+              <div className="text-2xl font-bold">{statsData?.total ?? 0}</div>
               <p className="text-xs text-muted-foreground">Total curated items</p>
             </CardContent>
           </Card>
@@ -108,9 +113,9 @@ export default function SpaceCurationPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : queue && queue.items.length > 0 ? (
+            ) : queueData && queueData.items.length > 0 ? (
               <div className="space-y-4">
-                {queue.items.map((item) => (
+                {queueData.items.map((item) => (
                   <div
                     key={item.id}
                     className="flex items-center justify-between p-4 border rounded-lg"

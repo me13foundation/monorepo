@@ -1,11 +1,22 @@
 "use client"
 
 import { useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { Button } from '@/components/ui/button'
 import { Loader2, ChevronDown, Folder } from 'lucide-react'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { SpaceSelectorModal } from './SpaceSelectorModal'
+import type { ResearchSpaceListResponse } from '@/types/research-space'
+
+// Helper to check if we're on an auth page
+function isAuthPage(pathname: string): boolean {
+  return pathname.startsWith('/auth') ||
+         pathname === '/' ||
+         pathname === '/login' ||
+         pathname === '/register' ||
+         pathname === '/forgot-password'
+}
 
 interface SpaceSelectorProps {
   currentSpaceId?: string
@@ -18,8 +29,8 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
   const [modalOpen, setModalOpen] = useState(false)
   const selectedSpaceId = currentSpaceId || contextSpaceId || ''
 
-  const spaces = data?.spaces || []
-  const currentSpace = spaces.find((s) => s.id === selectedSpaceId)
+  const spaces = (data as any)?.spaces || []
+  const currentSpace = spaces.find((s: any) => s.id === selectedSpaceId)
 
   if (isLoading) {
     return (

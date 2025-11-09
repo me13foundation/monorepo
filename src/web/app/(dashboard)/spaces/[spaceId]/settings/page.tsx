@@ -7,12 +7,14 @@ import { useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useResearchSpace } from '@/lib/queries/research-spaces'
 import { Loader2, Settings } from 'lucide-react'
+import type { ResearchSpace } from '@/types/research-space'
 
 export default function SpaceSettingsPage() {
   const params = useParams()
   const spaceId = params.spaceId as string
   const { setCurrentSpaceId } = useSpaceContext()
   const { data: space, isLoading } = useResearchSpace(spaceId)
+  const spaceData = space as ResearchSpace | undefined
 
   useEffect(() => {
     if (spaceId) {
@@ -36,7 +38,7 @@ export default function SpaceSettingsPage() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">Space Settings</h1>
           <p className="text-muted-foreground mt-1">
-            Configure settings for {space?.name || 'this research space'}
+            Configure settings for {spaceData?.name || 'this research space'}
           </p>
         </div>
 
@@ -54,21 +56,21 @@ export default function SpaceSettingsPage() {
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium">Space Name</label>
-                <p className="text-sm text-muted-foreground mt-1">{space?.name}</p>
+                <p className="text-sm text-muted-foreground mt-1">{spaceData?.name}</p>
               </div>
               <div>
                 <label className="text-sm font-medium">Slug</label>
-                <p className="text-sm text-muted-foreground mt-1 font-mono">{space?.slug}</p>
+                <p className="text-sm text-muted-foreground mt-1 font-mono">{spaceData?.slug}</p>
               </div>
-              {space?.description && (
+              {spaceData?.description && (
                 <div>
                   <label className="text-sm font-medium">Description</label>
-                  <p className="text-sm text-muted-foreground mt-1">{space.description}</p>
+                  <p className="text-sm text-muted-foreground mt-1">{spaceData.description}</p>
                 </div>
               )}
               <div>
                 <label className="text-sm font-medium">Status</label>
-                <p className="text-sm text-muted-foreground mt-1 capitalize">{space?.status}</p>
+                <p className="text-sm text-muted-foreground mt-1 capitalize">{spaceData?.status}</p>
               </div>
             </div>
           </CardContent>

@@ -11,6 +11,7 @@ import { InviteMemberDialog } from './InviteMemberDialog'
 import { UpdateRoleDialog } from './UpdateRoleDialog'
 import { Loader2, Settings, Trash2, Users } from 'lucide-react'
 import { SpaceStatus, MembershipRole } from '@/types/research-space'
+import type { ResearchSpace } from '@/types/research-space'
 import { useRouter } from 'next/navigation'
 import { roleColors, roleLabels, canManageMembers } from './role-utils'
 import { cn } from '@/lib/utils'
@@ -43,6 +44,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
   const deleteMutation = useDeleteResearchSpace()
   const removeMutation = useRemoveMember()
 
+  const spaceData = space as ResearchSpace | undefined
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
   const [updateRoleDialogOpen, setUpdateRoleDialogOpen] = useState(false)
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
@@ -88,7 +90,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
     )
   }
 
-  if (!space) {
+  if (!spaceData) {
     return (
       <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
         <p className="text-sm text-destructive">Research space not found</p>
@@ -101,18 +103,18 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold tracking-tight">{space.name}</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{spaceData.name}</h1>
             <Badge
               className={cn(
-                statusColors[space.status],
+                statusColors[spaceData.status],
                 'text-white'
               )}
             >
-              {statusLabels[space.status]}
+              {statusLabels[spaceData.status]}
             </Badge>
           </div>
-          <p className="text-muted-foreground">{space.description}</p>
-          <p className="text-sm text-muted-foreground mt-1 font-mono">{space.slug}</p>
+          <p className="text-muted-foreground">{spaceData.description}</p>
+          <p className="text-sm text-muted-foreground mt-1 font-mono">{spaceData.slug}</p>
         </div>
         {canManage && (
           <div className="flex gap-2">
@@ -153,17 +155,17 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
             <CardContent className="space-y-4">
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Created</p>
-                <p>{new Date(space.created_at).toLocaleDateString()}</p>
+                <p>{new Date(spaceData.created_at).toLocaleDateString()}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Last Updated</p>
-                <p>{new Date(space.updated_at).toLocaleDateString()}</p>
+                <p>{new Date(spaceData.updated_at).toLocaleDateString()}</p>
               </div>
-              {space.tags.length > 0 && (
+              {spaceData.tags.length > 0 && (
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2">Tags</p>
                   <div className="flex flex-wrap gap-2">
-                    {space.tags.map((tag) => (
+                    {spaceData.tags.map((tag) => (
                       <Badge key={tag} variant="outline">
                         {tag}
                       </Badge>

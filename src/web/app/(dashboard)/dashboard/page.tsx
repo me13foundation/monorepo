@@ -11,6 +11,7 @@ import { useSpaceContext } from '@/components/space-context-provider'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import type { ResearchSpaceListResponse } from '@/types/research-space'
 
 export default function DashboardPage() {
   return (
@@ -28,7 +29,8 @@ function DashboardContent() {
   const { data, isLoading: spacesLoading } = useResearchSpaces()
   const router = useRouter()
 
-  const spaces = data?.spaces || []
+  const spacesResponse = data as ResearchSpaceListResponse | undefined
+  const spaces = spacesResponse?.spaces ?? []
   const hasSpaces = spaces.length > 0
 
   return (
