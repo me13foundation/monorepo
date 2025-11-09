@@ -467,6 +467,7 @@ class DataDiscoveryService:
             description=f"Added from Data Source Discovery: {catalog_entry.description}",
             template_id=catalog_entry.source_template_id,
             configuration=configuration,
+            research_space_id=request.research_space_id,
             tags=["data-discovery", catalog_entry.category.lower()],
         )
 

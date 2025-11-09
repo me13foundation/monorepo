@@ -9,7 +9,7 @@ import asyncio
 import logging
 import os
 import secrets
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
 from typing import Any
 from uuid import uuid4
@@ -491,12 +491,14 @@ def get_legacy_dependency_container() -> DependencyContainer:
 
 
 # Data discovery service dependency
-def get_data_discovery_service_dependency() -> DataDiscoveryService:
+def get_data_discovery_service_dependency() -> (
+    Generator[DataDiscoveryService, None, None]
+):
     """FastAPI dependency for data discovery service."""
     # Create a new session for this request
     session = SessionLocal()
     try:
-        return container.create_data_discovery_service(session)
-    except Exception:
+        service = container.create_data_discovery_service(session)
+        yield service
+    finally:
         session.close()
-        raise
