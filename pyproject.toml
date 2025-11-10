@@ -178,7 +178,7 @@ line-length = 88
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "LOG", "RUF"]
+select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "LOG"]
 ignore = ["E203", "E501", "W291", "W292", "W293"]
 
 [tool.ruff.lint.per-file-ignores]
@@ -189,6 +189,8 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
     "TRY400", # allow logging.error in scripts
     "PLC0415", # allow local imports in scripts
     "BLE001", # allow broad exceptions in scripts
+    "C901",   # allow complex functions in utility scripts
+    "PLR0911", # allow many return statements in utility scripts
 ]
 "tests/**" = [
     "S101",  # allow assert in tests
@@ -213,7 +215,6 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
     "PTH110",   # allow os.path.exists in tests
     "SIM222",   # allow True instead of or True
     "PLR0913",  # allow many args in test fixtures
-    "RUF022",   # allow unsorted __all__ in fixtures
     "PT003",    # allow explicit scope arg in fixtures
     "TRY002",   # allow generic Exception in simple test mocks
     "BLE001",   # allow broad exceptions in tests
@@ -244,9 +245,6 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
     "FBT003", # boolean positional value
     "TRY301", # abstract raises in routes
     "SLF001", # allow private member access in routes
-    "TC001",  # type-check only import suggestions
-    "TC002",
-    "TC003",
     "C901",   # allow complex route handlers for now
     "S106",   # allow token literals in example responses
 ]
@@ -256,14 +254,12 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
     "PLR0911", # many returns in heuristics
     "PLR0912", # many branches in heuristics
     "PLR2004", # magic numbers for thresholds
-    "TC003",   # stdlib types in type-check blocks
     "BLE001",  # broad exceptions in normalizers (to be refactored)
     "T201",    # print used in exploratory normalizers
     "ERA001",  # commented code in exploratory modules
     "TRY003",  # long messages outside exception class
     "EM101",   # string literal exceptions
     "EM102",   # f-string exceptions
-    "PLC0206", # dict iteration style
     "SIM102",  # nested ifs in heuristics
     "PLC0415", # local imports in utility branches
     "PERF401", # comprehension vs append in mappers
@@ -283,9 +279,7 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
 ]
 "src/domain/validation/**" = [
     "TID",   # relative import hygiene relaxed in validation
-    "TC001", "TC003", # type-checking import placement
     "C901",  # complexity in validation pipelines
-    "RUF022", # __all__ sorting in exports
     "FBT001", "FBT002", # bool positional defaults in API signatures
     "PERF401", # prefer comprehension in gate lists
     "SIM118",  # dict key membership style
@@ -300,7 +294,7 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
     "PLR0912", # many branches in orchestrators
 ]
 "src/presentation/dash/**" = [
-    "ARG", "ERA", "INP001", "PLR0911", "PLR0912", "PERF401", "TC002",
+    "ARG", "ERA", "INP001", "PLR0911", "PLR0912", "PERF401",
     "PGH003", "FBT001", "FBT002", "G004", "TRY003", "TRY004", "EM101", "EM102"
 ]
 "src/repositories/**" = [
@@ -310,7 +304,6 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
     "DTZ003",  # utcnow usage in data access layer
     "RET504",  # redundant assignment before return
     "A002",    # builtin shadowing in protocol/generic interfaces
-    "PYI059",  # Generic[] base class order in typing
     "TRY300",  # try/else style in simple methods
     "B904",    # raise from suggestions
 ]

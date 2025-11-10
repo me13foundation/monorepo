@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Fetch reference ClinVar API responses for schema validation."""
 
 from __future__ import annotations
@@ -51,9 +52,10 @@ def main() -> None:
         json.dumps(summary_payload, indent=2),
     )
 
-    print("Updated ClinVar fixtures:")
-    print(f" - {OUTPUT_DIR / 'clinvar_search_response.json'}")
-    print(f" - {OUTPUT_DIR / 'clinvar_variant_response.json'}")
+    # Note: print is acceptable in script files
+    print("Updated ClinVar fixtures:")  # noqa: T201
+    print(f" - {OUTPUT_DIR / 'clinvar_search_response.json'}")  # noqa: T201
+    print(f" - {OUTPUT_DIR / 'clinvar_variant_response.json'}")  # noqa: T201
 
 
 if __name__ == "__main__":
