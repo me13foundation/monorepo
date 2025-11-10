@@ -11,7 +11,7 @@ import os
 import secrets
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -74,6 +74,7 @@ from src.infrastructure.repositories.variant_repository import (
 )
 from src.infrastructure.security.jwt_provider import JWTProvider
 from src.infrastructure.security.password_hasher import PasswordHasher
+from src.type_definitions.common import HealthCheckResponse
 
 DEFAULT_DEV_JWT_SECRET = os.getenv("MED13_DEV_JWT_SECRET") or secrets.token_urlsafe(64)
 
@@ -269,7 +270,7 @@ class DependencyContainer:
             # Shutdown
             await self.engine.dispose()
 
-    async def health_check(self) -> dict[str, Any]:
+    async def health_check(self) -> HealthCheckResponse:
         """Perform health check on all dependencies."""
         health_status = {
             "database": False,
@@ -311,7 +312,7 @@ class DependencyContainer:
         except (SQLAlchemyError, ValueError, RuntimeError) as exc:
             logger.warning("Service initialization health check failed: %s", exc)
 
-        return health_status
+        return cast("HealthCheckResponse", health_status)
 
     def create_gene_application_service(
         self,
@@ -369,8 +370,10 @@ class DependencyContainer:
     ) -> PublicationApplicationService:
         """Create a publication application service with the given session."""
         publication_repository = SqlAlchemyPublicationRepository(session)
+        evidence_repository = SqlAlchemyEvidenceRepository(session)
         return PublicationApplicationService(
             publication_repository=publication_repository,
+            evidence_repository=evidence_repository,
         )
 
     def create_curation_service(self, session: Session) -> CurationService:

@@ -2,6 +2,13 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from src.application.services.publication_service import (
+    PublicationApplicationService,
+)
+from src.infrastructure.repositories import (
+    SqlAlchemyEvidenceRepository,
+    SqlAlchemyPublicationRepository,
+)
 from src.models.database import (
     Base,
     EvidenceModel,
@@ -10,7 +17,6 @@ from src.models.database import (
     PublicationModel,
     VariantModel,
 )
-from src.services.domain.publication_service import PublicationService
 
 
 @pytest.fixture
@@ -77,7 +83,10 @@ def seed_publication_with_evidence(db_session) -> int:
 
 def test_publication_service_enriches_evidence(session):
     publication_id = seed_publication_with_evidence(session)
-    service = PublicationService(session)
+    service = PublicationApplicationService(
+        publication_repository=SqlAlchemyPublicationRepository(session),
+        evidence_repository=SqlAlchemyEvidenceRepository(session),
+    )
 
     publication = service.get_publication_with_evidence(publication_id)
 

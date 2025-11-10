@@ -4,9 +4,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { RegisterForm } from "@/components/auth/RegisterForm"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle } from "lucide-react"
+import { AuthShell } from "@/components/auth/AuthShell"
 
 export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
@@ -52,50 +52,33 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-heading font-bold text-foreground">
-            MED13 Admin
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Create your administrative account
-          </p>
+    <AuthShell
+      title="Create MED13 Account"
+      description="Request access to the administrative interface."
+      footer={
+        <div className="text-center text-sm text-muted-foreground">
+          Already verified?{" "}
+          <Link href="/auth/login" className="text-primary hover:underline">
+            Sign in
+          </Link>
         </div>
+      }
+    >
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Create Account</CardTitle>
-            <CardDescription className="text-center">
-              Fill in your information to create a new account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+      {success && (
+        <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+          <CheckCircle className="h-4 w-4" />
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
 
-            {success && (
-              <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
-
-            <RegisterForm onSubmit={handleRegister} isLoading={isLoading} />
-
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Already have an account?{" "}
-              <Link href="/auth/login" className="text-primary hover:underline">
-                Sign in
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <RegisterForm onSubmit={handleRegister} isLoading={isLoading} />
+    </AuthShell>
   )
 }

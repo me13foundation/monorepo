@@ -44,8 +44,9 @@ The MED13 Resource Library implements a robust **Clean Architecture** with compl
 ### ✅ **Type Safety Excellence - ACHIEVED**
 - **100% MyPy Compliance**: Strict type checking across all layers
 - **Pydantic Models**: Runtime validation with rich error messages
-- **Domain Entity Safety**: All business entities properly typed
+- **Domain Entity Safety**: Gene, Variant, Phenotype, Evidence, Publication, etc. run on Pydantic BaseModels with shared validators
 - **API Contract Safety**: Request/response models fully typed
+- **Generated Shared Types**: `make generate-ts-types` scans every module under `src/models/api/` (plus optional overrides) and regenerates `src/web/types/generated.ts` from the corresponding Pydantic schemas so the Next.js admin stays in lockstep
 
 ### ✅ **Data Sources Module - PRODUCTION READY**
 **Complete Implementation (Phase 1-3):**
@@ -219,6 +220,7 @@ Benefits:
 # src/domain/services/source_plugins/
 # Allows new source types without core changes
 # Maintains consistent interfaces and validation
+# SourcePluginRegistry + default FileUpload/API/Database plugins enforce config contracts
 ```
 
 #### **Shared Type Definitions**
@@ -233,6 +235,7 @@ Benefits:
 # src/domain/events/
 # Enables decoupling of domain logic
 # Supports event-driven architecture evolution
+# DomainEventBus + SourceCreated/Updated/StatusChanged events power audit trails
 ```
 
 ### 🎯 **Growth Principles**

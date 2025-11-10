@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
 from src.domain.repositories.phenotype_repository import (
@@ -13,7 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 from src.repositories.phenotype_repository import PhenotypeRepository
 
 if TYPE_CHECKING:
-    from src.type_definitions.common import PhenotypeUpdate
+    from src.type_definitions.common import PhenotypeUpdate, QueryFilters
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
@@ -71,11 +71,11 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         self,
         query: str,
         limit: int = 20,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Phenotype]:
         # filters retained for API compatibility
         if filters:
-            _ = filters
+            _ = dict(filters)
         models = self._repository.search_phenotypes(query, limit)
         return PhenotypeMapper.to_domain_sequence(models)
 
@@ -139,7 +139,7 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Phenotype], int]:
         # Simplified implementation; sort params retained for compatibility
         if sort_by:
@@ -147,14 +147,14 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         if sort_order:
             _ = sort_order
         if filters:
-            _ = filters
+            _ = dict(filters)
         offset = (page - 1) * per_page
         models = self._repository.find_all(limit=per_page, offset=offset)
         total = self._repository.count()
         return PhenotypeMapper.to_domain_sequence(models), total
 
-    def update(self, phenotype_id: int, updates: dict[str, Any]) -> Phenotype:
-        model = self._repository.update(phenotype_id, updates)
+    def update(self, phenotype_id: int, updates: PhenotypeUpdate) -> Phenotype:
+        model = self._repository.update(phenotype_id, dict(updates))
         return PhenotypeMapper.to_domain(model)
 
     def update_phenotype(
@@ -163,10 +163,7 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         updates: PhenotypeUpdate,
     ) -> Phenotype:
         """Update a phenotype with type-safe update parameters."""
-        # Convert TypedDict to Dict[str, Any] for the underlying repository
-        updates_dict = dict(updates)
-        model = self._repository.update(phenotype_id, updates_dict)
-        return PhenotypeMapper.to_domain(model)
+        return self.update(phenotype_id, updates)
 
 
 __all__ = ["SqlAlchemyPhenotypeRepository"]

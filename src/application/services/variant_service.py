@@ -1,11 +1,14 @@
 """Application-level orchestration for variant workflows."""
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 
+from src.domain.entities.evidence import Evidence
 from src.domain.entities.variant import EvidenceSummary, Variant
 from src.domain.repositories.evidence_repository import EvidenceRepository
 from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.variant_domain_service import VariantDomainService
+from src.type_definitions.common import QueryFilters, VariantUpdate
 
 
 class VariantApplicationService:
@@ -161,7 +164,19 @@ class VariantApplicationService:
         filters: dict[str, Any] | None = None,
     ) -> list[Variant]:
         """Search variants with optional filters."""
-        return self._variant_repository.search_variants(query, limit, filters)
+        normalized_filters = self._normalize_filters(filters)
+        return self._variant_repository.search_variants(
+            query,
+            limit,
+            normalized_filters,
+        )
+
+    def get_pathogenic_variants(
+        self,
+        limit: int | None = None,
+    ) -> list[Variant]:
+        """Retrieve variants classified as pathogenic or likely pathogenic."""
+        return self._variant_repository.find_pathogenic_variants(limit)
 
     def list_variants(
         self,
@@ -172,19 +187,24 @@ class VariantApplicationService:
         filters: dict[str, Any] | None = None,
     ) -> tuple[list[Variant], int]:
         """Retrieve paginated variants with optional filters."""
+        normalized_filters = self._normalize_filters(filters)
         return self._variant_repository.paginate_variants(
             page,
             per_page,
             sort_by,
             sort_order,
-            filters,
+            normalized_filters,
         )
 
-    def update_variant(self, variant_id: int, updates: dict[str, Any]) -> Variant:
+    def update_variant(self, variant_id: int, updates: VariantUpdate) -> Variant:
         """Update variant fields."""
-        # Apply domain business logic to updated entity and return
+        if not updates:
+            msg = "No variant updates provided"
+            raise ValueError(msg)
+
+        updated_variant = self._variant_repository.update(variant_id, updates)
         return self._variant_domain_service.apply_business_logic(
-            self._variant_repository.update(variant_id, updates),
+            updated_variant,
             "update",
         )
 
@@ -276,9 +296,10 @@ class VariantApplicationService:
             return 0.0
 
         evidence_list = self._evidence_repository.find_by_variant(variant_id)
+        evidence_summaries = self._summarize_evidence(evidence_list)
         return self._variant_domain_service.assess_clinical_significance_confidence(
             variant,
-            evidence_list,
+            evidence_summaries,
         )
 
     def detect_evidence_conflicts(self, variant_id: int) -> list[str]:
@@ -296,9 +317,10 @@ class VariantApplicationService:
             return []
 
         evidence_list = self._evidence_repository.find_by_variant(variant_id)
+        evidence_summaries = self._summarize_evidence(evidence_list)
         return self._variant_domain_service.detect_evidence_conflicts(
             variant,
-            evidence_list,
+            evidence_summaries,
         )
 
     def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
@@ -316,6 +338,30 @@ class VariantApplicationService:
             True if variant exists, False otherwise
         """
         return self._variant_repository.exists(variant_id)
+
+    @staticmethod
+    def _normalize_filters(
+        filters: dict[str, Any] | None,
+    ) -> QueryFilters | None:
+        if filters is None:
+            return None
+        return cast("QueryFilters", dict(filters))
+
+    @staticmethod
+    def _summarize_evidence(
+        evidence_list: Sequence[Evidence],
+    ) -> tuple[EvidenceSummary, ...]:
+        summaries = [
+            EvidenceSummary(
+                evidence_id=evidence.id,
+                evidence_level=evidence.evidence_level.value,
+                evidence_type=evidence.evidence_type,
+                description=evidence.description,
+                reviewed=evidence.reviewed,
+            )
+            for evidence in evidence_list
+        ]
+        return tuple(summaries)
 
 
 __all__ = ["VariantApplicationService"]

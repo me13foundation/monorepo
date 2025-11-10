@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from src.domain.entities.variant import VariantSummary  # noqa: TC001
 from src.domain.value_objects.identifiers import GeneIdentifier
-
-if TYPE_CHECKING:
-    from src.domain.entities.variant import VariantSummary
-    from src.domain.value_objects.provenance import Provenance
+from src.domain.value_objects.provenance import Provenance  # noqa: TC001
 
 
 class GeneType:
@@ -32,26 +31,50 @@ class GeneType:
 CHROMOSOME_PATTERN = re.compile(r"^(chr)?[0-9XYM]+$", re.IGNORECASE)
 
 
-@dataclass
-class Gene:
+class Gene(BaseModel):
+    """Gene entity modeled as a Pydantic BaseModel for runtime validation."""
+
     identifier: GeneIdentifier
-    gene_type: str = GeneType.UNKNOWN
+    gene_type: str = Field(default=GeneType.UNKNOWN)
     name: str | None = None
     description: str | None = None
     chromosome: str | None = None
     start_position: int | None = None
     end_position: int | None = None
     provenance: Provenance | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
-    variants: list[VariantSummary] = field(default_factory=list, repr=False)
+    variants: list[VariantSummary] = Field(default_factory=list)
 
-    def __post_init__(self) -> None:
-        self.gene_type = GeneType.validate(self.gene_type)
-        if self.chromosome:
-            self.chromosome = self._normalize_chromosome(self.chromosome)
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+        extra="ignore",
+    )
 
+    @field_validator("gene_type")
+    @classmethod
+    def _validate_gene_type(cls, value: str) -> str:
+        return GeneType.validate(value)
+
+    @field_validator("chromosome")
+    @classmethod
+    def _normalize_chromosome(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not CHROMOSOME_PATTERN.fullmatch(normalized):
+            msg = "chromosome must match pattern chr<id>"
+            raise ValueError(msg)
+        if not normalized.lower().startswith("chr"):
+            normalized = f"chr{normalized}"
+        return normalized.upper()
+
+    @model_validator(mode="after")
+    def _validate_positions(self) -> Gene:
         if self.start_position is not None and self.start_position < 1:
             msg = "start_position must be >= 1"
             raise ValueError(msg)
@@ -65,6 +88,7 @@ class Gene:
         ):
             msg = "end_position must be greater than or equal to start_position"
             raise ValueError(msg)
+        return self
 
     @classmethod
     def create(  # noqa: PLR0913 - explicit factory arguments for clarity
@@ -207,16 +231,6 @@ class Gene:
 
     def _touch(self) -> None:
         self.updated_at = datetime.now(UTC)
-
-    @staticmethod
-    def _normalize_chromosome(chromosome: str) -> str:
-        value = chromosome.strip()
-        if not CHROMOSOME_PATTERN.fullmatch(value):
-            msg = "chromosome must match pattern chr<id>"
-            raise ValueError(msg)
-        if not value.lower().startswith("chr"):
-            value = f"chr{value}"
-        return value.upper()
 
 
 __all__ = ["Gene", "GeneType"]

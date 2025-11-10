@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from src.domain.entities.variant import ClinicalSignificance, VariantSummary
 from src.domain.repositories.variant_repository import (
@@ -17,7 +17,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from src.models.database.variant import (
         ClinicalSignificance as DbClinicalSignificance,
     )
-    from src.type_definitions.common import VariantUpdate
+    from src.type_definitions.common import QueryFilters, VariantUpdate
 
 
 class SqlAlchemyVariantRepository(VariantRepositoryInterface):
@@ -83,8 +83,8 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         model = self._repository.find_with_evidence(variant_id)
         return VariantMapper.to_domain(model) if model else None
 
-    def update(self, variant_id: int, updates: dict[str, Any]) -> Variant:
-        model = self._repository.update(variant_id, updates)
+    def update(self, variant_id: int, updates: VariantUpdate) -> Variant:
+        model = self._repository.update(variant_id, dict(updates))
         return VariantMapper.to_domain(model)
 
     def delete(self, variant_id: int) -> bool:
@@ -153,7 +153,7 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Variant], int]:
         # Simplified implementation
         # Parameters retained for API compatibility
@@ -162,7 +162,7 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         if sort_order:
             _ = sort_order
         if filters:
-            _ = filters
+            _ = dict(filters)
         offset = (page - 1) * per_page
         models = self._repository.find_all(limit=per_page, offset=offset)
         total = self._repository.count()
@@ -172,13 +172,13 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Variant]:
         # Simplified implementation
         if query:
             _ = query
         if filters:
-            _ = filters
+            _ = dict(filters)
         models = self._repository.find_all(limit=limit)
         return VariantMapper.to_domain_sequence(models)
 

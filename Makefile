@@ -54,6 +54,19 @@ else
     VENV_ACTIVE := false
 endif
 
+REQUIRED_PYTHON_MAJOR := 3
+REQUIRED_PYTHON_MINOR := 12
+PYTHON_VERSION_OK := $(shell $(USE_PYTHON) -c "import sys; print('1' if sys.version_info >= ($(REQUIRED_PYTHON_MAJOR), $(REQUIRED_PYTHON_MINOR)) else '0')" 2>/dev/null || echo "0")
+PYTHON_VERSION_DISPLAY := $(shell $(USE_PYTHON) -c "import platform; print(platform.python_version())" 2>/dev/null || echo "unknown")
+
+define ensure_python_version
+	@if [ "$(PYTHON_VERSION_OK)" != "1" ]; then \
+		echo "❌ Python $(REQUIRED_PYTHON_MAJOR).$(REQUIRED_PYTHON_MINOR)+ is required. Detected: $(PYTHON_VERSION_DISPLAY)"; \
+		echo "   Update your Python installation or activate the correct virtual environment."; \
+		exit 1; \
+	fi
+endef
+
 # Warn if venv is not active but exists
 define check_venv
 	@if [ "$(VENV_ACTIVE)" = "false" ] && [ -d "$(VENV)" ]; then \
@@ -62,6 +75,7 @@ define check_venv
 		echo "   Or use: make activate"; \
 		echo ""; \
 	fi
+	$(call ensure_python_version)
 endef
 
 define ensure_postgres_env
@@ -94,6 +108,12 @@ help: ## Show this help message
 venv: $(VENV) ## Create virtual environment if it doesn't exist
 $(VENV):
 	@echo "Creating virtual environment..."
+		@python3 - <<'PY'
+	import platform
+	import sys
+	if sys.version_info < (3, 12):
+	    raise SystemExit(f"Python 3.12+ required to create virtualenv (found {platform.python_version()})")
+	PY
 	python3 -m venv $(VENV)
 	$(PIP) install --upgrade pip
 	@echo "Virtual environment created at $(VENV)"
@@ -128,6 +148,10 @@ setup-gcp: ## Set up Google Cloud SDK and authenticate
 	gcloud auth login
 	gcloud config set project YOUR_PROJECT_ID
 	gcloud services enable run.googleapis.com sqladmin.googleapis.com secretmanager.googleapis.com storage.googleapis.com
+
+generate-ts-types: ## Generate TypeScript definitions from backend models
+	$(call check_venv)
+	$(USE_PYTHON) scripts/generate_ts_types.py
 
 # Testing
 test: ## Run all tests

@@ -5,10 +5,14 @@ Standardizes phenotype identifiers from different sources (HPO, OMIM, etc.)
 into consistent formats for cross-referencing and deduplication.
 """
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import RawRecord  # noqa: TC001
+from src.type_definitions.json_utils import as_str, list_of_strings
 
 
 class PhenotypeIdentifierType(Enum):
@@ -66,7 +70,7 @@ class PhenotypeNormalizer:
 
     def normalize(
         self,
-        raw_phenotype_data: dict[str, Any],
+        raw_phenotype_data: RawRecord,
         source: str = "unknown",
     ) -> NormalizedPhenotype | None:
         """
@@ -92,12 +96,12 @@ class PhenotypeNormalizer:
 
     def _normalize_hpo_phenotype(
         self,
-        phenotype_data: dict[str, Any],
+        phenotype_data: RawRecord,
     ) -> NormalizedPhenotype | None:
         """Normalize phenotype data from HPO."""
-        hpo_id = phenotype_data.get("hpo_id")
-        name = phenotype_data.get("name")
-        definition = phenotype_data.get("definition")
+        hpo_id = as_str(phenotype_data.get("hpo_id"))
+        name = as_str(phenotype_data.get("name"))
+        definition = as_str(phenotype_data.get("definition"))
 
         if not hpo_id or not name:
             return None
@@ -113,7 +117,7 @@ class PhenotypeNormalizer:
         category = self._determine_hpo_category(hpo_id)
 
         # Extract synonyms (if available)
-        synonyms = phenotype_data.get("synonyms", [])
+        synonyms = list_of_strings(phenotype_data.get("synonyms"))
 
         # Build cross-references
         cross_refs = {"HPO": [hpo_id], "NAME": [name]}
@@ -135,10 +139,12 @@ class PhenotypeNormalizer:
 
     def _normalize_clinvar_phenotype(
         self,
-        phenotype_data: dict[str, Any],
+        phenotype_data: RawRecord,
     ) -> NormalizedPhenotype | None:
         """Normalize phenotype data from ClinVar."""
-        phenotype_name = phenotype_data.get("name") or phenotype_data.get("phenotype")
+        phenotype_name = as_str(phenotype_data.get("name")) or as_str(
+            phenotype_data.get("phenotype"),
+        )
 
         if not phenotype_name:
             return None
@@ -171,15 +177,19 @@ class PhenotypeNormalizer:
 
     def _normalize_generic_phenotype(
         self,
-        phenotype_data: dict[str, Any],
+        phenotype_data: RawRecord,
         source: str,
     ) -> NormalizedPhenotype | None:
         """Normalize phenotype data from generic sources."""
         # Try to extract common fields
-        phenotype_id = phenotype_data.get("id") or phenotype_data.get("phenotype_id")
-        name = phenotype_data.get("name") or phenotype_data.get("term")
-        definition = phenotype_data.get("definition") or phenotype_data.get(
-            "description",
+        phenotype_id = as_str(phenotype_data.get("id")) or as_str(
+            phenotype_data.get("phenotype_id"),
+        )
+        name = as_str(phenotype_data.get("name")) or as_str(
+            phenotype_data.get("term"),
+        )
+        definition = as_str(phenotype_data.get("definition")) or as_str(
+            phenotype_data.get("description"),
         )
 
         if not name and not phenotype_id:
@@ -191,14 +201,14 @@ class PhenotypeNormalizer:
             primary_id = phenotype_id
         else:
             id_type = PhenotypeIdentifierType.OTHER
-            primary_id = name
+            primary_id = name or "unknown"
 
         normalized = NormalizedPhenotype(
             primary_id=primary_id,
             id_type=id_type,
             name=name or "Unknown",
             definition=definition,
-            synonyms=phenotype_data.get("synonyms", []),
+            synonyms=list_of_strings(phenotype_data.get("synonyms")),
             category=None,
             cross_references={},
             source=source,

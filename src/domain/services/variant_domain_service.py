@@ -6,14 +6,14 @@ without infrastructure dependencies.
 """
 
 from collections import Counter
-from typing import Any
+from collections.abc import Mapping, Sequence
 
-from src.domain.entities.variant import Variant, VariantType
+from src.domain.entities.variant import EvidenceSummary, Variant, VariantType
 from src.domain.services.base import DomainService
 from src.type_definitions.domain import VariantDerivedProperties
 
 
-class VariantDomainService(DomainService):
+class VariantDomainService(DomainService[Variant]):
     """
     Domain service for Variant business logic.
 
@@ -24,8 +24,8 @@ class VariantDomainService(DomainService):
     def validate_business_rules(
         self,
         entity: Variant,
-        _operation: str,
-        _context: dict[str, Any] | None = None,
+        operation: str,
+        context: Mapping[str, object] | None = None,
     ) -> list[str]:
         """
         Validate variant business rules.
@@ -38,6 +38,7 @@ class VariantDomainService(DomainService):
         Returns:
             List of validation error messages
         """
+        del operation, context
         errors = []
 
         # Genomic coordinate validation
@@ -92,7 +93,7 @@ class VariantDomainService(DomainService):
 
         return entity
 
-    def calculate_derived_properties(self, entity: Variant) -> dict[str, Any]:
+    def calculate_derived_properties(self, entity: Variant) -> dict[str, object]:
         """
         Calculate derived properties for a variant.
 
@@ -150,7 +151,7 @@ class VariantDomainService(DomainService):
     def assess_clinical_significance_confidence(
         self,
         _variant: Variant,
-        evidence_list: list[Any],
+        evidence_list: Sequence[EvidenceSummary],
     ) -> float:
         """
         Assess confidence in clinical significance based on evidence.
@@ -182,7 +183,7 @@ class VariantDomainService(DomainService):
     def detect_evidence_conflicts(
         self,
         _variant: Variant,
-        evidence_list: list[Any],
+        evidence_list: Sequence[EvidenceSummary],
     ) -> list[str]:
         """
         Detect conflicting evidence for a variant.
@@ -306,7 +307,10 @@ class VariantDomainService(DomainService):
         mismatch_threshold = 0.05
         return abs(variant.allele_frequency - variant.gnomad_af) > mismatch_threshold
 
-    def _calculate_significance_consistency(self, evidence_list: list[Any]) -> float:
+    def _calculate_significance_consistency(
+        self,
+        evidence_list: Sequence[EvidenceSummary],
+    ) -> float:
         """Calculate consistency of clinical significance across evidence."""
         if not evidence_list:
             return 0.0

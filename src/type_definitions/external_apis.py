@@ -6,30 +6,29 @@ ClinVar, PubMed, HPO, UniProt, etc. These provide type safety when
 processing external data and help prevent runtime errors.
 """
 
-from typing import Any, TypedDict
+from typing import NotRequired, TypedDict
+
+from src.type_definitions.common import JSONObject, JSONValue
 
 
 # ClinVar API Types
-class ClinVarSearchResult(TypedDict):
-    """Individual ClinVar search result."""
+class ClinVarESearchResult(TypedDict):
+    """Structured ClinVar search payload returned from ESearch."""
 
-    uid: str
-    term: str
-    count: int | None
+    count: str
+    retmax: str
+    retstart: str
+    idlist: list[str]
+    querytranslation: NotRequired[str]
+    translationset: NotRequired[list[JSONObject]]
+    translationstack: NotRequired[list[JSONObject]]
 
 
 class ClinVarSearchResponse(TypedDict):
     """ClinVar ESearch API response structure."""
 
-    header: dict[str, Any]
-    esearchresult: dict[str, Any]
-    count: str
-    retmax: str
-    retstart: str
-    idlist: list[str]
-    translationset: list[ClinVarSearchResult]
-    translationstack: dict[str, Any]
-    querytranslation: str
+    header: JSONObject
+    esearchresult: ClinVarESearchResult
 
 
 class ClinVarVariantRecord(TypedDict, total=False):
@@ -37,34 +36,37 @@ class ClinVarVariantRecord(TypedDict, total=False):
 
     variation_id: str
     variation_name: str
-    gene: dict[str, Any] | None
-    condition: dict[str, Any] | None
-    clinical_significance: dict[str, Any] | None
+    gene: JSONObject | None
+    condition: JSONObject | None
+    clinical_significance: JSONObject | None
     review_status: str | None
-    interpretation: dict[str, Any] | None
-    submissions: list[dict[str, Any]]
+    interpretation: JSONObject | None
+    submissions: list[JSONObject]
     last_updated: str | None
+
+
+type ClinVarVariantResultMap = dict[str, ClinVarVariantRecord | list[str]]
 
 
 class ClinVarVariantResponse(TypedDict):
     """ClinVar ESummary API response for variant details."""
 
-    header: dict[str, Any]
-    result: dict[str, ClinVarVariantRecord]
+    header: JSONObject
+    result: ClinVarVariantResultMap
 
 
 # PubMed API Types
 class PubMedSearchResponse(TypedDict):
     """PubMed ESearch API response structure."""
 
-    header: dict[str, Any]
-    esearchresult: dict[str, Any]
+    header: JSONObject
+    esearchresult: JSONObject
     count: str
     retmax: str
     retstart: str
     idlist: list[str]
-    translationset: list[dict[str, Any]]
-    translationstack: dict[str, Any]
+    translationset: list[JSONObject]
+    translationstack: JSONObject
     querytranslation: str
 
 
@@ -122,7 +124,7 @@ class HPOOntologyResponse(TypedDict):
     version: str
     date: str
     terms: dict[str, HPOTerm]
-    metadata: dict[str, Any]
+    metadata: JSONObject
 
 
 # UniProt API Types
@@ -177,7 +179,7 @@ class ExternalAPIError(TypedDict):
     error: str
     message: str
     code: str | None
-    details: dict[str, Any] | None
+    details: JSONObject | None
 
 
 class ExternalAPIRateLimit(TypedDict):
@@ -193,7 +195,7 @@ class ExternalAPIResponse(TypedDict, total=False):
     """Generic external API response wrapper."""
 
     success: bool
-    data: Any
+    data: JSONValue | None
     error: ExternalAPIError | None
     rate_limit: ExternalAPIRateLimit | None
     request_id: str | None
@@ -209,7 +211,7 @@ class ExternalDataValidationResult(TypedDict):
     warnings: list[str]
     data_quality_score: float
     transformation_needed: bool
-    sanitized_data: Any | None
+    sanitized_data: JSONValue | None
 
 
 class APIEndpointConfig(TypedDict):
@@ -235,12 +237,32 @@ class ValidationIssue(TypedDict):
 
 
 class APIResponseValidationResult(TypedDict):
-    """Result of validating an external API response."""
+    """Result of validating a generic external API response."""
 
     is_valid: bool
     issues: list[ValidationIssue]
     data_quality_score: float
-    sanitized_data: Any | None
+    sanitized_data: JSONValue | None
+    validation_time_ms: float
+
+
+class ClinVarSearchValidationResult(TypedDict):
+    """Result of validating a ClinVar search response."""
+
+    is_valid: bool
+    issues: list[ValidationIssue]
+    data_quality_score: float
+    sanitized_data: ClinVarSearchResponse | None
+    validation_time_ms: float
+
+
+class ClinVarVariantValidationResult(TypedDict):
+    """Result of validating a ClinVar variant response."""
+
+    is_valid: bool
+    issues: list[ValidationIssue]
+    data_quality_score: float
+    sanitized_data: ClinVarVariantResponse | None
     validation_time_ms: float
 
 

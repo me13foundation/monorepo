@@ -6,7 +6,7 @@ without infrastructure dependencies.
 """
 
 import re
-from typing import Any
+from collections.abc import Mapping
 
 from src.domain.entities.gene import Gene, GeneType
 from src.domain.services.base import DomainService
@@ -14,7 +14,7 @@ from src.domain.value_objects.identifiers import GeneIdentifier
 from src.type_definitions.domain import GeneDerivedProperties
 
 
-class GeneDomainService(DomainService):
+class GeneDomainService(DomainService[Gene]):
     """
     Domain service for Gene business logic.
 
@@ -25,8 +25,8 @@ class GeneDomainService(DomainService):
     def validate_business_rules(
         self,
         entity: Gene,
-        _operation: str,  # kept for API compatibility
-        _context: dict[str, Any] | None = None,
+        operation: str,
+        context: Mapping[str, object] | None = None,
     ) -> list[str]:
         """
         Validate gene business rules.
@@ -39,6 +39,7 @@ class GeneDomainService(DomainService):
         Returns:
             List of validation error messages
         """
+        del operation, context
         errors = []
 
         # Symbol validation
@@ -83,7 +84,7 @@ class GeneDomainService(DomainService):
 
         return entity
 
-    def calculate_derived_properties(self, entity: Gene) -> dict[str, Any]:
+    def calculate_derived_properties(self, entity: Gene) -> dict[str, object]:
         """
         Calculate derived properties for a gene.
 

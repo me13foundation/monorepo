@@ -5,12 +5,13 @@ Provides common functionality for domain services that encapsulate
 business rules without infrastructure dependencies.
 """
 
-from typing import Any, TypeVar
+from collections.abc import Mapping
+from typing import Generic, TypeVar
 
-T = TypeVar("T")
+TEntity = TypeVar("TEntity")
 
 
-class DomainService:
+class DomainService(Generic[TEntity]):  # noqa: UP046
     """
     Base class for domain services.
 
@@ -20,9 +21,9 @@ class DomainService:
 
     def validate_business_rules(
         self,
-        _entity: Any,
+        _entity: TEntity,
         _operation: str,
-        _context: dict[str, Any] | None = None,
+        _context: Mapping[str, object] | None = None,
     ) -> list[str]:
         """
         Validate business rules for an entity operation.
@@ -37,7 +38,7 @@ class DomainService:
         """
         return []
 
-    def apply_business_logic(self, entity: Any, _operation: str) -> Any:
+    def apply_business_logic(self, entity: TEntity, _operation: str) -> TEntity:
         """
         Apply business logic transformations to an entity.
 
@@ -50,7 +51,7 @@ class DomainService:
         """
         return entity
 
-    def calculate_derived_properties(self, _entity: Any) -> dict[str, Any]:
+    def calculate_derived_properties(self, _entity: TEntity) -> Mapping[str, object]:
         """
         Calculate derived properties for an entity.
 

@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import Callable  # noqa: TC003
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from sqlalchemy import event
 from sqlalchemy.exc import OperationalError
 
 if TYPE_CHECKING:  # pragma: no cover - import only for typings
+    from collections.abc import Callable
+
     from sqlalchemy.engine import Engine
 else:  # pragma: no cover - runtime fallback type
     Engine = Any
@@ -79,7 +80,7 @@ def build_sqlite_connect_args(
     return connect_args
 
 
-def retry_on_sqlite_lock(
+def retry_on_sqlite_lock[T](
     operation: Callable[[], T],
     max_retries: int = MAX_RETRIES,
     initial_delay: float = INITIAL_RETRY_DELAY,

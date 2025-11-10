@@ -220,9 +220,9 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         models = list(self.session.execute(stmt).scalars())
         return GeneMapper.to_domain_sequence(models)
 
-    def update(self, gene_id: int, updates: dict[str, Any]) -> Gene:
+    def update(self, gene_id: int, updates: GeneUpdate) -> Gene:
         """Update a gene by ID."""
-        stmt = update(GeneModel).where(GeneModel.id == gene_id).values(**updates)
+        stmt = update(GeneModel).where(GeneModel.id == gene_id).values(**dict(updates))
         self.session.execute(stmt)
         self.session.commit()
         # Return updated entity
@@ -308,9 +308,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
 
     def update_gene(self, gene_id: int, updates: GeneUpdate) -> Gene:
         """Update a gene with type-safe update parameters."""
-        # Convert TypedDict to Dict[str, Any]
-        updates_dict = dict(updates)
-        return self.update(gene_id, updates_dict)
+        return self.update(gene_id, updates)
 
 
 __all__ = ["SqlAlchemyGeneRepository"]

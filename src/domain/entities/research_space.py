@@ -7,6 +7,10 @@ from uuid import UUID, uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+def _default_space_settings() -> dict[str, Any]:
+    return {}
+
+
 class SpaceStatus(str, Enum):
     """Research space lifecycle status."""
 
@@ -49,8 +53,8 @@ class ResearchSpace(BaseModel):
 
     # Configuration
     settings: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Space-specific settings",
+        default_factory=_default_space_settings,
+        description="Space-specific settings (flexible dict for arbitrary key-value pairs)",
     )
 
     # Metadata

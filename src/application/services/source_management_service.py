@@ -5,8 +5,10 @@ Orchestrates domain services and repositories to implement
 data source management use cases with proper business logic.
 """
 
-from typing import Any
+from typing import cast
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.domain.entities.source_template import SourceTemplate
 from src.domain.entities.user_data_source import (
@@ -17,30 +19,30 @@ from src.domain.entities.user_data_source import (
     SourceType,
     UserDataSource,
 )
+from src.domain.events import (
+    DomainEvent,
+    DomainEventBus,
+    SourceCreatedEvent,
+    SourceStatusChangedEvent,
+    SourceUpdatedEvent,
+    domain_event_bus,
+)
 from src.domain.repositories.source_template_repository import SourceTemplateRepository
 from src.domain.repositories.user_data_source_repository import UserDataSourceRepository
+from src.domain.services.source_plugins import SourcePluginRegistry, default_registry
+from src.type_definitions.common import StatisticsResponse
 
 
-class CreateSourceRequest:
+class CreateSourceRequest(BaseModel):
     """Request model for creating a new data source."""
 
-    def __init__(  # noqa: PLR0913 - explicit request fields for clarity
-        self,
-        owner_id: UUID,
-        name: str,
-        source_type: SourceType,
-        description: str = "",
-        template_id: UUID | None = None,
-        configuration: SourceConfiguration | None = None,
-        tags: list[str] | None = None,
-        research_space_id: UUID | None = None,
-    ):
-        self.owner_id = owner_id
-        self.name = name
-        self.description = description
-        self.source_type = source_type
-        self.template_id = template_id
-        self.configuration = configuration or SourceConfiguration(
+    owner_id: UUID
+    name: str
+    source_type: SourceType
+    description: str = ""
+    template_id: UUID | None = None
+    configuration: SourceConfiguration = Field(
+        default_factory=lambda: SourceConfiguration(
             url="",
             file_path="",
             format="",
@@ -49,27 +51,24 @@ class CreateSourceRequest:
             requests_per_minute=None,
             field_mapping={},
             metadata={},
-        )
-        self.tags = tags or []
-        self.research_space_id = research_space_id
+        ),
+    )
+    tags: list[str] = Field(default_factory=list)
+    research_space_id: UUID | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class UpdateSourceRequest:
+class UpdateSourceRequest(BaseModel):
     """Request model for updating a data source."""
 
-    def __init__(
-        self,
-        name: str | None = None,
-        description: str | None = None,
-        configuration: SourceConfiguration | None = None,
-        ingestion_schedule: IngestionSchedule | None = None,
-        tags: list[str] | None = None,
-    ):
-        self.name = name
-        self.description = description
-        self.configuration = configuration
-        self.ingestion_schedule = ingestion_schedule
-        self.tags = tags
+    name: str | None = None
+    description: str | None = None
+    configuration: SourceConfiguration | None = None
+    ingestion_schedule: IngestionSchedule | None = None
+    tags: list[str] | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class SourceManagementService:
@@ -84,6 +83,8 @@ class SourceManagementService:
         self,
         user_data_source_repository: UserDataSourceRepository,
         source_template_repository: SourceTemplateRepository | None = None,
+        plugin_registry: SourcePluginRegistry | None = None,
+        event_bus: DomainEventBus | None = None,
     ):
         """
         Initialize the source management service.
@@ -94,6 +95,8 @@ class SourceManagementService:
         """
         self._source_repository = user_data_source_repository
         self._template_repository = source_template_repository
+        self._plugin_registry = plugin_registry or default_registry
+        self._event_bus = event_bus or domain_event_bus
 
     def _require_template_repository(self) -> SourceTemplateRepository:
         """Ensure the template repository is available."""
@@ -101,6 +104,35 @@ class SourceManagementService:
             msg = "Source template repository is not configured"
             raise RuntimeError(msg)
         return self._template_repository
+
+    def _apply_plugin_validation(
+        self,
+        source_type: SourceType,
+        configuration: SourceConfiguration,
+    ) -> SourceConfiguration:
+        plugin = self._plugin_registry.get(source_type)
+        if plugin is None:
+            return configuration
+        return plugin.validate_configuration(configuration)
+
+    def _publish_event(self, event: DomainEvent) -> None:
+        """Publish a domain event safely."""
+        self._event_bus.publish(event)
+
+    def _determine_changed_fields(self, request: UpdateSourceRequest) -> list[str]:
+        """Return a list of changed field names for update events."""
+        changed: list[str] = []
+        if request.name is not None:
+            changed.append("name")
+        if request.description is not None:
+            changed.append("description")
+        if request.configuration is not None:
+            changed.append("configuration")
+        if request.ingestion_schedule is not None:
+            changed.append("ingestion_schedule")
+        if request.tags is not None:
+            changed.append("tags")
+        return changed
 
     def create_source(self, request: CreateSourceRequest) -> UserDataSource:
         """
@@ -126,6 +158,11 @@ class SourceManagementService:
                 msg = f"Template {request.template_id} is not available"
                 raise ValueError(msg)
 
+        configuration = self._apply_plugin_validation(
+            request.source_type,
+            request.configuration,
+        )
+
         # Create the source entity
         source = UserDataSource(
             id=UUID(),  # Will be set by repository
@@ -135,13 +172,15 @@ class SourceManagementService:
             description=request.description,
             source_type=request.source_type,
             template_id=request.template_id,
-            configuration=request.configuration,
+            configuration=configuration,
             tags=request.tags,
             last_ingested_at=None,
         )
 
         # Save to repository
-        return self._source_repository.save(source)
+        saved_source = self._source_repository.save(source)
+        self._publish_event(SourceCreatedEvent.from_source(saved_source))
+        return saved_source
 
     def get_source(
         self,
@@ -206,14 +245,19 @@ class SourceManagementService:
         # Apply updates
         updated_source = source
         if request.name is not None:
-            # This would create a new instance with updated name in a real immutable implementation
-            pass
+            updated_source = updated_source.model_copy(
+                update={"name": request.name},
+            )
         if request.description is not None:
             updated_source = updated_source.model_copy(
                 update={"description": request.description},
             )
         if request.configuration is not None:
-            updated_source = updated_source.update_configuration(request.configuration)
+            sanitized_config = self._apply_plugin_validation(
+                updated_source.source_type,
+                request.configuration,
+            )
+            updated_source = updated_source.update_configuration(sanitized_config)
         if request.ingestion_schedule is not None:
             updated_source = updated_source.model_copy(
                 update={"ingestion_schedule": request.ingestion_schedule},
@@ -221,7 +265,16 @@ class SourceManagementService:
         if request.tags is not None:
             updated_source = updated_source.model_copy(update={"tags": request.tags})
 
-        return self._source_repository.save(updated_source)
+        saved_source = self._source_repository.save(updated_source)
+        changed_fields = self._determine_changed_fields(request)
+        if changed_fields:
+            self._publish_event(
+                SourceUpdatedEvent.from_source(
+                    saved_source,
+                    changed_fields=changed_fields,
+                ),
+            )
+        return saved_source
 
     def delete_source(self, source_id: UUID, owner_id: UUID) -> bool:
         """
@@ -259,8 +312,16 @@ class SourceManagementService:
         if not source or source.owner_id != owner_id:
             return None
 
+        previous_status = source.status
         activated_source = source.update_status(SourceStatus.ACTIVE)
-        return self._source_repository.save(activated_source)
+        saved_source = self._source_repository.save(activated_source)
+        self._publish_event(
+            SourceStatusChangedEvent.from_source(
+                saved_source,
+                previous_status=previous_status,
+            ),
+        )
+        return saved_source
 
     def deactivate_source(
         self,
@@ -281,8 +342,16 @@ class SourceManagementService:
         if not source or source.owner_id != owner_id:
             return None
 
+        previous_status = source.status
         deactivated_source = source.update_status(SourceStatus.INACTIVE)
-        return self._source_repository.save(deactivated_source)
+        saved_source = self._source_repository.save(deactivated_source)
+        self._publish_event(
+            SourceStatusChangedEvent.from_source(
+                saved_source,
+                previous_status=previous_status,
+            ),
+        )
+        return saved_source
 
     def record_ingestion_success(self, source_id: UUID) -> UserDataSource | None:
         """
@@ -390,14 +459,15 @@ class SourceManagementService:
         template_repository = self._require_template_repository()
         return template_repository.find_available_for_user(user_id, skip, limit)
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> StatisticsResponse:
         """
         Get overall statistics about data sources.
 
         Returns:
             Dictionary with various statistics
         """
-        return self._source_repository.get_statistics()
+        stats = self._source_repository.get_statistics()
+        return cast("StatisticsResponse", stats)
 
     def validate_source_configuration(  # noqa: C901 - validator is intentionally comprehensive
         self,
@@ -413,6 +483,13 @@ class SourceManagementService:
             List of validation error messages (empty if valid)
         """
         errors = []
+
+        plugin = self._plugin_registry.get(source.source_type)
+        if plugin:
+            try:
+                plugin.validate_configuration(source.configuration)
+            except ValueError as exc:  # pragma: no cover - defensive logging path
+                errors.append(str(exc))
 
         # Basic validation
         if not source.name.strip():

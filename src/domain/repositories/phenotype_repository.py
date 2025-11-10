@@ -6,14 +6,13 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import Any
 
 from src.domain.entities.phenotype import Phenotype
 from src.domain.repositories.base import Repository
-from src.type_definitions.common import PhenotypeUpdate
+from src.type_definitions.common import PhenotypeUpdate, QueryFilters
 
 
-class PhenotypeRepository(Repository[Phenotype, int]):
+class PhenotypeRepository(Repository[Phenotype, int, PhenotypeUpdate]):
     """
     Domain repository interface for Phenotype entities.
 
@@ -42,11 +41,15 @@ class PhenotypeRepository(Repository[Phenotype, int]):
         """Find phenotypes by category."""
 
     @abstractmethod
+    def find_children(self, parent_hpo_id: str) -> list[Phenotype]:
+        """Find child phenotypes for a given HPO ID."""
+
+    @abstractmethod
     def search_phenotypes(
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Phenotype]:
         """Search phenotypes with optional filters."""
 
@@ -57,7 +60,7 @@ class PhenotypeRepository(Repository[Phenotype, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Phenotype], int]:
         """Retrieve paginated phenotypes with optional filters."""
 

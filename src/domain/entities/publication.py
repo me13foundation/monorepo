@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
-if TYPE_CHECKING:
-    from src.domain.entities.evidence import Evidence
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-if TYPE_CHECKING:
-    from src.domain.value_objects.identifiers import PublicationIdentifier
+from src.domain.entities.evidence import Evidence  # noqa: TC001
+from src.domain.value_objects.identifiers import PublicationIdentifier  # noqa: TC001
 
 
 class PublicationType:
@@ -39,54 +37,81 @@ class PublicationType:
         return normalized
 
 
-@dataclass
-class Publication:
+MIN_PUBLICATION_YEAR = 1800
+RELEVANCE_SCORE_MIN = 1
+RELEVANCE_SCORE_MAX = 5
+
+
+class Publication(BaseModel):
     identifier: PublicationIdentifier
     title: str
     authors: tuple[str, ...]
     journal: str
     publication_year: int
-    publication_type: str = PublicationType.JOURNAL_ARTICLE
+    publication_type: str = Field(default=PublicationType.JOURNAL_ARTICLE)
     volume: str | None = None
     issue: str | None = None
     pages: str | None = None
     publication_date: date | None = None
     abstract: str | None = None
-    keywords: tuple[str, ...] = field(default_factory=tuple)
+    keywords: tuple[str, ...] = Field(default_factory=tuple)
     citation_count: int = 0
     impact_factor: float | None = None
     reviewed: bool = False
     relevance_score: int | None = None
     full_text_url: str | None = None
     open_access: bool = False
-    evidence: list[Evidence] = field(default_factory=list, repr=False)
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    evidence: list[Evidence] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
 
-    def __post_init__(self) -> None:
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+    )
+
+    @field_validator("publication_type")
+    @classmethod
+    def _validate_type(cls, value: str) -> str:
+        return PublicationType.validate(value)
+
+    @field_validator("authors")
+    @classmethod
+    def _normalize_authors(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized = tuple(name.strip() for name in value if name.strip())
+        if not normalized:
+            msg = "Publication must have at least one author"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("keywords")
+    @classmethod
+    def _normalize_keywords(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(
+            sorted({keyword.strip().lower() for keyword in value if keyword.strip()}),
+        )
+
+    @model_validator(mode="after")
+    def _validate(self) -> Publication:
         if not self.title:
             msg = "Publication title cannot be empty"
             raise ValueError(msg)
-        if not self.authors:
-            msg = "Publication must have at least one author"
-            raise ValueError(msg)
-        min_publication_year = 1800
-        if self.publication_year < min_publication_year:
-            msg = "publication_year must be 1800 or later"
+        if self.publication_year < MIN_PUBLICATION_YEAR:
+            msg = f"publication_year must be {MIN_PUBLICATION_YEAR} or later"
             raise ValueError(msg)
         if self.impact_factor is not None and self.impact_factor < 0:
             msg = "impact_factor cannot be negative"
             raise ValueError(msg)
-        max_relevance = 5
         if self.relevance_score is not None and not (
-            1 <= self.relevance_score <= max_relevance
+            RELEVANCE_SCORE_MIN <= self.relevance_score <= RELEVANCE_SCORE_MAX
         ):
-            msg = "relevance_score must be between 1 and 5"
+            msg = (
+                f"relevance_score must be between {RELEVANCE_SCORE_MIN} "
+                f"and {RELEVANCE_SCORE_MAX}"
+            )
             raise ValueError(msg)
-        self.publication_type = PublicationType.validate(self.publication_type)
-        self.authors = self._normalize_people(self.authors)
-        self.keywords = self._normalize_keywords(self.keywords)
+        return self
 
     def add_author(self, author: str) -> None:
         cleaned = author.strip()
@@ -118,9 +143,13 @@ class Publication:
         self._touch()
 
     def update_relevance(self, relevance_score: int | None) -> None:
-        max_relevance = 5
-        if relevance_score is not None and not (1 <= relevance_score <= max_relevance):
-            msg = "relevance_score must be between 1 and 5"
+        if relevance_score is not None and not (
+            RELEVANCE_SCORE_MIN <= relevance_score <= RELEVANCE_SCORE_MAX
+        ):
+            msg = (
+                f"relevance_score must be between {RELEVANCE_SCORE_MIN} "
+                f"and {RELEVANCE_SCORE_MAX}"
+            )
             raise ValueError(msg)
         self.relevance_score = relevance_score
         self._touch()
@@ -131,18 +160,6 @@ class Publication:
 
     def _touch(self) -> None:
         self.updated_at = datetime.now(UTC)
-
-    @staticmethod
-    def _normalize_people(names: tuple[str, ...]) -> tuple[str, ...]:
-        return tuple(name.strip() for name in names if name.strip())
-
-    @staticmethod
-    def _normalize_keywords(keywords: tuple[str, ...]) -> tuple[str, ...]:
-        return tuple(
-            sorted(
-                {keyword.strip().lower() for keyword in keywords if keyword.strip()},
-            ),
-        )
 
 
 __all__ = ["Publication", "PublicationType"]

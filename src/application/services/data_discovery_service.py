@@ -10,6 +10,8 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from src.application.services.source_management_service import (
     CreateSourceRequest,
     SourceManagementService,
@@ -34,65 +36,50 @@ from src.domain.repositories.source_template_repository import SourceTemplateRep
 logger = logging.getLogger(__name__)
 
 
-class CreateDataDiscoverySessionRequest:
+class CreateDataDiscoverySessionRequest(BaseModel):
     """Request model for creating a new data discovery session."""
 
-    def __init__(
-        self,
-        owner_id: UUID,
-        name: str = "Untitled Session",
-        research_space_id: UUID | None = None,
-        initial_parameters: QueryParameters | None = None,
-    ):
-        self.owner_id = owner_id
-        self.name = name
-        self.research_space_id = research_space_id
-        self.initial_parameters = initial_parameters or QueryParameters(
+    owner_id: UUID
+    name: str = "Untitled Session"
+    research_space_id: UUID | None = None
+    initial_parameters: QueryParameters = Field(
+        default_factory=lambda: QueryParameters(
             gene_symbol=None,
             search_term=None,
-        )
+        ),
+    )
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class UpdateSessionParametersRequest:
+class UpdateSessionParametersRequest(BaseModel):
     """Request model for updating session parameters."""
 
-    def __init__(
-        self,
-        session_id: UUID,
-        parameters: QueryParameters,
-    ):
-        self.session_id = session_id
-        self.parameters = parameters
+    session_id: UUID
+    parameters: QueryParameters
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class ExecuteQueryTestRequest:
+class ExecuteQueryTestRequest(BaseModel):
     """Request model for executing a query test."""
 
-    def __init__(
-        self,
-        session_id: UUID,
-        catalog_entry_id: str,
-        timeout_seconds: int = 30,
-    ):
-        self.session_id = session_id
-        self.catalog_entry_id = catalog_entry_id
-        self.timeout_seconds = timeout_seconds
+    session_id: UUID
+    catalog_entry_id: str
+    timeout_seconds: int = 30
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class AddSourceToSpaceRequest:
+class AddSourceToSpaceRequest(BaseModel):
     """Request model for adding a tested source to a research space."""
 
-    def __init__(
-        self,
-        session_id: UUID,
-        catalog_entry_id: str,
-        research_space_id: UUID,
-        source_config: dict[str, Any] | None = None,
-    ):
-        self.session_id = session_id
-        self.catalog_entry_id = catalog_entry_id
-        self.research_space_id = research_space_id
-        self.source_config = source_config or {}
+    session_id: UUID
+    catalog_entry_id: str
+    research_space_id: UUID
+    source_config: dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class DataDiscoveryService:

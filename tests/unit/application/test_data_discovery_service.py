@@ -26,6 +26,7 @@ from tests.test_types.data_discovery_fixtures import (
     TEST_SESSION_ACTIVE,
     TEST_SOURCE_CLINVAR,
     create_test_data_discovery_session,
+    create_test_source_catalog_entry,
 )
 from tests.test_types.mocks import (
     create_mock_data_discovery_repositories,
@@ -377,9 +378,15 @@ class TestDataDiscoveryService:
         session_id = TEST_SESSION_ACTIVE.id
         space_id = uuid4()
 
+        # Create a catalog entry without template to avoid template lookup
+        catalog_entry_no_template = create_test_source_catalog_entry(
+            entry_id=TEST_SOURCE_CLINVAR.id,
+            source_template_id=None,  # No template, will use SourceType.API default
+        )
+
         # Mock dependencies
         service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
-        service._catalog_repo.find_by_id.return_value = TEST_SOURCE_CLINVAR
+        service._catalog_repo.find_by_id.return_value = catalog_entry_no_template
 
         # Mock source management service
         mock_data_source = Mock()
@@ -388,7 +395,7 @@ class TestDataDiscoveryService:
 
         request = AddSourceToSpaceRequest(
             session_id=session_id,
-            catalog_entry_id=TEST_SOURCE_CLINVAR.id,
+            catalog_entry_id=catalog_entry_no_template.id,
             research_space_id=space_id,
         )
 

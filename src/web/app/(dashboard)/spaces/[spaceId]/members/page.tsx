@@ -4,6 +4,7 @@ import { useSpaceContext } from '@/components/space-context-provider'
 import { useParams } from 'next/navigation'
 import { useEffect } from 'react'
 import { ResearchSpaceDetail } from '@/components/research-spaces/ResearchSpaceDetail'
+import { PageHero } from '@/components/ui/composition-patterns'
 
 export default function SpaceMembersPage() {
   const params = useParams()
@@ -17,7 +18,12 @@ export default function SpaceMembersPage() {
   }, [spaceId, setCurrentSpaceId])
 
   return (
-    <div>
+    <div className="space-y-6">
+      <PageHero
+        title="Team Management"
+        description="Invite collaborators, assign roles, and manage membership for this research space."
+        variant="research"
+      />
       <ResearchSpaceDetail spaceId={spaceId} defaultTab="members" />
     </div>
   )

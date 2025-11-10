@@ -8,29 +8,32 @@ separation of concerns and dependency inversion.
 import types
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
 
-TEntity = TypeVar("TEntity")
-TId = TypeVar("TId")
+from src.type_definitions.common import QueryFilters
 
 
 @dataclass
 class QuerySpecification:
     """Base class for query specifications."""
 
-    filters: dict[str, Any]
+    filters: QueryFilters
     sort_by: str | None = None
     sort_order: str | None = None
     limit: int | None = None
     offset: int | None = None
 
 
-class Repository(ABC, Generic[TEntity, TId]):
+class Repository[TEntity, TId, TUpdate](ABC):
     """
     Abstract base repository interface.
 
     Defines the contract for data access operations without specifying
     the underlying implementation technology.
+
+    Type Parameters:
+        TEntity: The entity type
+        TId: The entity ID type
+        TUpdate: The update type (TypedDict for type-safe updates)
     """
 
     @abstractmethod
@@ -58,8 +61,8 @@ class Repository(ABC, Generic[TEntity, TId]):
         """Create a new entity."""
 
     @abstractmethod
-    def update(self, entity_id: TId, updates: dict[str, Any]) -> TEntity:
-        """Update an existing entity."""
+    def update(self, entity_id: TId, updates: TUpdate) -> TEntity:
+        """Update an existing entity with type-safe update parameters."""
 
     @abstractmethod
     def delete(self, entity_id: TId) -> bool:
@@ -106,7 +109,5 @@ class UnitOfWork(ABC):
 __all__ = [
     "QuerySpecification",
     "Repository",
-    "TEntity",
-    "TId",
     "UnitOfWork",
 ]

@@ -7,15 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from src.infrastructure.ingest.base_ingestor import BaseIngestor
 from src.infrastructure.validation.api_response_validator import (
     APIResponseValidator,
 )
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from src.type_definitions.external_apis import ClinVarSearchResponse
 
 logger = logging.getLogger(__name__)
 
@@ -129,10 +126,15 @@ class ClinVarIngestor(BaseIngestor):
             id_list = data.get("esearchresult", {}).get("idlist", [])
             return [str(vid) for vid in id_list]
 
-        # Use validated data
-        validated_data = validation_result["sanitized_data"] or data
-        search_response: ClinVarSearchResponse = validated_data
-        id_list = search_response["esearchresult"]["idlist"]
+        sanitized = validation_result["sanitized_data"]
+        if sanitized is None:
+            logger.warning(
+                "ClinVar search response missing sanitized payload; falling back to raw data",
+            )
+            id_list = data.get("esearchresult", {}).get("idlist", [])
+            return [str(vid) for vid in id_list]
+
+        id_list = sanitized["esearchresult"]["idlist"]
         return [str(vid) for vid in id_list]
 
     async def _fetch_variant_details(
@@ -181,8 +183,14 @@ class ClinVarIngestor(BaseIngestor):
             # Fallback to old processing
             variant_response = summary_data
         else:
-            # Use validated data
-            variant_response = validation_result["sanitized_data"] or summary_data
+            sanitized_variant = validation_result["sanitized_data"]
+            if sanitized_variant is None:
+                logger.warning(
+                    "ClinVar variant validation returned no sanitized payload despite passing validation",
+                )
+                variant_response = summary_data
+            else:
+                variant_response = sanitized_variant
 
         records: list[dict[str, Any]] = []
         for uid in variant_response.get("result", {}):

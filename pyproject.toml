@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "MED13 Resource Library - Curated biomedical data for research"
 authors = [{name = "MED13 Foundation"}]
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
@@ -47,7 +47,7 @@ dev = [
 
 [tool.black]
 line-length = 88
-target-version = ['py311']
+target-version = ['py312']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -66,7 +66,7 @@ extend-exclude = '''
 '''
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -81,10 +81,10 @@ warn_unreachable = true
 strict_equality = true
 show_error_codes = true
 
-# Stricter Any usage controls (Phase 1)
+# Stricter Any usage controls
 disallow_any_generics = true
 disallow_any_unimported = true
-disallow_any_expr = false  # Gradual adoption for expressions
+disallow_any_expr = false  # Temporarily allow Any expressions until legacy parsing layers are fully typed
 
 # Module-specific settings
 [[tool.mypy.overrides]]
@@ -109,6 +109,17 @@ module = [
 disallow_any_generics = false
 disallow_any_unimported = false
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "src.domain.transform.*",
+    "src.domain.validation.*",
+    "src.application.packaging.*",
+    "src.application.curation.*",
+    "src.infrastructure.validation.api_response_validator",
+]
+disallow_any_expr = false
+disallow_any_generics = false
 
 [tool.flake8]
 max-line-length = 88
@@ -164,7 +175,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "LOG", "RUF"]

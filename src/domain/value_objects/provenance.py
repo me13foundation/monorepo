@@ -6,6 +6,14 @@ from datetime import UTC, datetime
 from enum import Enum
 
 
+def _empty_metadata() -> Mapping[str, object]:
+    return {}
+
+
+def _empty_processing_steps() -> Sequence[str]:
+    return ()
+
+
 class DataSource(str, Enum):
     """Enumeration of domain-level data sources."""
 
@@ -24,10 +32,10 @@ class Provenance:
     source_version: str | None = None
     source_url: str | None = None
     acquired_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    processing_steps: Sequence[str] = field(default_factory=tuple)
+    processing_steps: Sequence[str] = field(default_factory=_empty_processing_steps)
     quality_score: float | None = None
     validation_status: str = "pending"
-    metadata: Mapping[str, object] = field(default_factory=dict)
+    metadata: Mapping[str, object] = field(default_factory=_empty_metadata)
 
     def __post_init__(self) -> None:
         if not self.acquired_by:

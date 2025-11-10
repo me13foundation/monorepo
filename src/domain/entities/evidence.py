@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
-from typing import TYPE_CHECKING, ClassVar
+from typing import ClassVar
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from src.domain.entities.variant import VariantSummary  # noqa: TC001
 from src.domain.value_objects.confidence import Confidence, EvidenceLevel
-
-if TYPE_CHECKING:
-    from src.domain.entities.variant import VariantSummary
-    from src.domain.value_objects.identifiers import (
-        PhenotypeIdentifier,
-        PublicationIdentifier,
-        VariantIdentifier,
-    )
+from src.domain.value_objects.identifiers import (  # noqa: TC001
+    PhenotypeIdentifier,
+    PublicationIdentifier,
+    VariantIdentifier,
+)
 
 
 class EvidenceType:
@@ -43,14 +42,18 @@ class EvidenceType:
         return normalized
 
 
-@dataclass
-class Evidence:
+QUALITY_SCORE_MAX = 10
+
+
+class Evidence(BaseModel):
     variant_id: int
     phenotype_id: int
     description: str
     evidence_level: EvidenceLevel = EvidenceLevel.SUPPORTING
     evidence_type: str = EvidenceType.LITERATURE_REVIEW
-    confidence: Confidence = field(default_factory=lambda: Confidence.from_score(0.5))
+    confidence: Confidence = Field(
+        default_factory=lambda: Confidence.from_score(0.5),
+    )
     summary: str | None = None
     publication_id: int | None = None
     phenotype_identifier: PhenotypeIdentifier | None = None
@@ -64,25 +67,38 @@ class Evidence:
     reviewed: bool = False
     review_date: date | None = None
     reviewer_notes: str | None = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
 
-    def __post_init__(self) -> None:
-        self.evidence_type = EvidenceType.validate(self.evidence_type)
-        self.confidence = self._ensure_confidence_alignment(self.confidence)
+    model_config = ConfigDict(
+        validate_assignment=True,
+        arbitrary_types_allowed=True,
+    )
+
+    @field_validator("evidence_type")
+    @classmethod
+    def _validate_type(cls, value: str) -> str:
+        return EvidenceType.validate(value)
+
+    @model_validator(mode="after")
+    def _validate_values(self) -> Evidence:
         if not self.description:
             msg = "Evidence description cannot be empty"
             raise ValueError(msg)
-        max_quality = 10
         if self.quality_score is not None and not (
-            1 <= self.quality_score <= max_quality
+            1 <= self.quality_score <= QUALITY_SCORE_MAX
         ):
-            msg = "quality_score must be between 1 and 10"
+            msg = f"quality_score must be between 1 and {QUALITY_SCORE_MAX}"
             raise ValueError(msg)
         if self.sample_size is not None and self.sample_size < 1:
             msg = "sample_size must be positive"
             raise ValueError(msg)
+
+        aligned_confidence = self._ensure_confidence_alignment(self.confidence)
+        if aligned_confidence is not self.confidence:
+            return self.model_copy(update={"confidence": aligned_confidence})
+        return self
 
     def mark_reviewed(
         self,

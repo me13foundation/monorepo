@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { AxiosError } from 'axios'
-import { DataDiscoveryHeader } from '@/components/data-discovery/DataDiscoveryHeader'
 import { ParameterBar } from '@/components/data-discovery/ParameterBar'
 import { SourceCatalog } from '@/components/data-discovery/SourceCatalog'
 import { ResultsView } from '@/components/data-discovery/ResultsView'
@@ -22,6 +21,9 @@ import {
 } from '@/lib/queries/data-discovery'
 import { toast } from 'sonner'
 import { syncDiscoverySessionState } from '@/lib/state/discovery-session-sync'
+import { PageHero, DashboardSection } from '@/components/ui/composition-patterns'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 
 const DEFAULT_PARAMETERS: QueryParameters = {
   gene_symbol: 'MED13L',
@@ -263,30 +265,49 @@ export default function DataDiscoveryPage() {
   )
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <DataDiscoveryHeader />
+    <div className="space-y-6">
+      <PageHero
+        title="Data Source Discovery"
+        description="Discover, test, and promote the highest-quality biomedical data sources for MED13 research workflows."
+        variant="research"
+        actions={<Badge variant="secondary">Workbench Beta</Badge>}
+      />
 
+      <DashboardSection
+        title="Query Parameters"
+        description="Tune gene and phenotype filters to personalize discovery runs."
+      >
         <ParameterBar parameters={parameters} onParametersChange={handleParametersChange} />
+      </DashboardSection>
 
-        <div className="flex space-x-2 mb-6">
+      <DashboardSection
+        title={activeView === 'select' ? 'Select Data Sources' : 'View Generated Results'}
+        description={
+          activeView === 'select'
+            ? 'Browse the catalog and choose sources to test.'
+            : 'Review generated outputs and promote sources into spaces.'
+        }
+      >
+        <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => setActiveView('select')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
+            className={cn(
+              'px-4 py-2 rounded-md font-medium transition-colors',
               activeView === 'select'
-                ? 'bg-card text-foreground border-b-2 border-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'text-muted-foreground bg-muted hover:bg-muted/80',
+            )}
           >
             1. Select Data Sources
           </button>
           <button
             onClick={() => setActiveView('results')}
-            className={`px-4 py-2 rounded-t-lg font-medium transition-colors ${
+            className={cn(
+              'px-4 py-2 rounded-md font-medium transition-colors',
               activeView === 'results'
-                ? 'bg-card text-foreground border-b-2 border-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-            }`}
+                ? 'bg-primary text-primary-foreground shadow'
+                : 'text-muted-foreground bg-muted hover:bg-muted/80',
+            )}
           >
             2. View Generated Results
           </button>
@@ -313,10 +334,14 @@ export default function DataDiscoveryPage() {
             onRunTest={handleRunSingleTest}
           />
         )}
-      </div>
+      </DashboardSection>
 
       {activeView === 'select' && (
-        <FloatingActionBar selectedCount={selectedSources.length} onGenerate={handleGenerateResults} isGenerating={isGenerating} />
+        <FloatingActionBar
+          selectedCount={selectedSources.length}
+          onGenerate={handleGenerateResults}
+          isGenerating={isGenerating}
+        />
       )}
     </div>
   )

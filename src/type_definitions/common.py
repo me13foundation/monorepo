@@ -5,7 +5,15 @@ Contains TypedDict classes for update operations, API responses,
 and other common patterns throughout the application.
 """
 
-from typing import Any, Literal, TypedDict
+from __future__ import annotations
+
+from typing import Literal, TypedDict
+
+type JSONPrimitive = str | int | float | bool | None
+type JSONValue = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
+type JSONObject = dict[str, JSONValue]
+type RawRecord = dict[str, JSONValue]
+"""Raw data record from external sources (typed JSON)."""
 
 
 # Update operation types (replace Dict[str, Any])
@@ -78,7 +86,7 @@ class PublicationUpdate(TypedDict, total=False):
 class APIResponse(TypedDict, total=False):
     """Standard API response structure."""
 
-    data: list[dict[str, Any]]
+    data: list[JSONObject]
     total: int
     page: int
     per_page: int
@@ -89,7 +97,7 @@ class APIResponse(TypedDict, total=False):
 class PaginatedResponse(TypedDict, total=False):
     """Paginated API response structure."""
 
-    items: list[dict[str, Any]]
+    items: list[JSONObject]
     total: int
     page: int
     per_page: int
@@ -113,11 +121,6 @@ class ValidationResult(TypedDict):
     is_valid: bool
     errors: list[ValidationError]
     warnings: list[ValidationError]
-
-
-# Data processing types
-RawRecord = dict[str, Any]
-"""Raw data record from external sources (justified for flexibility with external APIs)."""
 
 
 # Status and filter types
@@ -144,3 +147,134 @@ class EntityFilter(TypedDict, total=False):
     sort_order: Literal["asc", "desc"]
     page: int
     per_page: int
+
+
+# Authentication credential types
+class ApiKeyCredentials(TypedDict):
+    """API key authentication credentials."""
+
+    api_key: str
+    header_name: str  # e.g., "X-API-Key", "Authorization"
+
+
+class BasicAuthCredentials(TypedDict):
+    """Basic authentication credentials."""
+
+    username: str
+    password: str
+
+
+class OAuthCredentials(TypedDict):
+    """OAuth authentication credentials."""
+
+    client_id: str
+    client_secret: str
+    token_url: str
+    scope: str | None
+
+
+class BearerTokenCredentials(TypedDict):
+    """Bearer token authentication credentials."""
+
+    token: str
+
+
+# Union type for all auth credential types
+AuthCredentials = (
+    ApiKeyCredentials
+    | BasicAuthCredentials
+    | OAuthCredentials
+    | BearerTokenCredentials
+    | dict[str, str | int | float | bool | None]
+)
+"""Type-safe authentication credentials. Falls back to dict for custom auth types."""
+
+
+# Source-specific metadata types
+class SourceMetadata(TypedDict, total=False):
+    """Type-safe source-specific metadata."""
+
+    version: str
+    last_updated: str
+    record_count: int
+    data_format: str
+    encoding: str
+    compression: str
+    schema_version: str
+    custom_fields: dict[str, str | int | float | bool | None]
+    limit: int | None
+    method: str
+    query_params: dict[str, JSONValue]
+    headers: dict[str, str]
+    required_fields: list[str]
+    expected_types: dict[str, str]
+    ingest_mode: str
+    auth_type: str
+    connection_string: str
+    driver: str
+
+
+# Research space settings types
+class ResearchSpaceSettings(TypedDict, total=False):
+    """Type-safe research space settings."""
+
+    # Curation settings
+    auto_approve: bool
+    require_review: bool
+    review_threshold: float
+
+    # Data source settings
+    max_data_sources: int
+    allowed_source_types: list[str]
+
+    # Access control
+    public_read: bool
+    allow_invites: bool
+
+    # Notification settings
+    email_notifications: bool
+    notification_frequency: str
+
+    # Custom settings
+    custom: dict[str, str | int | float | bool | None]
+
+
+# Query specification types
+class QueryFilters(TypedDict, total=False):
+    """Type-safe query filters."""
+
+    # Common filters
+    status: str
+    created_after: str
+    created_before: str
+    updated_after: str
+    updated_before: str
+    owner_id: str
+    space_id: str
+
+    # Search
+    search: str
+    tags: list[str]
+
+    # Custom filters
+    custom: dict[str, str | int | float | bool | None]
+
+
+# Statistics and health check types
+class StatisticsResponse(TypedDict, total=False):
+    """Type-safe statistics response."""
+
+    total_sources: int
+    status_counts: dict[str, int]
+    type_counts: dict[str, int]
+    average_quality_score: float | None
+    sources_with_quality_metrics: int
+
+
+class HealthCheckResponse(TypedDict, total=False):
+    """Type-safe health check response."""
+
+    database: bool
+    jwt_provider: bool
+    password_hasher: bool
+    services: bool

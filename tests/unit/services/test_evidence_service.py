@@ -4,6 +4,9 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.application.services.evidence_service import EvidenceApplicationService
+from src.domain.services.evidence_domain_service import EvidenceDomainService
+from src.infrastructure.repositories import SqlAlchemyEvidenceRepository
 from src.models.database import (
     Base,
     EvidenceModel,
@@ -11,7 +14,6 @@ from src.models.database import (
     PhenotypeModel,
     VariantModel,
 )
-from src.services.domain.evidence_service import EvidenceService
 
 
 @pytest.fixture
@@ -68,7 +70,10 @@ def seed_high_confidence_evidence(db_session: Session) -> None:
 
 def test_evidence_service_high_confidence(session: Session) -> None:
     seed_high_confidence_evidence(session)
-    service = EvidenceService(session)
+    service = EvidenceApplicationService(
+        evidence_repository=SqlAlchemyEvidenceRepository(session),
+        evidence_domain_service=EvidenceDomainService(),
+    )
 
     evidence_records = service.find_high_confidence_evidence()
 

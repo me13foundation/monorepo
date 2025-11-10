@@ -8,6 +8,7 @@ import { useSession } from 'next-auth/react'
 import { Settings, User, Bell, Shield, Save } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { PageHero } from '@/components/ui/composition-patterns'
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -23,12 +24,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your account settings and preferences
-        </p>
-      </div>
+      <PageHero
+        title="Settings"
+        description="Manage personal profile details, notification preferences, and workspace defaults."
+        variant="research"
+      />
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Profile Settings */}

@@ -5,11 +5,15 @@ Standardizes gene identifiers from different sources (HGNC, Ensembl, NCBI, etc.)
 into consistent formats for cross-referencing and deduplication.
 """
 
+from __future__ import annotations
+
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import RawRecord  # noqa: TC001
+from src.type_definitions.json_utils import as_object, as_str, list_of_strings
 
 
 class GeneIdentifierType(Enum):
@@ -68,7 +72,7 @@ class GeneNormalizer:
 
     def normalize(
         self,
-        raw_gene_data: dict[str, Any],
+        raw_gene_data: RawRecord,
         source: str = "unknown",
     ) -> NormalizedGene | None:
         """
@@ -95,12 +99,12 @@ class GeneNormalizer:
 
     def _normalize_clinvar_gene(
         self,
-        gene_data: dict[str, Any],
+        gene_data: RawRecord,
     ) -> NormalizedGene | None:
         """Normalize gene data from ClinVar."""
-        symbol = gene_data.get("gene_symbol") or gene_data.get("symbol")
-        gene_id = gene_data.get("gene_id") or gene_data.get("id")
-        gene_name = gene_data.get("gene_name") or gene_data.get("name")
+        symbol = as_str(gene_data.get("gene_symbol")) or as_str(gene_data.get("symbol"))
+        gene_id = as_str(gene_data.get("gene_id")) or as_str(gene_data.get("id"))
+        gene_name = as_str(gene_data.get("gene_name")) or as_str(gene_data.get("name"))
 
         if not symbol and not gene_id:
             return None
@@ -114,7 +118,7 @@ class GeneNormalizer:
         # Build cross-references
         cross_refs = {}
         if gene_id:
-            cross_refs["NCBI"] = [str(gene_id)]
+            cross_refs["NCBI"] = [gene_id]
         if symbol:
             cross_refs["SYMBOL"] = [symbol]
 
@@ -134,11 +138,11 @@ class GeneNormalizer:
 
     def _normalize_uniprot_gene(
         self,
-        gene_data: dict[str, Any],
+        gene_data: RawRecord,
     ) -> NormalizedGene | None:
         """Normalize gene data from UniProt."""
-        gene_name_data = gene_data.get("geneName", {})
-        symbol = gene_name_data.get("value")
+        gene_name_data = as_object(gene_data.get("geneName"))
+        symbol = as_str(gene_name_data.get("value"))
 
         if not symbol:
             return None
@@ -150,7 +154,8 @@ class GeneNormalizer:
         id_type = GeneIdentifierType.SYMBOL
 
         # Build cross-references
-        cross_refs = {"SYMBOL": [symbol], "UNIPROT": [gene_data.get("accession", "")]}
+        accession = as_str(gene_data.get("accession")) or ""
+        cross_refs = {"SYMBOL": [symbol], "UNIPROT": [accession]}
 
         normalized = NormalizedGene(
             primary_id=primary_id,
@@ -168,14 +173,16 @@ class GeneNormalizer:
 
     def _normalize_generic_gene(
         self,
-        gene_data: dict[str, Any],
+        gene_data: RawRecord,
         source: str,
     ) -> NormalizedGene | None:
         """Normalize gene data from generic sources."""
         # Try to extract common fields
-        symbol = gene_data.get("symbol") or gene_data.get("name")
-        gene_id = gene_data.get("id") or gene_data.get("gene_id")
-        name = gene_data.get("full_name") or gene_data.get("description")
+        symbol = as_str(gene_data.get("symbol")) or as_str(gene_data.get("name"))
+        gene_id = as_str(gene_data.get("id")) or as_str(gene_data.get("gene_id"))
+        name = as_str(gene_data.get("full_name")) or as_str(
+            gene_data.get("description"),
+        )
 
         if not symbol and not gene_id:
             return None
@@ -194,7 +201,7 @@ class GeneNormalizer:
             id_type=id_type,
             symbol=symbol,
             name=name,
-            synonyms=[],
+            synonyms=list_of_strings(gene_data.get("synonyms")),
             cross_references={},
             source=source,
             confidence_score=0.5,  # Lower confidence for generic sources

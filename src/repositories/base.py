@@ -4,7 +4,7 @@ Provides common database operations following repository pattern.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Protocol
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError, NoResultFound
@@ -12,57 +12,42 @@ from sqlalchemy.orm import DeclarativeBase, Session
 
 from src.database.session import get_session
 
-T = TypeVar("T", bound=DeclarativeBase)  # Model type
-ID_contra = TypeVar("ID_contra", contravariant=True)  # ID type (contravariant)
 
-
-class RepositoryProtocol(Protocol[T, ID_contra]):
+class RepositoryProtocol[T: DeclarativeBase, ID](Protocol):
     """Protocol defining the repository interface."""
 
     @property
-    def model_class(self) -> type[T]:
-        ...
+    def model_class(self) -> type[T]: ...
 
-    def get_by_id(self, id: ID_contra) -> T | None:
-        ...
+    def get_by_id(self, id: ID) -> T | None: ...
 
-    def get_by_id_or_fail(self, id: ID_contra) -> T:
-        ...
+    def get_by_id_or_fail(self, id: ID) -> T: ...
 
     def find_all(
         self,
         limit: int | None = None,
         offset: int | None = None,
-    ) -> list[T]:
-        ...
+    ) -> list[T]: ...
 
     def find_by_criteria(
         self,
         criteria: dict[str, Any],
         limit: int | None = None,
-    ) -> list[T]:
-        ...
+    ) -> list[T]: ...
 
-    def create(self, entity: T) -> T:
-        ...
+    def create(self, entity: T) -> T: ...
 
-    def update(self, id: ID_contra, updates: dict[str, Any]) -> T:
-        ...
+    def update(self, id: ID, updates: dict[str, Any]) -> T: ...
 
-    def delete(self, id: ID_contra) -> bool:
-        ...
+    def delete(self, id: ID) -> bool: ...
 
-    def count(self) -> int:
-        ...
+    def count(self) -> int: ...
 
-    def exists(self, id: ID_contra) -> bool:
-        ...
+    def exists(self, id: ID) -> bool: ...
 
-    def save(self) -> None:
-        ...
+    def save(self) -> None: ...
 
-    def rollback(self) -> None:
-        ...
+    def rollback(self) -> None: ...
 
 
 class RepositoryError(Exception):
@@ -77,7 +62,7 @@ class DuplicateError(RepositoryError):
     """Raised when attempting to create a duplicate entity."""
 
 
-class BaseRepository(ABC, Generic[T, ID_contra]):
+class BaseRepository[T: DeclarativeBase, ID](ABC):
     """
     Base repository class providing common CRUD operations.
 
@@ -102,7 +87,7 @@ class BaseRepository(ABC, Generic[T, ID_contra]):
             self._session = next(get_session())
         return self._session
 
-    def get_by_id(self, entity_id: ID_contra) -> T | None:
+    def get_by_id(self, entity_id: ID) -> T | None:
         """
         Retrieve an entity by its primary key.
 
@@ -117,7 +102,7 @@ class BaseRepository(ABC, Generic[T, ID_contra]):
         )
         return self.session.execute(stmt).scalar_one_or_none()
 
-    def get_by_id_or_fail(self, entity_id: ID_contra) -> T:
+    def get_by_id_or_fail(self, entity_id: ID) -> T:
         """
         Retrieve an entity by its primary key, raising NotFoundError if not found.
 
@@ -206,7 +191,7 @@ class BaseRepository(ABC, Generic[T, ID_contra]):
                 f"Duplicate {self.model_class.__name__}: {e!s}",
             ) from e
 
-    def update(self, entity_id: ID_contra, updates: dict[str, Any]) -> T:
+    def update(self, entity_id: ID, updates: dict[str, Any]) -> T:
         """
         Update an existing entity.
 
@@ -235,7 +220,7 @@ class BaseRepository(ABC, Generic[T, ID_contra]):
             message = f"{self.model_class.__name__} with id {entity_id} not found"
             raise NotFoundError(message) from err
 
-    def delete(self, entity_id: ID_contra) -> bool:
+    def delete(self, entity_id: ID) -> bool:
         """
         Delete an entity by its primary key.
 
@@ -264,7 +249,7 @@ class BaseRepository(ABC, Generic[T, ID_contra]):
         stmt = select(func.count()).select_from(self.model_class)
         return self.session.execute(stmt).scalar_one()
 
-    def exists(self, entity_id: ID_contra) -> bool:
+    def exists(self, entity_id: ID) -> bool:
         """
         Check if an entity with the given ID exists.
 

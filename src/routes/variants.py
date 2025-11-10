@@ -4,7 +4,7 @@ Variant API routes for MED13 Resource Library.
 RESTful endpoints for variant management with CRUD operations.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from src.models.api import (
     VariantUpdate,
 )
 from src.routes.serializers import serialize_variant
+from src.type_definitions.common import VariantUpdate as VariantUpdatePayload
 
 if TYPE_CHECKING:
     from src.application.services.variant_service import VariantApplicationService
@@ -235,8 +236,10 @@ async def update_variant(
                 detail=f"Variant {variant_id} not found",
             )
 
-        # Convert to dict for update
-        updates = variant_data.model_dump(exclude_unset=True)
+        updates = cast(
+            "VariantUpdatePayload",
+            variant_data.model_dump(exclude_unset=True),
+        )
 
         variant = service.update_variant(variant_id, updates)
         return VariantResponse.model_validate(serialize_variant(variant))

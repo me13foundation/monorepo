@@ -4,7 +4,7 @@ Gene API routes for MED13 Resource Library.
 RESTful endpoints for gene management with CRUD operations.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -13,6 +13,7 @@ from src.application.container import get_legacy_dependency_container
 from src.database.session import get_session
 from src.models.api import GeneCreate, GeneResponse, GeneUpdate, PaginatedResponse
 from src.routes.serializers import serialize_gene
+from src.type_definitions.common import GeneUpdate as GeneUpdatePayload
 
 if TYPE_CHECKING:
     from src.application.services.gene_service import GeneApplicationService
@@ -188,8 +189,10 @@ async def update_gene(
         if not existing_gene:
             raise HTTPException(status_code=404, detail=f"Gene {gene_id} not found")
 
-        # Prepare update data
-        update_data = gene_update.model_dump(exclude_unset=True)
+        update_data = cast(
+            "GeneUpdatePayload",
+            gene_update.model_dump(exclude_unset=True),
+        )
 
         updated_gene = service.update_gene(gene_id, update_data)
         serialized = serialize_gene(updated_gene)
@@ -197,6 +200,8 @@ async def update_gene(
 
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update gene: {e!s}")
 

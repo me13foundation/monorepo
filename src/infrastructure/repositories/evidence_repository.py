@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
@@ -19,7 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 from src.repositories.evidence_repository import EvidenceRepository
 
 if TYPE_CHECKING:
-    from src.type_definitions.common import EvidenceUpdate
+    from src.type_definitions.common import EvidenceUpdate, QueryFilters
 
 
 class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
@@ -177,7 +177,7 @@ class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
         per_page: int,
         _sort_by: str,
         _sort_order: str,
-        _filters: dict[str, Any] | None = None,
+        _filters: QueryFilters | None = None,
     ) -> tuple[list[Evidence], int]:
         # Simplified implementation
         offset = (page - 1) * per_page
@@ -189,14 +189,14 @@ class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
         self,
         _query: str,
         limit: int = 10,
-        _filters: dict[str, Any] | None = None,
+        _filters: QueryFilters | None = None,
     ) -> list[Evidence]:
         # Simplified implementation
         models = self._repository.find_all(limit=limit)
         return EvidenceMapper.to_domain_sequence(models)
 
-    def update(self, evidence_id: int, updates: dict[str, Any]) -> Evidence:
-        model = self._repository.update(evidence_id, updates)
+    def update(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
+        model = self._repository.update(evidence_id, dict(updates))
         return EvidenceMapper.to_domain(model)
 
     def update_evidence(
@@ -205,10 +205,7 @@ class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
         updates: EvidenceUpdate,
     ) -> Evidence:
         """Update evidence with type-safe update parameters."""
-        # Convert TypedDict to Dict[str, Any] for the underlying repository
-        updates_dict = dict(updates)
-        model = self._repository.update(evidence_id, updates_dict)
-        return EvidenceMapper.to_domain(model)
+        return self.update(evidence_id, updates)
 
     def count(self) -> int:
         return self._repository.count()

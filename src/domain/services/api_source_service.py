@@ -5,16 +5,24 @@ Handles API connections, authentication, rate limiting, and data retrieval
 for REST API data sources in the Data Sources module.
 """
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import contextlib
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from pydantic import BaseModel
 
-from src.domain.entities.user_data_source import SourceConfiguration
+from src.domain.entities.user_data_source import SourceConfiguration  # noqa: TC001
+from src.type_definitions.common import SourceMetadata  # noqa: TC001
+
+AuthHeaders = dict[str, str]
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class APIRequestResult(BaseModel):
@@ -60,7 +68,7 @@ class APISourceService:
         self.max_retries = max_retries
 
         # Supported authentication methods
-        self.auth_methods = {
+        self.auth_methods: dict[str, Callable[[dict[str, Any]], AuthHeaders | None]] = {
             "none": self._auth_none,
             "bearer": self._auth_bearer,
             "basic": self._auth_basic,
@@ -100,12 +108,8 @@ class APISourceService:
                 url = configuration.url
                 params = {}
 
-                # Add limit parameter to avoid large responses
-                # Ensure limit is at least 1, but allow larger configured limits
-                if "limit" in configuration.metadata:
-                    params["limit"] = max(int(configuration.metadata["limit"]), 1)
-                else:
-                    params["limit"] = 1
+                metadata = self._metadata(configuration)
+                params["limit"] = self._coerce_limit(metadata.get("limit"), default=1)
 
                 response = await client.request(
                     method=method,
@@ -185,10 +189,11 @@ class APISourceService:
                 if auth_headers:
                     headers.update(auth_headers)
 
+                metadata = self._metadata(configuration)
                 # Build request parameters
                 url = configuration.url
-                method = configuration.metadata.get("method", "GET").upper()
-                params = dict(configuration.metadata.get("query_params", {}))
+                method = metadata.get("method", "GET").upper()
+                params = dict(metadata.get("query_params", {}))
                 params.update(kwargs)
 
                 # Rate limiting
@@ -252,6 +257,20 @@ class APISourceService:
                 errors=[str(e)],
             )
 
+    @staticmethod
+    def _metadata(configuration: SourceConfiguration) -> SourceMetadata:
+        """Return metadata with a guaranteed dict backing."""
+        return configuration.metadata
+
+    @staticmethod
+    def _coerce_limit(value: Any, default: int) -> int:
+        """Coerce metadata limit to a positive integer."""
+        try:
+            candidate = int(value)
+        except (TypeError, ValueError):
+            return max(default, 1)
+        return max(candidate, 1)
+
     def _prepare_headers(self, configuration: SourceConfiguration) -> dict[str, str]:
         """Prepare HTTP headers for the request."""
         headers = {
@@ -260,14 +279,16 @@ class APISourceService:
         }
 
         # Add custom headers from configuration
-        custom_headers = configuration.metadata.get("headers", {})
+        metadata = self._metadata(configuration)
+        custom_headers = metadata.get("headers", {})
         headers.update(custom_headers)
 
         return headers
 
-    def _prepare_auth(self, configuration: SourceConfiguration) -> Any | None:
+    def _prepare_auth(self, configuration: SourceConfiguration) -> AuthHeaders | None:
         """Prepare authentication for the request."""
-        auth_config = configuration.auth_credentials or {}
+        auth_config_raw = configuration.auth_credentials or {}
+        auth_config: dict[str, Any] = dict(auth_config_raw)
         auth_type = configuration.auth_type or "none"
 
         if auth_type in self.auth_methods:
@@ -278,7 +299,7 @@ class APISourceService:
         """No authentication."""
         return
 
-    def _auth_bearer(self, config: dict[str, Any]) -> Any | None:
+    def _auth_bearer(self, config: dict[str, Any]) -> AuthHeaders | None:
         """Bearer token authentication."""
         token = config.get("token", "")
         if token:
@@ -286,7 +307,7 @@ class APISourceService:
             return {"Authorization": f"Bearer {token}"}
         return None
 
-    def _auth_basic(self, config: dict[str, Any]) -> Any | None:
+    def _auth_basic(self, config: dict[str, Any]) -> AuthHeaders | None:
         """Basic HTTP authentication."""
         username = config.get("username", "")
         password = config.get("password", "")
@@ -300,7 +321,7 @@ class APISourceService:
         # This is handled in _prepare_headers
         return
 
-    def _auth_oauth2(self, config: dict[str, Any]) -> Any | None:
+    def _auth_oauth2(self, config: dict[str, Any]) -> AuthHeaders | None:
         """OAuth2 authentication (simplified - would need token refresh logic)."""
         token = config.get("access_token", "")
         if token:

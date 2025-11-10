@@ -2,7 +2,13 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from src.application.services.variant_service import VariantApplicationService
 from src.domain.entities.variant import Variant
+from src.domain.services.variant_domain_service import VariantDomainService
+from src.infrastructure.repositories import (
+    SqlAlchemyEvidenceRepository,
+    SqlAlchemyVariantRepository,
+)
 from src.models.database import (
     Base,
     EvidenceModel,
@@ -10,7 +16,6 @@ from src.models.database import (
     PhenotypeModel,
     VariantModel,
 )
-from src.services.domain.variant_service import VariantService
 
 
 @pytest.fixture
@@ -69,7 +74,11 @@ def seed_variant_with_evidence(db_session) -> int:
 
 def test_variant_service_returns_variant_with_evidence(session):
     variant_id = seed_variant_with_evidence(session)
-    service = VariantService(session)
+    service = VariantApplicationService(
+        variant_repository=SqlAlchemyVariantRepository(session),
+        variant_domain_service=VariantDomainService(),
+        evidence_repository=SqlAlchemyEvidenceRepository(session),
+    )
 
     result = service.get_variant_with_evidence(variant_id)
 

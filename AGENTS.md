@@ -359,10 +359,11 @@ service = GeneDomainService(mock_repo)
 **API Response Validation**:
 ```python
 from src.infrastructure.validation.api_response_validator import APIResponseValidator
+from src.type_definitions.external_apis import ClinVarSearchValidationResult
 
-validation = APIResponseValidator.validate_clinvar_search_response(raw_data)
-if validation["is_valid"]:
-    typed_response = cast(ClinVarSearchResponse, validation["sanitized_data"])
+validation: ClinVarSearchValidationResult = APIResponseValidator.validate_clinvar_search_response(raw_data)
+if validation["is_valid"] and validation["sanitized_data"]:
+    typed_response = validation["sanitized_data"]
 ```
 
 ### Type Safety Benefits

@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { DataSourcesList } from '@/components/data-sources/DataSourcesList'
+import { PageHero, DashboardSection } from '@/components/ui/composition-patterns'
 
 export default function SpaceDataSourcesPage() {
   const params = useParams()
@@ -22,13 +23,14 @@ export default function SpaceDataSourcesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Space Data Sources</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage the data sources that belong to this research space.
-        </p>
-      </div>
-      <DataSourcesList spaceId={spaceId} />
+      <PageHero
+        title="Space Data Sources"
+        description="Manage ingestion pipelines, review quality metrics, and keep this research space’s data sources aligned with curation goals."
+        variant="research"
+      />
+      <DashboardSection title="Sources" description="All data sources attached to this space">
+        <DataSourcesList spaceId={spaceId} />
+      </DashboardSection>
     </div>
   )
 }

@@ -5,9 +5,19 @@ Parses UniProt XML data into structured protein records with
 sequence information, annotations, functions, and cross-references.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import JSONObject, RawRecord  # noqa: TC001
+from src.type_definitions.json_utils import (
+    as_int,
+    as_object,
+    as_str,
+    list_of_objects,
+    list_of_strings,
+)
 
 
 class ProteinExistence(Enum):
@@ -127,7 +137,7 @@ class UniProtProtein:
     comments: dict[str, list[str]]
 
     # Raw data for reference
-    raw_data: dict[str, Any]
+    raw_data: JSONObject
 
 
 class UniProtParser:
@@ -141,7 +151,7 @@ class UniProtParser:
     def __init__(self) -> None:
         self.protein_cache: dict[str, UniProtProtein] = {}
 
-    def parse_raw_data(self, raw_data: dict[str, Any]) -> UniProtProtein | None:
+    def parse_raw_data(self, raw_data: RawRecord) -> UniProtProtein | None:
         """
         Parse raw UniProt data into structured protein record.
 
@@ -152,8 +162,8 @@ class UniProtParser:
             Structured UniProtProtein object or None if parsing fails
         """
         try:
-            primary_accession = raw_data.get("primaryAccession")
-            entry_name = raw_data.get("uniProtkbId")
+            primary_accession = as_str(raw_data.get("primaryAccession"))
+            entry_name = as_str(raw_data.get("uniProtkbId"))
 
             if not primary_accession:
                 return None
@@ -198,11 +208,11 @@ class UniProtParser:
         except Exception as e:
             # Log error but don't fail completely
             print(
-                f"Error parsing UniProt record {raw_data.get('primaryAccession')}: {e}",
+                f"Error parsing UniProt record {as_str(raw_data.get('primaryAccession'))}: {e}",
             )
             return None
 
-    def parse_batch(self, raw_data_list: list[dict[str, Any]]) -> list[UniProtProtein]:
+    def parse_batch(self, raw_data_list: list[RawRecord]) -> list[UniProtProtein]:
         """
         Parse multiple UniProt records.
 
@@ -220,43 +230,38 @@ class UniProtParser:
 
         return parsed_proteins
 
-    def _extract_protein_name(self, data: dict[str, Any]) -> str:
+    def _extract_protein_name(self, data: JSONObject) -> str:
         """Extract protein name from data."""
-        protein_desc = data.get("proteinDescription", {})
-        recommended = protein_desc.get("recommendedName", {})
-        full_name = recommended.get("fullName", {})
+        protein_desc = as_object(data.get("proteinDescription"))
+        recommended = as_object(protein_desc.get("recommendedName"))
+        full_name = as_object(recommended.get("fullName"))
 
-        name_value = full_name.get("value")
-        if isinstance(name_value, str):
+        name_value = as_str(full_name.get("value"))
+        if name_value:
             return name_value
 
-        # Fallback to entry name
-        entry_name = data.get("uniProtkbId", "Unknown Protein")
-        if isinstance(entry_name, str):
-            return entry_name
+        entry_name = as_str(data.get("uniProtkbId"))
+        return entry_name or "Unknown Protein"
 
-        # Ensure we always return a string even if unexpected types appear
-        return "Unknown Protein"
-
-    def _extract_status(self, data: dict[str, Any]) -> UniProtStatus:
+    def _extract_status(self, data: JSONObject) -> UniProtStatus:
         """Extract entry status."""
         # This information might not be in the current data structure
         # Default to unreviewed for now
         return UniProtStatus.UNREVIEWED
 
-    def _extract_existence(self, data: dict[str, Any]) -> ProteinExistence:
+    def _extract_existence(self, data: JSONObject) -> ProteinExistence:
         """Extract protein existence evidence."""
         # This information might not be in the current data structure
         # Default to predicted for now
         return ProteinExistence.PREDICTED
 
-    def _extract_genes(self, data: dict[str, Any]) -> list[UniProtGene]:
+    def _extract_genes(self, data: JSONObject) -> list[UniProtGene]:
         """Extract gene information."""
-        genes = []
+        genes: list[UniProtGene] = []
 
-        for gene_data in data.get("genes", []):
-            gene_name_data = gene_data.get("geneName", {})
-            name = gene_name_data.get("value")
+        for gene_data in list_of_objects(data.get("genes")):
+            gene_name_data = as_object(gene_data.get("geneName"))
+            name = as_str(gene_name_data.get("value"))
             if name:
                 gene = UniProtGene(
                     name=name,
@@ -267,65 +272,69 @@ class UniProtParser:
 
         return genes
 
-    def _extract_organism(self, data: dict[str, Any]) -> UniProtOrganism:
+    def _extract_organism(self, data: JSONObject) -> UniProtOrganism:
         """Extract organism information."""
-        org_data = data.get("organism", {})
+        org_data = as_object(data.get("organism"))
 
         return UniProtOrganism(
-            scientific_name=org_data.get("scientificName", "Unknown"),
-            common_name=org_data.get("commonName"),
-            taxon_id=org_data.get("taxonId", ""),
-            lineage=org_data.get("lineage", []),
+            scientific_name=as_str(org_data.get("scientificName")) or "Unknown",
+            common_name=as_str(org_data.get("commonName")),
+            taxon_id=as_str(org_data.get("taxonId")) or "",
+            lineage=list_of_strings(org_data.get("lineage")),
         )
 
-    def _extract_sequence(self, data: dict[str, Any]) -> UniProtSequence:
+    def _extract_sequence(self, data: JSONObject) -> UniProtSequence:
         """Extract sequence information."""
-        seq_data = data.get("sequence", {})
+        seq_data = as_object(data.get("sequence"))
 
         return UniProtSequence(
-            length=seq_data.get("length", 0),
-            mass=seq_data.get("mass"),
-            checksum=seq_data.get("checksum"),
-            modified=seq_data.get("modified"),
-            version=seq_data.get("version", 1),
+            length=as_int(seq_data.get("length")) or 0,
+            mass=as_int(seq_data.get("mass")),
+            checksum=as_str(seq_data.get("checksum")),
+            modified=as_str(seq_data.get("modified")),
+            version=as_int(seq_data.get("version")) or 1,
         )
 
-    def _extract_functions(self, data: dict[str, Any]) -> list[UniProtFunction]:
+    def _extract_functions(self, data: JSONObject) -> list[UniProtFunction]:
         """Extract protein functions."""
         functions = []
 
-        for comment in data.get("comments", []):
-            if comment.get("commentType") == "FUNCTION":
-                for text_data in comment.get("texts", []):
+        for comment in list_of_objects(data.get("comments")):
+            if as_str(comment.get("commentType")) == "FUNCTION":
+                for text_data in list_of_objects(comment.get("texts")):
                     func = UniProtFunction(
-                        description=text_data.get("value", ""),
+                        description=as_str(text_data.get("value")) or "",
                         evidence=None,
                     )
                     functions.append(func)
 
         return functions
 
-    def _extract_subcellular_locations(self, data: dict[str, Any]) -> list[str]:
+    def _extract_subcellular_locations(self, data: JSONObject) -> list[str]:
         """Extract subcellular locations."""
         locations = []
 
-        for comment in data.get("comments", []):
-            if comment.get("commentType") == "SUBCELLULAR LOCATION":
-                for location_data in comment.get("subcellularLocations", []):
-                    location_value = location_data.get("location", {}).get("value")
+        for comment in list_of_objects(data.get("comments")):
+            if as_str(comment.get("commentType")) == "SUBCELLULAR LOCATION":
+                for location_data in list_of_objects(
+                    comment.get("subcellularLocations"),
+                ):
+                    location_value = as_str(
+                        as_object(location_data.get("location")).get("value"),
+                    )
                     if location_value:
                         locations.append(location_value)
 
         return locations
 
-    def _extract_features(self, data: dict[str, Any]) -> list[UniProtFeature]:
+    def _extract_features(self, data: JSONObject) -> list[UniProtFeature]:
         """Extract protein features."""
         features = []
 
-        for feature_data in data.get("features", []):
+        for feature_data in list_of_objects(data.get("features")):
             feature = UniProtFeature(
-                type=feature_data.get("type", ""),
-                description=feature_data.get("description"),
+                type=as_str(feature_data.get("type")) or "",
+                description=as_str(feature_data.get("description")),
                 position=None,  # Could extract from location data
                 begin=None,
                 end=None,
@@ -334,18 +343,23 @@ class UniProtParser:
 
         return features
 
-    def _extract_references(self, data: dict[str, Any]) -> list[UniProtReference]:
+    def _extract_references(self, data: JSONObject) -> list[UniProtReference]:
         """Extract literature references."""
-        references = []
+        references: list[UniProtReference] = []
 
-        for ref_data in data.get("references", []):
-            citation = ref_data.get("citation", {})
+        for ref_data in list_of_objects(data.get("references")):
+            citation = as_object(ref_data.get("citation"))
+            authors = list_of_strings(citation.get("authors"))
+
+            publication_date = as_str(
+                as_object(citation.get("publicationDate")).get("value"),
+            )
 
             reference = UniProtReference(
-                title=citation.get("title"),
-                authors=citation.get("authors", []),
+                title=as_str(citation.get("title")),
+                authors=authors,
                 journal=None,  # Not always available in current data
-                publication_date=citation.get("publicationDate", {}).get("value"),
+                publication_date=publication_date,
                 pubmed_id=None,  # Could extract from dbReferences if available
                 doi=None,
             )
@@ -355,14 +369,14 @@ class UniProtParser:
 
     def _extract_database_references(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> dict[str, list[str]]:
         """Extract database cross-references."""
         db_refs: dict[str, list[str]] = {}
 
-        for db_ref in data.get("dbReferences", []):
-            db_type = db_ref.get("type")
-            db_id = db_ref.get("id")
+        for db_ref in list_of_objects(data.get("dbReferences")):
+            db_type = as_str(db_ref.get("type"))
+            db_id = as_str(db_ref.get("id"))
 
             if db_type and db_id:
                 if db_type not in db_refs:
@@ -371,23 +385,22 @@ class UniProtParser:
 
         return db_refs
 
-    def _extract_keywords(self, data: dict[str, Any]) -> list[str]:
+    def _extract_keywords(self, data: JSONObject) -> list[str]:
         """Extract keywords."""
-        # Keywords might not be in current data structure
-        return []
+        return list_of_strings(data.get("keywords"))
 
-    def _extract_comments(self, data: dict[str, Any]) -> dict[str, list[str]]:
+    def _extract_comments(self, data: JSONObject) -> dict[str, list[str]]:
         """Extract comments by type."""
         comments: dict[str, list[str]] = {}
 
-        for comment in data.get("comments", []):
-            comment_type = comment.get("commentType")
+        for comment in list_of_objects(data.get("comments")):
+            comment_type = as_str(comment.get("commentType"))
             if comment_type:
                 if comment_type not in comments:
                     comments[comment_type] = []
 
-                for text_data in comment.get("texts", []):
-                    text_value = text_data.get("value")
+                for text_data in list_of_objects(comment.get("texts")):
+                    text_value = as_str(text_data.get("value"))
                     if text_value:
                         comments[comment_type].append(text_value)
 

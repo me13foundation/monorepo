@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from src.application.curation.dto import ConflictSummaryDTO
+from src.domain.entities.variant import EvidenceSummary
 
 if TYPE_CHECKING:
     from src.domain.entities.evidence import Evidence
@@ -46,17 +47,17 @@ class ConflictDetector:
         Returns:
             List of structured conflict summaries
         """
-        evidence_seq = evidence if isinstance(evidence, Sequence) else tuple(evidence)
-
+        evidence_seq = tuple(evidence)
         if not evidence_seq:
             return []
 
         summaries: list[ConflictSummaryDTO] = []
+        evidence_summaries = self._summarize_evidence(evidence_seq)
 
         # Variant-level heuristics (string descriptions) → normalize
         variant_conflicts = self.variant_domain_service.detect_evidence_conflicts(
             variant,
-            list(evidence_seq),
+            evidence_summaries,
         )
         summaries.extend(
             ConflictSummaryDTO(
@@ -69,7 +70,7 @@ class ConflictDetector:
 
         # Evidence-level structured conflicts
         evidence_conflicts = self.evidence_domain_service.detect_evidence_conflicts(
-            list(evidence_seq),
+            evidence_seq,
         )
         for conflict in evidence_conflicts:
             conflict_type = conflict.get("type", "evidence_conflict")
@@ -77,6 +78,8 @@ class ConflictDetector:
             severity = conflict.get("severity", "medium")
 
             evidence_ids = conflict.get("evidence_ids", []) if conflict else []
+            if not isinstance(evidence_ids, Sequence):
+                evidence_ids = []
 
             summaries.append(
                 ConflictSummaryDTO(
@@ -123,6 +126,23 @@ class ConflictDetector:
                 )
 
         return list(deduped.values())
+
+    @staticmethod
+    def _summarize_evidence(
+        evidence_list: Sequence[Evidence],
+    ) -> tuple[EvidenceSummary, ...]:
+        """Convert full Evidence entities into lightweight summaries."""
+        summaries = [
+            EvidenceSummary(
+                evidence_id=ev.id,
+                evidence_level=ev.evidence_level.value,
+                evidence_type=ev.evidence_type,
+                description=ev.description,
+                reviewed=ev.reviewed,
+            )
+            for ev in evidence_list
+        ]
+        return tuple(summaries)
 
 
 __all__ = ["ConflictDetector"]

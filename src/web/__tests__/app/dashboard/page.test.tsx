@@ -113,7 +113,7 @@ describe('DashboardPage', () => {
 
       expect(screen.getByText('Data Sources')).toBeInTheDocument()
       expect(screen.getByText('Total Records')).toBeInTheDocument()
-      expect(screen.getByText('Active Users')).toBeInTheDocument()
+      expect(screen.getByText('Genes Tracked')).toBeInTheDocument()
       expect(screen.getByText('System Health')).toBeInTheDocument()
     })
 
@@ -129,7 +129,7 @@ describe('DashboardPage', () => {
       renderWithProviders(<DashboardPage />)
       expect(screen.getByText(/Approved 9/i)).toBeInTheDocument()
       expect(screen.getByText(/Total records across entities/i)).toBeInTheDocument()
-      expect(screen.getByText(/Total genes in knowledge base/i)).toBeInTheDocument()
+      expect(screen.getByText(/Entities in knowledge base/i)).toBeInTheDocument()
       expect(screen.getByText(/Approximate approval rate/i)).toBeInTheDocument()
     })
   })

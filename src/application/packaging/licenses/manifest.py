@@ -2,12 +2,19 @@
 License manifest generation utilities.
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, cast
 
 import yaml  # type: ignore[import-untyped]
 
-from .manager import LicenseCompatibility, LicenseManager
+from .manager import (
+    LicenseCompatibility,
+    LicenseInfo,
+    LicenseManager,
+    LicenseManifest,
+    LicenseRecord,
+)
 
 
 class LicenseManifestGenerator:
@@ -16,9 +23,9 @@ class LicenseManifestGenerator:
     @staticmethod
     def generate_manifest(
         package_license: str,
-        source_licenses: list[dict[str, Any]],
+        source_licenses: list[LicenseRecord],
         output_path: Path | None = None,
-    ) -> dict[str, Any]:
+    ) -> LicenseManifest:
         """
         Generate license manifest.
 
@@ -30,7 +37,7 @@ class LicenseManifestGenerator:
         Returns:
             License manifest dictionary
         """
-        manifest: dict[str, Any] = {
+        manifest: LicenseManifest = {
             "package_license": package_license,
             "sources": source_licenses,
             "compliance": {
@@ -52,13 +59,13 @@ class LicenseManifestGenerator:
 
             if compatibility == LicenseCompatibility.MISSING:
                 compliance = manifest["compliance"]
-                warnings = cast("list[str]", compliance.setdefault("warnings", []))
+                warnings = compliance.setdefault("warnings", [])
                 warnings.append(f"Missing license for source: {source_name}")
 
             elif compatibility == LicenseCompatibility.INCOMPATIBLE:
                 compliance = manifest["compliance"]
                 compliance["status"] = "non-compliant"
-                issues_list = cast("list[str]", compliance.setdefault("issues", []))
+                issues_list = compliance.setdefault("issues", [])
                 issues_list.append(
                     f"Incompatible license '{source_license}' "
                     f"from source '{source_name}'",
@@ -80,7 +87,7 @@ class LicenseManifestGenerator:
         license_id: str,
         license_url: str | None = None,
         attribution: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> LicenseRecord:
         """
         Generate source license information dictionary.
 
@@ -93,7 +100,7 @@ class LicenseManifestGenerator:
         Returns:
             Source license information dictionary
         """
-        license_info = LicenseManager.get_license_info(license_id)
+        license_info: LicenseInfo = LicenseManager.get_license_info(license_id)
 
         return {
             "source": source_name,

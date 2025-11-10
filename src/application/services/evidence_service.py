@@ -6,12 +6,13 @@ use cases while preserving domain purity and strong typing.
 """
 
 from datetime import date
-from typing import Any
+from typing import Any, cast
 
 from src.domain.entities.evidence import Evidence, EvidenceType
 from src.domain.repositories.evidence_repository import EvidenceRepository
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.value_objects.confidence import Confidence, EvidenceLevel
+from src.type_definitions.common import EvidenceUpdate, QueryFilters
 
 
 class EvidenceApplicationService:
@@ -125,6 +126,10 @@ class EvidenceApplicationService:
         # Persist the entity
         return self._evidence_repository.create(evidence_entity)
 
+    def get_evidence_by_id(self, evidence_id: int) -> Evidence | None:
+        """Retrieve a specific evidence record by its database ID."""
+        return self._evidence_repository.get_by_id(evidence_id)
+
     def get_evidence_by_variant(self, variant_id: int) -> list[Evidence]:
         """Find evidence records for a variant."""
         return self._evidence_repository.find_by_variant(variant_id)
@@ -157,6 +162,26 @@ class EvidenceApplicationService:
         """Find evidence records from a specific source."""
         return self._evidence_repository.find_by_source(source)
 
+    def find_high_confidence_evidence(
+        self,
+        limit: int | None = None,
+    ) -> list[Evidence]:
+        """Retrieve evidence records exceeding the high-confidence threshold."""
+        return self._evidence_repository.find_high_confidence_evidence(limit)
+
+    def find_relationship_evidence(
+        self,
+        variant_id: int,
+        phenotype_id: int,
+        min_confidence: float = 0.5,
+    ) -> list[Evidence]:
+        """Retrieve evidence linking a variant and phenotype with minimum confidence."""
+        return self._evidence_repository.find_relationship_evidence(
+            variant_id,
+            phenotype_id,
+            min_confidence,
+        )
+
     def search_evidence(
         self,
         query: str,
@@ -164,7 +189,12 @@ class EvidenceApplicationService:
         filters: dict[str, Any] | None = None,
     ) -> list[Evidence]:
         """Search evidence with optional filters."""
-        return self._evidence_repository.search_evidence(query, limit, filters)
+        normalized_filters = self._normalize_filters(filters)
+        return self._evidence_repository.search_evidence(
+            query,
+            limit,
+            normalized_filters,
+        )
 
     def list_evidence(
         self,
@@ -175,18 +205,22 @@ class EvidenceApplicationService:
         filters: dict[str, Any] | None = None,
     ) -> tuple[list[Evidence], int]:
         """Retrieve paginated evidence with optional filters."""
+        normalized_filters = self._normalize_filters(filters)
         return self._evidence_repository.paginate_evidence(
             page,
             per_page,
             sort_by,
             sort_order,
-            filters,
+            normalized_filters,
         )
 
-    def update_evidence(self, evidence_id: int, updates: dict[str, Any]) -> Evidence:
+    def update_evidence(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
         """Update evidence fields."""
+        if not updates:
+            msg = "No evidence updates provided"
+            raise ValueError(msg)
+
         updated_evidence = self._evidence_repository.update(evidence_id, updates)
-        # Apply domain business logic to updated entity and return
         return self._evidence_domain_service.apply_business_logic(
             updated_evidence,
             "update",
@@ -253,6 +287,14 @@ class EvidenceApplicationService:
             True if evidence exists, False otherwise
         """
         return self._evidence_repository.exists(evidence_id)
+
+    @staticmethod
+    def _normalize_filters(
+        filters: dict[str, Any] | None,
+    ) -> QueryFilters | None:
+        if filters is None:
+            return None
+        return cast("QueryFilters", dict(filters))
 
 
 __all__ = ["EvidenceApplicationService"]

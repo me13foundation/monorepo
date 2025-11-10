@@ -5,9 +5,13 @@ Parses HPO ontology data into structured phenotype records with
 hierarchical relationships, definitions, and clinical information.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import JSONObject, RawRecord  # noqa: TC001
+from src.type_definitions.json_utils import as_str, list_of_strings
 
 
 class HPOTermType(Enum):
@@ -53,7 +57,7 @@ class HPOTerm:
     replaced_by: str | None
 
     # Raw data for reference
-    raw_data: dict[str, Any]
+    raw_data: JSONObject
 
 
 class HPOParser:
@@ -67,7 +71,7 @@ class HPOParser:
     def __init__(self) -> None:
         self.term_cache: dict[str, HPOTerm] = {}
 
-    def parse_raw_data(self, raw_data: dict[str, Any]) -> HPOTerm | None:
+    def parse_raw_data(self, raw_data: RawRecord) -> HPOTerm | None:
         """
         Parse raw HPO data into structured term record.
 
@@ -78,14 +82,14 @@ class HPOParser:
             Structured HPOTerm object or None if parsing fails
         """
         try:
-            hpo_id = raw_data.get("hpo_id")
-            name = raw_data.get("name")
+            hpo_id = as_str(raw_data.get("hpo_id"))
+            name = as_str(raw_data.get("name"))
 
             if not hpo_id or not name:
                 return None
 
             # Check if this is sample data format
-            if raw_data.get("format") == "sample":
+            if as_str(raw_data.get("format")) == "sample":
                 return self._parse_sample_data(raw_data)
             # Future: Parse full OBO format
             return self._parse_obo_data(raw_data)
@@ -95,7 +99,7 @@ class HPOParser:
             print(f"Error parsing HPO term {raw_data.get('hpo_id')}: {e}")
             return None
 
-    def parse_batch(self, raw_data_list: list[dict[str, Any]]) -> list[HPOTerm]:
+    def parse_batch(self, raw_data_list: list[RawRecord]) -> list[HPOTerm]:
         """
         Parse multiple HPO terms.
 
@@ -114,10 +118,10 @@ class HPOParser:
 
         return parsed_terms
 
-    def _parse_sample_data(self, raw_data: dict[str, Any]) -> HPOTerm:
+    def _parse_sample_data(self, raw_data: RawRecord) -> HPOTerm:
         """Parse sample HPO data format."""
-        hpo_id = raw_data["hpo_id"]
-        name = raw_data["name"]
+        hpo_id = as_str(raw_data.get("hpo_id")) or ""
+        name = as_str(raw_data.get("name")) or ""
 
         # Determine term type from name patterns
         term_type = self._infer_term_type(name)
@@ -125,7 +129,7 @@ class HPOParser:
         return HPOTerm(
             hpo_id=hpo_id,
             name=name,
-            definition=raw_data.get("definition"),
+            definition=as_str(raw_data.get("definition")),
             synonyms=[],  # Sample data doesn't include synonyms
             term_type=term_type,
             parents=[],  # Sample data doesn't include relationships
@@ -137,7 +141,7 @@ class HPOParser:
             raw_data=raw_data,
         )
 
-    def _parse_obo_data(self, raw_data: dict[str, Any]) -> HPOTerm:
+    def _parse_obo_data(self, raw_data: RawRecord) -> HPOTerm:
         """
         Parse full OBO format data.
 
@@ -145,23 +149,23 @@ class HPOParser:
         Currently returns a basic structure.
         """
         # TODO: Implement full OBO parsing when HPO ingestor downloads actual OBO files
-        hpo_id = raw_data.get("hpo_id", "")
-        name = raw_data.get("name", "")
+        hpo_id = as_str(raw_data.get("hpo_id")) or ""
+        name = as_str(raw_data.get("name")) or ""
 
         term_type = self._infer_term_type(name)
 
         return HPOTerm(
             hpo_id=hpo_id,
             name=name,
-            definition=raw_data.get("definition"),
-            synonyms=raw_data.get("synonyms", []),
+            definition=as_str(raw_data.get("definition")),
+            synonyms=list_of_strings(raw_data.get("synonyms")),
             term_type=term_type,
             parents=[],  # TODO: Parse is_a relationships
             children=[],
-            comment=raw_data.get("comment"),
-            xrefs=raw_data.get("xrefs", []),
-            is_obsolete=raw_data.get("is_obsolete", False),
-            replaced_by=raw_data.get("replaced_by"),
+            comment=as_str(raw_data.get("comment")),
+            xrefs=list_of_strings(raw_data.get("xrefs")),
+            is_obsolete=bool(raw_data.get("is_obsolete", False)),
+            replaced_by=as_str(raw_data.get("replaced_by")),
             raw_data=raw_data,
         )
 

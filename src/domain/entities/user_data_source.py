@@ -7,10 +7,16 @@ with additional biomedical data while maintaining provenance and quality standar
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from src.type_definitions.common import AuthCredentials, SourceMetadata
+
+
+def _empty_source_metadata() -> SourceMetadata:
+    return cast("SourceMetadata", {})
 
 
 class SourceType(str, Enum):
@@ -53,7 +59,7 @@ class SourceConfiguration(BaseModel):
 
     # Authentication
     auth_type: str | None = Field(None, description="Authentication method")
-    auth_credentials: dict[str, Any] | None = Field(
+    auth_credentials: AuthCredentials | None = Field(
         None,
         description="Authentication credentials",
     )
@@ -73,8 +79,8 @@ class SourceConfiguration(BaseModel):
     )
 
     # Source-specific metadata
-    metadata: dict[str, Any] = Field(
-        default_factory=dict,
+    metadata: SourceMetadata = Field(
+        default_factory=_empty_source_metadata,
         description="Additional source-specific metadata",
     )
 

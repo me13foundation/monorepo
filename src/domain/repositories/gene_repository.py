@@ -13,7 +13,7 @@ from src.domain.value_objects.identifiers import GeneIdentifier
 from src.type_definitions.common import GeneUpdate
 
 
-class GeneRepository(Repository[Gene, int]):
+class GeneRepository(Repository[Gene, int, GeneUpdate]):
     """
     Domain repository interface for Gene entities.
 

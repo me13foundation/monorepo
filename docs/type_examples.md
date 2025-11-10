@@ -116,11 +116,12 @@ def test_gene_variant_relationship() -> None:
 
 ```python
 from src.infrastructure.validation.api_response_validator import APIResponseValidator
+from src.type_definitions.external_apis import ClinVarSearchResponse, ClinVarSearchValidationResult
 
 # Example ClinVar API response validation
-def validate_clinvar_response(response_data: Dict[str, Any]) -> None:
+def validate_clinvar_response(response_data: Dict[str, Any]) -> ClinVarSearchResponse | None:
     """Validate ClinVar API response with comprehensive error reporting."""
-    validation_result = APIResponseValidator.validate_clinvar_search_response(response_data)
+    validation_result: ClinVarSearchValidationResult = APIResponseValidator.validate_clinvar_search_response(response_data)
 
     if not validation_result["is_valid"]:
         # Log detailed validation issues
@@ -136,16 +137,24 @@ def validate_clinvar_response(response_data: Dict[str, Any]) -> None:
             logger.error(f"Low quality ClinVar response (score: {quality_score})")
             return None
 
-    # Use validated and sanitized data
-    validated_data = validation_result["sanitized_data"] or response_data
-    return validated_data
+    sanitized = validation_result["sanitized_data"]
+    if sanitized is None:
+        logger.error("Sanitized ClinVar payload missing despite a valid response")
+        return None
+
+    return sanitized
+```
+
+Reference responses are stored in `tests/fixtures/api_samples/` and can be refreshed with:
+
+```bash
+python scripts/regenerate_clinvar_samples.py
 ```
 
 ### Runtime Type Safety for External APIs
 
 ```python
-from src.type_definitions.external_apis import ClinVarSearchResponse, ClinVarVariantResponse
-from typing import cast
+from src.type_definitions.external_apis import ClinVarSearchResponse
 
 def process_clinvar_search_response(raw_response: Dict[str, Any]) -> List[str]:
     """Process ClinVar search response with type safety."""
@@ -155,8 +164,9 @@ def process_clinvar_search_response(raw_response: Dict[str, Any]) -> List[str]:
     if not validation["is_valid"]:
         raise ValueError(f"Invalid ClinVar response: {validation['issues']}")
 
-    # Cast to typed structure for type safety
-    typed_response = cast(ClinVarSearchResponse, validation["sanitized_data"])
+    typed_response: ClinVarSearchResponse | None = validation["sanitized_data"]
+    if typed_response is None:
+        raise ValueError("ClinVar validation passed but returned no sanitized data")
 
     # Access fields with full IDE support and type checking
     return typed_response["esearchresult"]["idlist"]
@@ -233,7 +243,7 @@ def test_gene_update_with_type_safety() -> None:
 
 ```python
 from src.infrastructure.ingest.clinvar_ingestor import ClinVarIngestor
-from src.type_definitions.external_apis import ClinVarSearchResponse, ClinVarVariantResponse
+from src.type_definitions.external_apis import ClinVarSearchResponse, ClinVarSearchValidationResult
 
 class TypedClinVarIngestor(ClinVarIngestor):
     """ClinVar ingestor with enhanced type safety."""
@@ -250,14 +260,16 @@ class TypedClinVarIngestor(ClinVarIngestor):
         data = response.json()
 
         # Validate and type response
-        validation = APIResponseValidator.validate_clinvar_search_response(data)
+        validation: ClinVarSearchValidationResult = APIResponseValidator.validate_clinvar_search_response(data)
         if not validation["is_valid"]:
             logger.warning(f"ClinVar validation failed: {validation['issues']}")
             # Fallback to untyped processing
             return data.get("esearchresult", {}).get("idlist", [])
 
         # Use typed response
-        typed_response = cast(ClinVarSearchResponse, validation["sanitized_data"])
+        typed_response = validation["sanitized_data"]
+        if typed_response is None:
+            return data.get("esearchresult", {}).get("idlist", [])
         return typed_response["esearchresult"]["idlist"]
 ```
 
@@ -393,7 +405,10 @@ def process_api_data(raw_data: Dict[str, Any]) -> ProcessedData:
     validation = APIResponseValidator.validate_api_response(raw_data)
     if not validation["is_valid"]:
         handle_validation_errors(validation["issues"])
-    return process_validated_data(validation["sanitized_data"])
+    sanitized = validation["sanitized_data"]
+    if sanitized is None:
+        raise ValueError("Validated API response missing sanitized payload")
+    return process_validated_data(sanitized)
 
 # ❌ Bad: Skip validation
 def process_api_data(raw_data: Dict[str, Any]) -> ProcessedData:

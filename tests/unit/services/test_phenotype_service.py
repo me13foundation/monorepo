@@ -2,8 +2,11 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from src.application.services.phenotype_service import (
+    PhenotypeApplicationService,
+)
+from src.infrastructure.repositories import SqlAlchemyPhenotypeRepository
 from src.models.database import Base, PhenotypeModel
-from src.services.domain.phenotype_service import PhenotypeService
 
 
 @pytest.fixture
@@ -44,7 +47,7 @@ def seed_hierarchy(db_session) -> str:
 
 def test_get_phenotype_hierarchy(session):
     parent_hpo_id = seed_hierarchy(session)
-    service = PhenotypeService(session)
+    service = PhenotypeApplicationService(SqlAlchemyPhenotypeRepository(session))
 
     hierarchy = service.get_phenotype_hierarchy(parent_hpo_id)
 

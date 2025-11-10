@@ -5,9 +5,9 @@ import { signIn, useSession, getSession } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { LoginForm } from "@/components/auth/LoginForm"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { AuthShell } from "@/components/auth/AuthShell"
 
 function LoginContent() {
   const [error, setError] = useState<string | null>(null)
@@ -94,77 +94,56 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-heading font-bold text-foreground">
-            MED13 Admin
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Sign in to access the administrative interface
-          </p>
+    <AuthShell
+      title="MED13 Admin"
+      description="Sign in to access the administrative interface."
+      footer={
+        <div className="text-center text-sm text-muted-foreground">
+          Need help? <Link href="https://med13foundation.org/contact" className="text-primary hover:underline">Contact support</Link>
         </div>
+      }
+    >
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Sign In</CardTitle>
-            <CardDescription className="text-center">
-              Enter your credentials to access your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+      <LoginForm onSubmit={handleLogin} isLoading={isLoading} />
 
-            <LoginForm onSubmit={handleLogin} isLoading={isLoading} />
-
-            <div className="mt-4 text-center text-sm">
-              <Link
-                href="/auth/forgot-password"
-                className="text-primary hover:underline"
-              >
-                Forgot your password?
-              </Link>
-            </div>
-
-            <div className="mt-2 text-center text-sm text-muted-foreground">
-              Don&apos;t have an account?{" "}
-              <Link href="/auth/register" className="text-primary hover:underline">
-                Sign up
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mt-4 text-center text-sm">
+        <Link
+          href="/auth/forgot-password"
+          className="text-primary hover:underline"
+        >
+          Forgot your password?
+        </Link>
       </div>
-    </div>
+
+      <div className="mt-2 text-center text-sm text-muted-foreground">
+        Don&apos;t have an account?{" "}
+        <Link href="/auth/register" className="text-primary hover:underline">
+          Sign up
+        </Link>
+      </div>
+    </AuthShell>
   )
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-background px-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-heading font-bold text-foreground">
-              MED13 Admin
-            </h1>
-            <p className="mt-2 text-muted-foreground">
-              Sign in to access the administrative interface
-            </p>
-          </div>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center text-muted-foreground">Loading...</div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <AuthShell
+          title="MED13 Admin"
+          description="Sign in to access the administrative interface."
+          isLoading
+        >
+          <div />
+        </AuthShell>
+      }
+    >
       <LoginContent />
     </Suspense>
   )

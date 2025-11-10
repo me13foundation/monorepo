@@ -4,7 +4,7 @@ Evidence API routes for MED13 Resource Library.
 RESTful endpoints for evidence management linking variants and phenotypes.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -19,6 +19,7 @@ from src.models.api import (
     PaginatedResponse,
 )
 from src.routes.serializers import serialize_evidence
+from src.type_definitions.common import EvidenceUpdate as EvidenceUpdatePayload
 
 if TYPE_CHECKING:
     from src.application.services.evidence_service import EvidenceApplicationService
@@ -110,10 +111,7 @@ async def get_evidence_by_id(
     Retrieve a specific evidence record by its database ID.
     """
     try:
-        # For now, we'll use get_by_id - may need to enhance service later
-        evidence = service._evidence_repository.get_by_id(
-            evidence_id,
-        )  # Direct access for now
+        evidence = service.get_evidence_by_id(evidence_id)
         if not evidence:
             raise HTTPException(
                 status_code=404,
@@ -196,13 +194,17 @@ async def update_evidence(
                 detail=f"Evidence {evidence_id} not found",
             )
 
-        # Convert to dict for update
-        updates = evidence_data.model_dump(exclude_unset=True)
+        updates = cast(
+            "EvidenceUpdatePayload",
+            evidence_data.model_dump(exclude_unset=True),
+        )
 
         evidence = service.update_evidence(evidence_id, updates)
         return EvidenceResponse.model_validate(serialize_evidence(evidence))
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=500,

@@ -2,9 +2,11 @@
 License compliance checking for MED13 Resource Library packages.
 """
 
+from __future__ import annotations
+
 from enum import Enum
 from pathlib import Path
-from typing import Any, ClassVar, cast
+from typing import ClassVar, TypedDict
 
 import yaml  # type: ignore[import-untyped]
 
@@ -28,6 +30,47 @@ class LicenseType(str, Enum):
     GPL_3_0 = "GPL-3.0"
     PROPRIETARY = "proprietary"
     UNKNOWN = "unknown"
+
+
+class LicenseRecord(TypedDict, total=False):
+    """Structured representation of a source license entry."""
+
+    source: str
+    license: str
+    license_url: str
+    attribution: str
+
+
+class LicenseValidationResult(TypedDict):
+    """Result of validating a license identifier."""
+
+    valid: bool
+    license: str
+    message: str
+
+
+class ComplianceSection(TypedDict, total=False):
+    """Compliance block embedded in license manifests."""
+
+    status: str
+    issues: list[str]
+    warnings: list[str]
+
+
+class LicenseManifest(TypedDict):
+    """License manifest structure."""
+
+    package_license: str
+    sources: list[LicenseRecord]
+    compliance: ComplianceSection
+
+
+class LicenseInfo(TypedDict):
+    """Basic license information."""
+
+    id: str
+    url: str
+    name: str
 
 
 class LicenseManager:
@@ -77,7 +120,7 @@ class LicenseManager:
         return LicenseCompatibility.INCOMPATIBLE
 
     @staticmethod
-    def validate_license(license_id: str) -> dict[str, Any]:
+    def validate_license(license_id: str) -> LicenseValidationResult:
         """
         Validate license identifier.
 
@@ -109,9 +152,9 @@ class LicenseManager:
 
     @staticmethod
     def generate_manifest(
-        licenses: list[dict[str, Any]],
+        licenses: list[LicenseRecord],
         output_path: Path | None = None,
-    ) -> dict[str, Any]:
+    ) -> LicenseManifest:
         """
         Generate license manifest.
 
@@ -123,7 +166,7 @@ class LicenseManager:
             License manifest dictionary
         """
         package_license = "CC-BY-4.0"
-        manifest: dict[str, Any] = {
+        manifest: LicenseManifest = {
             "package_license": package_license,
             "sources": licenses,
             "compliance": {
@@ -142,7 +185,7 @@ class LicenseManager:
 
             if compatibility == LicenseCompatibility.INCOMPATIBLE:
                 compliance = manifest["compliance"]
-                issues_list = cast("list[str]", compliance.setdefault("issues", []))
+                issues_list = compliance.setdefault("issues", [])
                 compliance["status"] = "non-compliant"
                 issues_list.append(
                     f"Incompatible license: {source_license} "
@@ -159,7 +202,7 @@ class LicenseManager:
         return manifest
 
     @staticmethod
-    def get_license_info(license_id: str) -> dict[str, Any]:
+    def get_license_info(license_id: str) -> LicenseInfo:
         """
         Get license information.
 

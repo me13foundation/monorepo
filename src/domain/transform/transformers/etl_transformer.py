@@ -15,6 +15,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol, TypeVar, cast
 
+from src.type_definitions.common import RawRecord  # noqa: TC001
+
 from ..mappers.cross_reference_mapper import CrossReferenceMapper
 from ..mappers.gene_variant_mapper import GeneVariantLink, GeneVariantMapper
 from ..mappers.variant_phenotype_mapper import (
@@ -36,7 +38,6 @@ from ..parsers.hpo_parser import HPOParser, HPOTerm
 from ..parsers.pubmed_parser import PubMedParser, PubMedPublication
 from ..parsers.uniprot_parser import UniProtParser, UniProtProtein
 
-RawRecord = dict[str, Any]
 ParsedRecord = TypeVar("ParsedRecord")
 NormalizedRecord = TypeVar("NormalizedRecord", covariant=True)
 
@@ -254,10 +255,10 @@ class ETLTransformer:
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
         self.parsers: dict[str, BatchParser[Any]] = {
-            "clinvar": ClinVarParser(),
-            "pubmed": PubMedParser(),
-            "hpo": HPOParser(),
-            "uniprot": UniProtParser(),
+            "clinvar": cast("BatchParser[Any]", ClinVarParser()),
+            "pubmed": cast("BatchParser[Any]", PubMedParser()),
+            "hpo": cast("BatchParser[Any]", HPOParser()),
+            "uniprot": cast("BatchParser[Any]", UniProtParser()),
         }
 
         self.gene_normalizer = GeneNormalizer()
@@ -456,12 +457,15 @@ class ETLTransformer:
         seen_genes: set[str] = set()
         for protein in parsed_data.uniprot:
             for gene in protein.genes:
-                record = {
-                    "symbol": gene.name,
-                    "name": gene.name,
-                    "id": gene.locus,
-                    "synonyms": gene.synonyms,
-                }
+                record: RawRecord = cast(
+                    "RawRecord",
+                    {
+                        "symbol": gene.name,
+                        "name": gene.name,
+                        "id": gene.locus,
+                        "synonyms": gene.synonyms,
+                    },
+                )
                 normalized_gene = self.gene_normalizer.normalize(
                     record,
                     source="uniprot",
@@ -476,11 +480,14 @@ class ETLTransformer:
                     )
 
         for variant in parsed_data.clinvar:
-            gene_record = {
-                "gene_symbol": variant.gene_symbol,
-                "gene_id": variant.gene_id,
-                "gene_name": variant.gene_name,
-            }
+            gene_record: RawRecord = cast(
+                "RawRecord",
+                {
+                    "gene_symbol": variant.gene_symbol,
+                    "gene_id": variant.gene_id,
+                    "gene_name": variant.gene_name,
+                },
+            )
             normalized_gene = self.gene_normalizer.normalize(
                 gene_record,
                 source="clinvar",
@@ -496,17 +503,20 @@ class ETLTransformer:
 
         # Normalize variants
         for variant in parsed_data.clinvar:
-            variant_record = {
-                "clinvar_id": variant.clinvar_id,
-                "variant_id": variant.variant_id,
-                "variation_name": variant.variation_name,
-                "gene_symbol": variant.gene_symbol,
-                "chromosome": variant.chromosome,
-                "start_position": variant.start_position,
-                "reference_allele": variant.reference_allele,
-                "alternate_allele": variant.alternate_allele,
-                "clinical_significance": variant.clinical_significance.value,
-            }
+            variant_record: RawRecord = cast(
+                "RawRecord",
+                {
+                    "clinvar_id": variant.clinvar_id,
+                    "variant_id": variant.variant_id,
+                    "variation_name": variant.variation_name,
+                    "gene_symbol": variant.gene_symbol,
+                    "chromosome": variant.chromosome,
+                    "start_position": variant.start_position,
+                    "reference_allele": variant.reference_allele,
+                    "alternate_allele": variant.alternate_allele,
+                    "clinical_significance": variant.clinical_significance.value,
+                },
+            )
             normalized_variant = self.variant_normalizer.normalize(
                 variant_record,
                 source="clinvar",
@@ -521,7 +531,10 @@ class ETLTransformer:
         # Normalize phenotypes
         for variant in parsed_data.clinvar:
             for phenotype_name in variant.phenotypes:
-                phenotype_record = {"name": phenotype_name}
+                phenotype_record: RawRecord = cast(
+                    "RawRecord",
+                    {"name": phenotype_name},
+                )
                 normalized_phenotype = self.phenotype_normalizer.normalize(
                     phenotype_record,
                     source="clinvar",

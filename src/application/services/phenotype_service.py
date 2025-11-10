@@ -1,10 +1,21 @@
 """Application-level orchestration for phenotype use cases."""
 
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, cast
 
 from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
 from src.domain.repositories.phenotype_repository import PhenotypeRepository
 from src.domain.value_objects.identifiers import PhenotypeIdentifier
+from src.type_definitions.common import PhenotypeUpdate, QueryFilters
+
+
+@dataclass
+class PhenotypeHierarchy:
+    """Simple structure representing a phenotype parent/child relationship."""
+
+    phenotype: Phenotype
+    children: list[Phenotype]
+    parent_hpo_id: str | None
 
 
 class PhenotypeApplicationService:
@@ -73,6 +84,19 @@ class PhenotypeApplicationService:
         """Find phenotypes by category."""
         return self._phenotype_repository.find_by_category(category)
 
+    def get_phenotype_hierarchy(self, hpo_id: str) -> PhenotypeHierarchy | None:
+        """Return the target phenotype with its children."""
+        phenotype = self._phenotype_repository.find_by_hpo_id(hpo_id)
+        if phenotype is None:
+            return None
+
+        children = self._phenotype_repository.find_children(hpo_id)
+        return PhenotypeHierarchy(
+            phenotype=phenotype,
+            children=children,
+            parent_hpo_id=phenotype.parent_hpo_id,
+        )
+
     def search_phenotypes(
         self,
         query: str,
@@ -80,7 +104,12 @@ class PhenotypeApplicationService:
         filters: dict[str, Any] | None = None,
     ) -> list[Phenotype]:
         """Search phenotypes with optional filters."""
-        return self._phenotype_repository.search_phenotypes(query, limit, filters)
+        normalized_filters = self._normalize_filters(filters)
+        return self._phenotype_repository.search_phenotypes(
+            query,
+            limit,
+            normalized_filters,
+        )
 
     def list_phenotypes(
         self,
@@ -91,16 +120,24 @@ class PhenotypeApplicationService:
         filters: dict[str, Any] | None = None,
     ) -> tuple[list[Phenotype], int]:
         """Retrieve paginated phenotypes with optional filters."""
+        normalized_filters = self._normalize_filters(filters)
         return self._phenotype_repository.paginate_phenotypes(
             page,
             per_page,
             sort_by,
             sort_order,
-            filters,
+            normalized_filters,
         )
 
-    def update_phenotype(self, phenotype_id: int, updates: dict[str, Any]) -> Phenotype:
+    def update_phenotype(
+        self,
+        phenotype_id: int,
+        updates: PhenotypeUpdate,
+    ) -> Phenotype:
         """Update phenotype fields."""
+        if not updates:
+            msg = "No phenotype updates provided"
+            raise ValueError(msg)
         return self._phenotype_repository.update(phenotype_id, updates)
 
     def get_phenotype_statistics(self) -> dict[str, int | float | bool | str | None]:
@@ -119,5 +156,13 @@ class PhenotypeApplicationService:
         """
         return self._phenotype_repository.exists(phenotype_id)
 
+    @staticmethod
+    def _normalize_filters(
+        filters: dict[str, Any] | None,
+    ) -> QueryFilters | None:
+        if filters is None:
+            return None
+        return cast("QueryFilters", dict(filters))
 
-__all__ = ["PhenotypeApplicationService"]
+
+__all__ = ["PhenotypeApplicationService", "PhenotypeHierarchy"]

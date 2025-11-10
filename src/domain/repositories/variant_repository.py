@@ -6,14 +6,13 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import Any
 
 from src.domain.entities.variant import Variant, VariantSummary
 from src.domain.repositories.base import Repository
-from src.type_definitions.common import VariantUpdate
+from src.type_definitions.common import QueryFilters, VariantUpdate
 
 
-class VariantRepository(Repository[Variant, int]):
+class VariantRepository(Repository[Variant, int, VariantUpdate]):
     """
     Domain repository interface for Variant entities.
 
@@ -54,7 +53,7 @@ class VariantRepository(Repository[Variant, int]):
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Variant]:
         """Search variants with optional filters."""
 
@@ -65,7 +64,7 @@ class VariantRepository(Repository[Variant, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Variant], int]:
         """Retrieve paginated variants with optional filters."""
 
@@ -80,6 +79,13 @@ class VariantRepository(Repository[Variant, int]):
     @abstractmethod
     def find_by_gene_symbol(self, gene_symbol: str) -> list[Variant]:
         """Find variants associated with a gene symbol."""
+
+    @abstractmethod
+    def find_pathogenic_variants(
+        self,
+        limit: int | None = None,
+    ) -> list[Variant]:
+        """Find variants classified as pathogenic or likely pathogenic."""
 
     @abstractmethod
     def update_variant(self, variant_id: int, updates: VariantUpdate) -> Variant:

@@ -4,7 +4,7 @@ Phenotype API routes for MED13 Resource Library.
 RESTful endpoints for phenotype management with HPO ontology integration.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -18,6 +18,7 @@ from src.models.api import (
     PhenotypeUpdate,
 )
 from src.routes.serializers import serialize_phenotype
+from src.type_definitions.common import PhenotypeUpdate as PhenotypeUpdatePayload
 
 if TYPE_CHECKING:
     from src.application.services.phenotype_service import PhenotypeApplicationService
@@ -208,13 +209,17 @@ async def update_phenotype(
                 detail=f"Phenotype {phenotype_id} not found",
             )
 
-        # Convert to dict for update
-        updates = phenotype_data.model_dump(exclude_unset=True)
+        updates = cast(
+            "PhenotypeUpdatePayload",
+            phenotype_data.model_dump(exclude_unset=True),
+        )
 
         phenotype = service.update_phenotype(phenotype_id, updates)
         return PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(
             status_code=500,

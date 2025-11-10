@@ -4,11 +4,9 @@ Common API schemas for MED13 Resource Library.
 Shared Pydantic models for pagination, errors, and health checks.
 """
 
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
-
-T = TypeVar("T")
 
 
 class PaginationParams(BaseModel):
@@ -24,7 +22,7 @@ class PaginationParams(BaseModel):
     )
 
 
-class PaginatedResponse(BaseModel, Generic[T]):
+class PaginatedResponse[T](BaseModel):
     """Response wrapper for paginated results."""
 
     model_config = ConfigDict(strict=True)

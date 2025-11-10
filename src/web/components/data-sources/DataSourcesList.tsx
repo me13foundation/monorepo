@@ -8,23 +8,16 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Database, Loader2 } from 'lucide-react'
 import { CreateDataSourceDialog } from './CreateDataSourceDialog'
 import type { DataSource } from '@/types/data-source'
+import { componentRegistry } from '@/lib/components/registry'
 
 interface DataSourcesListProps {
   spaceId: string
 }
 
-const statusColors: Record<string, string> = {
-  active: 'bg-green-500',
-  inactive: 'bg-gray-500',
-  draft: 'bg-yellow-500',
-  error: 'bg-red-500',
-  pending_review: 'bg-blue-500',
-  archived: 'bg-gray-400',
-}
-
 export function DataSourcesList({ spaceId }: DataSourcesListProps) {
   const { data, isLoading, error } = useSpaceDataSources(spaceId)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const StatusBadge = componentRegistry.get<{ status: string }>('dataSource.statusBadge')
 
   if (isLoading) {
     return (
@@ -90,11 +83,11 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
                       {source.description || 'No description'}
                     </CardDescription>
                   </div>
-                  <Badge
-                    className={`${statusColors[source.status] || 'bg-gray-500'} text-white`}
-                  >
-                    {source.status}
-                  </Badge>
+                  {StatusBadge ? (
+                    <StatusBadge status={source.status} />
+                  ) : (
+                    <Badge variant="outline">{source.status}</Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>

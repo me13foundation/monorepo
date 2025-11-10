@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from src.domain.repositories.publication_repository import (
     PublicationRepository as PublicationRepositoryInterface,
@@ -10,7 +10,7 @@ from src.repositories.publication_repository import PublicationRepository
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from src.models.database import PublicationType as DbPublicationType
-    from src.type_definitions.common import PublicationUpdate
+    from src.type_definitions.common import PublicationUpdate, QueryFilters
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
@@ -92,11 +92,11 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         self,
         query: str,
         limit: int = 20,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Publication]:
         # Filters retained for API compatibility
         if filters:
-            _ = filters
+            _ = dict(filters)
         models = self._repository.search_publications(query, limit)
         return PublicationMapper.to_domain_sequence(models)
 
@@ -180,11 +180,11 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Publication], int]:
         # Simplified implementation
         if filters:
-            _ = filters
+            _ = dict(filters)
         if sort_by:
             _ = sort_by
         if sort_order:
@@ -194,8 +194,8 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         total = self._repository.count()
         return PublicationMapper.to_domain_sequence(models), total
 
-    def update(self, publication_id: int, updates: dict[str, Any]) -> Publication:
-        model = self._repository.update(publication_id, updates)
+    def update(self, publication_id: int, updates: PublicationUpdate) -> Publication:
+        model = self._repository.update(publication_id, dict(updates))
         return PublicationMapper.to_domain(model)
 
     def update_publication(
@@ -204,10 +204,7 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         updates: PublicationUpdate,
     ) -> Publication:
         """Update a publication with type-safe update parameters."""
-        # Convert TypedDict to Dict[str, Any] for the underlying repository
-        updates_dict = dict(updates)
-        model = self._repository.update(publication_id, updates_dict)
-        return PublicationMapper.to_domain(model)
+        return self.update(publication_id, updates)
 
     def find_recent_publications(self, days: int = 30) -> list[Publication]:
         models = self._repository.find_recent_publications(days=days)

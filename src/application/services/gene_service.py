@@ -1,6 +1,6 @@
 """Application-level orchestration for gene use cases."""
 
-from typing import Any
+from typing import Any, cast
 
 from src.domain.entities.gene import Gene
 from src.domain.entities.variant import VariantSummary
@@ -9,6 +9,7 @@ from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.value_objects.identifiers import GeneIdentifier
 from src.domain.value_objects.provenance import Provenance
+from src.type_definitions.common import GeneUpdate
 
 
 class GeneApplicationService:
@@ -219,7 +220,7 @@ class GeneApplicationService:
         """
         return self._gene_repository.search_by_name_or_symbol(query, limit)
 
-    def update_gene(self, gene_id: str, updates: dict[str, Any]) -> Gene:
+    def update_gene(self, gene_id: str, updates: GeneUpdate) -> Gene:
         """Update mutable gene fields by gene identifier."""
         gene = self._gene_repository.find_by_gene_id_or_fail(gene_id)
 
@@ -235,9 +236,10 @@ class GeneApplicationService:
             "uniprot_id",
         }
 
-        sanitized_updates = {
-            key: value for key, value in updates.items() if key in allowed_fields
-        }
+        sanitized_updates = cast(
+            "GeneUpdate",
+            {key: value for key, value in updates.items() if key in allowed_fields},
+        )
 
         if not sanitized_updates:
             msg = "No valid fields provided for update"
@@ -283,7 +285,7 @@ class GeneApplicationService:
             msg = "End position must be greater than start position"
             raise ValueError(msg)
 
-        updates: dict[str, Any] = {}
+        updates: GeneUpdate = {}
         if chromosome is not None:
             updates["chromosome"] = chromosome
         if start_position is not None:

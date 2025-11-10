@@ -6,7 +6,8 @@ and confidence scoring logic without infrastructure dependencies.
 """
 
 from collections import Counter
-from typing import Any
+from collections.abc import Mapping, Sequence
+from typing import cast
 
 from src.domain.entities.evidence import Evidence
 from src.domain.services.base import DomainService
@@ -14,7 +15,7 @@ from src.domain.value_objects.confidence import Confidence, EvidenceLevel
 from src.type_definitions.domain import EvidenceDerivedProperties
 
 
-class EvidenceDomainService(DomainService):
+class EvidenceDomainService(DomainService[Evidence]):
     """
     Domain service for Evidence business logic.
 
@@ -25,8 +26,8 @@ class EvidenceDomainService(DomainService):
     def validate_business_rules(
         self,
         entity: Evidence,
-        _operation: str,
-        _context: dict[str, Any] | None = None,
+        operation: str,
+        context: Mapping[str, object] | None = None,
     ) -> list[str]:
         """
         Validate evidence business rules.
@@ -39,6 +40,7 @@ class EvidenceDomainService(DomainService):
         Returns:
             List of validation error messages
         """
+        del operation, context
         errors = []
 
         # Confidence score validation
@@ -82,7 +84,7 @@ class EvidenceDomainService(DomainService):
 
         return entity
 
-    def calculate_derived_properties(self, entity: Evidence) -> dict[str, Any]:
+    def calculate_derived_properties(self, entity: Evidence) -> dict[str, object]:
         """
         Calculate derived properties for evidence.
 
@@ -159,8 +161,8 @@ class EvidenceDomainService(DomainService):
 
     def detect_evidence_conflicts(
         self,
-        evidence_list: list[Evidence],
-    ) -> list[dict[str, Any]]:
+        evidence_list: Sequence[Evidence],
+    ) -> list[dict[str, object]]:
         """
         Detect conflicts between evidence records.
 
@@ -170,7 +172,7 @@ class EvidenceDomainService(DomainService):
         Returns:
             List of conflict descriptions with details
         """
-        conflicts: list[dict[str, Any]] = []
+        conflicts: list[dict[str, object]] = []
 
         min_for_conflict = 2
         if len(evidence_list) < min_for_conflict:
@@ -192,8 +194,8 @@ class EvidenceDomainService(DomainService):
 
     def calculate_evidence_consensus(
         self,
-        evidence_list: list[Evidence],
-    ) -> dict[str, Any]:
+        evidence_list: Sequence[Evidence],
+    ) -> dict[str, object]:
         """
         Calculate consensus from multiple evidence records.
 
@@ -374,8 +376,8 @@ class EvidenceDomainService(DomainService):
 
     def _detect_significance_conflicts(
         self,
-        evidence_list: list[Evidence],
-    ) -> list[dict[str, Any]]:
+        evidence_list: Sequence[Evidence],
+    ) -> list[dict[str, object]]:
         """Detect clinical significance conflicts."""
         conflicts = []
 
@@ -391,20 +393,23 @@ class EvidenceDomainService(DomainService):
 
         if pathogenic and benign:
             conflicts.append(
-                {
-                    "type": "significance_conflict",
-                    "description": f"Conflicting clinical significance: {len(pathogenic)} pathogenic vs {len(benign)} benign",
-                    "severity": "high",
-                    "evidence_ids": pathogenic + benign,
-                },
+                cast(
+                    "dict[str, object]",
+                    {
+                        "type": "significance_conflict",
+                        "description": f"Conflicting clinical significance: {len(pathogenic)} pathogenic vs {len(benign)} benign",
+                        "severity": "high",
+                        "evidence_ids": pathogenic + benign,
+                    },
+                ),
             )
 
         return conflicts
 
     def _detect_frequency_conflicts(
         self,
-        evidence_list: list[Evidence],
-    ) -> list[dict[str, Any]]:
+        evidence_list: Sequence[Evidence],
+    ) -> list[dict[str, object]]:
         """Detect frequency conflicts."""
         conflicts = []
 
@@ -421,27 +426,30 @@ class EvidenceDomainService(DomainService):
             threshold = 0.05
             if freq_range > threshold:
                 conflicts.append(
-                    {
-                        "type": "frequency_conflict",
-                        "description": f"Large frequency discrepancy: {freq_range:.4f} across {len(frequencies)} sources",
-                        "severity": "medium",
-                        "evidence_ids": [evid_id for _, evid_id in frequencies],
-                    },
+                    cast(
+                        "dict[str, object]",
+                        {
+                            "type": "frequency_conflict",
+                            "description": f"Large frequency discrepancy: {freq_range:.4f} across {len(frequencies)} sources",
+                            "severity": "medium",
+                            "evidence_ids": [evid_id for _, evid_id in frequencies],
+                        },
+                    ),
                 )
 
         return conflicts
 
     def _detect_functional_study_conflicts(
         self,
-        _evidence_list: list[Evidence],
-    ) -> list[dict[str, Any]]:
+        _evidence_list: Sequence[Evidence],
+    ) -> list[dict[str, object]]:
         """Detect functional study conflicts (placeholder)."""
         # Would implement logic for functional study conflicts
         return []
 
     def _calculate_consensus_confidence(
         self,
-        evidence_list: list[Evidence],
+        evidence_list: Sequence[Evidence],
         agreement_score: float,
     ) -> float:
         """Calculate confidence in consensus."""

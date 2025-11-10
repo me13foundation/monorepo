@@ -91,6 +91,7 @@ class ResearchSpaceManagementService:
             msg = f"Slug '{request.slug}' already exists"
             raise ValueError(msg)
 
+        settings = self._normalize_settings(request.settings)
         # Create the space entity
         space = ResearchSpace(
             id=uuid4(),  # Generate new UUID
@@ -99,7 +100,7 @@ class ResearchSpaceManagementService:
             description=request.description,
             owner_id=request.owner_id,
             status=SpaceStatus.ACTIVE,
-            settings=request.settings or {},
+            settings=settings,
             tags=request.tags or [],
         )
 
@@ -193,7 +194,9 @@ class ResearchSpaceManagementService:
                 update={"description": request.description},
             )
         if request.settings is not None:
-            updated_space = updated_space.with_settings(request.settings)
+            updated_space = updated_space.with_settings(
+                self._normalize_settings(request.settings),
+            )
         if request.tags is not None:
             updated_space = updated_space.with_tags(request.tags)
         if request.status is not None:
@@ -321,6 +324,13 @@ class ResearchSpaceManagementService:
             "active_spaces": active_spaces,
             "archived_spaces": total_spaces - active_spaces,
         }
+
+    @staticmethod
+    def _normalize_settings(
+        settings: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Normalize arbitrary dicts into research space settings dict."""
+        return dict(settings or {})
 
     def validate_space(self, space: ResearchSpace) -> list[str]:
         """

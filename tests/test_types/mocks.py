@@ -7,6 +7,9 @@ Provides type-safe mock repositories and services for comprehensive unit testing
 from typing import Any
 from unittest.mock import MagicMock
 
+from src.application.services.evidence_service import EvidenceApplicationService
+from src.application.services.gene_service import GeneApplicationService
+from src.application.services.variant_service import VariantApplicationService
 from src.domain.entities.evidence import Evidence
 from src.domain.entities.gene import Gene
 from src.domain.entities.phenotype import Phenotype
@@ -17,11 +20,9 @@ from src.domain.repositories.gene_repository import GeneRepository
 from src.domain.repositories.phenotype_repository import PhenotypeRepository
 from src.domain.repositories.publication_repository import PublicationRepository
 from src.domain.repositories.variant_repository import VariantRepository
-from src.services.domain.evidence_service import (
-    EvidenceService as EvidenceDomainService,
-)
-from src.services.domain.gene_service import GeneService as GeneDomainService
-from src.services.domain.variant_service import VariantService as VariantDomainService
+from src.domain.services.evidence_domain_service import EvidenceDomainService
+from src.domain.services.gene_domain_service import GeneDomainService
+from src.domain.services.variant_domain_service import VariantDomainService
 
 from .fixtures import (
     TestEvidence,
@@ -285,6 +286,39 @@ class MockVariantRepository(VariantRepository):
         if variant_id in self._variants:
             del self._variants[variant_id]
 
+    def find_pathogenic_variants(
+        self,
+        limit: int | None = None,
+    ) -> list[Variant]:
+        """Return variants marked as pathogenic or likely pathogenic."""
+        pathogenic_statuses = {"pathogenic", "likely_pathogenic"}
+        variants = [
+            Variant(
+                variant_id=test_variant.variant_id,
+                clinvar_id=test_variant.clinvar_id,
+                chromosome=test_variant.chromosome,
+                position=test_variant.position,
+                reference_allele=test_variant.reference_allele,
+                alternate_allele=test_variant.alternate_allele,
+                variant_type=test_variant.variant_type,
+                clinical_significance=test_variant.clinical_significance,
+                gene_identifier=test_variant.gene_identifier,
+                gene_database_id=test_variant.gene_database_id,
+                hgvs_genomic=test_variant.hgvs_genomic,
+                hgvs_protein=test_variant.hgvs_protein,
+                hgvs_cdna=test_variant.hgvs_cdna,
+                condition=test_variant.condition,
+                review_status=test_variant.review_status,
+                allele_frequency=test_variant.allele_frequency,
+                gnomad_af=test_variant.gnomad_af,
+            )
+            for test_variant in self._variants.values()
+            if test_variant.clinical_significance in pathogenic_statuses
+        ]
+        if limit is not None:
+            return variants[:limit]
+        return variants
+
 
 class MockPhenotypeRepository(PhenotypeRepository):
     """Type-safe mock phenotype repository for testing."""
@@ -466,6 +500,39 @@ class MockEvidenceRepository(EvidenceRepository):
         if evidence_id in self._evidence:
             del self._evidence[evidence_id]
 
+    def find_high_confidence_evidence(
+        self,
+        limit: int | None = None,
+    ) -> list[Evidence]:
+        """Return evidence entries with high confidence scores."""
+        high_confidence = [
+            evidence
+            for evidence in self.list_all()
+            if evidence.confidence_score is not None
+            and evidence.confidence_score >= 0.9
+        ]
+        if limit is not None:
+            return high_confidence[:limit]
+        return high_confidence
+
+    def find_relationship_evidence(
+        self,
+        variant_id: int,
+        phenotype_id: int,
+        min_confidence: float = 0.5,
+    ) -> list[Evidence]:
+        """Return evidence records linking the provided variant and phenotype."""
+        return [
+            evidence
+            for evidence in self.list_all()
+            if evidence.variant_id == variant_id
+            and evidence.phenotype_id == phenotype_id
+            and (
+                evidence.confidence_score is None
+                or evidence.confidence_score >= min_confidence
+            )
+        ]
+
 
 class MockPublicationRepository(PublicationRepository):
     """Type-safe mock publication repository for testing."""
@@ -554,11 +621,26 @@ class MockPublicationRepository(PublicationRepository):
         if publication_id in self._publications:
             del self._publications[publication_id]
 
+    def find_recent_publications(self, days: int = 30) -> list[Publication]:
+        """Return recent publications (mocked as entire dataset)."""
+        return self.list_all()
+
+    def find_med13_relevant(
+        self,
+        min_relevance: int = 3,
+        limit: int | None = None,
+    ) -> list[Publication]:
+        """Return MED13-relevant publications (mocked subset)."""
+        publications = self.list_all()
+        if limit is not None:
+            publications = publications[:limit]
+        return publications
+
 
 # Factory functions for creating mock services
 def create_mock_gene_service(
     genes: list[TestGene] | None = None,
-) -> GeneDomainService:
+) -> GeneApplicationService:
     """
     Create a mock gene domain service with typed repositories.
 
@@ -568,13 +650,19 @@ def create_mock_gene_service(
     Returns:
         Mock gene domain service
     """
-    mock_repo = MockGeneRepository(genes)
-    return GeneDomainService(mock_repo)
+    mock_gene_repo = MockGeneRepository(genes)
+    mock_variant_repo = MockVariantRepository()
+    domain_service = GeneDomainService()
+    return GeneApplicationService(
+        gene_repository=mock_gene_repo,
+        gene_domain_service=domain_service,
+        variant_repository=mock_variant_repo,
+    )
 
 
 def create_mock_variant_service(
     variants: list[TestVariant] | None = None,
-) -> VariantDomainService:
+) -> VariantApplicationService:
     """
     Create a mock variant domain service with typed repositories.
 
@@ -584,13 +672,19 @@ def create_mock_variant_service(
     Returns:
         Mock variant domain service
     """
-    mock_repo = MockVariantRepository(variants)
-    return VariantDomainService(mock_repo)
+    mock_variant_repo = MockVariantRepository(variants)
+    mock_evidence_repo = MockEvidenceRepository()
+    domain_service = VariantDomainService()
+    return VariantApplicationService(
+        variant_repository=mock_variant_repo,
+        variant_domain_service=domain_service,
+        evidence_repository=mock_evidence_repo,
+    )
 
 
 def create_mock_evidence_service(
     evidence_list: list[TestEvidence] | None = None,
-) -> EvidenceDomainService:
+) -> EvidenceApplicationService:
     """
     Create a mock evidence domain service with typed repositories.
 
@@ -601,7 +695,11 @@ def create_mock_evidence_service(
         Mock evidence domain service
     """
     mock_repo = MockEvidenceRepository(evidence_list)
-    return EvidenceDomainService(mock_repo)
+    domain_service = EvidenceDomainService()
+    return EvidenceApplicationService(
+        evidence_repository=mock_repo,
+        evidence_domain_service=domain_service,
+    )
 
 
 # Data Discovery mock repositories and services

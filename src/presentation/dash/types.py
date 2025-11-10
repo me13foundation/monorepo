@@ -8,12 +8,7 @@ callbacks and components can rely on precise typing instead of raw dicts.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from typing import (
-    NotRequired,
-    SupportsFloat,
-    SupportsInt,
-    TypeVar,
-)
+from typing import NotRequired, SupportsFloat, SupportsInt
 
 from typing_extensions import TypedDict
 
@@ -123,11 +118,7 @@ class CuratedRecordDetail(TypedDict, total=False):
     audit: AuditInfo | None
 
 
-TQueueMapping = TypeVar("TQueueMapping", bound=Mapping[str, object])
-TDetailMapping = TypeVar("TDetailMapping", bound=Mapping[str, object])
-
-
-def coerce_queue_items(
+def coerce_queue_items[TQueueMapping: Mapping[str, object]](
     raw_items: Iterable[TQueueMapping],
 ) -> list[ReviewQueueItem]:
     """
@@ -155,7 +146,9 @@ def coerce_queue_items(
     return items
 
 
-def coerce_curated_detail(payload: TDetailMapping) -> CuratedRecordDetail:
+def coerce_curated_detail[TDetailMapping: Mapping[str, object]](
+    payload: TDetailMapping,
+) -> CuratedRecordDetail:
     """
     Validate and cast a curated detail response into a typed mapping.
 

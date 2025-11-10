@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from enum import Enum
-from typing import Any
+from typing import TypedDict, Unpack
 
 
 class EvidenceLevel(str, Enum):
@@ -41,7 +41,7 @@ class Confidence:
             raise ValueError(message)
 
     @classmethod
-    def from_score(cls, score: float, **kwargs: Any) -> Confidence:
+    def from_score(cls, score: float, **kwargs: Unpack[ConfidenceExtras]) -> Confidence:
         level = cls._infer_level(score)
         return cls(score=score, level=level, **kwargs)
 
@@ -97,3 +97,11 @@ class Confidence:
 
 
 __all__ = ["Confidence", "EvidenceLevel"]
+
+
+class ConfidenceExtras(TypedDict, total=False):
+    sample_size: int | None
+    p_value: float | None
+    study_count: int | None
+    peer_reviewed: bool
+    replicated: bool

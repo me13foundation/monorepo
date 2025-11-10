@@ -6,14 +6,13 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import Any
 
 from src.domain.entities.evidence import Evidence
 from src.domain.repositories.base import Repository
-from src.type_definitions.common import EvidenceUpdate
+from src.type_definitions.common import EvidenceUpdate, QueryFilters
 
 
-class EvidenceRepository(Repository[Evidence, int]):
+class EvidenceRepository(Repository[Evidence, int, EvidenceUpdate]):
     """
     Domain repository interface for Evidence entities.
 
@@ -54,11 +53,27 @@ class EvidenceRepository(Repository[Evidence, int]):
         """Find evidence records from a specific source."""
 
     @abstractmethod
+    def find_high_confidence_evidence(
+        self,
+        limit: int | None = None,
+    ) -> list[Evidence]:
+        """Find evidence with high confidence scores."""
+
+    @abstractmethod
+    def find_relationship_evidence(
+        self,
+        variant_id: int,
+        phenotype_id: int,
+        min_confidence: float = 0.0,
+    ) -> list[Evidence]:
+        """Find evidence linking a variant and phenotype with minimum confidence."""
+
+    @abstractmethod
     def search_evidence(
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Evidence]:
         """Search evidence with optional filters."""
 
@@ -69,7 +84,7 @@ class EvidenceRepository(Repository[Evidence, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Evidence], int]:
         """Retrieve paginated evidence with optional filters."""
 

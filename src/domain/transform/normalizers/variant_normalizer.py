@@ -5,10 +5,14 @@ Standardizes genetic variant identifiers from different sources and formats
 (HGVS, ClinVar, dbSNP, etc.) into consistent representations.
 """
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import RawRecord  # noqa: TC001
+from src.type_definitions.json_utils import as_int, as_str
 
 
 class VariantIdentifierType(Enum):
@@ -76,7 +80,7 @@ class VariantNormalizer:
 
     def normalize(
         self,
-        raw_variant_data: dict[str, Any],
+        raw_variant_data: RawRecord,
         source: str = "unknown",
     ) -> NormalizedVariant | None:
         """
@@ -100,12 +104,12 @@ class VariantNormalizer:
 
     def _normalize_clinvar_variant(
         self,
-        variant_data: dict[str, Any],
+        variant_data: RawRecord,
     ) -> NormalizedVariant | None:
         """Normalize variant data from ClinVar."""
-        clinvar_id = variant_data.get("clinvar_id")
-        variant_id = variant_data.get("variant_id")
-        variation_name = variant_data.get("variation_name")
+        clinvar_id = as_str(variant_data.get("clinvar_id"))
+        variant_id = as_str(variant_data.get("variant_id"))
+        variation_name = as_str(variant_data.get("variation_name"))
 
         if not clinvar_id and not variant_id:
             return None
@@ -115,6 +119,9 @@ class VariantNormalizer:
             primary_id = clinvar_id
             id_type = VariantIdentifierType.CLINVAR_VCV
         else:
+            if variant_id is None:
+                # Defensive guard: should not occur because we require one identifier
+                return None
             primary_id = variant_id
             id_type = VariantIdentifierType.OTHER
 
@@ -133,13 +140,13 @@ class VariantNormalizer:
                 hgvs_notations["g"] = variation_name
 
         # Extract clinical significance
-        clinical_significance = variant_data.get("clinical_significance")
+        clinical_significance = as_str(variant_data.get("clinical_significance"))
 
         # Extract gene information
-        gene_symbol = variant_data.get("gene_symbol")
+        gene_symbol = as_str(variant_data.get("gene_symbol"))
 
         # Build cross-references
-        cross_refs = {}
+        cross_refs: dict[str, list[str]] = {}
         if variant_id:
             cross_refs["CLINVAR"] = [variant_id]
         if variation_name:
@@ -162,15 +169,15 @@ class VariantNormalizer:
 
     def _normalize_generic_variant(
         self,
-        variant_data: dict[str, Any],
+        variant_data: RawRecord,
         source: str,
     ) -> NormalizedVariant | None:
         """Normalize variant data from generic sources."""
         # Try to identify the variant type and extract information
         variant_id = (
-            variant_data.get("id")
-            or variant_data.get("variant_id")
-            or variant_data.get("identifier")
+            as_str(variant_data.get("id"))
+            or as_str(variant_data.get("variant_id"))
+            or as_str(variant_data.get("identifier"))
         )
 
         if not variant_id:
@@ -190,8 +197,8 @@ class VariantNormalizer:
             id_type=id_type,
             genomic_location=genomic_location,
             hgvs_notations=hgvs_notations,
-            clinical_significance=variant_data.get("clinical_significance"),
-            gene_symbol=variant_data.get("gene_symbol"),
+            clinical_significance=as_str(variant_data.get("clinical_significance")),
+            gene_symbol=as_str(variant_data.get("gene_symbol")),
             cross_references={},
             source=source,
             confidence_score=0.6,  # Medium confidence for generic sources
@@ -216,39 +223,42 @@ class VariantNormalizer:
 
     def _extract_genomic_location(
         self,
-        variant_data: dict[str, Any],
+        variant_data: RawRecord,
     ) -> GenomicLocation | None:
         """Extract genomic location information."""
-        chromosome = variant_data.get("chromosome")
-        position = variant_data.get("start_position") or variant_data.get("position")
-        reference_allele = variant_data.get("reference_allele")
-        alternate_allele = variant_data.get("alternate_allele")
-        assembly = variant_data.get("assembly", "GRCh38")
+        chromosome = as_str(variant_data.get("chromosome"))
+        position = as_int(variant_data.get("start_position")) or as_int(
+            variant_data.get("position"),
+        )
+        reference_allele = as_str(variant_data.get("reference_allele"))
+        alternate_allele = as_str(variant_data.get("alternate_allele"))
+        assembly = as_str(variant_data.get("assembly")) or "GRCh38"
 
         if not chromosome:
             return None
 
-        try:
-            position_int = int(position) if position else None
-        except (ValueError, TypeError):
-            position_int = None
-
         return GenomicLocation(
-            chromosome=str(chromosome),
-            position=position_int,
+            chromosome=chromosome,
+            position=position,
             reference_allele=reference_allele,
             alternate_allele=alternate_allele,
             assembly=assembly,
         )
 
-    def _extract_hgvs_notations(self, variant_data: dict[str, Any]) -> dict[str, str]:
+    def _extract_hgvs_notations(self, variant_data: RawRecord) -> dict[str, str]:
         """Extract HGVS notations from variant data."""
         hgvs_notations = {}
 
         # Look for HGVS fields
-        hgvs_c = variant_data.get("hgvs_c") or variant_data.get("c_notation")
-        hgvs_p = variant_data.get("hgvs_p") or variant_data.get("p_notation")
-        hgvs_g = variant_data.get("hgvs_g") or variant_data.get("g_notation")
+        hgvs_c = as_str(variant_data.get("hgvs_c")) or as_str(
+            variant_data.get("c_notation"),
+        )
+        hgvs_p = as_str(variant_data.get("hgvs_p")) or as_str(
+            variant_data.get("p_notation"),
+        )
+        hgvs_g = as_str(variant_data.get("hgvs_g")) or as_str(
+            variant_data.get("g_notation"),
+        )
 
         if hgvs_c:
             hgvs_notations["c"] = hgvs_c

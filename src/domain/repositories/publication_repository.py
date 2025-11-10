@@ -6,14 +6,13 @@ the underlying implementation.
 """
 
 from abc import abstractmethod
-from typing import Any
 
 from src.domain.entities.publication import Publication
 from src.domain.repositories.base import Repository
-from src.type_definitions.common import PublicationUpdate
+from src.type_definitions.common import PublicationUpdate, QueryFilters
 
 
-class PublicationRepository(Repository[Publication, int]):
+class PublicationRepository(Repository[Publication, int, PublicationUpdate]):
     """
     Domain repository interface for Publication entities.
 
@@ -54,7 +53,7 @@ class PublicationRepository(Repository[Publication, int]):
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Publication]:
         """Search publications with optional filters."""
 
@@ -65,7 +64,7 @@ class PublicationRepository(Repository[Publication, int]):
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Publication], int]:
         """Retrieve paginated publications with optional filters."""
 
@@ -76,6 +75,14 @@ class PublicationRepository(Repository[Publication, int]):
     @abstractmethod
     def find_recent_publications(self, days: int = 30) -> list[Publication]:
         """Find publications from the last N days."""
+
+    @abstractmethod
+    def find_med13_relevant(
+        self,
+        min_relevance: int = 3,
+        limit: int | None = None,
+    ) -> list[Publication]:
+        """Find publications relevant to MED13 research."""
 
     @abstractmethod
     def update_publication(

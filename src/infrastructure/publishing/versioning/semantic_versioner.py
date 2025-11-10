@@ -128,8 +128,9 @@ class SemanticVersioner:
         if not versions:
             return None
 
-        sorted_versions = sorted(
-            versions,
-            key=lambda v: SemanticVersioner.parse_version(v)[:3],
-        )
+        def _version_key(value: str) -> tuple[int, int, int]:
+            major, minor, patch, *_extras = SemanticVersioner.parse_version(value)
+            return major, minor, patch
+
+        sorted_versions = sorted(versions, key=_version_key)
         return sorted_versions[-1]

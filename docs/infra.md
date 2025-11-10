@@ -163,7 +163,7 @@ med13-resource-library/
 Maintain a working Dockerfile for local development and future containerization:
 
 ```dockerfile
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 

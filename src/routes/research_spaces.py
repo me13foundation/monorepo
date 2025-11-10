@@ -106,7 +106,7 @@ class ResearchSpaceResponse(BaseModel):
             description=space.description,
             owner_id=space.owner_id,
             status=space.status.value,
-            settings=space.settings,
+            settings=dict(space.settings),
             tags=space.tags,
             created_at=space.created_at.isoformat(),
             updated_at=space.updated_at.isoformat(),

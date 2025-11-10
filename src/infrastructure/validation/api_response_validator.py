@@ -8,8 +8,14 @@ helping prevent runtime errors from malformed external data.
 import time
 from typing import Any
 
+from src.type_definitions.common import JSONObject, JSONValue
 from src.type_definitions.external_apis import (
     APIResponseValidationResult,
+    ClinVarESearchResult,
+    ClinVarSearchResponse,
+    ClinVarSearchValidationResult,
+    ClinVarVariantResponse,
+    ClinVarVariantValidationResult,
     ValidationIssue,
 )
 
@@ -24,16 +30,36 @@ class APIResponseValidator:
 
     @staticmethod
     def validate_clinvar_search_response(
-        data: dict[str, Any],
-    ) -> APIResponseValidationResult:
+        data: JSONValue,
+    ) -> ClinVarSearchValidationResult:
         """Validate ClinVar search API response."""
         start_time = time.time()
 
         issues: list[ValidationIssue] = []
+        sanitized_data: ClinVarSearchResponse | None = None
 
-        # Check required top-level fields
+        if not isinstance(data, dict):
+            issues.append(
+                ValidationIssue(
+                    field="root",
+                    issue_type="invalid",
+                    message="Response must be an object",
+                    severity="error",
+                ),
+            )
+            validation_time = (time.time() - start_time) * 1000
+            return ClinVarSearchValidationResult(
+                is_valid=False,
+                issues=issues,
+                data_quality_score=0.0,
+                sanitized_data=None,
+                validation_time_ms=validation_time,
+            )
+
+        payload: JSONObject = data
+
         required_fields = ["esearchresult", "header"]
-        missing = [field for field in required_fields if field not in data]
+        missing = [field for field in required_fields if field not in payload]
         issues.extend(
             [
                 ValidationIssue(
@@ -46,20 +72,26 @@ class APIResponseValidator:
             ],
         )
 
-        # Check esearchresult structure
-        if "esearchresult" in data:
-            esearchresult = data["esearchresult"]
-            if not isinstance(esearchresult, dict):
-                issues.append(
-                    ValidationIssue(
-                        field="esearchresult",
-                        issue_type="invalid",
-                        message="esearchresult must be an object",
-                        severity="error",
-                    ),
-                )
-            # Check for idlist
-            elif "idlist" not in esearchresult:
+        header_obj = payload.get("header")
+        header_payload: JSONObject | None = (
+            header_obj if isinstance(header_obj, dict) else None
+        )
+        if header_obj is not None and header_payload is None:
+            issues.append(
+                ValidationIssue(
+                    field="header",
+                    issue_type="invalid",
+                    message="header must be an object",
+                    severity="error",
+                ),
+            )
+
+        esearch_section = payload.get("esearchresult")
+        sanitized_esearch: ClinVarESearchResult | None = None
+
+        if isinstance(esearch_section, dict):
+            raw_idlist = esearch_section.get("idlist")
+            if raw_idlist is None:
                 issues.append(
                     ValidationIssue(
                         field="esearchresult.idlist",
@@ -68,7 +100,7 @@ class APIResponseValidator:
                         severity="error",
                     ),
                 )
-            elif not isinstance(esearchresult["idlist"], list):
+            elif not isinstance(raw_idlist, list):
                 issues.append(
                     ValidationIssue(
                         field="esearchresult.idlist",
@@ -77,92 +109,120 @@ class APIResponseValidator:
                         severity="error",
                     ),
                 )
+            else:
+                id_list = [
+                    str(identifier)
+                    for identifier in raw_idlist
+                    if isinstance(identifier, (str, int))
+                ]
 
-        # Calculate data quality score
+                sanitized_esearch = {
+                    "count": str(esearch_section.get("count", "0")),
+                    "retmax": str(esearch_section.get("retmax", "0")),
+                    "retstart": str(esearch_section.get("retstart", "0")),
+                    "idlist": id_list,
+                }
+
+                query_translation = esearch_section.get("querytranslation")
+                if isinstance(query_translation, str):
+                    sanitized_esearch["querytranslation"] = query_translation
+
+                translationset = esearch_section.get("translationset")
+                if isinstance(translationset, list):
+                    sanitized_esearch["translationset"] = [
+                        entry for entry in translationset if isinstance(entry, dict)
+                    ]
+
+                translationstack = esearch_section.get("translationstack")
+                if isinstance(translationstack, list):
+                    sanitized_esearch["translationstack"] = [
+                        entry for entry in translationstack if isinstance(entry, dict)
+                    ]
+        else:
+            issues.append(
+                ValidationIssue(
+                    field="esearchresult",
+                    issue_type="missing",
+                    message="esearchresult field is required",
+                    severity="error",
+                ),
+            )
+
         error_count = sum(1 for issue in issues if issue["severity"] == "error")
-        total_checks = len(required_fields) + 2  # +2 for esearchresult checks
+        total_checks = len(required_fields) + 2
         data_quality_score = max(0.0, 1.0 - (error_count / total_checks))
 
-        validation_time = (time.time() - start_time) * 1000  # ms
+        if error_count == 0 and header_payload and sanitized_esearch:
+            sanitized_data = ClinVarSearchResponse(
+                header=header_payload,
+                esearchresult=sanitized_esearch,
+            )
 
-        return APIResponseValidationResult(
-            is_valid=len([i for i in issues if i["severity"] == "error"]) == 0,
+        validation_time = (time.time() - start_time) * 1000
+
+        return ClinVarSearchValidationResult(
+            is_valid=error_count == 0,
             issues=issues,
             data_quality_score=data_quality_score,
-            sanitized_data=(
-                data if data_quality_score > APIResponseValidator.QUALITY_LOW else None
-            ),
+            sanitized_data=sanitized_data,
             validation_time_ms=validation_time,
         )
 
     @staticmethod
     def validate_clinvar_variant_response(
-        data: dict[str, Any],
-    ) -> APIResponseValidationResult:
+        data: JSONValue,
+    ) -> ClinVarVariantValidationResult:
         """Validate ClinVar variant details API response."""
         start_time = time.time()
 
         issues: list[ValidationIssue] = []
+        sanitized_data: ClinVarVariantResponse | None = None
 
-        # Check required fields
-        if "result" not in data:
+        if not isinstance(data, dict):
             issues.append(
                 ValidationIssue(
-                    field="result",
-                    issue_type="missing",
-                    message="result field is required",
-                    severity="error",
-                ),
-            )
-
-        if "header" not in data:
-            issues.append(
-                ValidationIssue(
-                    field="header",
-                    issue_type="missing",
-                    message="header field is required",
-                    severity="warning",  # Header is less critical
-                ),
-            )
-
-        # Check result structure
-        if "result" in data and isinstance(data["result"], dict):
-            result = data["result"]
-            if not result:
-                issues.append(
-                    ValidationIssue(
-                        field="result",
-                        issue_type="invalid",
-                        message="result object is empty",
-                        severity="warning",
-                    ),
-                )
-        elif "result" in data:
-            issues.append(
-                ValidationIssue(
-                    field="result",
+                    field="root",
                     issue_type="invalid",
-                    message="result must be an object",
+                    message="Response must be an object",
                     severity="error",
                 ),
             )
+            validation_time = (time.time() - start_time) * 1000
+            return ClinVarVariantValidationResult(
+                is_valid=False,
+                issues=issues,
+                data_quality_score=0.0,
+                sanitized_data=None,
+                validation_time_ms=validation_time,
+            )
 
-        # Calculate data quality score
+        header_issues, header_obj = APIResponseValidator._validate_header_section(
+            data.get("header"),
+        )
+        issues.extend(header_issues)
+
+        result_issues, result_map = APIResponseValidator._sanitize_variant_result(
+            data.get("result"),
+        )
+        issues.extend(result_issues)
+
         error_count = sum(1 for issue in issues if issue["severity"] == "error")
         total_checks = 2  # result and header checks
         data_quality_score = max(0.0, 1.0 - (error_count / total_checks))
 
+        if error_count == 0 and header_obj and result_map is not None:
+            sanitized_data = ClinVarVariantResponse(
+                header=header_obj,
+                result=result_map,
+            )
+
         validation_time = (time.time() - start_time) * 1000
 
-        return APIResponseValidationResult(
-            is_valid=len([i for i in issues if i["severity"] == "error"]) == 0,
+        return ClinVarVariantValidationResult(
+            is_valid=error_count == 0,
             issues=issues,
             data_quality_score=data_quality_score,
-            sanitized_data=(
-                data
-                if data_quality_score > APIResponseValidator.QUALITY_VERY_HIGH
-                else None
-            ),  # Higher threshold for variant data
+            sanitized_data=sanitized_data,
             validation_time_ms=validation_time,
         )
 
@@ -389,3 +449,126 @@ class APIResponseValidator:
     QUALITY_MEDIUM: float = 0.6
     QUALITY_HIGH: float = 0.7
     QUALITY_VERY_HIGH: float = 0.8
+
+    @staticmethod
+    def _validate_header_section(
+        header_obj: Any,
+    ) -> tuple[list[ValidationIssue], dict[str, Any] | None]:
+        issues: list[ValidationIssue] = []
+        if header_obj is None:
+            issues.append(
+                ValidationIssue(
+                    field="header",
+                    issue_type="missing",
+                    message="header field is required",
+                    severity="warning",
+                ),
+            )
+            return issues, None
+
+        if not isinstance(header_obj, dict):
+            issues.append(
+                ValidationIssue(
+                    field="header",
+                    issue_type="invalid",
+                    message="header must be an object",
+                    severity="error",
+                ),
+            )
+            return issues, None
+
+        return issues, header_obj
+
+    @staticmethod
+    def _sanitize_variant_record(record_value: dict[str, Any]) -> dict[str, Any]:
+        record: dict[str, Any] = {}
+        for field_name in (
+            "variation_id",
+            "variation_name",
+            "review_status",
+            "last_updated",
+        ):
+            field_value = record_value.get(field_name)
+            if isinstance(field_value, (str, int)):
+                record[field_name] = str(field_value)
+
+        for structured_field in (
+            "gene",
+            "condition",
+            "clinical_significance",
+            "interpretation",
+        ):
+            maybe_dict = record_value.get(structured_field)
+            if isinstance(maybe_dict, dict):
+                record[structured_field] = maybe_dict
+
+        submissions = record_value.get("submissions")
+        if isinstance(submissions, list):
+            record["submissions"] = [
+                submission for submission in submissions if isinstance(submission, dict)
+            ]
+
+        return record
+
+    @staticmethod
+    def _sanitize_variant_result(
+        result_section: Any,
+    ) -> tuple[list[ValidationIssue], dict[str, Any] | None]:
+        issues: list[ValidationIssue] = []
+        if result_section is None:
+            issues.append(
+                ValidationIssue(
+                    field="result",
+                    issue_type="missing",
+                    message="result field is required",
+                    severity="error",
+                ),
+            )
+            return issues, None
+
+        if not isinstance(result_section, dict):
+            issues.append(
+                ValidationIssue(
+                    field="result",
+                    issue_type="invalid",
+                    message="result must be an object",
+                    severity="error",
+                ),
+            )
+            return issues, None
+
+        if not result_section:
+            issues.append(
+                ValidationIssue(
+                    field="result",
+                    issue_type="invalid",
+                    message="result object is empty",
+                    severity="warning",
+                ),
+            )
+
+        sanitized_records: dict[str, Any] = {}
+        for key, value in result_section.items():
+            if key == "uids":
+                if isinstance(value, list):
+                    sanitized_records["uids"] = [
+                        str(uid) for uid in value if isinstance(uid, (str, int))
+                    ]
+                continue
+
+            if not isinstance(value, dict):
+                issues.append(
+                    ValidationIssue(
+                        field=f"result.{key}",
+                        issue_type="invalid",
+                        message="Variant entry must be an object",
+                        severity="warning",
+                    ),
+                )
+                continue
+
+            sanitized_records[key] = APIResponseValidator._sanitize_variant_record(
+                value,
+            )
+
+        return issues, sanitized_records or None
