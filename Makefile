@@ -5,6 +5,23 @@
 VENV := venv
 PYTHON := $(VENV)/bin/python3
 PIP := $(VENV)/bin/pip3
+ALEMBIC_BIN := $(if $(wildcard $(VENV)/bin/alembic),$(VENV)/bin/alembic,alembic)
+
+# Dockerized Postgres configuration
+POSTGRES_ENV_FILE := .env.postgres
+POSTGRES_ENV_TEMPLATE := .env.postgres.example
+POSTGRES_COMPOSE_FILE := docker-compose.postgres.yml
+POSTGRES_SERVICE := postgres
+POSTGRES_COMPOSE := docker compose --env-file $(POSTGRES_ENV_FILE) -f $(POSTGRES_COMPOSE_FILE)
+POSTGRES_ACTIVE_FLAG := .postgres-active
+POSTGRES_ACTIVE := $(wildcard $(POSTGRES_ACTIVE_FLAG))
+BACKEND_PID_FILE := .uvicorn.pid
+BACKEND_LOG := logs/backend.log
+WEB_PID_FILE := .next.dev.pid
+WEB_LOG := logs/web.log
+WEB_PID_FILE_ABS := $(abspath $(WEB_PID_FILE))
+WEB_LOG_ABS := $(abspath $(WEB_LOG))
+NEXT_DEV_ENV := NEXTAUTH_SECRET=med13-resource-library-nextauth-secret-key-for-development-2024-secure-random-string NEXTAUTH_URL=http://localhost:3000 NEXT_PUBLIC_API_URL=http://localhost:8080
 
 # Detect environment type
 CI_ENV := $(CI)
@@ -47,7 +64,25 @@ define check_venv
 	fi
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage
+define ensure_postgres_env
+	@if [ ! -f "$(POSTGRES_ENV_FILE)" ]; then \
+		if [ -f "$(POSTGRES_ENV_TEMPLATE)" ]; then \
+			cp "$(POSTGRES_ENV_TEMPLATE)" "$(POSTGRES_ENV_FILE)"; \
+			echo "Created $(POSTGRES_ENV_FILE) from template."; \
+		else \
+			echo "Missing $(POSTGRES_ENV_TEMPLATE). Cannot create $(POSTGRES_ENV_FILE)."; \
+			exit 1; \
+		fi \
+	fi
+endef
+
+define run_with_postgres_env
+	$(call ensure_postgres_env)
+	@echo "▶ Using Postgres env ($(POSTGRES_ENV_FILE))"
+	@/bin/bash -lc 'set -a; source "$(POSTGRES_ENV_FILE)"; set +a; $(1)'
+endef
+
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage
 
 # Default target
 help: ## Show this help message
@@ -97,19 +132,39 @@ setup-gcp: ## Set up Google Cloud SDK and authenticate
 # Testing
 test: ## Run all tests
 	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest)
+endif
 
 test-verbose: ## Run tests with verbose output
 	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest -v --tb=short
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest -v --tb=short)
+endif
 
 test-cov: ## Run tests with coverage report
 	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest --cov=src --cov-report=html --cov-report=term-missing
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest --cov=src --cov-report=html --cov-report=term-missing)
+endif
 
 test-watch: ## Run tests in watch mode
 	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest-watch
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest-watch)
+endif
 
 # Code Quality
 lint: ## Run all linting tools (warnings only)
@@ -171,7 +226,62 @@ security-full: security-audit ## Full security assessment with all tools
 # Local Development
 run-local: ## Run the application locally
 	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,$(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload)
+endif
+
+run-all-postgres: ## Restart Postgres, run migrations, seed admin, start backend + Next.js
+	@$(MAKE) -s stop-all
+	@$(MAKE) -s docker-postgres-up
+	@$(MAKE) -s postgres-migrate
+	@$(MAKE) -s db-seed-admin
+	@$(MAKE) -s start-local
+	@echo "Backend running in background. Starting Next.js..."
+	@$(MAKE) -s start-web
+	@echo "All services running. FastAPI logs: $(BACKEND_LOG) | Next.js logs: $(WEB_LOG)"
+start-local: ## Run FastAPI backend in the background (logs/backend.log)
+	$(call check_venv)
+	@mkdir -p $(dir $(BACKEND_LOG))
+	@if lsof -ti tcp:8080 >/dev/null 2>&1; then \
+		echo "Port 8080 already in use. Run 'make stop-local' or free the port before starting in background."; \
+		exit 1; \
+	fi
+	@if [ -f "$(BACKEND_PID_FILE)" ] && kill -0 $$(cat "$(BACKEND_PID_FILE)") 2>/dev/null; then \
+		echo "FastAPI already running (PID $$(cat "$(BACKEND_PID_FILE)"))."; \
+		exit 0; \
+	fi
+ifeq ($(POSTGRES_ACTIVE),)
+	@nohup $(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 >> "$(BACKEND_LOG)" 2>&1 &
+	@echo $$! > "$(BACKEND_PID_FILE)"
+else
+	@$(MAKE) postgres-migrate
+	@/bin/bash -lc "set -a; source \"$(POSTGRES_ENV_FILE)\"; set +a; nohup $(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 >> \"$(BACKEND_LOG)\" 2>&1 & echo \$$! > \"$(BACKEND_PID_FILE)\""
+endif
+	@i=0; while [ ! -f "$(BACKEND_PID_FILE)" ] && [ $$i -lt 10 ]; do sleep 0.5; i=$$((i+1)); done
+	@if [ -f "$(BACKEND_PID_FILE)" ]; then \
+		PID=$$(cat "$(BACKEND_PID_FILE)"); \
+		echo "FastAPI started in background (PID $$PID). Logs: $(BACKEND_LOG)"; \
+	else \
+		echo "FastAPI launch command executed but PID file was not created. Check $(BACKEND_LOG) for details."; \
+	fi
+
+backend-status: ## Show FastAPI background process status
+	@if [ -f "$(BACKEND_PID_FILE)" ]; then \
+		PID=$$(cat "$(BACKEND_PID_FILE)"); \
+		if kill -0 $$PID 2>/dev/null; then \
+			echo "FastAPI running (PID $$PID). Logs: $(BACKEND_LOG)"; \
+		else \
+			echo "FastAPI PID file exists but process $$PID is not running."; \
+		fi; \
+	else \
+		echo "FastAPI backend is not running (no PID file)."; \
+	fi
+
+run-local-postgres: ## Run the FastAPI backend with Postgres env vars loaded
+	$(call run_with_postgres_env,$(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload)
 
 run-dash: ## Run the Dash curation interface locally
 	$(call check_venv)
@@ -179,13 +289,75 @@ run-dash: ## Run the Dash curation interface locally
 
 run-web: ## Run the Next.js admin interface locally (seeds admin user if needed)
 	@echo "Ensuring admin user exists..."
+ifeq ($(POSTGRES_ACTIVE),)
 	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
 	@echo "Starting Next.js admin interface..."
-	cd src/web && NEXTAUTH_SECRET=med13-resource-library-nextauth-secret-key-for-development-2024-secure-random-string NEXTAUTH_URL=http://localhost:3000 NEXT_PUBLIC_API_URL=http://localhost:8080 npm run dev
+	cd src/web && $(NEXT_DEV_ENV) npm run dev
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)")
+	@echo "Starting Next.js admin interface..."
+	$(call run_with_postgres_env,cd src/web && $(NEXT_DEV_ENV) npm run dev)
+endif
+
+run-web-postgres: ## Run the Next.js admin interface with Postgres env vars loaded
+	@echo "Ensuring admin user exists (Postgres)..."
+	$(call run_with_postgres_env,$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)")
+	@echo "Starting Next.js admin interface (Postgres)..."
+	$(call run_with_postgres_env,cd src/web && $(NEXT_DEV_ENV) npm run dev)
+
+start-web: ## Run Next.js admin interface in the background (logs/web.log)
+	$(call check_venv)
+	@mkdir -p $(dir $(WEB_LOG))
+	@if lsof -ti tcp:3000 >/dev/null 2>&1; then \
+		echo "Port 3000 already in use. Run 'make stop-web' or free the port before starting in background."; \
+		exit 1; \
+	fi
+	@if [ -f "$(WEB_PID_FILE)" ] && kill -0 $$(cat "$(WEB_PID_FILE)") 2>/dev/null; then \
+		echo "Next.js already running (PID $$(cat "$(WEB_PID_FILE)"))."; \
+		exit 0; \
+	fi
+	@echo "Ensuring admin user exists..."
+ifeq ($(POSTGRES_ACTIVE),)
+	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
+	@/bin/bash -lc "cd src/web && $(NEXT_DEV_ENV) nohup npm run dev >> \"$(WEB_LOG_ABS)\" 2>&1 & echo \$$! > \"$(WEB_PID_FILE_ABS)\""
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)")
+	@/bin/bash -lc "set -a; source \"$(POSTGRES_ENV_FILE)\"; set +a; cd src/web && $(NEXT_DEV_ENV) nohup npm run dev >> \"$(WEB_LOG_ABS)\" 2>&1 & echo \$$! > \"$(WEB_PID_FILE_ABS)\""
+endif
+	@i=0; while [ ! -f "$(WEB_PID_FILE)" ] && [ $$i -lt 10 ]; do sleep 0.5; i=$$((i+1)); done
+	@if [ -f "$(WEB_PID_FILE)" ]; then \
+		PID=$$(cat "$(WEB_PID_FILE)"); \
+		echo "Next.js started in background (PID $$PID). Logs: $(WEB_LOG)"; \
+	else \
+		echo "Next.js launch command executed but PID file was not created. Check $(WEB_LOG) for details."; \
+	fi
+
+test-postgres: ## Run pytest with Postgres env vars loaded
+	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest)
+
+postgres-cmd: ## Run arbitrary CMD with Postgres env vars (usage: make postgres-cmd CMD="make run-local")
+	@if [ -z "$(CMD)" ]; then \
+		echo "Usage: make postgres-cmd CMD=\"<command>\""; \
+		exit 1; \
+	fi
+	$(call run_with_postgres_env,$(CMD))
 
 stop-local: ## Stop the local FastAPI backend
 	@echo "Stopping FastAPI backend..."
-	-pkill -f "uvicorn main:app" || echo "No FastAPI process found"
+	@if [ -f "$(BACKEND_PID_FILE)" ]; then \
+		PID=$$(cat "$(BACKEND_PID_FILE)"); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID && echo "Stopped FastAPI process $$PID."; \
+		else \
+			echo "PID $$PID not running; cleaning up stale PID file."; \
+		fi; \
+		rm -f "$(BACKEND_PID_FILE)"; \
+	else \
+		echo "No PID file found; attempting graceful shutdown."; \
+		pkill -f "uvicorn main:app" || echo "No FastAPI process found"; \
+	fi
 
 stop-dash: ## Stop the Dash curation interface
 	@echo "Stopping Dash UI..."
@@ -193,10 +365,27 @@ stop-dash: ## Stop the Dash curation interface
 
 stop-web: ## Stop the Next.js admin interface
 	@echo "Stopping Next.js admin interface..."
-	-pkill -f "npm run dev" || echo "No Next.js process found"
+	@if [ -f "$(WEB_PID_FILE)" ]; then \
+		PID=$$(cat "$(WEB_PID_FILE)"); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID && echo "Stopped Next.js process $$PID."; \
+		else \
+			echo "PID $$PID not running; cleaning up stale PID file."; \
+		fi; \
+		rm -f "$(WEB_PID_FILE)"; \
+	else \
+		pkill -f "npm run dev" >/dev/null 2>&1 && echo "Stopped npm dev process via pkill." || echo "No Next.js process found"; \
+	fi
 
-stop-all: stop-local stop-dash stop-web docker-stop ## Stop all services (local + Docker)
-	@echo "All services stopped"
+stop-all: ## Stop FastAPI, Dash, Next.js, Postgres, and remove PID files/log hints
+	@$(MAKE) -s stop-local
+	@$(MAKE) -s stop-dash
+	@$(MAKE) -s stop-web
+	@$(MAKE) -s docker-stop
+	@$(MAKE) -s docker-postgres-destroy
+	@rm -f "$(BACKEND_PID_FILE)"
+	@rm -f "$(WEB_PID_FILE)"
+	@echo "All services stopped (including Postgres)."
 
 run-docker: docker-build ## Build and run with Docker
 	docker run -p 8080:8080 med13-resource-library
@@ -210,43 +399,137 @@ docker-run: ## Run Docker container
 
 docker-stop: ## Stop and remove Docker container
 	@echo "Stopping Docker container..."
-	-docker stop $$(docker ps -q --filter ancestor=med13-resource-library) || echo "No running containers found"
-	-docker rm $$(docker ps -aq --filter ancestor=med13-resource-library) || echo "No containers to remove"
+	@if docker ps -q --filter ancestor=med13-resource-library | grep -q .; then \
+		docker stop $$(docker ps -q --filter ancestor=med13-resource-library); \
+		docker rm $$(docker ps -aq --filter ancestor=med13-resource-library); \
+	else \
+		echo "No running containers found"; \
+	fi
 
 docker-push: docker-build ## Build and push Docker image to GCR
 	docker tag med13-resource-library gcr.io/YOUR_PROJECT_ID/med13-resource-library
 	docker push gcr.io/YOUR_PROJECT_ID/med13-resource-library
 
+# Dockerized Postgres helpers
+docker-postgres-up: ## Start Postgres dev container (creates .env.postgres if missing)
+	$(call ensure_postgres_env)
+	@echo "Starting Postgres via $(POSTGRES_COMPOSE_FILE)..."
+	$(POSTGRES_COMPOSE) up -d
+	@touch "$(POSTGRES_ACTIVE_FLAG)"
+	@echo "Postgres mode enabled (auto-applied to run-local/run-web/test)."
+
+docker-postgres-down: ## Stop Postgres container (data persists)
+	@if [ ! -f "$(POSTGRES_ENV_FILE)" ]; then \
+		echo "No $(POSTGRES_ENV_FILE) found; nothing to stop."; \
+		exit 0; \
+	fi
+	@echo "Stopping Postgres container..."
+	$(POSTGRES_COMPOSE) down && rm -f "$(POSTGRES_ACTIVE_FLAG)" || true
+	@echo "Postgres mode flags cleared (commands revert to SQLite)."
+
+docker-postgres-destroy: ## Stop Postgres container and remove volumes
+	@if [ ! -f "$(POSTGRES_ENV_FILE)" ]; then \
+		echo "No $(POSTGRES_ENV_FILE) found; nothing to destroy."; \
+		exit 0; \
+	fi
+	@echo "Destroying Postgres container and volumes..."
+	$(POSTGRES_COMPOSE) down -v && rm -f "$(POSTGRES_ACTIVE_FLAG)" || true
+	@echo "Postgres mode flags cleared (commands revert to SQLite)."
+
+docker-postgres-logs: ## Tail Postgres logs
+	@if [ ! -f "$(POSTGRES_ENV_FILE)" ]; then \
+		echo "No $(POSTGRES_ENV_FILE) found; cannot tail logs."; \
+		exit 1; \
+	fi
+	@echo "Tailing Postgres logs (Ctrl+C to stop)..."
+	$(POSTGRES_COMPOSE) logs -f $(POSTGRES_SERVICE)
+
+docker-postgres-status: ## Show Postgres container status
+	@if [ ! -f "$(POSTGRES_ENV_FILE)" ]; then \
+		echo "No $(POSTGRES_ENV_FILE) found; Postgres not configured."; \
+		exit 0; \
+	fi
+	$(POSTGRES_COMPOSE) ps
+
+postgres-disable: ## Keep container running but force commands back to SQLite
+	@rm -f "$(POSTGRES_ACTIVE_FLAG)"
+	@echo "Postgres mode flag removed. Existing containers unaffected."
+
+postgres-wait: ## Wait until Postgres is ready to accept connections
+ifeq ($(POSTGRES_ACTIVE),)
+	@echo "Postgres mode inactive; skipping wait."
+else
+	@echo "Waiting for Postgres health check..."
+	$(call run_with_postgres_env,$(USE_PYTHON) scripts/wait_for_postgres.py)
+endif
+
+postgres-migrate: ## Run Alembic migrations when Postgres mode is active
+ifeq ($(POSTGRES_ACTIVE),)
+	@echo "Postgres mode inactive; skipping migrations."
+else
+	@$(MAKE) -s postgres-wait
+	@echo "Applying Alembic migrations (Postgres)..."
+	$(call run_with_postgres_env,$(ALEMBIC_BIN) upgrade head)
+endif
+
 # Database
 db-migrate: ## Run database migrations
+ifeq ($(POSTGRES_ACTIVE),)
 	alembic upgrade head
+else
+	$(call run_with_postgres_env,alembic upgrade head)
+endif
 
 db-create: ## Create database migration
 	@echo "Creating new migration..."
+ifeq ($(POSTGRES_ACTIVE),)
 	alembic revision --autogenerate -m "$(msg)"
+else
+	$(call run_with_postgres_env,alembic revision --autogenerate -m "$(msg)")
+endif
 
 db-reset: ## Reset database (WARNING: destroys data)
 	@echo "This will destroy all data. Are you sure? [y/N] " && read ans && [ $${ans:-N} = y ]
+ifeq ($(POSTGRES_ACTIVE),)
 	alembic downgrade base
+else
+	$(call run_with_postgres_env,alembic downgrade base)
+endif
 
 db-seed: ## Seed database with test data
 	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) scripts/seed_database.py
+else
+	$(call run_with_postgres_env,$(USE_PYTHON) scripts/seed_database.py)
+endif
 
 db-seed-admin: ## Seed admin user (creates admin@med13.org with password admin123)
 	$(call check_venv)
 	@echo "Seeding admin user..."
+ifeq ($(POSTGRES_ACTIVE),)
 	@$(USE_PYTHON) scripts/seed_admin_user.py
+else
+	$(call run_with_postgres_env,$(USE_PYTHON) scripts/seed_admin_user.py)
+endif
 
 db-reset-admin-password: ## Reset admin password (default: admin123)
 	$(call check_venv)
 	@echo "Resetting admin password..."
+ifeq ($(POSTGRES_ACTIVE),)
 	@$(USE_PYTHON) scripts/reset_admin_password.py
+else
+	$(call run_with_postgres_env,$(USE_PYTHON) scripts/reset_admin_password.py)
+endif
 
 db-verify-admin: ## Verify admin user exists
 	$(call check_venv)
 	@echo "Verifying admin user..."
+ifeq ($(POSTGRES_ACTIVE),)
 	@$(USE_PYTHON) scripts/reset_admin_password.py --verify-only
+else
+	$(call run_with_postgres_env,$(USE_PYTHON) scripts/reset_admin_password.py --verify-only)
+endif
 
 # Deployment
 deploy-staging: ## Deploy to staging environment
@@ -400,3 +683,6 @@ backup-db: ## Create database backup (SQLite)
 restore-db: ## Restore database from backup (specify FILE variable)
 	@echo "Restoring SQLite database from $(FILE)..."
 	cp $(FILE) med13.db
+restart-postgres: ## Recreate Postgres container (down -v, up)
+	@$(MAKE) -s docker-postgres-destroy
+	@$(MAKE) -s docker-postgres-up

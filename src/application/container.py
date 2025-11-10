@@ -18,6 +18,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import NullPool
 
 from src.application.curation.conflict_detector import ConflictDetector
 from src.application.curation.repositories.review_repository import (
@@ -38,6 +39,8 @@ from src.application.services.source_management_service import SourceManagementS
 from src.application.services.user_management_service import UserManagementService
 from src.application.services.variant_service import VariantApplicationService
 from src.database.session import SessionLocal
+from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
+from src.database.url_resolver import resolve_async_database_url
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.services.variant_domain_service import VariantDomainService
@@ -87,7 +90,7 @@ class DependencyContainer:
 
     def __init__(
         self,
-        database_url: str = "sqlite+aiosqlite:///./med13.db",
+        database_url: str | None = None,
         jwt_secret_key: str | None = None,
         jwt_algorithm: str = "HS256",
     ):
@@ -95,21 +98,34 @@ class DependencyContainer:
         Initialize the unified dependency container.
 
         Args:
-            database_url: Database connection string (async)
+            database_url: Optional async database connection string override
             jwt_secret_key: Secret key for JWT signing
             jwt_algorithm: JWT algorithm (default: HS256)
         """
-        self.database_url = database_url
+        resolved_db_url = database_url or resolve_async_database_url()
+        self.database_url = resolved_db_url
         resolved_secret = jwt_secret_key or DEFAULT_DEV_JWT_SECRET
         self.jwt_secret_key = resolved_secret
         self.jwt_algorithm = jwt_algorithm
 
         # Initialize ASYNC database engine (for Clean Architecture - auth)
+        engine_kwargs: dict[str, Any] = {
+            "echo": False,  # Set to True for debugging
+            "pool_pre_ping": True,
+        }
+        if resolved_db_url.startswith("sqlite"):
+            engine_kwargs["connect_args"] = build_sqlite_connect_args(
+                include_thread_check=False,
+            )
+            engine_kwargs["poolclass"] = NullPool
+
         self.engine = create_async_engine(
-            database_url,
-            echo=False,  # Set to True for debugging
-            pool_pre_ping=True,
+            resolved_db_url,
+            **engine_kwargs,
         )
+
+        if resolved_db_url.startswith("sqlite"):
+            configure_sqlite_engine(self.engine.sync_engine)
 
         # Create async session factory
         self.async_session_factory = async_sessionmaker(

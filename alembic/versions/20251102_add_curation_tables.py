@@ -27,9 +27,9 @@ def upgrade() -> None:
     op.create_table(
         "reviews",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("entity_type", sa.String(length=50), nullable=False, index=True),
-        sa.Column("entity_id", sa.String(length=128), nullable=False, index=True),
-        sa.Column("status", sa.String(length=32), nullable=False, index=True),
+        sa.Column("entity_type", sa.String(length=50), nullable=False),
+        sa.Column("entity_id", sa.String(length=128), nullable=False),
+        sa.Column("status", sa.String(length=32), nullable=False),
         sa.Column(
             "priority",
             sa.String(length=16),
@@ -65,9 +65,9 @@ def upgrade() -> None:
     op.create_table(
         "audit_logs",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("action", sa.String(length=64), nullable=False, index=True),
-        sa.Column("entity_type", sa.String(length=50), nullable=False, index=True),
-        sa.Column("entity_id", sa.String(length=128), nullable=False, index=True),
+        sa.Column("action", sa.String(length=64), nullable=False),
+        sa.Column("entity_type", sa.String(length=50), nullable=False),
+        sa.Column("entity_id", sa.String(length=128), nullable=False),
         sa.Column("user", sa.String(length=128), nullable=True),
         sa.Column("details", sa.Text(), nullable=True),
         sa.Column(

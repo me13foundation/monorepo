@@ -5,6 +5,7 @@ Database representation of reusable data source templates with
 relationships and constraints for the Data Sources module.
 """
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, Boolean, Float, Integer, String, Text
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     from .user_data_source import UserDataSourceModel
 
 
-class TemplateCategoryEnum(SQLEnum):
+class TemplateCategoryEnum(str, Enum):
     """SQLAlchemy enum for template categories."""
 
     CLINICAL = "clinical"
@@ -30,7 +31,7 @@ class TemplateCategoryEnum(SQLEnum):
     OTHER = "other"
 
 
-class SourceTypeEnum(SQLEnum):
+class SourceTypeEnum(str, Enum):
     """SQLAlchemy enum for source types."""
 
     FILE_UPLOAD = "file_upload"
@@ -64,7 +65,7 @@ class SourceTemplateModel(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False, default="")
     category: Mapped[TemplateCategoryEnum] = mapped_column(
-        TemplateCategoryEnum,
+        SQLEnum(TemplateCategoryEnum),
         nullable=False,
         default=TemplateCategoryEnum.OTHER,
         index=True,
@@ -72,7 +73,7 @@ class SourceTemplateModel(Base):
 
     # Template definition
     source_type: Mapped[SourceTypeEnum] = mapped_column(
-        SourceTypeEnum,
+        SQLEnum(SourceTypeEnum),
         nullable=False,
         index=True,
     )

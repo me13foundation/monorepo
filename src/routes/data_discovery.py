@@ -11,6 +11,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from src.application.container import get_data_discovery_service_dependency
 from src.application.services.data_discovery_service import (
@@ -20,6 +22,7 @@ from src.application.services.data_discovery_service import (
     ExecuteQueryTestRequest,
     UpdateSessionParametersRequest,
 )
+from src.database.session import get_session
 from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
     QueryParameters,
@@ -27,6 +30,9 @@ from src.domain.entities.data_discovery_session import (
     QueryTestResult,
     SourceCatalogEntry,
     TestResultStatus,
+)
+from src.infrastructure.repositories.research_space_repository import (
+    SqlAlchemyResearchSpaceRepository,
 )
 
 logger = logging.getLogger(__name__)
@@ -133,6 +139,15 @@ class QueryTestResultResponse(BaseModel):
     completed_at: str | None
 
 
+class UpdateSelectionRequest(BaseModel):
+    """Request model for bulk selection updates."""
+
+    source_ids: list[str] = Field(
+        default_factory=list,
+        description="List of catalog entry IDs that should remain selected",
+    )
+
+
 @router.post(
     "/sessions",
     response_model=DataDiscoverySessionResponse,
@@ -143,23 +158,44 @@ class QueryTestResultResponse(BaseModel):
 async def create_session(
     request: CreateSessionRequest,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    db: Session = Depends(get_session),
 ) -> DataDiscoverySessionResponse:
     """Create a new workbench session."""
     try:
         # TODO: Get current user from authentication context
         owner_id = UUID("00000000-0000-0000-0000-000000000001")  # Placeholder
 
+        validated_space_id = request.research_space_id
+        if validated_space_id:
+            space_repo = SqlAlchemyResearchSpaceRepository(session=db)
+            if not space_repo.exists(validated_space_id):
+                logger.warning(
+                    "Research space %s not found while creating discovery session; defaulting to None",
+                    validated_space_id,
+                )
+                validated_space_id = None
+
         create_request = CreateDataDiscoverySessionRequest(
             owner_id=owner_id,
             name=request.name,
-            research_space_id=request.research_space_id,
+            research_space_id=validated_space_id,
             initial_parameters=QueryParameters(
                 gene_symbol=request.initial_parameters.gene_symbol,
                 search_term=request.initial_parameters.search_term,
             ),
         )
 
-        session = service.create_session(create_request)
+        try:
+            session = service.create_session(create_request)
+        except IntegrityError as exc:
+            logger.exception(
+                "Failed to create workbench session due to integrity error (space_id=%s)",
+                validated_space_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid research space reference",
+            ) from exc
         return _session_to_response(session)
 
     except Exception as e:
@@ -205,7 +241,7 @@ async def list_sessions(
     summary="Get workbench session",
     description="Retrieve detailed information about a specific workbench session.",
 )
-async def get_session(
+async def get_session_detail(
     session_id: UUID,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> DataDiscoverySessionResponse:
@@ -296,6 +332,37 @@ async def toggle_source_selection(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update source selection",
+        ) from e
+
+
+@router.put(
+    "/sessions/{session_id}/selections",
+    response_model=DataDiscoverySessionResponse,
+    summary="Set session source selections",
+    description="Replace the selected sources for a data discovery session.",
+)
+async def update_source_selection(
+    session_id: UUID,
+    request: UpdateSelectionRequest,
+    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+) -> DataDiscoverySessionResponse:
+    """Set the selected sources for a workbench session."""
+    try:
+        session = service.set_source_selection(session_id, request.source_ids)
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Data discovery session not found",
+            )
+        return _session_to_response(session)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Failed to update source selections for %s", session_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update source selections",
         ) from e
 
 

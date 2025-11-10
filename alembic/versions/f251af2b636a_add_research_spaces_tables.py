@@ -138,23 +138,23 @@ def upgrade() -> None:
         ["user_id"],
         unique=False,
     )
-    op.drop_index(op.f("idx_sessions_active_only"), table_name="sessions")
-    op.drop_index(op.f("idx_sessions_expired_cleanup"), table_name="sessions")
-    op.drop_index(op.f("idx_sessions_expires_at"), table_name="sessions")
-    op.drop_index(op.f("idx_sessions_ip_address"), table_name="sessions")
-    op.drop_index(op.f("idx_sessions_last_activity"), table_name="sessions")
-    op.drop_index(op.f("idx_sessions_refresh_expires"), table_name="sessions")
-    op.drop_index(op.f("idx_sessions_user_status"), table_name="sessions")
-    op.drop_index(op.f("ix_sessions_expires_at"), table_name="sessions")
-    op.drop_index(op.f("ix_sessions_status"), table_name="sessions")
-    op.drop_index(op.f("ix_sessions_user_id"), table_name="sessions")
-    op.drop_table("sessions")
+    op.drop_constraint(
+        "fk_ingestion_jobs_source_id_user_data_sources",
+        "ingestion_jobs",
+        type_="foreignkey",
+    )
+    op.drop_constraint(
+        "fk_user_data_sources_template_id_source_templates",
+        "user_data_sources",
+        type_="foreignkey",
+    )
     op.alter_column(
         "ingestion_jobs",
         "id",
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=False,
+        postgresql_using="id::uuid",
     )
     op.alter_column(
         "ingestion_jobs",
@@ -162,6 +162,7 @@ def upgrade() -> None:
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=False,
+        postgresql_using="source_id::uuid",
     )
     op.alter_column(
         "ingestion_jobs",
@@ -169,6 +170,7 @@ def upgrade() -> None:
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=True,
+        postgresql_using="triggered_by::uuid",
     )
     op.alter_column(
         "source_templates",
@@ -176,6 +178,7 @@ def upgrade() -> None:
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=False,
+        postgresql_using="id::uuid",
     )
     op.alter_column(
         "source_templates",
@@ -183,6 +186,7 @@ def upgrade() -> None:
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=False,
+        postgresql_using="created_by::uuid",
     )
     op.add_column(
         "user_data_sources",
@@ -194,6 +198,7 @@ def upgrade() -> None:
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=False,
+        postgresql_using="id::uuid",
     )
     op.alter_column(
         "user_data_sources",
@@ -201,6 +206,7 @@ def upgrade() -> None:
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=False,
+        postgresql_using="owner_id::uuid",
     )
     op.alter_column(
         "user_data_sources",
@@ -208,6 +214,7 @@ def upgrade() -> None:
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(as_uuid=False),
         existing_nullable=True,
+        postgresql_using="template_id::uuid",
     )
     op.create_index(
         op.f("ix_user_data_sources_research_space_id"),
@@ -222,12 +229,29 @@ def upgrade() -> None:
         ["research_space_id"],
         ["id"],
     )
+    op.create_foreign_key(
+        "fk_user_data_sources_template_id_source_templates",
+        "user_data_sources",
+        "source_templates",
+        ["template_id"],
+        ["id"],
+        ondelete="SET NULL",
+    )
+    op.create_foreign_key(
+        "fk_ingestion_jobs_source_id_user_data_sources",
+        "ingestion_jobs",
+        "user_data_sources",
+        ["source_id"],
+        ["id"],
+        ondelete="CASCADE",
+    )
     op.alter_column(
         "users",
         "id",
         existing_type=sa.NUMERIC(),
         type_=sa.UUID(),
         existing_nullable=False,
+        postgresql_using="id::uuid",
     )
     # ### end Alembic commands ###
 

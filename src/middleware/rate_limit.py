@@ -144,6 +144,12 @@ class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
                 lambda: TokenBucket(capacity=20, refill_rate=2),
             ),  # 20 req, 2/sec
         }
+        # Paths that should bypass endpoint-specific limits (method -> prefixes)
+        self.method_exemptions: dict[str, tuple[str, ...]] = {
+            "POST": (
+                "/data-discovery/sessions",  # session creation is already gated upstream
+            ),
+        }
 
     async def dispatch(
         self,
@@ -158,6 +164,10 @@ class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
 
         method = request.method
         if method not in self.endpoint_limits:
+            return await call_next(request)
+
+        exempt_prefixes = self.method_exemptions.get(method, ())
+        if any(request.url.path.startswith(prefix) for prefix in exempt_prefixes):
             return await call_next(request)
 
         client_ip = self._get_client_ip(request)

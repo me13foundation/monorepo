@@ -1,6 +1,5 @@
 'use client'
 
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { useParams } from 'next/navigation'
 import { useEffect } from 'react'
@@ -18,10 +17,8 @@ export default function SpaceMembersPage() {
   }, [spaceId, setCurrentSpaceId])
 
   return (
-    <ProtectedRoute>
-      <div>
-        <ResearchSpaceDetail spaceId={spaceId} defaultTab="members" />
-      </div>
-    </ProtectedRoute>
+    <div>
+      <ResearchSpaceDetail spaceId={spaceId} defaultTab="members" />
+    </div>
   )
 }

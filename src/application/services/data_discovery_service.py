@@ -6,6 +6,7 @@ following Clean Architecture principles with dependency injection.
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -235,7 +236,39 @@ class DataDiscoveryService:
         """
         session = self._session_repo.find_by_id(session_id)
         if not session:
+            logger.warning(
+                "Unable to toggle source %s; session %s not found",
+                catalog_entry_id,
+                session_id,
+            )
             return None
+
+        catalog_entry = self._catalog_repo.find_by_id(catalog_entry_id)
+        if not catalog_entry:
+            logger.warning(
+                "Catalog entry %s missing while toggling selection on session %s",
+                catalog_entry_id,
+                session_id,
+            )
+            return None
+
+        if not catalog_entry.is_active:
+            logger.warning(
+                "Attempted to select inactive catalog entry %s on session %s",
+                catalog_entry_id,
+                session_id,
+            )
+            return None
+
+        if catalog_entry.param_type != QueryParameterType.NONE:
+            current_parameters = session.current_parameters
+            if not current_parameters.can_run_query(catalog_entry.param_type):
+                logger.warning(
+                    "Session %s lacks required parameters for catalog entry %s",
+                    session_id,
+                    catalog_entry_id,
+                )
+                return None
 
         # Toggle selection
         updated_session = session.toggle_source_selection(catalog_entry_id)
@@ -246,6 +279,66 @@ class DataDiscoveryService:
             "Toggled source %s selection in session %s",
             catalog_entry_id,
             session_id,
+        )
+        return saved_session
+
+    def set_source_selection(
+        self,
+        session_id: UUID,
+        catalog_entry_ids: Sequence[str],
+    ) -> DataDiscoverySession | None:
+        """
+        Explicitly set session selections to the provided catalog entries.
+        """
+        session = self._session_repo.find_by_id(session_id)
+        if not session:
+            logger.warning("Unable to set selections; session %s not found", session_id)
+            return None
+
+        if not catalog_entry_ids:
+            updated_session = session.with_selected_sources([])
+            return self._session_repo.save(updated_session)
+
+        valid_sources: list[str] = []
+        seen_sources: set[str] = set()
+        for catalog_entry_id in catalog_entry_ids:
+            if catalog_entry_id in seen_sources:
+                continue
+            seen_sources.add(catalog_entry_id)
+
+            catalog_entry = self._catalog_repo.find_by_id(catalog_entry_id)
+            if not catalog_entry:
+                logger.warning(
+                    "Catalog entry %s missing while bulk updating selection on session %s",
+                    catalog_entry_id,
+                    session_id,
+                )
+                continue
+            if not catalog_entry.is_active:
+                logger.warning(
+                    "Attempted to select inactive catalog entry %s on session %s",
+                    catalog_entry_id,
+                    session_id,
+                )
+                continue
+            if catalog_entry.param_type != QueryParameterType.NONE:
+                current_parameters = session.current_parameters
+                if not current_parameters.can_run_query(catalog_entry.param_type):
+                    logger.warning(
+                        "Session %s lacks required parameters for catalog entry %s",
+                        session_id,
+                        catalog_entry_id,
+                    )
+                    continue
+
+            valid_sources.append(catalog_entry_id)
+
+        updated_session = session.with_selected_sources(valid_sources)
+        saved_session = self._session_repo.save(updated_session)
+        logger.info(
+            "Updated selections for session %s (%d sources retained)",
+            session_id,
+            len(valid_sources),
         )
         return saved_session
 

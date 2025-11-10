@@ -5,6 +5,7 @@ Database representation of data ingestion job executions with
 relationships and constraints for the Data Sources module.
 """
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import JSON, ForeignKey, String
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     from .user_data_source import UserDataSourceModel
 
 
-class IngestionStatusEnum(SQLEnum):
+class IngestionStatusEnum(str, Enum):
     """SQLAlchemy enum for ingestion job status."""
 
     PENDING = "pending"
@@ -29,7 +30,7 @@ class IngestionStatusEnum(SQLEnum):
     PARTIAL = "partial"
 
 
-class IngestionTriggerEnum(SQLEnum):
+class IngestionTriggerEnum(str, Enum):
     """SQLAlchemy enum for ingestion job triggers."""
 
     MANUAL = "manual"
@@ -62,7 +63,7 @@ class IngestionJobModel(Base):
 
     # Execution details
     trigger: Mapped[IngestionTriggerEnum] = mapped_column(
-        IngestionTriggerEnum,
+        SQLEnum(IngestionTriggerEnum),
         nullable=False,
     )
     triggered_by: Mapped[str | None] = mapped_column(
@@ -74,7 +75,7 @@ class IngestionJobModel(Base):
 
     # Status and progress
     status: Mapped[IngestionStatusEnum] = mapped_column(
-        IngestionStatusEnum,
+        SQLEnum(IngestionStatusEnum),
         nullable=False,
         default=IngestionStatusEnum.PENDING,
         index=True,

@@ -5,6 +5,7 @@ These entities represent user data discovery sessions for discovering, testing,
 and validating data sources before adding them to Research Spaces.
 """
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any, assert_never
@@ -368,6 +369,25 @@ class DataDiscoverySession(BaseModel):
     def is_source_selected(self, catalog_entry_id: str) -> bool:
         """Check if a source is selected."""
         return catalog_entry_id in self.selected_sources
+
+    def with_selected_sources(
+        self,
+        source_ids: Sequence[str],
+    ) -> "DataDiscoverySession":
+        """
+        Create new session with an explicit set of selected sources.
+
+        Args:
+            source_ids: Iterable of catalog entry IDs to persist
+        """
+        deduped = list(dict.fromkeys(source_ids))
+        return self.model_copy(
+            update={
+                "selected_sources": deduped,
+                "updated_at": datetime.now(UTC),
+                "last_activity_at": datetime.now(UTC),
+            },
+        )
 
     def is_source_tested(self, catalog_entry_id: str) -> bool:
         """Check if a source has been tested."""

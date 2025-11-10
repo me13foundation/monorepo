@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: med13-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MED13_POSTGRES_DB:-med13_dev}
+      POSTGRES_USER: ${MED13_POSTGRES_USER:-med13_dev}
+      POSTGRES_PASSWORD: ${MED13_POSTGRES_PASSWORD:-med13_dev_password}
+    ports:
+      - "${MED13_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - med13-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -d ${MED13_POSTGRES_DB:-med13_dev} -U ${MED13_POSTGRES_USER:-med13_dev}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  med13-postgres-data:
+    driver: local

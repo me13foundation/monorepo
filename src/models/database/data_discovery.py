@@ -36,16 +36,18 @@ class DataDiscoverySessionModel(Base):
     __tablename__ = "data_discovery_sessions"
 
     # Primary key
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=False), primary_key=True)
+    # Use String for SQLite compatibility (stores UUIDs as strings, handles legacy integers)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
 
     # Ownership and context
-    owner_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=False),
+    # Use String for SQLite compatibility (stores UUIDs as strings, handles legacy integers)
+    owner_id: Mapped[str] = mapped_column(
+        String(36),
         nullable=False,
         index=True,
         doc="User who owns this session",
     )
-    research_space_id: Mapped[UUID | None] = mapped_column(
+    research_space_id: Mapped[str | None] = mapped_column(
         PGUUID(as_uuid=False),
         ForeignKey("research_spaces.id"),
         nullable=True,
@@ -178,11 +180,13 @@ class QueryTestResultModel(Base):
     __tablename__ = "query_test_results"
 
     # Primary key
-    id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=False), primary_key=True)
+    # Use String for SQLite compatibility (stores UUIDs as strings)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
 
     # Relationships
-    session_id: Mapped[UUID] = mapped_column(
-        PGUUID(as_uuid=False),
+    # Use String for SQLite compatibility (stores UUIDs as strings)
+    session_id: Mapped[str] = mapped_column(
+        String(36),
         ForeignKey("data_discovery_sessions.id"),
         nullable=False,
         index=True,

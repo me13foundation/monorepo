@@ -33,9 +33,7 @@ def upgrade() -> None:
         "DATABASE",
         "WEB_SCRAPING",
         name="sourcetypeenum",
-        create_type=False,
     )
-    source_type_enum.create(op.get_bind(), checkfirst=True)
 
     source_status_enum = sa.Enum(
         "DRAFT",
@@ -45,9 +43,7 @@ def upgrade() -> None:
         "PENDING_REVIEW",
         "ARCHIVED",
         name="sourcestatusenum",
-        create_type=False,
     )
-    source_status_enum.create(op.get_bind(), checkfirst=True)
 
     template_category_enum = sa.Enum(
         "CLINICAL",
@@ -58,9 +54,7 @@ def upgrade() -> None:
         "ONTOLOGY",
         "OTHER",
         name="templatecategoryenum",
-        create_type=False,
     )
-    template_category_enum.create(op.get_bind(), checkfirst=True)
 
     ingestion_status_enum = sa.Enum(
         "PENDING",
@@ -70,9 +64,7 @@ def upgrade() -> None:
         "CANCELLED",
         "PARTIAL",
         name="ingestionstatusenum",
-        create_type=False,
     )
-    ingestion_status_enum.create(op.get_bind(), checkfirst=True)
 
     ingestion_trigger_enum = sa.Enum(
         "MANUAL",
@@ -81,9 +73,7 @@ def upgrade() -> None:
         "WEBHOOK",
         "RETRY",
         name="ingestiontriggerenum",
-        create_type=False,
     )
-    ingestion_trigger_enum.create(op.get_bind(), checkfirst=True)
 
     # Create source_templates table
     op.create_table(

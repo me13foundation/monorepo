@@ -103,6 +103,9 @@ celerybeat.pid
 
 # Environments
 .env
+.env.postgres
+.postgres-active
+.uvicorn.pid
 .venv
 env/
 venv/
@@ -116,6 +119,7 @@ venv.bak/
 
 # Rope project settings
 .ropeproject
+logs/
 
 # mkdocs documentation
 /site

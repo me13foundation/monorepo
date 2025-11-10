@@ -1,32 +1,34 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useSpaceContext } from '@/components/space-context-provider'
 import { useParams } from 'next/navigation'
+import { useSpaceContext } from '@/components/space-context-provider'
+import { DataSourcesList } from '@/components/data-sources/DataSourcesList'
 
 export default function SpaceDataSourcesPage() {
-  const router = useRouter()
   const params = useParams()
   const spaceId = params.spaceId as string
   const { setCurrentSpaceId } = useSpaceContext()
 
   useEffect(() => {
-    // Set the current space context for consistency
     if (spaceId) {
       setCurrentSpaceId(spaceId)
     }
+  }, [spaceId, setCurrentSpaceId])
 
-    // Redirect to the Research Data Workbench
-    router.replace('/workbench')
-  }, [spaceId, setCurrentSpaceId, router])
+  if (!spaceId) {
+    return null
+  }
 
   return (
-    <div className="flex items-center justify-center min-h-[400px]">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-        <p className="text-muted-foreground">Redirecting to Research Data Workbench...</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Space Data Sources</h1>
+        <p className="text-muted-foreground mt-1">
+          Manage the data sources that belong to this research space.
+        </p>
       </div>
+      <DataSourcesList spaceId={spaceId} />
     </div>
   )
 }

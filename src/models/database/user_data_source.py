@@ -7,6 +7,7 @@ and constraints for the Data Sources module.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
     from .source_template import SourceTemplateModel
 
 
-class SourceTypeEnum(SQLEnum):
+class SourceTypeEnum(str, Enum):
     """SQLAlchemy enum for source types."""
 
     FILE_UPLOAD = "file_upload"
@@ -38,7 +39,7 @@ class SourceTypeEnum(SQLEnum):
     WEB_SCRAPING = "web_scraping"
 
 
-class SourceStatusEnum(SQLEnum):
+class SourceStatusEnum(str, Enum):
     """SQLAlchemy enum for source status."""
 
     DRAFT = "draft"
@@ -83,7 +84,7 @@ class UserDataSourceModel(Base):
 
     # Configuration
     source_type: Mapped[SourceTypeEnum] = mapped_column(
-        SourceTypeEnum,
+        SQLEnum(SourceTypeEnum),
         nullable=False,
         index=True,
     )
@@ -101,7 +102,7 @@ class UserDataSourceModel(Base):
 
     # Status and lifecycle
     status: Mapped[SourceStatusEnum] = mapped_column(
-        SourceStatusEnum,
+        SQLEnum(SourceStatusEnum),
         nullable=False,
         default=SourceStatusEnum.DRAFT,
         index=True,

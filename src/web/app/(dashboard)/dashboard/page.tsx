@@ -3,7 +3,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useSession } from 'next-auth/react'
 import { Database, Users, Activity, BarChart3, Plus, FolderPlus, ExternalLink } from 'lucide-react'
 import { useDashboardStats, useRecentActivities } from '@/lib/queries/dashboard'
@@ -14,11 +13,7 @@ import Link from 'next/link'
 import type { ResearchSpaceListResponse } from '@/types/research-space'
 
 export default function DashboardPage() {
-  return (
-    <ProtectedRoute>
-      <DashboardContent />
-    </ProtectedRoute>
-  )
+  return <DashboardContent />
 }
 
 function DashboardContent() {

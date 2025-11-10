@@ -19,6 +19,7 @@ from src.application.services.data_discovery_service import (
 )
 from src.domain.entities.data_discovery_session import (
     QueryParameters,
+    QueryParameterType,
     TestResultStatus,
 )
 from tests.test_types.data_discovery_fixtures import (
@@ -144,6 +145,7 @@ class TestDataDiscoveryService:
 
         # Mock the repository
         service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        service._catalog_repo.find_by_id.return_value = TEST_SOURCE_CLINVAR
         updated_session = create_test_data_discovery_session(
             id=session_id,
             selected_sources=["clinvar"],  # Added clinvar
@@ -155,6 +157,39 @@ class TestDataDiscoveryService:
         assert result is not None
         assert "clinvar" in result.selected_sources
         service._session_repo.save.assert_called_once()
+
+    def test_set_source_selection_filters_invalid_sources(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Test setting selections filters out invalid catalog entries."""
+        session_id = TEST_SESSION_ACTIVE.id
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        service._catalog_repo.find_by_id.side_effect = lambda source_id: (
+            TEST_SOURCE_CLINVAR if source_id == "clinvar" else None
+        )
+        updated_session = create_test_data_discovery_session(
+            id=session_id,
+            selected_sources=["clinvar"],
+        )
+        service._session_repo.save.return_value = updated_session
+
+        result = service.set_source_selection(session_id, ["clinvar", "missing"])
+
+        assert result is not None
+        assert result.selected_sources == ["clinvar"]
+
+    def test_set_source_selection_session_missing(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Test attempting to set selections for a missing session."""
+        session_id = uuid4()
+        service._session_repo.find_by_id.return_value = None
+
+        result = service.set_source_selection(session_id, ["clinvar"])
+
+        assert result is None
 
     def test_get_source_catalog(self, service: DataDiscoveryService) -> None:
         """Test retrieving source catalog."""
@@ -264,6 +299,65 @@ class TestDataDiscoveryService:
         result = await service.execute_query_test(request)
 
         assert result is None
+
+    def test_toggle_source_selection_missing_catalog(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Selection toggle should noop when catalog entry not found."""
+        session_id = TEST_SESSION_ACTIVE.id
+        service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
+        service._catalog_repo.find_by_id.return_value = None
+
+        result = service.toggle_source_selection(session_id, "missing-entry")
+
+        assert result is None
+        service._session_repo.save.assert_not_called()
+
+    def test_toggle_source_selection_invalid_parameters(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Selection toggle should require required parameters to be present."""
+        session_id = TEST_SESSION_ACTIVE.id
+        session_without_params = create_test_data_discovery_session(
+            id=session_id,
+            current_parameters=QueryParameters(gene_symbol=None, search_term=None),
+        )
+        service._session_repo.find_by_id.return_value = session_without_params
+        source_requires_gene = TEST_SOURCE_CLINVAR.model_copy()
+        service._catalog_repo.find_by_id.return_value = source_requires_gene
+
+        result = service.toggle_source_selection(session_id, source_requires_gene.id)
+
+        assert result is None
+        service._session_repo.save.assert_not_called()
+
+    def test_toggle_source_selection_allows_paramless_sources(
+        self,
+        service: DataDiscoveryService,
+    ) -> None:
+        """Ensure sources that require no parameters can be toggled without data."""
+        session_id = TEST_SESSION_ACTIVE.id
+        session_without_params = create_test_data_discovery_session(
+            id=session_id,
+            current_parameters=QueryParameters(gene_symbol=None, search_term=None),
+        )
+        service._session_repo.find_by_id.return_value = session_without_params
+        source_paramless = TEST_SOURCE_CLINVAR.model_copy(
+            update={"param_type": QueryParameterType.NONE},
+        )
+        service._catalog_repo.find_by_id.return_value = source_paramless
+        updated_session = create_test_data_discovery_session(
+            id=session_id,
+            selected_sources=[source_paramless.id],
+        )
+        service._session_repo.save.return_value = updated_session
+
+        result = service.toggle_source_selection(session_id, source_paramless.id)
+
+        assert result is not None
+        assert source_paramless.id in result.selected_sources
 
     def test_get_session_test_results(self, service: DataDiscoveryService) -> None:
         """Test retrieving session test results."""

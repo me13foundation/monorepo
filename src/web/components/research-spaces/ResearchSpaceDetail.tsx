@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { useResearchSpace, useUpdateResearchSpace, useDeleteResearchSpace, useRemoveMember } from '@/lib/queries/research-spaces'
+import { useResearchSpace, useUpdateResearchSpace, useDeleteResearchSpace, useRemoveMember, useSpaceMembers } from '@/lib/queries/research-spaces'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -43,6 +43,11 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
   const updateMutation = useUpdateResearchSpace()
   const deleteMutation = useDeleteResearchSpace()
   const removeMutation = useRemoveMember()
+  const {
+    data: membersData,
+    isLoading: membersLoading,
+    error: membersErrorRaw,
+  } = useSpaceMembers(spaceId)
 
   const spaceData = space as ResearchSpace | undefined
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
@@ -50,10 +55,13 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
   const [selectedCurrentRole, setSelectedCurrentRole] = useState<MembershipRole | null>(null)
 
-  // Get user's role in this space (simplified - would need actual membership query)
-  // TODO: Get from membership query - for now assume viewer
-  const userRole = MembershipRole.VIEWER as MembershipRole
+  const membershipList = membersData?.memberships ?? []
+  const matchedMembership = membershipList.find((membership) => membership.user_id === session?.user?.id)
+  const sessionRoleKey = session?.user?.role?.toUpperCase() as keyof typeof MembershipRole | undefined
+  const fallbackRole = sessionRoleKey ? MembershipRole[sessionRoleKey] : undefined
+  const userRole = matchedMembership?.role ?? fallbackRole ?? MembershipRole.VIEWER
   const canManage = canManageMembers(userRole)
+  const membersError = membersErrorRaw instanceof Error ? membersErrorRaw : null
 
   const handleUpdateRole = (membershipId: string, currentRole: MembershipRole) => {
     setSelectedMembershipId(membershipId)
@@ -178,13 +186,16 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
         </TabsContent>
 
         <TabsContent value="members" className="space-y-4">
-          <SpaceMembersList
-            spaceId={spaceId}
-            onInvite={() => setInviteDialogOpen(true)}
-            onUpdateRole={handleUpdateRole}
-            onRemove={handleRemoveMember}
-            canManage={canManage}
-          />
+        <SpaceMembersList
+          spaceId={spaceId}
+          memberships={membershipList}
+          isLoading={membersLoading}
+          error={membersError}
+          onInvite={() => setInviteDialogOpen(true)}
+          onUpdateRole={handleUpdateRole}
+          onRemove={handleRemoveMember}
+          canManage={canManage}
+        />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">

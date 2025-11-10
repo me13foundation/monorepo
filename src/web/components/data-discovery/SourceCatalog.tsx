@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -27,8 +27,6 @@ import {
   Users,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { useDataDiscoveryStore } from '@/lib/stores/data-discovery-store'
-import { useSourceCatalog } from '@/lib/queries/data-discovery'
 import { SourceCatalogEntry } from '@/lib/types/data-discovery'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -106,25 +104,30 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   'AI Predictive Models': BrainCircuit,
 }
 
-export function SourceCatalog() {
+interface SourceCatalogProps {
+  catalog?: SourceCatalogEntry[]
+  isLoading: boolean
+  error: Error | null
+  selectedSources: string[]
+  onToggleSource: (sourceId: string) => void | Promise<void>
+  onSelectAllInCategory: (category: string, sourceIds: string[]) => void | Promise<void>
+}
+
+export function SourceCatalog({
+  catalog: catalogData,
+  isLoading,
+  error,
+  selectedSources,
+  onToggleSource,
+  onSelectAllInCategory,
+}: SourceCatalogProps) {
   const [activeCategory, setActiveCategory] = useState('All Sources')
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const { selectedSources, toggleSourceSelection, selectAllInCategory, catalog: storeCatalog, setCatalog } = useDataDiscoveryStore()
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false)
   const { data: session } = useSession()
-  const { data: apiCatalog, isLoading, error } = useSourceCatalog()
 
-  // Update store catalog when API data loads
-  React.useEffect(() => {
-    if (apiCatalog && apiCatalog.length > 0) {
-      setCatalog(apiCatalog)
-    }
-  }, [apiCatalog, setCatalog])
-
-  // Use store catalog or fallback to API data
-  const catalog = React.useMemo(() => {
-    return storeCatalog.length > 0 ? storeCatalog : (apiCatalog || [])
-  }, [storeCatalog, apiCatalog])
+  const catalog = useMemo(() => catalogData ?? [], [catalogData])
 
   // Filter sources based on category and search
   const filteredSources = useMemo(() => {
@@ -148,9 +151,17 @@ export function SourceCatalog() {
     return categorySourceIds.every(id => selectedSources.includes(id))
   }, [filteredSources, selectedSources])
 
-  const handleSelectAll = () => {
-    const categorySourceIds = filteredSources.map(s => s.id)
-    selectAllInCategory(activeCategory)
+  const handleSelectAll = async () => {
+    const categorySourceIds = filteredSources.map((s) => s.id)
+    if (categorySourceIds.length === 0) {
+      return
+    }
+    setIsBulkUpdating(true)
+    try {
+      await onSelectAllInCategory(activeCategory, categorySourceIds)
+    } finally {
+      setIsBulkUpdating(false)
+    }
   }
 
   // Show authentication required state
@@ -252,6 +263,7 @@ export function SourceCatalog() {
             variant="outline"
             size="sm"
             onClick={handleSelectAll}
+            disabled={isBulkUpdating || filteredSources.length === 0}
             className="flex items-center space-x-2"
           >
             <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
@@ -259,7 +271,13 @@ export function SourceCatalog() {
             }`}>
               {allInCategorySelected && <Check className="w-3 h-3 text-primary-foreground" />}
             </div>
-            <span>{allInCategorySelected ? 'Deselect All' : 'Select All'}</span>
+            <span>
+              {isBulkUpdating
+                ? 'Updating…'
+                : allInCategorySelected
+                  ? 'Deselect All'
+                  : 'Select All'}
+            </span>
           </Button>
         </div>
 
@@ -270,7 +288,7 @@ export function SourceCatalog() {
                 key={source.id}
                 source={source}
                 isSelected={selectedSources.includes(source.id)}
-                onToggle={() => toggleSourceSelection(source.id)}
+                onToggle={() => onToggleSource(source.id)}
               />
             ))
           ) : (

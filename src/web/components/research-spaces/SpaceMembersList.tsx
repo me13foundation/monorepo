@@ -1,7 +1,7 @@
 "use client"
 
-import { useSpaceMembers, useRemoveMember } from '@/lib/queries/research-spaces'
-import { MembershipRole } from '@/types/research-space'
+import { useRemoveMember } from '@/lib/queries/research-spaces'
+import { MembershipRole, type ResearchSpaceMembership } from '@/types/research-space'
 import {
   Table,
   TableBody,
@@ -19,6 +19,9 @@ import { cn } from '@/lib/utils'
 
 interface SpaceMembersListProps {
   spaceId: string
+  memberships: ResearchSpaceMembership[]
+  isLoading: boolean
+  error: Error | null
   onInvite?: () => void
   onUpdateRole?: (membershipId: string, currentRole: MembershipRole) => void
   onRemove?: (membershipId: string) => void
@@ -27,24 +30,24 @@ interface SpaceMembersListProps {
 
 export function SpaceMembersList({
   spaceId,
+  memberships,
+  isLoading,
+  error,
   onInvite,
   onUpdateRole,
   onRemove,
   canManage = false,
 }: SpaceMembersListProps) {
-  const { data, isLoading, error } = useSpaceMembers(spaceId)
   const removeMutation = useRemoveMember()
 
   const handleRemove = async (membershipId: string) => {
     if (onRemove) {
       onRemove(membershipId)
-    } else {
-      if (confirm('Are you sure you want to remove this member?')) {
-        try {
-          await removeMutation.mutateAsync({ spaceId, membershipId })
-        } catch (error) {
-          console.error('Failed to remove member:', error)
-        }
+    } else if (confirm('Are you sure you want to remove this member?')) {
+      try {
+        await removeMutation.mutateAsync({ spaceId, membershipId })
+      } catch (removalError) {
+        console.error('Failed to remove member:', removalError)
       }
     }
   }
@@ -66,8 +69,6 @@ export function SpaceMembersList({
       </div>
     )
   }
-
-  const memberships = data?.memberships || []
 
   return (
     <div className="space-y-4">

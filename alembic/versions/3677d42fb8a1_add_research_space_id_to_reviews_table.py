@@ -9,6 +9,7 @@ Create Date: 2025-11-07 16:52:36.819339
 from collections.abc import Sequence
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
@@ -26,6 +27,13 @@ def upgrade() -> None:
     inspector = sa.inspect(conn)
     columns = [col["name"] for col in inspector.get_columns("reviews")]
 
+    dialect_name = conn.dialect.name
+    column_type: sa.types.TypeEngine
+    if dialect_name == "postgresql":
+        column_type = postgresql.UUID(as_uuid=False)
+    else:
+        column_type = sa.String(length=36)
+
     if "research_space_id" not in columns:
         # SQLite doesn't support adding foreign keys after table creation
         # Use batch mode for SQLite compatibility
@@ -34,7 +42,7 @@ def upgrade() -> None:
             batch_op.add_column(
                 sa.Column(
                     "research_space_id",
-                    sa.String(length=36),  # UUID as string for SQLite compatibility
+                    column_type,
                     nullable=True,
                 ),
             )

@@ -5,10 +5,12 @@ These implementations provide concrete SQLAlchemy-based data access
 for data discovery sessions, source catalogs, and query test results.
 """
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from src.database.sqlite_utils import retry_on_sqlite_lock
 from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
     QueryTestResult,
@@ -33,6 +35,61 @@ from src.models.database.data_discovery import (
     SourceCatalogEntryModel,
 )
 
+LEGACY_OWNER_ID_THRESHOLD = 1_000
+
+
+def _expand_identifier(
+    identifier: UUID | str,
+    *,
+    allow_legacy_formats: bool = True,
+) -> list[str]:
+    """
+    Generate identifier variations that may exist in legacy rows.
+
+    Some historical data persisted UUIDs without hyphens. Modern inserts
+    always include hyphens, so we try both representations when looking up
+    records to keep behaviour robust.
+    """
+    raw_value = str(identifier)
+    if not allow_legacy_formats:
+        return [raw_value]
+
+    candidates = {raw_value}
+    compact = raw_value.replace("-", "")
+    if compact:
+        candidates.add(compact)
+    return list(candidates)
+
+
+def _owner_identifier_candidates(
+    identifier: UUID | str,
+    *,
+    allow_legacy_formats: bool,
+) -> list[str]:
+    """
+    Build owner identifier candidates, optionally adding hyphenless/numeric fallbacks.
+    """
+    raw_value = str(identifier)
+    if not allow_legacy_formats:
+        return [raw_value]
+
+    candidates = {raw_value}
+    compact = raw_value.replace("-", "")
+    if compact:
+        candidates.add(compact)
+        stripped = compact.lstrip("0")
+        if stripped and stripped.isdigit():
+            int_value = int(stripped)
+            if int_value < LEGACY_OWNER_ID_THRESHOLD:
+                candidates.add(str(int_value))
+    return list(candidates)
+
+
+def _dialect_name_for_session(session: Session) -> str:
+    bind: Any = getattr(session, "bind", None)
+    dialect = getattr(bind, "dialect", None) if bind else None
+    return getattr(dialect, "name", "") if dialect else ""
+
 
 class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
     """
@@ -49,6 +106,12 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
             session: SQLAlchemy database session
         """
         self._session = session
+        dialect_name = _dialect_name_for_session(session)
+        self._allow_legacy_identifiers = dialect_name == "sqlite"
+        dialect_name = _dialect_name_for_session(session)
+        self._allow_legacy_identifiers = dialect_name == "sqlite"
+        dialect_name = _dialect_name_for_session(session)
+        self._allow_legacy_owner_formats = dialect_name == "sqlite"
 
     def save(self, session: DataDiscoverySession) -> DataDiscoverySession:
         """
@@ -62,7 +125,11 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         """
         model = session_to_model(session)
         self._session.merge(model)
-        self._session.commit()
+
+        def _commit() -> None:
+            self._session.commit()
+
+        retry_on_sqlite_lock(_commit)
         return session
 
     def find_by_id(self, session_id: UUID) -> DataDiscoverySession | None:
@@ -75,12 +142,18 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         Returns:
             The session entity if found, None otherwise
         """
-        model = self._session.get(DataDiscoverySessionModel, session_id)
-        return session_to_entity(model) if model else None
+        for candidate in _expand_identifier(
+            session_id,
+            allow_legacy_formats=self._allow_legacy_owner_formats,
+        ):
+            model = self._session.get(DataDiscoverySessionModel, candidate)
+            if model:
+                return session_to_entity(model)
+        return None
 
     def find_by_owner(
         self,
-        owner_id: UUID,
+        owner_id: UUID | str,
         *,
         include_inactive: bool = False,
     ) -> list[DataDiscoverySession]:
@@ -94,8 +167,12 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         Returns:
             List of session entities owned by the user
         """
-        query = self._session.query(DataDiscoverySessionModel).filter_by(
-            owner_id=owner_id,
+        owner_candidates = _owner_identifier_candidates(
+            owner_id,
+            allow_legacy_formats=self._allow_legacy_owner_formats,
+        )
+        query = self._session.query(DataDiscoverySessionModel).filter(
+            DataDiscoverySessionModel.owner_id.in_(owner_candidates),
         )
 
         if not include_inactive:
@@ -114,9 +191,17 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         Returns:
             List of session entities in the space
         """
+        # Convert UUID to string for database query (database stores UUIDs as strings)
+        space_ids = _expand_identifier(
+            space_id,
+            allow_legacy_formats=self._allow_legacy_owner_formats,
+        )
         models = (
             self._session.query(DataDiscoverySessionModel)
-            .filter_by(research_space_id=space_id, is_active=True)
+            .filter(
+                DataDiscoverySessionModel.research_space_id.in_(space_ids),
+                DataDiscoverySessionModel.is_active.is_(True),
+            )
             .order_by(DataDiscoverySessionModel.last_activity_at.desc())
             .all()
         )
@@ -132,11 +217,19 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         Returns:
             True if deleted, False if not found
         """
-        model = self._session.get(DataDiscoverySessionModel, session_id)
-        if model:
-            self._session.delete(model)
-            self._session.commit()
-            return True
+        for candidate in _expand_identifier(
+            session_id,
+            allow_legacy_formats=self._allow_legacy_owner_formats,
+        ):
+            model = self._session.get(DataDiscoverySessionModel, candidate)
+            if model:
+                self._session.delete(model)
+
+                def _commit() -> None:
+                    self._session.commit()
+
+                retry_on_sqlite_lock(_commit)
+                return True
         return False
 
 
@@ -288,7 +381,10 @@ class SQLAlchemySourceCatalogRepository(SourceCatalogRepository):
             current_successes = int(model.success_rate * (total_uses - 1))
             model.success_rate = current_successes / total_uses
 
-        self._session.commit()
+        def _commit() -> None:
+            self._session.commit()
+
+        retry_on_sqlite_lock(_commit)
         return True
 
 
@@ -307,6 +403,8 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
             session: SQLAlchemy database session
         """
         self._session = session
+        dialect_name = _dialect_name_for_session(session)
+        self._allow_legacy_identifiers = dialect_name == "sqlite"
 
     def save(self, result: QueryTestResult) -> QueryTestResult:
         """
@@ -320,7 +418,11 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
         """
         model = query_result_to_model(result)
         self._session.merge(model)
-        self._session.commit()
+
+        def _commit() -> None:
+            self._session.commit()
+
+        retry_on_sqlite_lock(_commit)
         return result
 
     def find_by_session(self, session_id: UUID) -> list[QueryTestResult]:
@@ -333,9 +435,13 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
         Returns:
             List of test result entities for the session
         """
+        session_ids = _expand_identifier(
+            session_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
         models = (
             self._session.query(QueryTestResultModel)
-            .filter_by(session_id=session_id)
+            .filter(QueryTestResultModel.session_id.in_(session_ids))
             .order_by(QueryTestResultModel.started_at.desc())
             .all()
         )
@@ -375,7 +481,9 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
         Returns:
             The test result entity if found, None otherwise
         """
-        model = self._session.get(QueryTestResultModel, result_id)
+        # Convert UUID to string for database query (database stores UUIDs as strings)
+        result_id_str = str(result_id) if isinstance(result_id, UUID) else result_id
+        model = self._session.get(QueryTestResultModel, result_id_str)
         return query_result_to_entity(model) if model else None
 
     def delete_session_results(self, session_id: UUID) -> int:
@@ -388,10 +496,20 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
         Returns:
             Number of results deleted
         """
+        session_ids = _expand_identifier(
+            session_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
         deleted_count = (
             self._session.query(QueryTestResultModel)
-            .filter_by(session_id=session_id)
-            .delete()
+            .filter(
+                QueryTestResultModel.session_id.in_(session_ids),
+            )
+            .delete(synchronize_session=False)
         )
-        self._session.commit()
+
+        def _commit() -> None:
+            self._session.commit()
+
+        retry_on_sqlite_lock(_commit)
         return deleted_count

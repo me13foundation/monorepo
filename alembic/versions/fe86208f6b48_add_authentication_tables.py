@@ -120,6 +120,13 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+            server_onupdate=sa.text("now()"),
+        ),
+        sa.Column(
             "last_activity",
             sa.DateTime(timezone=True),
             nullable=False,

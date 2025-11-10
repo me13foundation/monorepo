@@ -48,16 +48,64 @@ make setup-dev
 # Install Next.js dependencies
 make web-install
 
-# Run all services
-make run-local    # Terminal 1: FastAPI backend (port 8080)
-make run-web      # Terminal 2: Next.js admin (port 3000)
-make run-dash     # Terminal 3: Dash curation (port 8050)
+# Run everything on fresh Postgres (recommended)
+make run-all-postgres   # Wipes & recreates Postgres, applies migrations, seeds admin, starts backend + Next.js
+
+# Optional background helpers
+make start-local     # Launch FastAPI in background (uses SQLite unless .postgres-active exists)
+make backend-status  # Check if the background backend is running
+make start-web       # Launch Next.js admin in background (logs/web.log)
+make stop-web        # Stop background Next.js (use stop-all to tear everything down)
+make stop-local      # Stop the FastAPI backend (foreground or background)
 
 # Access the services
 # - API Documentation: http://localhost:8080/docs
 # - Admin Dashboard: http://localhost:3000/dashboard
 # - Curation Interface: http://localhost:8050
 ```
+
+### Optional: Run Postgres Locally
+
+SQLite remains the default for quick prototyping, but you can run the backend
+and tests against a Dockerized Postgres instance for closer-to-prod behavior.
+See `docs/local_postgres.md` for details. Key commands:
+
+```bash
+# One-shot command: reset Postgres, run migrations, seed admin, start backend (background) + Next.js dev
+make run-all-postgres
+
+# Restart workflow after changing migrations or seeds
+make restart-postgres   # Destroys & recreates the Postgres container (data wiped; rerun run-all-postgres afterward)
+make run-all-postgres   # Rebuild stack with fresh data
+
+# Tear everything down (FastAPI, Dash, Next.js, Postgres containers)
+make stop-all
+```
+
+`make run-all-postgres` drops any existing Postgres dev container, recreates it via `docker-compose.postgres.yml`,
+runs Alembic migrations, seeds the default admin (`admin@med13.org` / `admin123`), ensures the default research space
+exists, then starts FastAPI in the background (logs → `logs/backend.log`) before launching the Next.js dev server.
+The command also writes a `.postgres-active` flag so all other Make targets automatically source `.env.postgres`
+and re-run migrations before touching the database.
+
+Use the advanced helpers below if you need finer control over the Postgres container or want to run Dash alongside the stack:
+
+```bash
+make docker-postgres-up        # Creates .env.postgres if missing, then starts the DB
+make docker-postgres-status    # Inspect container health
+make docker-postgres-logs      # Tail Postgres output (Ctrl+C to stop)
+make docker-postgres-down      # Stop the container (data persists)
+make docker-postgres-destroy   # Stop + wipe data volume (fresh start)
+make run-local-postgres        # Start FastAPI with DATABASE_URL/ASYNC_DATABASE_URL loaded
+make run-web-postgres          # Seed admin + start Next.js with Postgres env
+make test-postgres             # Run pytest suite using Postgres
+make postgres-cmd CMD="..."    # Run any command with Postgres env (e.g., migrations)
+make postgres-disable          # Keep container up but revert commands to SQLite
+```
+
+When Postgres mode is active (`.postgres-active` exists), `make run-local`, `make run-web`, `make test`, and `make start-local`
+automatically source `.env.postgres` **and run `alembic upgrade head`** before starting. Tear the container down (or run
+`make postgres-disable`) to switch back to SQLite defaults.
 
 ### Environment Status Check
 
@@ -172,11 +220,13 @@ The Makefile automatically detects your environment:
 
 ```bash
 # Initial setup
-make setup-dev         # Python environment + dependencies
-make web-install       # Next.js dependencies
+make setup-dev          # Python environment + dependencies
+make web-install        # Next.js dependencies
 
-# Development cycle - run before commit/push
-make all               # Complete quality assurance (Python + Next.js)
+# Unified start/stop workflow (Postgres-backed dev stack)
+make run-all-postgres   # Clean Postgres -> migrations -> seed admin -> FastAPI + Next.js
+make restart-postgres   # Recreate Postgres container (rerun run-all-postgres afterward if services were stopped)
+make stop-all           # Stop FastAPI, Dash, Next.js, and Postgres containers
 
 # Individual quality checks
 make format            # Python auto-format
@@ -189,8 +239,8 @@ make test              # Python tests
 make web-test          # Next.js tests
 
 # Development servers (run in separate terminals)
-make run-local         # FastAPI backend
-make run-web           # Next.js admin UI
+make run-local         # FastAPI backend (auto-migrates if Postgres active)
+make run-web           # Next.js admin UI (seeds admin if needed)
 make run-dash          # Dash curation UI
 
 # Production builds

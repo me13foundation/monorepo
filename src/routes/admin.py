@@ -10,8 +10,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.orm import Session
 
 from src.application.services.data_source_authorization_service import (
     DataSourceAuthorizationService,
@@ -24,7 +23,7 @@ from src.application.services.source_management_service import (
 from src.application.services.template_management_service import (
     TemplateManagementService,
 )
-from src.database.session import get_session
+from src.database.session import SessionLocal, get_session
 from src.domain.entities.user_data_source import (
     IngestionSchedule,
     SourceConfiguration,
@@ -47,11 +46,6 @@ router = APIRouter(
         500: {"description": "Internal Server Error"},
     },
 )
-
-# Database session setup (simplified for now)
-# TODO: Use proper dependency injection from container
-engine = create_engine("sqlite:///med13.db")  # TODO: Get from config
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def get_db_session() -> Session:

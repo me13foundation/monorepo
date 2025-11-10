@@ -6,6 +6,9 @@ following the Clean Architecture pattern of separating domain logic
 from infrastructure concerns.
 """
 
+from typing import Any
+from uuid import UUID
+
 from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
     QueryParameters,
@@ -21,6 +24,31 @@ from src.models.database.data_discovery import (
 )
 
 
+def _coerce_uuid(value: Any) -> UUID:
+    """
+    Convert a value that may come from legacy rows into a proper UUID.
+    """
+    if isinstance(value, UUID):
+        return value
+    if isinstance(value, int):
+        return UUID(f"{value:032x}")
+    if isinstance(value, str):
+        normalized = value.strip()
+        try:
+            return UUID(normalized)
+        except ValueError:
+            if normalized.isdigit():
+                return UUID(f"{int(normalized):032x}")
+            raise
+    return UUID(str(value))
+
+
+def _coerce_uuid_or_none(value: Any | None) -> UUID | None:
+    if value is None:
+        return None
+    return _coerce_uuid(value)
+
+
 def session_to_model(entity: DataDiscoverySession) -> DataDiscoverySessionModel:
     """
     Convert a DataDiscoverySession entity to a database model.
@@ -31,10 +59,19 @@ def session_to_model(entity: DataDiscoverySession) -> DataDiscoverySessionModel:
     Returns:
         The corresponding database model
     """
+    # Convert UUID objects to strings for database storage
     return DataDiscoverySessionModel(
-        id=entity.id,
-        owner_id=entity.owner_id,
-        research_space_id=entity.research_space_id,
+        id=str(entity.id) if isinstance(entity.id, UUID) else entity.id,
+        owner_id=(
+            str(entity.owner_id)
+            if isinstance(entity.owner_id, UUID)
+            else entity.owner_id
+        ),
+        research_space_id=(
+            str(entity.research_space_id)
+            if entity.research_space_id and isinstance(entity.research_space_id, UUID)
+            else entity.research_space_id
+        ),
         name=entity.name,
         gene_symbol=entity.current_parameters.gene_symbol,
         search_term=entity.current_parameters.search_term,
@@ -59,15 +96,19 @@ def session_to_entity(model: DataDiscoverySessionModel) -> DataDiscoverySession:
     Returns:
         The corresponding domain entity
     """
+    session_id = _coerce_uuid(model.id)
+    owner_id = _coerce_uuid(model.owner_id)
+    research_space_id = _coerce_uuid_or_none(model.research_space_id)
+
     parameters = QueryParameters(
         gene_symbol=model.gene_symbol,
         search_term=model.search_term,
     )
 
     return DataDiscoverySession(
-        id=model.id,
-        owner_id=model.owner_id,
-        research_space_id=model.research_space_id,
+        id=session_id,
+        owner_id=owner_id,
+        research_space_id=research_space_id,
         name=model.name,
         current_parameters=parameters,
         selected_sources=model.selected_sources or [],
@@ -153,9 +194,14 @@ def query_result_to_model(entity: QueryTestResult) -> QueryTestResultModel:
     Returns:
         The corresponding database model
     """
+    # Convert UUID objects to strings for database storage
     return QueryTestResultModel(
-        id=entity.id,
-        session_id=entity.session_id,
+        id=str(entity.id) if isinstance(entity.id, UUID) else entity.id,
+        session_id=(
+            str(entity.session_id)
+            if isinstance(entity.session_id, UUID)
+            else entity.session_id
+        ),
         catalog_entry_id=entity.catalog_entry_id,
         status=entity.status.value,  # Convert enum to string
         gene_symbol=entity.parameters.gene_symbol,
@@ -180,14 +226,42 @@ def query_result_to_entity(model: QueryTestResultModel) -> QueryTestResult:
     Returns:
         The corresponding domain entity
     """
+    # Convert string UUIDs from database to UUID objects for domain entities
+    # Handle various input types (string, UUID, int for legacy data)
+    model_result_id: Any = model.id
+    if isinstance(model_result_id, str):
+        result_id = UUID(model_result_id)
+    elif isinstance(model_result_id, UUID):
+        result_id = model_result_id
+    else:
+        # Legacy integer IDs - convert to UUID (zero-padded)
+        result_id = (
+            UUID(f"{model_result_id:032x}")
+            if isinstance(model_result_id, int)
+            else UUID(str(model_result_id))
+        )
+
+    model_session_id: Any = model.session_id
+    if isinstance(model_session_id, str):
+        session_id = UUID(model_session_id)
+    elif isinstance(model_session_id, UUID):
+        session_id = model_session_id
+    else:
+        # Legacy integer IDs - convert to UUID (zero-padded)
+        session_id = (
+            UUID(f"{model_session_id:032x}")
+            if isinstance(model_session_id, int)
+            else UUID(str(model_session_id))
+        )
+
     parameters = QueryParameters(
         gene_symbol=model.gene_symbol,
         search_term=model.search_term,
     )
 
     return QueryTestResult(
-        id=model.id,
-        session_id=model.session_id,
+        id=result_id,
+        session_id=session_id,
         catalog_entry_id=model.catalog_entry_id,
         parameters=parameters,
         status=TestResultStatus(model.status),

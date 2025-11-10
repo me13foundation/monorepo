@@ -6,7 +6,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.application.container import container, initialize_legacy_session
-from src.database.seed import ensure_source_catalog_seeded
+from src.database.seed import (
+    ensure_default_research_space_seeded,
+    ensure_source_catalog_seeded,
+)
 from src.database.session import get_session
 from src.middleware.auth import AuthMiddleware
 from src.middleware.jwt_auth import JWTAuthMiddleware
@@ -39,6 +42,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         initialize_legacy_session(legacy_session)
         ensure_source_catalog_seeded(legacy_session)
+        ensure_default_research_space_seeded(legacy_session)
         legacy_session.commit()
         yield
     except Exception:

@@ -1,19 +1,34 @@
-import os
 from collections.abc import Generator
+from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///med13.db",
-)
+from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
+from src.database.url_resolver import resolve_sync_database_url
 
-engine = create_engine(DATABASE_URL, future=True, pool_pre_ping=True)
+DATABASE_URL = resolve_sync_database_url()
+
+ENGINE_KWARGS: dict[str, Any] = {
+    "future": True,
+    "pool_pre_ping": True,
+}
+
+if DATABASE_URL.startswith("sqlite"):
+    ENGINE_KWARGS["connect_args"] = build_sqlite_connect_args()
+    ENGINE_KWARGS["poolclass"] = NullPool
+
+engine = create_engine(DATABASE_URL, **ENGINE_KWARGS)
+
+if DATABASE_URL.startswith("sqlite"):
+    configure_sqlite_engine(engine)
+
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,
     autocommit=False,
+    expire_on_commit=False,
     class_=Session,
 )
 

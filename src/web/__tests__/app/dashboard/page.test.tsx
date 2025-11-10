@@ -55,11 +55,6 @@ jest.mock('next-auth/react', () => ({
   signOut: jest.fn()
 }))
 
-// Mock ProtectedRoute to render children directly
-jest.mock('@/components/auth/ProtectedRoute', () => ({
-  ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>
-}))
-
 // Mock space context
 const mockSetCurrentSpaceId = jest.fn()
 const mockUseSpaceContext = jest.fn(() => ({

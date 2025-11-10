@@ -72,14 +72,32 @@ export function SpaceContextProvider({ children }: SpaceContextProviderProps) {
     }
 
     const savedSpaceId = localStorage.getItem('currentSpaceId')
-    if (savedSpaceId && spaces.some((s) => s.id === savedSpaceId)) {
-      setCurrentSpaceIdState(savedSpaceId)
-    } else if (spaces.length > 0) {
-      const firstSpaceId = spaces[0].id
-      setCurrentSpaceIdState(firstSpaceId)
-      localStorage.setItem('currentSpaceId', firstSpaceId)
+    const savedSpaceExists = savedSpaceId
+      ? spaces.some((space) => space.id === savedSpaceId)
+      : false
+
+    if (savedSpaceId && savedSpaceExists) {
+      if (savedSpaceId !== currentSpaceId) {
+        setCurrentSpaceIdState(savedSpaceId)
+      }
+      return
     }
-  }, [pathname, spaces, onAuthPage])
+
+    if (savedSpaceId && !savedSpaceExists) {
+      localStorage.removeItem('currentSpaceId')
+    }
+
+    if (spaces.length > 0) {
+      const firstSpaceId = spaces[0].id
+      if (firstSpaceId !== currentSpaceId) {
+        setCurrentSpaceIdState(firstSpaceId)
+        localStorage.setItem('currentSpaceId', firstSpaceId)
+      }
+    } else if (currentSpaceId !== null) {
+      setCurrentSpaceIdState(null)
+      localStorage.removeItem('currentSpaceId')
+    }
+  }, [pathname, spaces, onAuthPage, currentSpaceId])
 
   const setCurrentSpaceId = (spaceId: string | null) => {
     setCurrentSpaceIdState(spaceId)

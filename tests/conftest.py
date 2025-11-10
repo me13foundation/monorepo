@@ -13,6 +13,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from src.database.url_resolver import to_async_database_url
 from src.models.database.base import Base
 
 # Test database configuration
@@ -59,6 +60,7 @@ def setup_test_environment():
 
     # Set test-specific environment variables
     os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+    os.environ["ASYNC_DATABASE_URL"] = to_async_database_url(TEST_DATABASE_URL)
     os.environ["TESTING"] = "true"
 
     yield

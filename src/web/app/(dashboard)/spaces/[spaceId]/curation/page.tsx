@@ -1,6 +1,5 @@
 'use client'
 
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { useParams } from 'next/navigation'
 import { useEffect } from 'react'
@@ -37,23 +36,20 @@ export default function SpaceCurationPage() {
 
   if (isLoading) {
     return (
-      <ProtectedRoute>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      </ProtectedRoute>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     )
   }
 
   return (
-    <ProtectedRoute>
-      <div>
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold tracking-tight">Data Curation</h1>
-          <p className="text-muted-foreground mt-1">
-            Review and curate data for {spaceData?.name || 'this research space'}
-          </p>
-        </div>
+    <div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold tracking-tight">Data Curation</h1>
+        <p className="text-muted-foreground mt-1">
+          Review and curate data for {spaceData?.name || 'this research space'}
+        </p>
+      </div>
 
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-6">
           <Card>
@@ -101,54 +97,53 @@ export default function SpaceCurationPage() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Curation Queue</CardTitle>
-            <CardDescription>
-              Review and approve data items for this research space
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {queueLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : queueData && queueData.items.length > 0 ? (
-              <div className="space-y-4">
-                {queueData.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="font-medium">
-                        {item.entity_type} - {item.entity_id}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Priority: {item.priority} • Status: {item.status}
-                        {item.quality_score !== null && ` • Score: ${item.quality_score}`}
-                      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Curation Queue</CardTitle>
+          <CardDescription>
+            Review and approve data items for this research space
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {queueLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : queueData && queueData.items.length > 0 ? (
+            <div className="space-y-4">
+              {queueData.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium">
+                      {item.entity_type} - {item.entity_id}
                     </div>
-                    {item.last_updated && (
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(item.last_updated).toLocaleDateString()}
-                      </div>
-                    )}
+                    <div className="text-sm text-muted-foreground">
+                      Priority: {item.priority} • Status: {item.status}
+                      {item.quality_score !== null && ` • Score: ${item.quality_score}`}
+                    </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No curation items yet</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start curating data by connecting data sources and reviewing imported items.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </ProtectedRoute>
+                  {item.last_updated && (
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(item.last_updated).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No curation items yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Start curating data by connecting data sources and reviewing imported items.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   )
 }
