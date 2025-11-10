@@ -1,69 +1,25 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = [ "setuptools>=61.0", "wheel",]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "med13-resource-library"
 version = "0.1.0"
 description = "MED13 Resource Library - Curated biomedical data for research"
-authors = [{name = "MED13 Foundation"}]
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
-    "fastapi>=0.115.0",
-    "uvicorn[standard]>=0.30.0",
-    "pydantic>=2.8.0",
-    "pydantic-settings>=2.3.0",
-    "sqlalchemy>=2.0.0",
-    "psycopg2-binary>=2.9.0",
-    "asyncpg>=0.29.0",
-    "alembic>=1.13.0",
-    "google-cloud-secretmanager>=2.16.0",
-    "google-cloud-storage>=2.10.0",
-    "httpx>=0.27.0",
-    "pandas>=2.2.0",
-    "numpy>=1.26.0",
-    "plotly>=5.17.0",
-    "dash>=2.17.0",
-    "dash-bootstrap-components>=1.6.0",
-    "gradio>=4.44.1",
-]
+dependencies = [ "fastapi>=0.115.0", "uvicorn[standard]>=0.30.0", "pydantic>=2.8.0", "pydantic-settings>=2.3.0", "sqlalchemy>=2.0.0", "psycopg2-binary>=2.9.0", "asyncpg>=0.29.0", "alembic>=1.13.0", "google-cloud-secretmanager>=2.16.0", "google-cloud-storage>=2.10.0", "httpx>=0.27.0", "pandas>=2.2.0", "numpy>=1.26.0", "plotly>=5.17.0", "dash>=2.17.0", "dash-bootstrap-components>=1.6.0", "gradio>=4.44.1",]
+[[project.authors]]
+name = "MED13 Foundation"
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "pytest-cov>=5.0.0",
-    "black>=24.0.0",
-    "flake8>=7.0.0",
-    "mypy>=1.8.0",
-    "pre-commit>=3.7.0",
-    "pip-audit>=2.7.0",
-    "bandit>=1.8.0",
-    "safety>=3.0.0",
-    "pytest-watch>=4.2.0",
-    "pytest-xdist>=3.6.0",
-]
+dev = [ "pytest>=8.0.0", "pytest-asyncio>=0.23.0", "pytest-cov>=5.0.0", "black>=24.0.0", "flake8>=7.0.0", "mypy>=1.8.0", "pre-commit>=3.7.0", "pip-audit>=2.7.0", "bandit>=1.8.0", "safety>=3.0.0", "pytest-watch>=4.2.0", "pytest-xdist>=3.6.0",]
 
 [tool.black]
 line-length = 88
-target-version = ['py312']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
+target-version = [ "py312",]
+include = "\\.pyi?$"
+extend-exclude = "/(\n  # directories\n  \\.eggs\n  | \\.git\n  | \\.hg\n  | \\.mypy_cache\n  | \\.tox\n  | \\.venv\n  | _build\n  | buck-out\n  | build\n  | dist\n)/\n"
 
 [tool.mypy]
 python_version = "3.12"
@@ -80,243 +36,69 @@ warn_no_return = true
 warn_unreachable = true
 strict_equality = true
 show_error_codes = true
-
-# Stricter Any usage controls
 disallow_any_generics = true
 disallow_any_unimported = true
-disallow_any_expr = false  # Temporarily allow Any expressions until legacy parsing layers are fully typed
-
-# Module-specific settings
+disallow_any_expr = false
 [[tool.mypy.overrides]]
-module = [
-    "alembic.*",
-    "plotly.*",
-    "dash.*",
-    "dash_bootstrap_components.*",
-    "requests.*",
-    "requests",
-    "dash_table",
-    "dash_table.*",
-]
+module = [ "alembic.*", "plotly.*", "dash.*", "dash_bootstrap_components.*", "requests.*", "requests", "dash_table", "dash_table.*",]
 ignore_missing_imports = true
 
-# Dash UI components - exclude from strict Any checks
 [[tool.mypy.overrides]]
-module = [
-    "src.presentation.dash.*",
-    "src.dash_app",
-]
+module = [ "src.presentation.dash.*", "src.dash_app",]
 disallow_any_generics = false
 disallow_any_unimported = false
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = [
-    "src.domain.transform.*",
-    "src.domain.validation.*",
-    "src.application.packaging.*",
-    "src.application.curation.*",
-    "src.infrastructure.validation.api_response_validator",
-]
+module = [ "src.domain.transform.*", "src.domain.validation.*", "src.application.packaging.*", "src.application.curation.*", "src.infrastructure.validation.api_response_validator",]
 disallow_any_expr = false
 disallow_any_generics = false
 
 [tool.flake8]
 max-line-length = 88
-extend-ignore = ["E203", "W503", "E501"]
-exclude = [
-    ".git",
-    "__pycache__",
-    "build",
-    "dist",
-    "*.egg-info",
-    ".venv",
-    ".tox",
-    "migrations",
-    "src/web/node_modules",
-]
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = "-ra -q --strict-markers --strict-config"
-testpaths = ["tests"]
-python_files = ["test_*.py", "*_test.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-markers = [
-    "unit: Unit tests",
-    "integration: Integration tests",
-    "slow: Slow running tests",
-    "api: API endpoint tests",
-    "database: Database tests",
-]
-
-[tool.coverage.run]
-source = ["src"]
-omit = [
-    "*/tests/*",
-    "*/test_*.py",
-    "src/main.py",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
-]
+extend-ignore = [ "E203", "W503", "E501",]
+exclude = [ ".git", "__pycache__", "build", "dist", "*.egg-info", ".venv", ".tox", "migrations", "src/web/node_modules",]
 
 [tool.ruff]
 line-length = 88
 target-version = "py312"
 
-[tool.ruff.lint]
-select = ["E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "LOG"]
-ignore = ["E203", "E501", "W291", "W292", "W293"]
-
-[tool.ruff.lint.per-file-ignores]
-"src/web/**" = ["T20", "ARG", "ERA"]
-"scripts/**" = [
-    "E402",   # allow imports after sys.path manipulation
-    "S107",   # allow hardcoded passwords in seed scripts
-    "TRY400", # allow logging.error in scripts
-    "PLC0415", # allow local imports in scripts
-    "BLE001", # allow broad exceptions in scripts
-    "C901",   # allow complex functions in utility scripts
-    "PLR0911", # allow many return statements in utility scripts
-]
-"tests/**" = [
-    "S101",  # allow assert in tests
-    "ARG",   # allow unused fixtures/args
-    "ERA",   # allow commented code in tests
-    "PLR2004",  # allow magic numbers in tests
-    "SLF001",   # allow private access in tests
-    "E402",     # allow constants before imports in tests
-    "S106",     # allow test tokens/secrets
-    "PT011",    # allow broad raises in tests
-    "B017",     # allow blind exception asserts in tests
-    "N806",     # allow uppercase local vars in tests
-    "PLC0415",  # allow local imports in tests
-    "PTH123",   # allow built-in open in tests
-    "EM102",    # allow f-string exceptions in tests
-    "TRY003",   # allow string literal exceptions in tests
-    "S105",     # allow test tokens as constants
-    "INP001",   # allow implicit namespace packages in tests
-    "B007",     # allow unused loop vars in tests
-    "PERF102",  # allow .items in tests
-    "RET504",   # allow redundant assignment before return in tests
-    "PTH110",   # allow os.path.exists in tests
-    "SIM222",   # allow True instead of or True
-    "PLR0913",  # allow many args in test fixtures
-    "PT003",    # allow explicit scope arg in fixtures
-    "TRY002",   # allow generic Exception in simple test mocks
-    "BLE001",   # allow broad exceptions in tests
-    "B023",     # allow loop var not bound in inner fn in tests
-]
-"src/dash_app.py" = [
-    "ARG001",  # unused callback args
-    "PLR0913", # many callback params
-    "PLR0912", # branching complexity
-    "C901",    # complexity in callbacks
-    "TRY300",  # return in try
-    "TRY401",  # redundant exception arg
-    "TRY400",  # prefer logging.exception
-    "G004",    # f-string in logging
-    "BLE001",  # broad exceptions in UI
-    "PLC0415", # local import in method due to optional deps
-    "PLW0603", # global statement for client singleton
-]
-"src/routes/**" = [
-    "B008",   # FastAPI Depends in signature
-    "BLE001", # broad excepts in HTTP layer
-    "B904",   # exception chaining in HTTP handlers
-    "TRY300", # return in try blocks
-    "RET504", # redundant assignment before return
-    "ARG001", # unused args in route signatures
-    "PLR0913", # many params in routes
-    "FBT001", # boolean positional in Query
-    "FBT003", # boolean positional value
-    "TRY301", # abstract raises in routes
-    "SLF001", # allow private member access in routes
-    "C901",   # allow complex route handlers for now
-    "S106",   # allow token literals in example responses
-    "TC001", "TC002", "TC003"  # type-checking import placement
-]
-"src/domain/transform/**" = [
-    "TID252",  # prefer absolute imports (relaxed in transform)
-    "C901",    # complex rule heuristics in mapping logic
-    "PLR0911", # many returns in heuristics
-    "PLR0912", # many branches in heuristics
-    "PLR2004", # magic numbers for thresholds
-    "BLE001",  # broad exceptions in normalizers (to be refactored)
-    "T201",    # print used in exploratory normalizers
-    "ERA001",  # commented code in exploratory modules
-    "TRY003",  # long messages outside exception class
-    "EM101",   # string literal exceptions
-    "EM102",   # f-string exceptions
-    "SIM102",  # nested ifs in heuristics
-    "PLC0415", # local imports in utility branches
-    "PERF401", # comprehension vs append in mappers
-    "ARG002",  # unused optional args in hooks
-    "RET504",  # redundant assignment before return in transforms
-    "SIM105",  # contextlib.suppress preference
-    "DTZ007",  # naive datetime from strptime
-    "DTZ001",  # datetime() without tzinfo
-    "N817",    # ElementTree aliasing
-    "PLC0105", # TypeVar naming nit
-    "FBT001",  # bool positional param in transformers
-    "FBT002",  # bool default positional param
-    "TRY300",  # try/else preference in transforms
-    "TRY400",  # prefer logging.exception
-    "G004",    # logging f-string
-    "SLF001",  # private member access in orchestrator
-]
-"src/domain/validation/**" = [
-    "TID",   # relative import hygiene relaxed in validation
-    "C901",  # complexity in validation pipelines
-    "FBT001", "FBT002", # bool positional defaults in API signatures
-    "PERF401", # prefer comprehension in gate lists
-    "SIM118",  # dict key membership style
-    "A002",    # builtin shadowing in report APIs
-    "UP007",   # X | Y hint migrations
-    "PLR0913", # many args in signatures
-    "PLR2004", # magic constants in thresholds
-    "TRY003",  # long messages outside exception class
-    "EM102",   # f-string exceptions in validation
-    "SLF001",  # private member access
-    "PLC0415", # local imports in loaders
-    "PLR0912", # many branches in orchestrators
-]
-"src/presentation/dash/**" = [
-    "ARG", "ERA", "INP001", "PLR0911", "PLR0912", "PERF401",
-    "PGH003", "FBT001", "FBT002", "G004", "TRY003", "TRY004", "EM101", "EM102",
-    "TC002"  # third-party imports in type-checking blocks
-]
-"src/repositories/**" = [
-    "TRY003",  # message constants for exceptions
-    "EM101",
-    "EM102",
-    "DTZ003",  # utcnow usage in data access layer
-    "RET504",  # redundant assignment before return
-    "A002",    # builtin shadowing in protocol/generic interfaces
-    "TRY300",  # try/else style in simple methods
-    "B904",    # raise from suggestions
-]
-
 [tool.bandit]
-exclude_dirs = ["tests", "migrations", ".venv"]
-skips = ["B101", "B601"]  # Skip assert checks and shell usage
+exclude_dirs = [ "tests", "migrations", ".venv",]
+skips = [ "B101", "B601",]
 
 [tool.safety]
-ignore-vulns = [
-    # Add any false positives here
-]
-# Use the new scan command format
-scan = {}
+ignore-vulns = []
+
+[tool.ruff.lint]
+select = [ "E", "F", "W", "C90", "I", "N", "UP", "YTT", "S", "BLE", "FBT", "B", "A", "COM", "C4", "DTZ", "T10", "DJ", "EM", "EXE", "FA", "ISC", "ICN", "G", "INP", "PIE", "T20", "PYI", "PT", "Q", "RSE", "RET", "SLF", "SLOT", "SIM", "TID", "TCH", "INT", "ARG", "PTH", "ERA", "PD", "PGH", "PL", "TRY", "FLY", "NPY", "AIR", "PERF", "FURB", "LOG",]
+ignore = [ "E203", "E501", "W291", "W292", "W293",]
+
+[tool.safety.scan]
+
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers --strict-config"
+testpaths = [ "tests",]
+python_files = [ "test_*.py", "*_test.py",]
+python_classes = [ "Test*",]
+python_functions = [ "test_*",]
+markers = [ "unit: Unit tests", "integration: Integration tests", "slow: Slow running tests", "api: API endpoint tests", "database: Database tests",]
+
+[tool.coverage.run]
+source = [ "src",]
+omit = [ "*/tests/*", "*/test_*.py", "src/main.py",]
+
+[tool.coverage.report]
+exclude_lines = [ "pragma: no cover", "def __repr__", "if self.debug:", "if settings.DEBUG", "raise AssertionError", "raise NotImplementedError", "if 0:", "if __name__ == .__main__.:", "class .*\\bProtocol\\):", "@(abc\\.)?abstractmethod",]
+
+[tool.ruff.lint.per-file-ignores]
+"src/web/**" = [ "T20", "ARG", "ERA",]
+"scripts/**" = [ "E402", "S107", "TRY400", "PLC0415", "BLE001", "C901", "PLR0911",]
+"tests/**" = [ "S101", "ARG", "ERA", "PLR2004", "SLF001", "E402", "S106", "PT011", "B017", "N806", "PLC0415", "PTH123", "EM102", "TRY003", "S105", "INP001", "B007", "PERF102", "RET504", "PTH110", "SIM222", "PLR0913", "PT003", "TRY002", "BLE001", "B023",]
+"src/dash_app.py" = [ "ARG001", "PLR0913", "PLR0912", "C901", "TRY300", "TRY401", "TRY400", "G004", "BLE001", "PLC0415", "PLW0603",]
+"src/routes/**" = [ "B008", "BLE001", "B904", "TRY300", "RET504", "ARG001", "PLR0913", "FBT001", "FBT003", "TRY301", "SLF001", "C901", "S106", "TC001", "TC002", "TC003",]
+"src/domain/transform/**" = [ "TID252", "C901", "PLR0911", "PLR0912", "PLR2004", "BLE001", "T201", "ERA001", "TRY003", "EM101", "EM102", "SIM102", "PLC0415", "PERF401", "ARG002", "RET504", "SIM105", "DTZ007", "DTZ001", "N817", "PLC0105", "FBT001", "FBT002", "TRY300", "TRY400", "G004", "SLF001", "TC003", "PLC0206",]
+"src/domain/validation/**" = [ "TID", "TC001", "TC002", "TC003", "C901", "FBT001", "FBT002", "PERF401", "SIM118", "A002", "UP007", "PLR0913", "PLR2004", "TRY003", "EM102", "SLF001", "PLC0415", "PLR0912",]
+"src/presentation/dash/**" = [ "ARG", "ERA", "INP001", "PLR0911", "PLR0912", "PERF401", "PGH003", "FBT001", "FBT002", "G004", "TRY003", "TRY004", "EM101", "EM102", "TC002",]
+"src/repositories/**" = [ "TRY003", "EM101", "EM102", "DTZ003", "RET504", "A002", "TRY300", "B904",]
