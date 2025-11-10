@@ -247,6 +247,7 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
     "SLF001", # allow private member access in routes
     "C901",   # allow complex route handlers for now
     "S106",   # allow token literals in example responses
+    "TC001", "TC002", "TC003"  # type-checking import placement
 ]
 "src/domain/transform/**" = [
     "TID252",  # prefer absolute imports (relaxed in transform)
@@ -295,7 +296,8 @@ ignore = ["E203", "E501", "W291", "W292", "W293"]
 ]
 "src/presentation/dash/**" = [
     "ARG", "ERA", "INP001", "PLR0911", "PLR0912", "PERF401",
-    "PGH003", "FBT001", "FBT002", "G004", "TRY003", "TRY004", "EM101", "EM102"
+    "PGH003", "FBT001", "FBT002", "G004", "TRY003", "TRY004", "EM101", "EM102",
+    "TC002"  # third-party imports in type-checking blocks
 ]
 "src/repositories/**" = [
     "TRY003",  # message constants for exceptions
