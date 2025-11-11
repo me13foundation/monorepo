@@ -4,6 +4,7 @@ Authentication middleware for MED13 Resource Library API.
 Implements API key-based authentication with role-based access control.
 """
 
+import logging
 import os
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -13,18 +14,55 @@ from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
+_ENVIRONMENT = os.getenv("MED13_ENV", "development").lower()
+_ALLOW_MISSING_KEYS = (
+    os.getenv("MED13_ALLOW_MISSING_API_KEYS")
+    or ("1" if _ENVIRONMENT == "development" else "0")
+) == "1"
+logger = logging.getLogger(__name__)
+_DEV_DEFAULT_KEYS = {
+    "ADMIN_API_KEY": "admin-key-123",
+    "WRITE_API_KEY": "write-key-789",
+    "READ_API_KEY": "read-key-456",
+}
+
 
 class APIKeyAuth:
     """API key authentication handler."""
 
     def __init__(self) -> None:
         self.api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-        # In production, these would come from environment variables or a database
-        self.valid_api_keys: dict[str, str] = {
-            os.getenv("ADMIN_API_KEY", "admin-key-123"): "admin",
-            os.getenv("READ_API_KEY", "read-key-456"): "read",
-            os.getenv("WRITE_API_KEY", "write-key-789"): "write",
-        }
+        self.valid_api_keys: dict[str, str] = {}
+        self._register_api_key("ADMIN_API_KEY", "admin")
+        self._register_api_key("WRITE_API_KEY", "write")
+        self._register_api_key("READ_API_KEY", "read")
+        self.enabled = bool(self.valid_api_keys)
+        if not self.enabled:
+            if not _ALLOW_MISSING_KEYS:
+                msg = (
+                    "No API keys configured. Set ADMIN_API_KEY / WRITE_API_KEY / "
+                    "READ_API_KEY environment variables or set "
+                    "MED13_ALLOW_MISSING_API_KEYS=1 for local development."
+                )
+                raise RuntimeError(msg)
+            logger.warning(
+                "API key authentication disabled (no keys configured). "
+                "Requests must rely on JWT bearer tokens.",
+            )
+
+    def _register_api_key(self, env_var: str, role: str) -> None:
+        """Register an API key from environment variables."""
+        api_key = os.getenv(env_var)
+        if not api_key and _ALLOW_MISSING_KEYS:
+            api_key = _DEV_DEFAULT_KEYS.get(env_var)
+            if api_key:
+                logger.warning(
+                    "Using development default for %s. Do not use in production.",
+                    env_var,
+                )
+        if not api_key:
+            return
+        self.valid_api_keys[api_key] = role
 
     async def authenticate(self, request: Request) -> str | None:
         """
@@ -103,6 +141,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         # Skip authentication for excluded paths
         if any(request.url.path.startswith(path) for path in self.exclude_paths):
+            return await call_next(request)
+
+        if not self.auth.enabled:
             return await call_next(request)
 
         # Skip if JWT token is present (let JWTAuthMiddleware handle it)

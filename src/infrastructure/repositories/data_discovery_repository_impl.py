@@ -151,6 +151,34 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
                 return session_to_entity(model)
         return None
 
+    def find_owned_session(
+        self,
+        session_id: UUID,
+        owner_id: UUID,
+    ) -> DataDiscoverySession | None:
+        """
+        Find a session by ID constrained to the provided owner.
+        """
+        session_candidates = _expand_identifier(
+            session_id,
+            allow_legacy_formats=self._allow_legacy_owner_formats,
+        )
+        owner_candidates = _owner_identifier_candidates(
+            owner_id,
+            allow_legacy_formats=self._allow_legacy_owner_formats,
+        )
+        model = (
+            self._session.query(DataDiscoverySessionModel)
+            .filter(
+                DataDiscoverySessionModel.id.in_(session_candidates),
+                DataDiscoverySessionModel.owner_id.in_(owner_candidates),
+            )
+            .first()
+        )
+        if model:
+            return session_to_entity(model)
+        return None
+
     def find_by_owner(
         self,
         owner_id: UUID | str,

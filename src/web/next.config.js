@@ -1,3 +1,20 @@
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'
+const connectSources = ["'self'", API_BASE_URL]
+if (WS_BASE_URL) {
+  connectSources.push(WS_BASE_URL)
+}
+const cspDirectives = [
+  "default-src 'self'",
+  "frame-ancestors 'none'",
+  "img-src 'self' data: https:",
+  "object-src 'none'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  `connect-src ${connectSources.join(' ')}`,
+  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data:"
+].join('; ')
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Enable SWC minification for better performance
@@ -22,6 +39,14 @@ const nextConfig = {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin',
           },
+          {
+            key: 'Content-Security-Policy',
+            value: cspDirectives,
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
         ],
       },
     ]
@@ -38,8 +63,8 @@ const nextConfig = {
   },
   // Environment variables
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080',
-    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080',
+    NEXT_PUBLIC_API_URL: API_BASE_URL,
+    NEXT_PUBLIC_WS_URL: WS_BASE_URL,
   },
 }
 

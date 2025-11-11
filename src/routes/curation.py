@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.application.container import get_legacy_dependency_container
+from src.application.container import container, get_legacy_dependency_container
 from src.application.curation.repositories.audit_repository import (
     SqlAlchemyAuditRepository,
 )
@@ -22,7 +22,12 @@ from src.application.curation.services.review_service import (
     ReviewQueueItem,
     ReviewService,
 )
+from src.application.services.audit_service import AuditTrailService
+from src.application.services.authorization_service import AuthorizationService
 from src.database.session import get_session
+from src.domain.entities.user import User
+from src.domain.value_objects.permission import Permission
+from src.routes.auth import get_current_active_user
 
 router = APIRouter(prefix="/curation", tags=["curation"])
 
@@ -74,15 +79,37 @@ def _curation_detail_service(
     return container.create_curation_detail_service(db)
 
 
+_audit_trail_service = AuditTrailService(SqlAlchemyAuditRepository())
+
+
+def _audit_service() -> AuditTrailService:
+    return _audit_trail_service
+
+
+async def _require_permission(
+    current_user: User,
+    permission: Permission,
+    authz_service: AuthorizationService,
+) -> None:
+    await authz_service.require_permission(current_user.id, permission)
+
+
 @router.get("/queue", response_model=list[dict[str, Any]])
-def list_queue(
+async def list_queue(
     entity_type: str | None = None,
     status: str | None = None,
     priority: str | None = None,
     limit: int = 100,
     offset: int = 0,
     db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+    authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> list[dict[str, Any]]:
+    await _require_permission(
+        current_user,
+        Permission.CURATION_REVIEW,
+        authz_service,
+    )
     service = _review_service()
     results: list[ReviewQueueItem] = service.list_queue(
         db,
@@ -99,14 +126,43 @@ def list_queue(
 
 
 @router.post("/submit", status_code=status.HTTP_201_CREATED)
-def submit(req: SubmitRequest, db: Session = Depends(get_session)) -> dict[str, int]:
+async def submit(
+    req: SubmitRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+    authz_service: AuthorizationService = Depends(container.get_authorization_service),
+    audit_service: AuditTrailService = Depends(_audit_service),
+) -> dict[str, int]:
+    await _require_permission(
+        current_user,
+        Permission.CURATION_REVIEW,
+        authz_service,
+    )
     service = _review_service()
     created = service.submit(db, req.entity_type, req.entity_id, req.priority)
+    audit_service.record_action(
+        db,
+        action="curation.submit",
+        target=(req.entity_type, req.entity_id),
+        actor_id=current_user.id,
+        details={"priority": req.priority, "review_id": created.id},
+    )
     return {"id": created.id}
 
 
 @router.post("/bulk")
-def bulk(req: BulkRequest, db: Session = Depends(get_session)) -> dict[str, int]:
+async def bulk(
+    req: BulkRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+    authz_service: AuthorizationService = Depends(container.get_authorization_service),
+    audit_service: AuditTrailService = Depends(_audit_service),
+) -> dict[str, int]:
+    await _require_permission(
+        current_user,
+        Permission.CURATION_APPROVE,
+        authz_service,
+    )
     service = _approval_service()
     ids_list = list(req.ids)
     if req.action == "approve":
@@ -117,11 +173,29 @@ def bulk(req: BulkRequest, db: Session = Depends(get_session)) -> dict[str, int]
         count = service.quarantine(db, ids_list)
     else:
         raise HTTPException(status_code=400, detail="Invalid action")
+    audit_service.record_action(
+        db,
+        action=f"curation.bulk.{req.action}",
+        target=("curation_queue", ",".join(str(_id) for _id in ids_list)),
+        actor_id=current_user.id,
+        details={"ids": ids_list, "updated": count},
+    )
     return {"updated": count}
 
 
 @router.post("/comment", status_code=status.HTTP_201_CREATED)
-def comment(req: CommentRequest, db: Session = Depends(get_session)) -> dict[str, int]:
+async def comment(
+    req: CommentRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+    authz_service: AuthorizationService = Depends(container.get_authorization_service),
+    audit_service: AuditTrailService = Depends(_audit_service),
+) -> dict[str, int]:
+    await _require_permission(
+        current_user,
+        Permission.CURATION_REVIEW,
+        authz_service,
+    )
     service = _comment_service()
     comment_id = service.add_comment(
         db,
@@ -130,14 +204,23 @@ def comment(req: CommentRequest, db: Session = Depends(get_session)) -> dict[str
         req.comment,
         req.user,
     )
+    audit_service.record_action(
+        db,
+        action="curation.comment",
+        target=(req.entity_type, req.entity_id),
+        actor_id=current_user.id,
+        details={"comment_id": comment_id, "delegated_user": req.user},
+    )
     return {"id": comment_id}
 
 
 @router.get("/{entity_type}/{entity_id}", response_model=dict[str, Any])
-def get_curated_detail(
+async def get_curated_detail(
     entity_type: str,
     entity_id: str,
     service: CurationDetailService = Depends(_curation_detail_service),
+    current_user: User = Depends(get_current_active_user),
+    authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> dict[str, Any]:
     """
     Retrieve enriched detail payload for a queued entity.
@@ -145,6 +228,11 @@ def get_curated_detail(
     Currently supports variant entities and returns a structure compatible
     with the Dash curation interface.
     """
+    await _require_permission(
+        current_user,
+        Permission.CURATION_REVIEW,
+        authz_service,
+    )
     try:
         detail = service.get_detail(entity_type, entity_id)
         return dict(detail.to_serializable())

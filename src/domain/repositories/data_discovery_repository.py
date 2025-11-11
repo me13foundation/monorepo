@@ -49,6 +49,23 @@ class DataDiscoverySessionRepository(ABC):
         """
 
     @abstractmethod
+    def find_owned_session(
+        self,
+        session_id: UUID,
+        owner_id: UUID,
+    ) -> DataDiscoverySession | None:
+        """
+        Find a session by ID that belongs to the specified owner.
+
+        Args:
+            session_id: The session identifier to load
+            owner_id: The user who must own the session
+
+        Returns:
+            The session if it belongs to the owner, None otherwise
+        """
+
+    @abstractmethod
     def find_by_owner(
         self,
         owner_id: UUID,

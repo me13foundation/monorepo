@@ -28,6 +28,33 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: src/web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: src/web
+        run: npm ci
+
+      - name: Lint web app
+        working-directory: src/web
+        run: npm run lint
+
+      - name: Type-check web app
+        working-directory: src/web
+        run: npm run type-check
+
+      - name: Test web app
+        working-directory: src/web
+        run: npm run test -- --runInBand --ci
+
+      - name: Audit web dependencies
+        working-directory: src/web
+        run: npm audit --production
+
       - name: Run linting
         run: ruff check src/ tests/
 
@@ -65,6 +92,17 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           file: ./coverage.xml
+
+      - name: Build API container image
+        run: docker build -t med13-resource-library:test .
+
+      - name: Scan container image with Trivy
+        uses: aquasecurity/trivy-action@v0.17.0
+        with:
+          image-ref: med13-resource-library:test
+          format: table
+          ignore-unfixed: true
+          exit-code: 1
 
   deploy-staging:
     needs: test

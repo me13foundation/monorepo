@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -26,9 +27,33 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+MIN_ADMIN_PASSWORD_LENGTH = 12
+ADMIN_PASSWORD_ENV_VAR = (
+    "MED13_ADMIN_PASSWORD"  # noqa: S105 - env var name, not a credential
+)
+
+
+def _resolve_password(explicit: str | None) -> str:
+    """Resolve secure password input."""
+    candidate = explicit or os.getenv(ADMIN_PASSWORD_ENV_VAR)
+    if not candidate:
+        message = (
+            "New admin password required. Pass --password or set "
+            f"{ADMIN_PASSWORD_ENV_VAR}."
+        )
+        raise ValueError(message)
+    if len(candidate) < MIN_ADMIN_PASSWORD_LENGTH:
+        message = (
+            "Admin password must be at least "
+            f"{MIN_ADMIN_PASSWORD_LENGTH} characters."
+        )
+        raise ValueError(message)
+    return candidate
+
+
 def reset_admin_password(
     email: str = "admin@med13.org",
-    password: str = "admin123",
+    password: str | None = None,
 ) -> bool:
     """
     Reset password for admin user.
@@ -42,6 +67,7 @@ def reset_admin_password(
     """
     session = SessionLocal()
     password_hasher = PasswordHasher()
+    resolved_password = _resolve_password(password)
 
     try:
         # Find admin user
@@ -53,14 +79,14 @@ def reset_admin_password(
             return False
 
         # Reset password
-        admin.hashed_password = password_hasher.hash_password(password)
+        admin.hashed_password = password_hasher.hash_password(resolved_password)
         session.commit()
 
         logger.info("✅ Admin password reset successfully!")
         logger.info("   Email: %s", email)
         logger.info("   Username: %s", admin.username)
-        logger.warning("   New Password: %s", password)
-        logger.warning("   ⚠️  Please change the password after first login!")
+        logger.warning("   Password provided via CLI/env (not logged).")
+        logger.warning("   ⚠️  Rotate the password after first login!")
 
     except SQLAlchemyError:
         session.rollback()
@@ -121,8 +147,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--password",
-        default="admin123",
-        help="New password (default: admin123)",
+        help=(
+            "New password (required unless MED13_ADMIN_PASSWORD environment "
+            "variable is set)"
+        ),
     )
     parser.add_argument(
         "--verify-only",
@@ -136,7 +164,8 @@ def main() -> None:
         if args.verify_only:
             success = verify_admin_user(email=args.email)
         else:
-            success = reset_admin_password(email=args.email, password=args.password)
+            password = _resolve_password(args.password)
+            success = reset_admin_password(email=args.email, password=password)
 
         if not success:
             sys.exit(1)

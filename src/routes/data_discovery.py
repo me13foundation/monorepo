@@ -15,6 +15,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.application.container import get_data_discovery_service_dependency
+from src.application.curation.repositories.audit_repository import (
+    SqlAlchemyAuditRepository,
+)
+from src.application.services.audit_service import AuditTrailService
 from src.application.services.data_discovery_service import (
     AddSourceToSpaceRequest,
     CreateDataDiscoverySessionRequest,
@@ -31,13 +35,21 @@ from src.domain.entities.data_discovery_session import (
     SourceCatalogEntry,
     TestResultStatus,
 )
+from src.domain.entities.user import User, UserRole
 from src.infrastructure.repositories.research_space_repository import (
     SqlAlchemyResearchSpaceRepository,
 )
+from src.routes.auth import get_current_active_user
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/data-discovery", tags=["data-discovery"])
+
+_audit_trail_service = AuditTrailService(SqlAlchemyAuditRepository())
+
+
+def _audit_service() -> AuditTrailService:
+    return _audit_trail_service
 
 
 # Pydantic models for API requests/responses
@@ -148,6 +160,42 @@ class UpdateSelectionRequest(BaseModel):
     )
 
 
+def _owner_filter_for_user(current_user: User) -> UUID | None:
+    """Return the owner filter to apply based on the current user's role."""
+    return None if current_user.role == UserRole.ADMIN else current_user.id
+
+
+def _require_session_for_user(
+    session_id: UUID,
+    service: DataDiscoveryService,
+    current_user: User,
+) -> DataDiscoverySession:
+    """Load a session while enforcing ownership constraints."""
+    if current_user.role == UserRole.ADMIN:
+        session = service.get_session(session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Data discovery session not found",
+            )
+        return session
+
+    session = service.get_session_for_owner(session_id, current_user.id)
+    if session is not None:
+        return session
+
+    # Determine whether the session exists but belongs to someone else
+    if service.get_session(session_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this data discovery session",
+        )
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Data discovery session not found",
+    )
+
+
 @router.post(
     "/sessions",
     response_model=DataDiscoverySessionResponse,
@@ -159,12 +207,11 @@ async def create_session(
     request: CreateSessionRequest,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
     db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user),
+    audit_service: AuditTrailService = Depends(_audit_service),
 ) -> DataDiscoverySessionResponse:
     """Create a new workbench session."""
     try:
-        # TODO: Get current user from authentication context
-        owner_id = UUID("00000000-0000-0000-0000-000000000001")  # Placeholder
-
         validated_space_id = request.research_space_id
         if validated_space_id:
             space_repo = SqlAlchemyResearchSpaceRepository(session=db)
@@ -176,7 +223,7 @@ async def create_session(
                 validated_space_id = None
 
         create_request = CreateDataDiscoverySessionRequest(
-            owner_id=owner_id,
+            owner_id=current_user.id,
             name=request.name,
             research_space_id=validated_space_id,
             initial_parameters=QueryParameters(
@@ -196,6 +243,18 @@ async def create_session(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid research space reference",
             ) from exc
+        audit_service.record_action(
+            db,
+            action="data_discovery.session.create",
+            target=("data_discovery_session", str(session.id)),
+            actor_id=current_user.id,
+            details={
+                "research_space_id": (
+                    str(validated_space_id) if validated_space_id else None
+                ),
+                "name": request.name,
+            },
+        )
         return _session_to_response(session)
 
     except Exception as e:
@@ -215,14 +274,21 @@ async def create_session(
 async def list_sessions(
     include_inactive: bool = Query(False, description="Include inactive sessions"),
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
+    owner_id: UUID
+    | None = Query(
+        None,
+        description="Filter sessions by owner (admin only)",
+    ),
 ) -> list[DataDiscoverySessionResponse]:
     """List all workbench sessions for the current user."""
     try:
-        # TODO: Get current user from authentication context
-        owner_id = UUID("00000000-0000-0000-0000-000000000001")  # Placeholder
+        effective_owner = owner_id if current_user.role == UserRole.ADMIN else None
+        if effective_owner is None:
+            effective_owner = current_user.id
 
         sessions = service.get_user_sessions(
-            owner_id,
+            effective_owner,
             include_inactive=include_inactive,
         )
         return [_session_to_response(session) for session in sessions]
@@ -244,15 +310,11 @@ async def list_sessions(
 async def get_session_detail(
     session_id: UUID,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
 ) -> DataDiscoverySessionResponse:
     """Get a specific workbench session."""
     try:
-        session = service.get_session(session_id)
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Data discovery session not found",
-            )
+        session = _require_session_for_user(session_id, service, current_user)
         return _session_to_response(session)
 
     except HTTPException:
@@ -275,9 +337,15 @@ async def update_session_parameters(
     session_id: UUID,
     request: UpdateParametersRequest,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(_audit_service),
 ) -> DataDiscoverySessionResponse:
     """Update parameters for a workbench session."""
     try:
+        _require_session_for_user(session_id, service, current_user)
+        owner_filter = _owner_filter_for_user(current_user)
+
         update_request = UpdateSessionParametersRequest(
             session_id=session_id,
             parameters=QueryParameters(
@@ -286,13 +354,23 @@ async def update_session_parameters(
             ),
         )
 
-        session = service.update_session_parameters(update_request)
-        if not session:
+        updated_session = service.update_session_parameters(
+            update_request,
+            owner_id=owner_filter,
+        )
+        if not updated_session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Data discovery session not found",
             )
-        return _session_to_response(session)
+        audit_service.record_action(
+            db,
+            action="data_discovery.session.update_parameters",
+            target=("data_discovery_session", str(updated_session.id)),
+            actor_id=current_user.id,
+            details=update_request.parameters.model_dump(),
+        )
+        return _session_to_response(updated_session)
 
     except HTTPException:
         raise
@@ -314,15 +392,35 @@ async def toggle_source_selection(
     session_id: UUID,
     catalog_entry_id: str,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(_audit_service),
 ) -> DataDiscoverySessionResponse:
     """Toggle source selection in a workbench session."""
     try:
-        session = service.toggle_source_selection(session_id, catalog_entry_id)
+        _require_session_for_user(session_id, service, current_user)
+        owner_filter = _owner_filter_for_user(current_user)
+
+        session = service.toggle_source_selection(
+            session_id,
+            catalog_entry_id,
+            owner_id=owner_filter,
+        )
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Data discovery session not found",
             )
+        audit_service.record_action(
+            db,
+            action="data_discovery.session.toggle_source",
+            target=("data_discovery_session", str(session.id)),
+            actor_id=current_user.id,
+            details={
+                "catalog_entry_id": catalog_entry_id,
+                "selected_sources": session.selected_sources,
+            },
+        )
         return _session_to_response(session)
 
     except HTTPException:
@@ -345,15 +443,32 @@ async def update_source_selection(
     session_id: UUID,
     request: UpdateSelectionRequest,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(_audit_service),
 ) -> DataDiscoverySessionResponse:
     """Set the selected sources for a workbench session."""
     try:
-        session = service.set_source_selection(session_id, request.source_ids)
+        _require_session_for_user(session_id, service, current_user)
+        owner_filter = _owner_filter_for_user(current_user)
+
+        session = service.set_source_selection(
+            session_id,
+            request.source_ids,
+            owner_id=owner_filter,
+        )
         if not session:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Data discovery session not found",
             )
+        audit_service.record_action(
+            db,
+            action="data_discovery.session.set_sources",
+            target=("data_discovery_session", str(session.id)),
+            actor_id=current_user.id,
+            details={"selected_sources": session.selected_sources},
+        )
         return _session_to_response(session)
 
     except HTTPException:
@@ -376,21 +491,40 @@ async def execute_query_test(
     session_id: UUID,
     request: ExecuteTestRequest,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(_audit_service),
 ) -> QueryTestResultResponse:
     """Execute a query test."""
     try:
+        _require_session_for_user(session_id, service, current_user)
+        owner_filter = _owner_filter_for_user(current_user)
+
         test_request = ExecuteQueryTestRequest(
             session_id=session_id,
             catalog_entry_id=request.catalog_entry_id,
             timeout_seconds=request.timeout_seconds,
         )
 
-        result = await service.execute_query_test(test_request)
+        result = await service.execute_query_test(
+            test_request,
+            owner_id=owner_filter,
+        )
         if not result:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Session or catalog entry not found",
             )
+        audit_service.record_action(
+            db,
+            action="data_discovery.session.execute_test",
+            target=("data_discovery_session", str(session_id)),
+            actor_id=current_user.id,
+            details={
+                "catalog_entry_id": request.catalog_entry_id,
+                "status": result.status.value,
+            },
+        )
         return _test_result_to_response(result)
 
     except HTTPException:
@@ -412,9 +546,12 @@ async def execute_query_test(
 async def get_session_test_results(
     session_id: UUID,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
 ) -> list[QueryTestResultResponse]:
     """Get all test results for a session."""
     try:
+        _require_session_for_user(session_id, service, current_user)
+
         results = service.get_session_test_results(session_id)
         return [_test_result_to_response(result) for result in results]
 
@@ -436,9 +573,15 @@ async def add_source_to_space(
     session_id: UUID,
     request: AddToSpaceRequest,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(_audit_service),
 ) -> dict[str, str]:
     """Add a tested source to a research space."""
     try:
+        _require_session_for_user(session_id, service, current_user)
+        owner_filter = _owner_filter_for_user(current_user)
+
         add_request = AddSourceToSpaceRequest(
             session_id=session_id,
             catalog_entry_id=request.catalog_entry_id,
@@ -446,13 +589,27 @@ async def add_source_to_space(
             source_config=request.source_config,
         )
 
-        data_source_id = await service.add_source_to_space(add_request)
+        data_source_id = await service.add_source_to_space(
+            add_request,
+            owner_id=owner_filter,
+        )
         if not data_source_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Failed to add source to research space",
             )
 
+        audit_service.record_action(
+            db,
+            action="data_discovery.session.add_to_space",
+            target=("data_discovery_session", str(session_id)),
+            actor_id=current_user.id,
+            details={
+                "catalog_entry_id": request.catalog_entry_id,
+                "research_space_id": str(request.research_space_id),
+                "data_source_id": str(data_source_id),
+            },
+        )
         return {
             "data_source_id": str(data_source_id),
             "message": "Source added to space successfully",
@@ -504,15 +661,28 @@ async def get_source_catalog(
 async def delete_session(
     session_id: UUID,
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(_audit_service),
 ) -> None:
     """Delete a workbench session."""
     try:
-        success = service.delete_session(session_id)
+        _require_session_for_user(session_id, service, current_user)
+        owner_filter = _owner_filter_for_user(current_user)
+
+        success = service.delete_session(session_id, owner_id=owner_filter)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Data discovery session not found",
             )
+        audit_service.record_action(
+            db,
+            action="data_discovery.session.delete",
+            target=("data_discovery_session", str(session_id)),
+            actor_id=current_user.id,
+            details={},
+        )
 
     except HTTPException:
         raise

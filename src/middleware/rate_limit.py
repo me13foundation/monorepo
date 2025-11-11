@@ -13,6 +13,8 @@ from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
+from src.middleware.distributed_rate_limit import build_distributed_limiter
+
 
 class TokenBucket:
     """Token bucket implementation for rate limiting."""
@@ -150,6 +152,7 @@ class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
                 "/data-discovery/sessions",  # session creation is already gated upstream
             ),
         }
+        self.distributed_limiter = build_distributed_limiter()
 
     async def dispatch(
         self,
@@ -180,6 +183,18 @@ class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
                 detail=f"Rate limit exceeded for {method} requests. Please try again later.",
                 headers={"Retry-After": str(retry_after)},
             )
+
+        if self.distributed_limiter:
+            allowed, retry_after = await self.distributed_limiter.allow(
+                f"{method}:{request.url.path}:{client_ip}",
+                bucket.capacity,
+            )
+            if not allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Global rate limit exceeded. Please try again later.",
+                    headers={"Retry-After": str(retry_after)},
+                )
 
         response = await call_next(request)
 

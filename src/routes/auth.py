@@ -90,13 +90,8 @@ async def list_routes() -> dict[str, list[dict[str, Any]]]:
     return {"routes": routes}
 
 
-@auth_router.post("/debug")
-async def debug_endpoint(data: dict[str, Any]) -> dict[str, Any]:
-    """Debug endpoint to test request handling."""
-    return {"received": data, "message": "Debug endpoint working"}
-
-
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
     auth_service: AuthenticationService = Depends(
         get_authentication_service_dependency,

@@ -23,6 +23,8 @@ WEB_PID_FILE_ABS := $(abspath $(WEB_PID_FILE))
 WEB_LOG_ABS := $(abspath $(WEB_LOG))
 NEXT_DEV_ENV := NEXTAUTH_SECRET=med13-resource-library-nextauth-secret-key-for-development-2024-secure-random-string NEXTAUTH_URL=http://localhost:3000 NEXT_PUBLIC_API_URL=http://localhost:8080
 
+ADMIN_PASSWORD_EFFECTIVE := $(strip $(or $(ADMIN_PASSWORD),$(MED13_ADMIN_PASSWORD)))
+
 # Detect environment type
 CI_ENV := $(CI)
 IN_VENV := $(shell python3 -c "import sys; print('1' if sys.prefix != sys.base_prefix else '0')" 2>/dev/null || echo "0")
@@ -261,7 +263,7 @@ run-all-postgres: ## Restart Postgres, run migrations, seed admin, start backend
 	@$(MAKE) -s stop-all
 	@$(MAKE) -s docker-postgres-up
 	@$(MAKE) -s postgres-migrate
-	@$(MAKE) -s db-seed-admin
+	@$(call run_with_postgres_env,$(MAKE) -s db-seed-admin)
 	@$(MAKE) -s start-local
 	@echo "Backend running in background. Starting Next.js..."
 	@$(MAKE) -s start-web
@@ -520,22 +522,30 @@ else
 	$(call run_with_postgres_env,$(USE_PYTHON) scripts/seed_database.py)
 endif
 
-db-seed-admin: ## Seed admin user (creates admin@med13.org with password admin123)
+db-seed-admin: ## Seed admin user (requires ADMIN_PASSWORD or MED13_ADMIN_PASSWORD)
 	$(call check_venv)
+	@if [ -z "$(ADMIN_PASSWORD_EFFECTIVE)" ]; then \
+		echo "ADMIN_PASSWORD or MED13_ADMIN_PASSWORD must be provided (e.g. ADMIN_PASSWORD='StrongPassw0rd!' make db-seed-admin)"; \
+		exit 1; \
+	fi
 	@echo "Seeding admin user..."
 ifeq ($(POSTGRES_ACTIVE),)
-	@$(USE_PYTHON) scripts/seed_admin_user.py
+	@ADMIN_PASSWORD="$(ADMIN_PASSWORD_EFFECTIVE)" $(USE_PYTHON) scripts/seed_admin_user.py --password "$$ADMIN_PASSWORD"
 else
-	$(call run_with_postgres_env,$(USE_PYTHON) scripts/seed_admin_user.py)
+	$(call run_with_postgres_env,ADMIN_PASSWORD="$(ADMIN_PASSWORD_EFFECTIVE)" $(USE_PYTHON) scripts/seed_admin_user.py --password "$$ADMIN_PASSWORD")
 endif
 
-db-reset-admin-password: ## Reset admin password (default: admin123)
+db-reset-admin-password: ## Reset admin password (requires ADMIN_PASSWORD or MED13_ADMIN_PASSWORD)
 	$(call check_venv)
+	@if [ -z "$(ADMIN_PASSWORD_EFFECTIVE)" ]; then \
+		echo "ADMIN_PASSWORD or MED13_ADMIN_PASSWORD must be provided (e.g. ADMIN_PASSWORD='NewStrongPass!' make db-reset-admin-password)"; \
+		exit 1; \
+	fi
 	@echo "Resetting admin password..."
 ifeq ($(POSTGRES_ACTIVE),)
-	@$(USE_PYTHON) scripts/reset_admin_password.py
+	@ADMIN_PASSWORD="$(ADMIN_PASSWORD_EFFECTIVE)" $(USE_PYTHON) scripts/reset_admin_password.py --password "$$ADMIN_PASSWORD"
 else
-	$(call run_with_postgres_env,$(USE_PYTHON) scripts/reset_admin_password.py)
+	$(call run_with_postgres_env,ADMIN_PASSWORD="$(ADMIN_PASSWORD_EFFECTIVE)" $(USE_PYTHON) scripts/reset_admin_password.py --password "$$ADMIN_PASSWORD")
 endif
 
 db-verify-admin: ## Verify admin user exists

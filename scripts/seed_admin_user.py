@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -28,10 +29,34 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+MIN_ADMIN_PASSWORD_LENGTH = 12
+ADMIN_PASSWORD_ENV_VAR = (
+    "MED13_ADMIN_PASSWORD"  # noqa: S105 - env var name, not a credential
+)
+
+
+def _resolve_admin_password(explicit: str | None) -> str:
+    """Resolve admin password from CLI flag or environment."""
+    candidate = explicit or os.getenv(ADMIN_PASSWORD_ENV_VAR)
+    if not candidate:
+        message = (
+            "Admin password required. Pass --password or set "
+            f"{ADMIN_PASSWORD_ENV_VAR}."
+        )
+        raise ValueError(message)
+    if len(candidate) < MIN_ADMIN_PASSWORD_LENGTH:
+        message = (
+            "Admin password must be at least "
+            f"{MIN_ADMIN_PASSWORD_LENGTH} characters long."
+        )
+        raise ValueError(message)
+    return candidate
+
+
 def create_admin_user(
     email: str = "admin@med13.org",
     username: str = "admin",
-    password: str = "admin123",  # default password for seed script
+    password: str | None = None,
     full_name: str = "MED13 Administrator",
 ) -> None:
     """
@@ -45,6 +70,7 @@ def create_admin_user(
     """
     session = SessionLocal()
     password_hasher = PasswordHasher()
+    resolved_password = _resolve_admin_password(password)
 
     try:
         # Check if admin already exists
@@ -60,7 +86,7 @@ def create_admin_user(
             email=email,
             username=username,
             full_name=full_name,
-            hashed_password=password_hasher.hash_password(password),
+            hashed_password=password_hasher.hash_password(resolved_password),
             role=UserRole.ADMIN,
             status=UserStatus.ACTIVE,
             email_verified=True,
@@ -72,8 +98,8 @@ def create_admin_user(
         logger.info("✅ Admin user created successfully!")
         logger.info("   Email: %s", email)
         logger.info("   Username: %s", username)
-        logger.warning("   Password: %s", password)
-        logger.warning("   ⚠️  Please change the password after first login!")
+        logger.warning("   Password provided via CLI/env (not logged).")
+        logger.warning("   ⚠️  Rotate the password after first login!")
 
     except SQLAlchemyError:
         session.rollback()
@@ -192,8 +218,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--password",
-        default="admin123",
-        help="Admin password (default: admin123)",
+        help=(
+            "Admin password (required unless MED13_ADMIN_PASSWORD environment "
+            "variable is set)"
+        ),
     )
     parser.add_argument(
         "--full-name",

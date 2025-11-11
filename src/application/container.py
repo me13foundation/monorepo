@@ -151,8 +151,11 @@ class DependencyContainer:
 
         # Initialize Clean Architecture services (lazy-loaded, async)
         self._authentication_service: AuthenticationService | None = None
+        self._authentication_service_loop: asyncio.AbstractEventLoop | None = None
         self._authorization_service: AuthorizationService | None = None
+        self._authorization_service_loop: asyncio.AbstractEventLoop | None = None
         self._user_management_service: UserManagementService | None = None
+        self._user_management_service_loop: asyncio.AbstractEventLoop | None = None
 
         # Initialize Legacy domain services (pure business logic, no dependencies)
         self._gene_domain_service: GeneDomainService | None = None
@@ -175,7 +178,11 @@ class DependencyContainer:
 
     async def get_authentication_service(self) -> AuthenticationService:
         """Get the authentication service instance."""
-        if self._authentication_service is None:
+        current_loop = asyncio.get_running_loop()
+        if (
+            self._authentication_service is None
+            or self._authentication_service_loop is not current_loop
+        ):
             user_repository = self.get_user_repository()
             session_repository = self.get_session_repository()
             self._authentication_service = AuthenticationService(
@@ -184,25 +191,36 @@ class DependencyContainer:
                 jwt_provider=self.jwt_provider,
                 password_hasher=self.password_hasher,
             )
+            self._authentication_service_loop = current_loop
         return self._authentication_service
 
     async def get_authorization_service(self) -> AuthorizationService:
         """Get the authorization service instance."""
-        if self._authorization_service is None:
+        current_loop = asyncio.get_running_loop()
+        if (
+            self._authorization_service is None
+            or self._authorization_service_loop is not current_loop
+        ):
             user_repository = self.get_user_repository()
             self._authorization_service = AuthorizationService(
                 user_repository=user_repository,
             )
+            self._authorization_service_loop = current_loop
         return self._authorization_service
 
     async def get_user_management_service(self) -> UserManagementService:
         """Get the user management service instance."""
-        if self._user_management_service is None:
+        current_loop = asyncio.get_running_loop()
+        if (
+            self._user_management_service is None
+            or self._user_management_service_loop is not current_loop
+        ):
             user_repository = self.get_user_repository()
             self._user_management_service = UserManagementService(
                 user_repository=user_repository,
                 password_hasher=self.password_hasher,
             )
+            self._user_management_service_loop = current_loop
         return self._user_management_service
 
     # LEGACY SYSTEM METHODS (Sync SQLAlchemy for backward compatibility)

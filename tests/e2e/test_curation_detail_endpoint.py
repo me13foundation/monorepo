@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import os
+
 from fastapi.testclient import TestClient
 
+from src.application import container as container_module
 from src.database.session import SessionLocal, engine
+from src.domain.entities.user import UserRole, UserStatus
+from src.infrastructure.security.password_hasher import PasswordHasher
 from src.main import create_app
+from src.middleware import jwt_auth as jwt_auth_module
 from src.models.database import (
     Base,
     EvidenceModel,
@@ -13,22 +19,48 @@ from src.models.database import (
 )
 from src.models.database.audit import AuditLog
 from src.models.database.review import ReviewRecord
+from src.models.database.user import UserModel
 from tests.test_types.fixtures import (
     create_test_gene,
     create_test_phenotype,
     create_test_variant,
 )
 
+TEST_ADMIN_PASSWORD = os.getenv("MED13_E2E_ADMIN_PASSWORD", "StrongPass!123")
 
-def test_curation_detail_endpoint_returns_clinical_context() -> None:
-    """Ensure curator detail endpoint returns phenotypes, evidence, and audit summary."""
-    # Reset schema for a clean slate
-    Base.metadata.drop_all(bind=engine)
+
+def _reset_container_services() -> None:
+    """Ensure async services are rebuilt with the current event loop."""
+    container = container_module.container
+    container._authentication_service = None
+    container._authentication_service_loop = None
+    container._authorization_service = None
+    container._authorization_service_loop = None
+    container._user_management_service = None
+    container._user_management_service_loop = None
+    jwt_auth_module.SKIP_JWT_VALIDATION = True
+
+
+def _reset_tables(session: SessionLocal) -> None:
+    """Clear tables touched by this test to avoid cross-test leakage."""
+    for model in (
+        AuditLog,
+        ReviewRecord,
+        EvidenceModel,
+        PhenotypeModel,
+        VariantModel,
+        GeneModel,
+    ):
+        session.query(model).delete()
+    session.commit()
+
+
+def _seed_curation_context() -> None:
+    """Create the gene/variant/phenotype/evidence records needed by the test."""
     Base.metadata.create_all(bind=engine)
-
     session = SessionLocal()
     try:
-        # Seed gene, variant, phenotype, evidence
+        _reset_tables(session)
         gene_data = create_test_gene(gene_id="GENE-E2E", symbol="MED13E2E")
         gene = GeneModel(
             gene_id=gene_data.gene_id,
@@ -125,15 +157,26 @@ def test_curation_detail_endpoint_returns_clinical_context() -> None:
     finally:
         session.close()
 
-    app = create_app()
-    client = TestClient(app)
 
-    response = client.get(
-        "/curation/variants/VCV-E2E-1",
-        headers={"X-API-Key": "read-key-456"},
-    )
+def test_curation_detail_endpoint_returns_clinical_context() -> None:
+    """Ensure curator detail endpoint returns phenotypes, evidence, and audit summary."""
+    _seed_curation_context()
 
-    assert response.status_code == 200
+    _reset_container_services()
+    jwt_auth_module.SKIP_JWT_VALIDATION = True
+    try:
+        app = create_app()
+        client = TestClient(app)
+
+        headers = _get_auth_headers(client)
+        response = client.get(
+            "/curation/variants/VCV-E2E-1",
+            headers=headers,
+        )
+
+        assert response.status_code == 200, response.json()
+    finally:
+        jwt_auth_module.SKIP_JWT_VALIDATION = False
     payload = response.json()
 
     assert payload["variant"]["variant_id"] == "VCV-E2E-1"
@@ -152,3 +195,38 @@ def test_curation_detail_endpoint_returns_clinical_context() -> None:
     assert audit is not None
     assert audit["total_annotations"] >= 1
     assert any("Status" in action for action in audit["pending_actions"])
+
+
+def _create_admin_user(
+    email: str = "admin-e2e@med13.org",
+    password: str | None = None,
+) -> tuple[str, str]:
+    resolved_password = password or TEST_ADMIN_PASSWORD
+    session = SessionLocal()
+    try:
+        session.query(UserModel).filter(UserModel.email == email).delete()
+        admin = UserModel(
+            email=email,
+            username="admin-e2e",
+            full_name="E2E Admin",
+            hashed_password=PasswordHasher().hash_password(resolved_password),
+            role=UserRole.ADMIN,
+            status=UserStatus.ACTIVE,
+            email_verified=True,
+        )
+        session.add(admin)
+        session.commit()
+    finally:
+        session.close()
+    return email, resolved_password
+
+
+def _get_auth_headers(client: TestClient) -> dict[str, str]:
+    email, password = _create_admin_user()
+    resp = client.post(
+        "/auth/login",
+        json={"email": email, "password": password},
+    )
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}

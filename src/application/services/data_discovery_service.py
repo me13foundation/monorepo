@@ -160,6 +160,16 @@ class DataDiscoveryService:
         """
         return self._session_repo.find_by_id(session_id)
 
+    def get_session_for_owner(
+        self,
+        session_id: UUID,
+        owner_id: UUID,
+    ) -> DataDiscoverySession | None:
+        """
+        Get a session by ID if it belongs to the provided owner.
+        """
+        return self._session_repo.find_owned_session(session_id, owner_id)
+
     def get_user_sessions(
         self,
         owner_id: UUID,
@@ -184,6 +194,7 @@ class DataDiscoveryService:
     def update_session_parameters(
         self,
         request: UpdateSessionParametersRequest,
+        owner_id: UUID | None = None,
     ) -> DataDiscoverySession | None:
         """
         Update parameters for a data discovery session.
@@ -194,7 +205,11 @@ class DataDiscoveryService:
         Returns:
             Updated session or None if not found
         """
-        session = self._session_repo.find_by_id(request.session_id)
+        session = (
+            self._session_repo.find_owned_session(request.session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(request.session_id)
+        )
         if not session:
             return None
 
@@ -210,6 +225,7 @@ class DataDiscoveryService:
         self,
         session_id: UUID,
         catalog_entry_id: str,
+        owner_id: UUID | None = None,
     ) -> DataDiscoverySession | None:
         """
         Toggle source selection in a data discovery session.
@@ -221,7 +237,11 @@ class DataDiscoveryService:
         Returns:
             Updated session or None if not found
         """
-        session = self._session_repo.find_by_id(session_id)
+        session = (
+            self._session_repo.find_owned_session(session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(session_id)
+        )
         if not session:
             logger.warning(
                 "Unable to toggle source %s; session %s not found",
@@ -273,11 +293,16 @@ class DataDiscoveryService:
         self,
         session_id: UUID,
         catalog_entry_ids: Sequence[str],
+        owner_id: UUID | None = None,
     ) -> DataDiscoverySession | None:
         """
         Explicitly set session selections to the provided catalog entries.
         """
-        session = self._session_repo.find_by_id(session_id)
+        session = (
+            self._session_repo.find_owned_session(session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(session_id)
+        )
         if not session:
             logger.warning("Unable to set selections; session %s not found", session_id)
             return None
@@ -353,6 +378,7 @@ class DataDiscoveryService:
     async def execute_query_test(
         self,
         request: ExecuteQueryTestRequest,
+        owner_id: UUID | None = None,
     ) -> QueryTestResult | None:
         """
         Execute a query test against a data source.
@@ -364,7 +390,11 @@ class DataDiscoveryService:
             Test result or None if session/entry not found
         """
         # Get session and catalog entry
-        session = self._session_repo.find_by_id(request.session_id)
+        session = (
+            self._session_repo.find_owned_session(request.session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(request.session_id)
+        )
         catalog_entry = self._catalog_repo.find_by_id(request.catalog_entry_id)
 
         if not session or not catalog_entry:
@@ -510,6 +540,7 @@ class DataDiscoveryService:
     async def add_source_to_space(
         self,
         request: AddSourceToSpaceRequest,
+        owner_id: UUID | None = None,
     ) -> UUID | None:
         """
         Add a tested source to a research space as a UserDataSource.
@@ -521,7 +552,11 @@ class DataDiscoveryService:
             ID of created UserDataSource or None if failed
         """
         # Get session and catalog entry
-        session = self._session_repo.find_by_id(request.session_id)
+        session = (
+            self._session_repo.find_owned_session(request.session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(request.session_id)
+        )
         catalog_entry = self._catalog_repo.find_by_id(request.catalog_entry_id)
 
         if not session or not catalog_entry:
@@ -569,7 +604,11 @@ class DataDiscoveryService:
             )
             return data_source.id
 
-    def delete_session(self, session_id: UUID) -> bool:
+    def delete_session(
+        self,
+        session_id: UUID,
+        owner_id: UUID | None = None,
+    ) -> bool:
         """
         Delete a data discovery session and all its test results.
 
@@ -580,6 +619,21 @@ class DataDiscoveryService:
             True if deleted successfully
         """
         try:
+            if owner_id:
+                session = self._session_repo.find_owned_session(session_id, owner_id)
+                if not session:
+                    logger.warning(
+                        "Owner %s attempted to delete unauthorized session %s",
+                        owner_id,
+                        session_id,
+                    )
+                    return False
+            else:
+                session = self._session_repo.find_by_id(session_id)
+                if not session:
+                    logger.warning("Session %s not found for deletion", session_id)
+                    return False
+
             # Delete test results first
             self._query_repo.delete_session_results(session_id)
 
@@ -592,7 +646,4 @@ class DataDiscoveryService:
         else:
             if success:
                 logger.info("Deleted data discovery session %s", session_id)
-            else:
-                logger.warning("Session %s not found for deletion", session_id)
-
             return success

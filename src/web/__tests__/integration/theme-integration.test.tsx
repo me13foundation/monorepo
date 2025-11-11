@@ -13,7 +13,6 @@ const mockSession = {
     role: 'admin',
     email_verified: true,
     access_token: 'test-access-token',
-    refresh_token: 'test-refresh-token',
     expires_at: Date.now() + 3600000, // 1 hour from now
   },
   expires: '2025-12-31T00:00:00.000Z'

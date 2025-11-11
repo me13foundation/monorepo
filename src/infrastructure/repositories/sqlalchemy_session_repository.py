@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -28,6 +29,13 @@ class SqlAlchemySessionRepository(SessionRepository):
     Converts between SQLAlchemy models and domain entities while providing
     asynchronous persistence operations for session management.
     """
+
+    @staticmethod
+    def _hash_token(token: str | None) -> str | None:
+        """Hash tokens before persisting to the database."""
+        if token is None:
+            return None
+        return sha256(token.encode()).hexdigest()
 
     def __init__(self, session_factory: Any) -> None:
         """
@@ -63,6 +71,8 @@ class SqlAlchemySessionRepository(SessionRepository):
             data = session_entity.model_dump(mode="python")
             data.setdefault("created_at", now)
             data.setdefault("last_activity", now)
+            data["session_token"] = self._hash_token(data.get("session_token"))
+            data["refresh_token"] = self._hash_token(data.get("refresh_token"))
 
             db_session = SessionModel(**data)
             session.add(db_session)
@@ -82,7 +92,7 @@ class SqlAlchemySessionRepository(SessionRepository):
         """Get session by access token."""
         async with self._session() as session:
             stmt = select(SessionModel).where(
-                SessionModel.session_token == access_token,
+                SessionModel.session_token == self._hash_token(access_token),
             )
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
@@ -92,7 +102,7 @@ class SqlAlchemySessionRepository(SessionRepository):
         """Get session by refresh token."""
         async with self._session() as session:
             stmt = select(SessionModel).where(
-                SessionModel.refresh_token == refresh_token,
+                SessionModel.refresh_token == self._hash_token(refresh_token),
             )
             result = await session.execute(stmt)
             model = result.scalar_one_or_none()
@@ -107,7 +117,7 @@ class SqlAlchemySessionRepository(SessionRepository):
             now = datetime.now(UTC)
             stmt = select(SessionModel).where(
                 and_(
-                    SessionModel.refresh_token == refresh_token,
+                    SessionModel.refresh_token == self._hash_token(refresh_token),
                     SessionModel.status == SessionStatus.ACTIVE,
                     SessionModel.refresh_expires_at > now,
                 ),
@@ -128,6 +138,10 @@ class SqlAlchemySessionRepository(SessionRepository):
             data.pop("id", None)
             data.pop("created_at", None)
             data.setdefault("last_activity", datetime.now(UTC))
+            if "session_token" in data:
+                data["session_token"] = self._hash_token(data["session_token"])
+            if "refresh_token" in data:
+                data["refresh_token"] = self._hash_token(data["refresh_token"])
 
             for field, value in data.items():
                 setattr(db_session, field, value)

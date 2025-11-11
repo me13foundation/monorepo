@@ -21,7 +21,10 @@ from src.application.dto.auth_responses import (
     ValidationErrorResponse,
 )
 from src.application.services.authentication_service import AuthenticationService
-from src.application.services.authorization_service import AuthorizationService
+from src.application.services.authorization_service import (
+    AuthorizationError,
+    AuthorizationService,
+)
 from src.application.services.user_management_service import (
     UserAlreadyExistsError,
     UserManagementError,
@@ -55,6 +58,24 @@ users_router = APIRouter(
 )
 
 
+async def _ensure_permission(
+    current_user: User,
+    permission: Permission | str,
+    authz_service: AuthorizationService,
+) -> None:
+    """Enforce that the current user has the provided permission."""
+    try:
+        permission_obj = (
+            permission if isinstance(permission, Permission) else Permission(permission)
+        )
+        await authz_service.require_permission(current_user.id, permission_obj)
+    except AuthorizationError as exc:
+        raise HTTPException(
+            status_code=HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
+
+
 @users_router.post(
     "",
     response_model=UserProfileResponse,
@@ -75,10 +96,7 @@ async def create_user(
     """
     try:
         # Check permission
-        await authz_service.require_permission(
-            current_user.id,
-            Permission("user:create"),
-        )
+        await _ensure_permission(current_user, "user:create", authz_service)
         user = await user_service.create_user(request, current_user.id)
         return UserProfileResponse(user=UserPublic.from_user(user))
     except UserAlreadyExistsError as e:
@@ -112,11 +130,14 @@ async def list_users(
     user_service: UserManagementService = Depends(
         container.get_user_management_service,
     ),
+    authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> UserListResponse:
     """
     List users with pagination and filtering.
     """
     try:
+        await _ensure_permission(current_user, Permission.USER_READ, authz_service)
+
         # Validate role parameter
         user_role = None
         if role:
@@ -213,10 +234,7 @@ async def update_user(
     """
     try:
         # Check permission
-        await authz_service.require_permission(
-            current_user.id,
-            Permission("user:update"),
-        )
+        await _ensure_permission(current_user, "user:update", authz_service)
         updated_user = await user_service.admin_update_user(UUID(user_id), request)
         return UserProfileResponse(user=UserPublic.from_user(updated_user))
     except UserNotFoundError:
@@ -249,10 +267,7 @@ async def delete_user(
     """
     try:
         # Check permission
-        await authz_service.require_permission(
-            current_user.id,
-            Permission("user:delete"),
-        )
+        await _ensure_permission(current_user, "user:delete", authz_service)
 
         # Prevent users from deleting themselves
         if str(current_user.id) == user_id:
@@ -291,10 +306,7 @@ async def lock_user_account(
     """
     try:
         # Check permission
-        await authz_service.require_permission(
-            current_user.id,
-            Permission("user:update"),
-        )
+        await _ensure_permission(current_user, "user:update", authz_service)
 
         # Prevent users from locking themselves
         if str(current_user.id) == user_id:
@@ -333,10 +345,7 @@ async def unlock_user_account(
     """
     try:
         # Check permission
-        await authz_service.require_permission(
-            current_user.id,
-            Permission("user:update"),
-        )
+        await _ensure_permission(current_user, "user:update", authz_service)
         await user_service.unlock_user_account(UUID(user_id))
         return GenericSuccessResponse(message="User account unlocked successfully")
     except UserNotFoundError:
@@ -359,11 +368,13 @@ async def get_user_statistics(
     user_service: UserManagementService = Depends(
         container.get_user_management_service,
     ),
+    authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> UserStatisticsResponse:
     """
     Get user statistics overview.
     """
     try:
+        await _ensure_permission(current_user, Permission.AUDIT_READ, authz_service)
         stats = await user_service.get_user_statistics()
         return stats
     except UserManagementError as e:

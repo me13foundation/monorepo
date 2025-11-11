@@ -82,11 +82,32 @@ make stop-all
 ```
 
 `make run-all-postgres` drops any existing Postgres dev container, recreates it via `docker-compose.postgres.yml`,
-runs Alembic migrations, seeds the default admin (`admin@med13.org` / `admin123`), ensures the default research space
-exists, then starts FastAPI in the background (logs → `logs/backend.log`) before launching the Next.js dev server.
+runs Alembic migrations, seeds the default admin (`admin@med13.org` with the password you provide via
+`ADMIN_PASSWORD`/`MED13_ADMIN_PASSWORD`), ensures the default research space exists, then starts FastAPI in the
+background (logs → `logs/backend.log`) before launching the Next.js dev server.
 The command also writes a `.postgres-active` flag so all other Make targets automatically source `.env.postgres`
 and re-run migrations before touching the database.
 
+💡 **Tip:** add `MED13_ADMIN_PASSWORD=<your strong local password>` to `.env.postgres` (gitignored) so that
+`make run-all-postgres`, `make run-web-postgres`, and other Postgres-aware targets can seed/reset the admin user
+without additional CLI flags. For SQLite workflows, pass the password inline:
+`ADMIN_PASSWORD='changeme!' make db-seed-admin`.
+
+For rate limiting, the same compose file now brings up a `med13-redis` container. The default `.env.postgres`
+configuration sets `MED13_RATE_LIMIT_REDIS_URL=redis://localhost:${MED13_REDIS_PORT}/0`, enabling the distributed
+token bucket middleware automatically whenever Postgres mode is active.
+
+Running the full test suite against Postgres is as simple as:
+
+```bash
+# One-shot Postgres-backed test cycle
+MED13_ADMIN_PASSWORD="StrongLocalPass1!" make run-all-postgres \
+  && MED13_ALLOW_MISSING_API_KEYS=1 MED13_ADMIN_PASSWORD="StrongLocalPass1!" make test \
+  && make postgres-disable
+```
+
+This starts the containers, seeds the admin account with your supplied password, runs `pytest` against Postgres/Redis,
+then removes the `.postgres-active` flag so future commands default back to SQLite.
 Use the advanced helpers below if you need finer control over the Postgres container:
 
 ```bash
@@ -111,6 +132,16 @@ automatically source `.env.postgres` **and run `alembic upgrade head`** before s
 ```bash
 make check-env
 ```
+
+### Security-Sensitive Environment Variables
+
+Set the following variables (preferably via Secret Manager) before running in staging or production:
+
+- `ADMIN_API_KEY`, `WRITE_API_KEY`, `READ_API_KEY` – required for API-key clients; the backend will not start without them unless `MED13_ALLOW_MISSING_API_KEYS=1` (development only).
+- `MED13_ADMIN_PASSWORD` or `ADMIN_PASSWORD` (Make targets) – required when seeding or resetting the default admin account (for Postgres flows, place `MED13_ADMIN_PASSWORD` in `.env.postgres`).
+- `MED13_RATE_LIMIT_REDIS_URL` – optional Redis URL to enable cross-instance rate limiting.
+- `MED13_ENV` – set to `production`/`staging` to enforce secure database credentials.
+- `DATABASE_URL` / `ASYNC_DATABASE_URL` – Postgres connection strings automatically receive `sslmode=require` in `staging`/`production`. Only set `MED13_ALLOW_INSECURE_DEFAULTS=1` when you explicitly need to bypass TLS enforcement for local debugging.
 
 ## 📁 Project Structure
 
@@ -378,11 +409,18 @@ make deploy-prod       # Deploys all services to production
 - **Node.js**: npm audit and dependency checks
 - **Vulnerability Checks**: CI/CD pipeline for both ecosystems
 - **License Compliance**: All biomedical data sources verified
+- **Container Scanning**: Every CI run builds the FastAPI image and scans it with Trivy before deployments
+- **Schema Fuzzing**: Schemathesis-based smoke tests (`pytest tests/security/test_schemathesis_contracts.py`) ensure OpenAPI endpoints stay within contract without leaking 5xx responses
 
 ### Type Safety
 - **100% MyPy Compliance**: Strict typing across Python codebase
 - **Shared Type Definitions**: TypeScript types synced between services
 - **Runtime Validation**: Pydantic models ensure data integrity
+
+### Audit Logging & Access Controls
+- **JWT-first curation pipeline**: Curation routes reject API-key-only requests and require JWT-authenticated users with explicit permissions.
+- **Per-user Data Discovery isolation**: Repository filters ensure sessions can only be read or mutated by their owners (admins may opt-in to override).
+- **Append-only audit trail**: High-risk curation and data-discovery actions emit structured entries into `audit_logs`, providing tamper-resistant traceability.
 
 ## 📚 Documentation
 

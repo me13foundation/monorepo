@@ -21,7 +21,6 @@ export enum UserRole {
 export interface AuthSession {
   user: User & {
     access_token: string
-    refresh_token: string
     expires_at: number
   }
   expires: string

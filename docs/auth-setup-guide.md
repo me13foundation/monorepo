@@ -45,14 +45,9 @@ python scripts/seed_admin_user.py \
   --full-name "Your Name"
 ```
 
-**Default Admin Credentials:**
-- **Email**: `admin@med13.org`
-- **Username**: `admin`
-- **Password**: `admin123`
-- **Role**: `ADMIN`
-- **Status**: `ACTIVE`
-
-⚠️ **Security Warning**: Change the default password immediately after first login!
+⚠️ **Security Requirement**: You must supply a strong admin password (12+ characters) either via the
+`--password` flag or by setting the `MED13_ADMIN_PASSWORD` environment variable before seeding. No default password
+is bundled with the project.
 
 ### Step 3: Start the Backend
 
@@ -78,9 +73,7 @@ make run-web
 ### Step 5: Login
 
 1. Navigate to: `http://localhost:3000/auth/login`
-2. Enter credentials:
-   - Email: `admin@med13.org`
-   - Password: `admin123`
+2. Enter the credentials you configured during seeding (e.g., `admin@med13.org` / `YourSecurePassword123!`)
 3. Click "Sign In"
 4. You'll be redirected to `/dashboard`
 
@@ -108,7 +101,7 @@ curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "email": "admin@med13.org",
-    "password": "admin123"
+    "password": "YourSecurePassword123!"
   }'
 ```
 
@@ -166,7 +159,7 @@ curl -X POST http://localhost:8080/auth/login \
    ```
 
 2. **Verify password:**
-   - Default password is `admin123`
+   - Confirm you are using the password supplied when seeding (`--password` or `MED13_ADMIN_PASSWORD`)
    - Passwords are case-sensitive
    - Check for extra spaces
 
