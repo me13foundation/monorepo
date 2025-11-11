@@ -4,9 +4,9 @@ Provides statistics and activity feed endpoints for the curation dashboard.
 """
 
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
@@ -17,13 +17,25 @@ from src.infrastructure.repositories import (
     SqlAlchemyPublicationRepository,
     SqlAlchemyVariantRepository,
 )
+from src.models.api import ActivityFeedItem, DashboardSummary
 from src.routes.serializers import build_activity_feed_item, build_dashboard_summary
 
 router = APIRouter(prefix="/stats", tags=["dashboard"])
 
 
-@router.get("/dashboard", summary="Get dashboard statistics")
-async def get_dashboard_stats(db: Session = Depends(get_session)) -> dict[str, Any]:
+class RecentActivitiesResponse(BaseModel):
+    """Recent activity list response."""
+
+    activities: list[ActivityFeedItem]
+    total: int
+
+
+@router.get(
+    "/dashboard",
+    summary="Get dashboard statistics",
+    response_model=DashboardSummary,
+)
+async def get_dashboard_stats(db: Session = Depends(get_session)) -> DashboardSummary:
     """
     Retrieve overall dashboard statistics.
 
@@ -92,11 +104,15 @@ async def get_dashboard_stats(db: Session = Depends(get_session)) -> dict[str, A
         )
 
 
-@router.get("/activities/recent", summary="Get recent activity feed")
+@router.get(
+    "/activities/recent",
+    summary="Get recent activity feed",
+    response_model=RecentActivitiesResponse,
+)
 async def get_recent_activities(
     db: Session = Depends(get_session),
     limit: int = 10,
-) -> dict[str, Any]:
+) -> RecentActivitiesResponse:
     """
     Retrieve recent activities for the dashboard activity feed.
 
@@ -140,10 +156,8 @@ async def get_recent_activities(
             ),
         ]
 
-        return {
-            "activities": activities[:limit],
-            "total": len(activities),
-        }
+        limited = activities[:limit]
+        return RecentActivitiesResponse(activities=limited, total=len(activities))
 
     except Exception as e:
         raise HTTPException(

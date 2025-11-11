@@ -96,7 +96,7 @@ define run_with_postgres_env
 	@/bin/bash -lc 'set -a; source "$(POSTGRES_ENV_FILE)"; set +a; $(1)'
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage web-visual-test
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage web-visual-test
 
 # Default target
 help: ## Show this help message
@@ -307,9 +307,6 @@ backend-status: ## Show FastAPI background process status
 run-local-postgres: ## Run the FastAPI backend with Postgres env vars loaded
 	$(call run_with_postgres_env,$(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 --reload)
 
-run-dash: ## Run the Dash curation interface locally
-	$(call check_venv)
-	$(USE_PYTHON) -c "from src.dash_app import app; app.run(host='0.0.0.0', port=8050, debug=True)"
 
 run-web: ## Run the Next.js admin interface locally (seeds admin user if needed)
 	@echo "Ensuring admin user exists..."
@@ -383,10 +380,6 @@ stop-local: ## Stop the local FastAPI backend
 		pkill -f "uvicorn main:app" || echo "No FastAPI process found"; \
 	fi
 
-stop-dash: ## Stop the Dash curation interface
-	@echo "Stopping Dash UI..."
-	-pkill -f "dash_app" || echo "No Dash process found"
-
 stop-web: ## Stop the Next.js admin interface
 	@echo "Stopping Next.js admin interface..."
 	@if [ -f "$(WEB_PID_FILE)" ]; then \
@@ -401,9 +394,8 @@ stop-web: ## Stop the Next.js admin interface
 		pkill -f "npm run dev" >/dev/null 2>&1 && echo "Stopped npm dev process via pkill." || echo "No Next.js process found"; \
 	fi
 
-stop-all: ## Stop FastAPI, Dash, Next.js, Postgres, and remove PID files/log hints
+stop-all: ## Stop FastAPI, Next.js, Postgres, and remove PID files/log hints
 	@$(MAKE) -s stop-local
-	@$(MAKE) -s stop-dash
 	@$(MAKE) -s stop-web
 	@$(MAKE) -s docker-stop
 	@$(MAKE) -s docker-postgres-destroy

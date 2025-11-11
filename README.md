@@ -1,27 +1,27 @@
 # MED13 Resource Library 🏥
 
-A comprehensive biomedical data platform for MED13 genetic variants, phenotypes, and evidence. Features a **three-tier architecture** with FastAPI backend, Next.js admin interface, and Dash curation tools. Built for Google Cloud Run deployment with enterprise-grade quality assurance.
+A comprehensive biomedical data platform for MED13 genetic variants, phenotypes, and evidence. Features a **dual-service architecture** with a FastAPI backend and a Next.js admin interface (Dash UI sunset). Built for Google Cloud Run deployment with enterprise-grade quality assurance.
 
 **🚀 Currently in Phase 1: Next.js Admin Migration** - Transforming to a modern, scalable platform
 
 ## 📋 Overview
 
-A **three-service architecture** biomedical data platform featuring Clean Architecture principles, type safety, and modern web interfaces. Currently implementing **Next.js admin interface migration** alongside existing FastAPI backend and Dash curation tools.
+A **two-service architecture** biomedical data platform featuring Clean Architecture principles, type safety, and a modern Next.js interface. The Dash curation client has been retired in favor of the unified Next.js experience.
 
 ### 🏗️ Architecture
 
 ```
 MED13 Resource Library
 ├── FastAPI Backend (med13-api)      # REST API & business logic
-├── Next.js Admin (med13-admin)      # Modern admin dashboard
-└── Dash Curation (med13-curation)   # Research curation workflows
+└── Next.js Admin (med13-admin)      # Modern admin dashboard
 ```
 
 ### 🎯 Key Features
-- **Three-Tier Architecture**: Independent scaling of admin, API, and curation services
+- **Dual-Service Architecture**: Independent scaling of admin UI and API services
 - **Clean Architecture**: Domain-driven design with clear separation of concerns
 - **Type Safety**: 100% MyPy compliance with shared TypeScript types
 - **Modern Admin UI**: Next.js 14 with Tailwind CSS and shadcn/ui components
+- **Template Catalog**: Fully typed `/admin/templates` endpoints for managing reusable data source templates
 - **Comprehensive APIs**: REST endpoints with OpenAPI documentation
 - **FAIR Compliance**: Findable, Accessible, Interoperable, Reusable data
 - **Cloud-Native**: Multi-service Google Cloud Run deployment
@@ -61,7 +61,6 @@ make stop-local      # Stop the FastAPI backend (foreground or background)
 # Access the services
 # - API Documentation: http://localhost:8080/docs
 # - Admin Dashboard: http://localhost:3000/dashboard
-# - Curation Interface: http://localhost:8050
 ```
 
 ### Optional: Run Postgres Locally
@@ -78,7 +77,7 @@ make run-all-postgres
 make restart-postgres   # Destroys & recreates the Postgres container (data wiped; rerun run-all-postgres afterward)
 make run-all-postgres   # Rebuild stack with fresh data
 
-# Tear everything down (FastAPI, Dash, Next.js, Postgres containers)
+# Tear everything down (FastAPI, Next.js, Postgres containers)
 make stop-all
 ```
 
@@ -88,7 +87,7 @@ exists, then starts FastAPI in the background (logs → `logs/backend.log`) befo
 The command also writes a `.postgres-active` flag so all other Make targets automatically source `.env.postgres`
 and re-run migrations before touching the database.
 
-Use the advanced helpers below if you need finer control over the Postgres container or want to run Dash alongside the stack:
+Use the advanced helpers below if you need finer control over the Postgres container:
 
 ```bash
 make docker-postgres-up        # Creates .env.postgres if missing, then starts the DB
@@ -125,8 +124,7 @@ med13-resource-library/
 │   ├── domain/                  # Business logic & entities
 │   ├── application/             # Use cases & services
 │   ├── infrastructure/          # External adapters & repositories
-│   ├── presentation/            # UI implementations
-│   │   └── dash/               # Dash curation interface
+│   ├── presentation/            # Reserved for future UI adapters
 │   └── shared/                 # Shared types between services
 │       └── types/              # TypeScript type definitions
 ├── src/web/                     # Next.js admin interface
@@ -168,7 +166,6 @@ make web-install       # Install Next.js dependencies
 # Development Servers
 make run-local         # Start FastAPI backend (port 8080)
 make run-web           # Start Next.js admin interface (port 3000)
-make run-dash          # Start Dash curation interface (port 8050)
 
 # Code Quality
 make lint              # Python linting (flake8, ruff, mypy, bandit)
@@ -226,7 +223,7 @@ make web-install        # Next.js dependencies
 # Unified start/stop workflow (Postgres-backed dev stack)
 make run-all-postgres   # Clean Postgres -> migrations -> seed admin -> FastAPI + Next.js
 make restart-postgres   # Recreate Postgres container (rerun run-all-postgres afterward if services were stopped)
-make stop-all           # Stop FastAPI, Dash, Next.js, and Postgres containers
+make stop-all           # Stop FastAPI, Next.js, and Postgres containers
 
 # Individual quality checks
 make format            # Python auto-format
@@ -241,7 +238,6 @@ make web-test          # Next.js tests
 # Development servers (run in separate terminals)
 make run-local         # FastAPI backend (auto-migrates if Postgres active)
 make run-web           # Next.js admin UI (seeds admin if needed)
-make run-dash          # Dash curation UI
 
 # Production builds
 make web-build         # Build Next.js for production
@@ -328,8 +324,7 @@ make all
 
 ### Multi-Service Architecture
 - **FastAPI Backend**: `med13-api` - Core business logic and APIs
-- **Next.js Admin**: `med13-admin` - Administrative interface
-- **Dash Curation**: `med13-curation` - Research curation workflows
+- **Next.js Admin**: `med13-admin` - Administrative interface (replaces Dash workflows)
 
 ### Automated CI/CD
 - **GitHub Actions**: Multi-service pipeline with parallel builds
@@ -343,8 +338,6 @@ make all
 - **med13-api-staging**: Staging backend service
 - **med13-admin**: Next.js admin interface
 - **med13-admin-staging**: Staging admin service
-- **med13-curation**: Dash curation interface
-- **med13-curation-staging**: Staging curation service
 
 ### Deployment Commands
 
@@ -461,4 +454,27 @@ This project uses data from multiple biomedical sources. Refer to `docs/goal.md`
 
 **🚀 Phase 1: Next.js Admin Migration - Building Enterprise-Grade Multi-Service Architecture** 🏥✨
 
-*FastAPI Backend • Next.js Admin • Dash Curation • Clean Architecture • Type Safety • Cloud-Native*
+*FastAPI Backend • Next.js Admin • Clean Architecture • Type Safety • Cloud-Native*
+### 🧱 Template Catalog API
+
+Manage reusable data source templates directly from the admin interface:
+
+```
+GET    /admin/templates            # List templates (available/public/mine)
+GET    /admin/templates/{id}       # Fetch template details
+POST   /admin/templates            # Create a template
+PUT    /admin/templates/{id}       # Update template metadata/schema
+DELETE /admin/templates/{id}       # Delete a template
+```
+
+All endpoints return strongly typed payloads backed by the shared `TemplateResponse` model, with matching helpers in `src/web/lib/api/templates.ts` and `src/web/hooks/use-templates.ts`.
+
+### 🖥️ Template Catalog UI
+
+The Next.js admin dashboard now includes a dedicated `/templates` workspace featuring:
+
+- Scope tabs (`available`, `public`, `mine`) with paginated cards
+- In-place create/edit dialogs for schema updates and metadata
+- Detail views (`/templates/{id}`) with schema inspection and destructive-action confirmations
+
+These components reuse the same typed hooks, so backend/API updates stay in sync with the UI.

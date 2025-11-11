@@ -80,10 +80,7 @@ async def get_variants(
             filters=filters,
         )
 
-        variant_responses = [
-            VariantResponse.model_validate(serialize_variant(variant))
-            for variant in variants
-        ]
+        variant_responses = [serialize_variant(variant) for variant in variants]
 
         total_pages = (total + per_page - 1) // per_page
         return PaginatedResponse(
@@ -130,7 +127,7 @@ async def get_variant(
                 detail=f"Variant {variant_id} not found",
             )
 
-        return VariantResponse.model_validate(serialize_variant(variant))
+        return serialize_variant(variant)
     except HTTPException:
         raise
     except Exception as e:
@@ -161,7 +158,7 @@ async def get_variant_by_clinvar_id(
                 detail=f"Variant with ClinVar ID {clinvar_id} not found",
             )
 
-        return VariantResponse.model_validate(serialize_variant(variant))
+        return serialize_variant(variant)
     except HTTPException:
         raise
     except Exception as e:
@@ -208,7 +205,7 @@ async def create_variant(
             gnomad_af=getattr(variant_data, "gnomad_af", None),
         )
 
-        return VariantResponse.model_validate(serialize_variant(variant))
+        return serialize_variant(variant)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -242,7 +239,7 @@ async def update_variant(
         )
 
         variant = service.update_variant(variant_id, updates)
-        return VariantResponse.model_validate(serialize_variant(variant))
+        return serialize_variant(variant)
     except HTTPException:
         raise
     except ValueError as e:
@@ -286,7 +283,7 @@ async def update_variant_classification(
             clinical_significance=clinical_significance,
         )
 
-        return VariantResponse.model_validate(serialize_variant(variant))
+        return serialize_variant(variant)
     except HTTPException:
         raise
     except ValueError as e:

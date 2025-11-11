@@ -54,9 +54,7 @@ async def get_genes(
         )
 
         # Convert to response models
-        gene_responses = [
-            GeneResponse.model_validate(serialize_gene(gene)) for gene in genes
-        ]
+        gene_responses = [serialize_gene(gene) for gene in genes]
 
         total_pages = (total + per_page - 1) // per_page
 
@@ -113,7 +111,7 @@ async def get_gene(
             phenotypes=phenotypes,
         )
 
-        return GeneResponse.model_validate(serialized_gene)
+        return serialized_gene
 
     except HTTPException:
         raise
@@ -162,8 +160,7 @@ async def create_gene(
             uniprot_id=gene.uniprot_id,
         )
 
-        serialized = serialize_gene(created_gene)
-        return GeneResponse.model_validate(serialized)
+        return serialize_gene(created_gene)
 
     except HTTPException:
         raise
@@ -195,8 +192,7 @@ async def update_gene(
         )
 
         updated_gene = service.update_gene(gene_id, update_data)
-        serialized = serialize_gene(updated_gene)
-        return GeneResponse.model_validate(serialized)
+        return serialize_gene(updated_gene)
 
     except HTTPException:
         raise

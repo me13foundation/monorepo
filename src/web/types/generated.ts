@@ -83,9 +83,9 @@ export interface EvidenceResponse {
   reviewer_notes?: string | null;
   created_at: string;
   updated_at: string;
-  variant?: Record<string, unknown> | null;
-  phenotype?: Record<string, unknown> | null;
-  publication?: Record<string, unknown> | null;
+  variant?: VariantLinkSummary | null;
+  phenotype?: PhenotypeSummary | null;
+  publication?: PublicationSummary | null;
 }
 
 export interface EvidenceUpdate {
@@ -102,6 +102,41 @@ export interface EvidenceUpdate {
   reviewed?: boolean | null;
   review_date?: string | null;
   reviewer_notes?: string | null;
+}
+
+export interface GeneSummary {
+  id?: number | null;
+  gene_id?: string | null;
+  symbol?: string | null;
+  name?: string | null;
+}
+
+export interface VariantLinkSummary {
+  id?: number | null;
+  variant_id?: string | null;
+  clinvar_id?: string | null;
+  gene_symbol?: string | null;
+}
+
+export interface PhenotypeSummary {
+  id?: number | null;
+  hpo_id?: string | null;
+  name?: string | null;
+}
+
+export interface PublicationSummary {
+  id?: number | null;
+  title?: string | null;
+  pubmed_id?: string | null;
+  doi?: string | null;
+}
+
+export interface EvidenceSummaryResponse {
+  id?: number | null;
+  evidence_level: string;
+  evidence_type: string;
+  description: string;
+  reviewed: boolean;
 }
 
 export interface GeneCreate {
@@ -179,9 +214,9 @@ export interface PhenotypeResponse {
   updated_at: string;
   evidence_count?: number;
   variant_count?: number;
-  parent_phenotype?: Record<string, unknown> | null;
-  child_phenotypes?: Record<string, unknown>[] | null;
-  evidence?: Record<string, unknown>[] | null;
+  parent_phenotype?: PhenotypeSummary | null;
+  child_phenotypes?: PhenotypeSummary[] | null;
+  evidence?: EvidenceSummaryResponse[] | null;
 }
 
 export interface PhenotypeUpdate {
@@ -315,8 +350,8 @@ export interface VariantResponse {
   created_at: string;
   updated_at: string;
   evidence_count?: number;
-  gene?: Record<string, unknown> | null;
-  evidence?: Record<string, unknown>[] | null;
+  gene?: GeneSummary | null;
+  evidence?: EvidenceSummaryResponse[] | null;
 }
 
 export interface VariantUpdate {

@@ -4,7 +4,8 @@ Phenotype API routes for MED13 Resource Library.
 RESTful endpoints for phenotype management with HPO ontology integration.
 """
 
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -13,8 +14,13 @@ from src.application.container import get_legacy_dependency_container
 from src.database.session import get_session
 from src.models.api import (
     PaginatedResponse,
+    PhenotypeCategory,
+    PhenotypeCategoryResult,
     PhenotypeCreate,
+    PhenotypeEvidenceResponse,
     PhenotypeResponse,
+    PhenotypeSearchResult,
+    PhenotypeStatisticsResponse,
     PhenotypeUpdate,
 )
 from src.routes.serializers import serialize_phenotype
@@ -24,6 +30,20 @@ if TYPE_CHECKING:
     from src.application.services.phenotype_service import PhenotypeApplicationService
 
 router = APIRouter(prefix="/phenotypes", tags=["phenotypes"])
+
+
+def _stat_count(stats: Mapping[str, object], key: str) -> int:
+    value = stats.get(key, 0)
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, (int, float)):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
 
 
 def get_phenotype_service(
@@ -74,8 +94,7 @@ async def get_phenotypes(
         )
 
         phenotype_responses = [
-            PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
-            for phenotype in phenotypes
+            serialize_phenotype(phenotype) for phenotype in phenotypes
         ]
 
         total_pages = (total + per_page - 1) // per_page
@@ -117,7 +136,7 @@ async def get_phenotype(
                 status_code=404,
                 detail=f"Phenotype {phenotype_id} not found",
             )
-        return PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
+        return serialize_phenotype(phenotype)
     except HTTPException:
         raise
     except Exception as e:
@@ -146,7 +165,7 @@ async def get_phenotype_by_hpo_id(
                 status_code=404,
                 detail=f"Phenotype with HPO ID {hpo_id} not found",
             )
-        return PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
+        return serialize_phenotype(phenotype)
     except HTTPException:
         raise
     except Exception as e:
@@ -178,7 +197,7 @@ async def create_phenotype(
             synonyms=phenotype_data.synonyms,
         )
 
-        return PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
+        return serialize_phenotype(phenotype)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -215,7 +234,7 @@ async def update_phenotype(
         )
 
         phenotype = service.update_phenotype(phenotype_id, updates)
-        return PhenotypeResponse.model_validate(serialize_phenotype(phenotype))
+        return serialize_phenotype(phenotype)
     except HTTPException:
         raise
     except ValueError as e:
@@ -257,13 +276,17 @@ async def delete_phenotype(
         )
 
 
-@router.get("/search/", summary="Search phenotypes", response_model=dict[str, Any])
+@router.get(
+    "/search/",
+    summary="Search phenotypes",
+    response_model=PhenotypeSearchResult,
+)
 async def search_phenotypes(
     query: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
     category: str | None = Query(None, description="Filter by category"),
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> dict[str, Any]:
+) -> PhenotypeSearchResult:
     """
     Search phenotypes by name, HPO term, or synonyms.
     """
@@ -271,11 +294,11 @@ async def search_phenotypes(
         filters = {"category": category} if category else {}
         phenotypes = service.search_phenotypes(query, limit, filters)
 
-        return {
-            "query": query,
-            "total_results": len(phenotypes),
-            "results": [serialize_phenotype(p) for p in phenotypes],
-        }
+        return PhenotypeSearchResult(
+            query=query,
+            total_results=len(phenotypes),
+            results=[serialize_phenotype(p) for p in phenotypes],
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -283,7 +306,11 @@ async def search_phenotypes(
         )
 
 
-@router.get("/category/{category}", summary="Get phenotypes by category")
+@router.get(
+    "/category/{category}",
+    summary="Get phenotypes by category",
+    response_model=PhenotypeCategoryResult,
+)
 async def get_phenotypes_by_category(
     category: str,
     limit: int
@@ -294,7 +321,7 @@ async def get_phenotypes_by_category(
         description="Maximum number of results",
     ),
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> dict[str, Any]:
+) -> PhenotypeCategoryResult:
     """
     Retrieve phenotypes filtered by clinical category.
     """
@@ -304,11 +331,16 @@ async def get_phenotypes_by_category(
         if limit:
             phenotypes = phenotypes[:limit]
 
-        return {
-            "category": category,
-            "total_results": len(phenotypes),
-            "results": [serialize_phenotype(p) for p in phenotypes],
-        }
+        try:
+            response_category = PhenotypeCategory(category)
+        except ValueError:
+            response_category = PhenotypeCategory.OTHER
+
+        return PhenotypeCategoryResult(
+            category=response_category,
+            total_results=len(phenotypes),
+            results=[serialize_phenotype(p) for p in phenotypes],
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -319,17 +351,21 @@ async def get_phenotypes_by_category(
 @router.get(
     "/statistics/",
     summary="Get phenotype statistics",
-    response_model=dict[str, Any],
+    response_model=PhenotypeStatisticsResponse,
 )
 async def get_phenotype_statistics(
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> dict[str, Any]:
+) -> PhenotypeStatisticsResponse:
     """
     Retrieve statistics about phenotypes in the repository.
     """
     try:
         stats = service.get_phenotype_statistics()
-        return stats
+        return PhenotypeStatisticsResponse(
+            total_phenotypes=_stat_count(stats, "total_phenotypes"),
+            root_terms=_stat_count(stats, "root_terms"),
+            phenotypes_with_evidence=_stat_count(stats, "phenotypes_with_evidence"),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -337,11 +373,15 @@ async def get_phenotype_statistics(
         )
 
 
-@router.get("/{phenotype_id}/evidence", summary="Get evidence for a phenotype")
+@router.get(
+    "/{phenotype_id}/evidence",
+    summary="Get evidence for a phenotype",
+    response_model=PhenotypeEvidenceResponse,
+)
 async def get_phenotype_evidence(
     phenotype_id: int,
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
-) -> dict[str, Any]:
+) -> PhenotypeEvidenceResponse:
     """
     Retrieve all evidence associated with a specific phenotype.
     """
@@ -353,11 +393,11 @@ async def get_phenotype_evidence(
             )
 
         # TODO: Implement evidence retrieval for phenotypes
-        return {
-            "phenotype_id": phenotype_id,
-            "evidence": [],
-            "total_count": 0,
-        }
+        return PhenotypeEvidenceResponse(
+            phenotype_id=phenotype_id,
+            evidence=[],
+            total_count=0,
+        )
     except HTTPException:
         raise
     except Exception as e:

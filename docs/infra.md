@@ -17,7 +17,7 @@ This document outlines the infrastructure for the MED13 Resource Library, a soph
 
 **Current Services**:
 - `med13-api`: FastAPI backend (REST APIs, business logic)
-- `med13-curation`: Dash researcher interface
+- `med13-curation` (retired): Legacy Dash researcher interface
 - `med13-admin`: Next.js admin interface (planned)
 
 ### Clean Architecture Implementation
@@ -31,7 +31,7 @@ This document outlines the infrastructure for the MED13 Resource Library, a soph
 
 **Layer Structure**:
 ```
-Presentation Layer: FastAPI routes + Dash UI + Next.js UI
+Presentation Layer: FastAPI routes + Next.js UI (Dash UI retired; references retained for history)
 Application Layer: Use cases, service orchestration
 Domain Layer: Business entities, rules, invariants
 Infrastructure Layer: Database, external APIs, frameworks
@@ -77,8 +77,8 @@ Infrastructure Layer: Database, external APIs, frameworks
 - **Deployment**: Cloud Run with independent scaling
 - **Features**: REST APIs, business logic, data validation, authentication
 
-#### Dash Researcher Interface (`med13-curation`)
-- **Runtime**: Python 3.12+ with Dash framework
+#### Legacy Dash Researcher Interface (`med13-curation`) – Retired
+- **Runtime**: (Retired) Python 3.12+ with Dash framework
 - **UI Framework**: Plotly Dash with Bootstrap components
 - **Purpose**: Researcher curation workflows and data visualization
 - **Integration**: Consumes FastAPI backend APIs
@@ -132,7 +132,6 @@ med13-resource-library/
 │   │   └── web/               # Next.js admin (planned)
 │   ├── routes/                 # FastAPI route definitions
 │   ├── main.py                 # FastAPI application entry point
-│   └── dash_app.py             # Dash application entry point
 │
 ├── docs/                        # Documentation
 │   ├── infra.md                # Infrastructure guide (this file)
@@ -205,7 +204,6 @@ make activate           # Activate virtual environment
 
 # Multi-service development
 make run-local          # FastAPI backend (port 8080)
-make run-dash           # Dash researcher UI (port 8050)
 # Future: make run-web  # Next.js admin UI (port 3000)
 
 # Quality assurance (Clean Architecture focus)
@@ -406,21 +404,6 @@ jobs:
         env-vars-file: .env.production
         region: ${{ env.REGION }}
 
-  # Deploy Dash researcher UI
-  deploy-curation:
-    needs: quality-gate
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    steps:
-    - uses: actions/checkout@v4
-    - name: Deploy Dash UI
-      uses: google-github-actions/deploy-cloudrun@v2
-      with:
-        service: med13-curation
-        source: .
-        env-vars-file: .env.production
-        region: ${{ env.REGION }}
-
   # Future: Deploy Next.js admin UI
   # deploy-admin:
   #   needs: quality-gate
@@ -454,12 +437,12 @@ jobs:
 web: uvicorn src.main:create_app --host 0.0.0.0 --port $PORT --factory
 ```
 
-**Dash Researcher UI (`Procfile.dash`):**
+**Legacy Dash Researcher UI (`Procfile.dash`, retired):**
 ```
-web: python src/dash_app.py
+# (Removed) web: python src/dash_app.py
 ```
 
-**Next.js Admin UI (`Procfile.admin`) - Planned:**
+**Next.js Admin UI (`Procfile.admin`):**
 ```
 web: npm start
 ```
@@ -470,7 +453,6 @@ web: npm start
 ```bash
 DATABASE_URL=sqlite:///med13.db
 API_BASE_URL=http://localhost:8080
-DASH_BASE_URL=http://localhost:8050
 SECRET_KEY=dev-secret-key
 DEBUG=True
 ```
@@ -479,10 +461,9 @@ DEBUG=True
 ```bash
 DATABASE_URL=postgresql://user:pass@cloudsql-instance/med13
 API_BASE_URL=https://med13-api.com
-DASH_BASE_URL=https://med13-curation.com
 SECRET_KEY=${SECRET_KEY}
 DEBUG=False
-CORS_ORIGINS=https://med13-curation.com,https://med13-admin.com
+CORS_ORIGINS=https://med13-admin.com
 ```
 
 #### requirements.txt
@@ -671,11 +652,8 @@ Per Service Monthly Estimates:
 │   ├── CPU: $15-50/month (depends on API load)
 │   ├── Memory: $20-70/month (512MB-2GB instances)
 │   └── Requests: $0-10/month (first 2M free)
-├── med13-curation (Dash UI)
-│   ├── CPU: $5-15/month (researcher usage patterns)
-│   ├── Memory: $10-30/month (UI-focused workload)
-│   └── Requests: $0-5/month (dashboard interactions)
-└── med13-admin (Next.js UI) - Planned
+├── med13-curation (Legacy Dash UI - retired) [decommissioned]
+└── med13-admin (Next.js UI)
     ├── CPU: $3-10/month (admin usage patterns)
     ├── Memory: $8-20/month (React SPA)
     └── Requests: $0-3/month (admin workflows)
@@ -745,7 +723,7 @@ med13-api (FastAPI Backend):
 ├── Business: API calls per endpoint, data source ingestion rates
 └── Errors: Application exceptions, database connection issues
 
-med13-curation (Dash UI):
+med13-curation (Legacy Dash UI - retired):
 ├── User Metrics: Page views, session duration, user interactions
 ├── Performance: Load times, rendering performance, API call latency
 ├── Errors: JavaScript errors, failed API requests
@@ -903,15 +881,6 @@ services:
       - db
     volumes:
       - ./src:/app/src
-
-  curation:
-    build: .
-    ports:
-      - "8050:8050"
-    environment:
-      - API_BASE_URL=http://api:8080
-    depends_on:
-      - api
 
   db:
     image: postgres:15

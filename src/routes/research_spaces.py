@@ -58,6 +58,7 @@ from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
 )
 from src.routes.auth import get_current_active_user
+from src.type_definitions.common import JSONObject
 
 # HTTP status codes
 HTTP_201_CREATED = 201
@@ -91,7 +92,7 @@ class ResearchSpaceResponse(BaseModel):
     description: str
     owner_id: UUID
     status: str
-    settings: dict[str, Any]
+    settings: JSONObject
     tags: list[str]
     created_at: str
     updated_at: str
@@ -176,7 +177,7 @@ class CreateSpaceRequestModel(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     slug: str = Field(..., min_length=3, max_length=50)
     description: str = Field(default="", max_length=500)
-    settings: dict[str, Any] = Field(default_factory=dict)
+    settings: JSONObject = Field(default_factory=dict)
     tags: list[str] = Field(default_factory=list)
 
 
@@ -185,7 +186,7 @@ class UpdateSpaceRequestModel(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=100)
     description: str | None = Field(None, max_length=500)
-    settings: dict[str, Any] | None = None
+    settings: JSONObject | None = None
     tags: list[str] | None = None
     status: str | None = None
 
@@ -657,7 +658,9 @@ class CreateDataSourceRequest(BaseModel):
     name: str
     description: str = ""
     source_type: str
-    config: dict[str, Any] = Field(default_factory=dict)
+    config: SourceConfiguration = Field(
+        default_factory=lambda: SourceConfiguration.model_validate({}),
+    )
     tags: list[str] = Field(default_factory=list)
 
 
@@ -712,10 +715,8 @@ def create_space_data_source(
     verify_space_membership(space_id, current_user.id, membership_service, session)
 
     try:
-        # Create source configuration
-        config = SourceConfiguration(**request.config)
+        config = request.config
 
-        # Create source request
         create_request = CreateSourceRequestService(
             owner_id=current_user.id,
             name=request.name,

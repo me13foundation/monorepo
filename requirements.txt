@@ -23,14 +23,6 @@ pandas>=2.2.0
 numpy>=1.26.0
 defusedxml>=0.7.0
 
-# UI and visualization
-plotly>=5.17.0
-dash>=2.17.0
-dash-bootstrap-components>=1.6.0
-dash-table>=5.0.0
-python-socketio>=5.8.0
-websockets>=12.0
-
 # Utilities
 python-multipart>=0.0.6
 pyyaml>=6.0.0

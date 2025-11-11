@@ -6,9 +6,11 @@ Pydantic models for phenotype-related API requests and responses.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from .common import PhenotypeSummary
+from .evidence import EvidenceSummaryResponse
 
 
 class PhenotypeCategory(str, Enum):
@@ -138,17 +140,56 @@ class PhenotypeResponse(BaseModel):
     variant_count: int = Field(default=0, description="Number of associated variants")
 
     # Optional relationships (included based on query parameters)
-    parent_phenotype: dict[str, Any] | None = Field(
+    parent_phenotype: PhenotypeSummary | None = Field(
         None,
         description="Parent phenotype details",
     )
-    child_phenotypes: list[dict[str, Any]] | None = Field(
+    child_phenotypes: list[PhenotypeSummary] | None = Field(
         None,
         description="Child phenotypes",
     )
-    evidence: list[dict[str, Any]] | None = Field(
+    evidence: list[EvidenceSummaryResponse] | None = Field(
         None,
         description="Associated evidence",
+    )
+
+
+class PhenotypeSearchResult(BaseModel):
+    """Response payload for phenotype search endpoints."""
+
+    query: str = Field(..., description="Original search query")
+    total_results: int = Field(..., ge=0, description="Number of matches")
+    results: list[PhenotypeResponse] = Field(..., description="Matching phenotypes")
+
+
+class PhenotypeCategoryResult(BaseModel):
+    """Response payload for category-filtered phenotype queries."""
+
+    category: PhenotypeCategory = Field(..., description="Category filter applied")
+    total_results: int = Field(..., ge=0, description="Number of matches")
+    results: list[PhenotypeResponse] = Field(..., description="Matching phenotypes")
+
+
+class PhenotypeStatisticsResponse(BaseModel):
+    """Aggregate statistics about phenotypes in the repository."""
+
+    total_phenotypes: int = Field(..., ge=0, description="Total phenotype count")
+    root_terms: int = Field(..., ge=0, description="Number of root HPO terms")
+    phenotypes_with_evidence: int = Field(
+        ...,
+        ge=0,
+        description="Phenotypes that currently have evidence",
+    )
+
+
+class PhenotypeEvidenceResponse(BaseModel):
+    """Evidence listing for a phenotype."""
+
+    phenotype_id: int = Field(..., description="Phenotype identifier")
+    total_count: int = Field(..., ge=0, description="Number of evidence records")
+    evidence: list[EvidenceSummaryResponse] = Field(
+        default_factory=list,
+        description="Evidence summaries attached to the phenotype",
     )
 
 

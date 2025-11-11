@@ -9,13 +9,13 @@ This document provides essential context and instructions for AI agents building
 **MED13 Resource Library** is a curated biomedical data platform for MED13 genetic variants, phenotypes, and evidence. It implements Clean Architecture with:
 
 - **Domain**: MED13-specific business logic and validation rules
-- **Architecture**: FastAPI backend, Next.js admin interface, Dash researcher UI
+- **Architecture**: FastAPI backend with a Next.js admin interface (Dash UI sunset in favor of Next.js)
 - **Tech Stack**: Python 3.12+, TypeScript, PostgreSQL, Clean Architecture patterns
 - **Purpose**: Provide researchers and administrators with reliable, type-safe biomedical data management
 
 **Key Characteristics:**
 - **Healthcare Domain**: Strict data integrity and privacy requirements
-- **Multi-Interface**: Separate admin/research user experiences
+- **Next.js-Only UI**: The Dash curation client has been retired; the admin UI is the canonical interface
 - **Type Safety First**: 100% MyPy compliance, Pydantic validation
 - **Clean Architecture**: Domain-driven design with clear layer separation
 
@@ -34,7 +34,7 @@ This document provides essential context and instructions for AI agents building
 - **New features**: Follow existing module structure (`/domain`, `/application`, `/infrastructure`)
 - **API endpoints**: Add to `/routes` with proper FastAPI router patterns
 - **Database changes**: Create Alembic migrations in `/alembic/versions`
-- **UI components**: Place in appropriate presentation layer (`/presentation/dash` or future `/web`)
+- **UI components**: Implement in the Next.js app (`/src/web`) with shared typed contracts from the backend
 
 ### Testing Requirements
 - **Unit tests**: Required for all domain logic and services
@@ -61,8 +61,7 @@ source venv/bin/activate # Activate virtual environment
 ### Development Servers
 ```bash
 make run-local          # Start FastAPI backend (port 8080)
-make run-dash           # Start Dash UI (port 8050)
-# Future: make run-web  # Start Next.js admin (port 3000)
+make run-web            # Start Next.js admin interface (port 3000)
 ```
 
 ### Quality Assurance
@@ -90,7 +89,7 @@ The MED13 Resource Library implements a **Clean Architecture** with clear separa
 ┌─────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                       │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │                 FastAPI REST API • Dash UI              │ │
+│  │                 FastAPI REST API • Next.js UI           │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
                                  │
@@ -137,7 +136,7 @@ Phase 1-3 Complete: ✅
 ├── Domain Entities (Pydantic models with business logic)
 ├── Application Services (Use cases & orchestration)
 ├── Infrastructure Repositories (SQLAlchemy implementations)
-├── Presentation Layer (Dash UI with Bootstrap components)
+├── Presentation Layer (Next.js admin interface)
 └── Quality Assurance (Type safety, testing, validation)
 ```
 
@@ -151,9 +150,8 @@ med13-resource-library/
 │   ├── domain/                  # Business logic (shared)
 │   ├── application/             # Use cases (shared)
 │   ├── infrastructure/          # External adapters (shared)
-│   ├── presentation/            # UI implementations
-│   │   ├── dash/               # Researcher interface
-│   │   └── web/                # Future: Next.js admin
+│   ├── presentation/            # Reserved for future UI adapters
+│   ├── web/                     # Next.js admin interface
 │   └── routes/                  # API endpoints
 ├── docs/                         # Documentation
 ├── tests/                        # Backend tests
@@ -163,12 +161,12 @@ med13-resource-library/
 ```
 
 **Service Boundaries:**
-- **FastAPI Backend** (`src/`): Core business logic, shared across UIs
-- **Dash UI** (`src/presentation/dash/`): Researcher curation workflows
-- **Next.js Admin** (Future: `src/web/`): Administrative management interface
+- **FastAPI Backend** (`src/`): Core business logic, shared across services
+- **Next.js Admin UI** (`src/web/`): Administrative and research workflows (Dash UI retired)
+- **Template Catalog**: `/admin/templates` endpoints expose reusable data source templates for the Next.js admin experience
 
 **Cross-Service Dependencies:**
-- All UIs consume the same FastAPI REST API
+- The Next.js UI consumes the FastAPI REST API
 - Shared TypeScript types generated from Pydantic models
 - Common domain entities and business rules
 
@@ -178,7 +176,7 @@ med13-resource-library/
 **Use conventional commits for automated deployments:**
 ```bash
 feat(api): add data source management endpoints
-fix(dash): resolve table sorting bug in curation UI
+fix(web): resolve table sorting bug in admin UI
 docs: update API documentation
 ci: update deployment configuration
 ```
@@ -210,9 +208,6 @@ make all
 ```bash
 # Backend deployment
 gcloud run deploy med13-api --source .
-
-# Dash UI deployment
-gcloud run deploy med13-curation --source .
 
 # Future: Next.js deployment
 gcloud run deploy med13-admin --source .
@@ -379,7 +374,6 @@ if validation["is_valid"] and validation["sanitized_data"]:
 ```
 src/
 ├── main.py                     # FastAPI app wiring
-├── dash_app.py                 # Dash UI application
 ├── routes/                     # API endpoint definitions
 ├── domain/                     # Business logic & entities
 │   ├── entities/              # Domain models (Pydantic)
@@ -392,8 +386,7 @@ src/
 │   ├── mappers/              # Data mapping
 │   └── validation/           # External API validation
 ├── models/                    # Database models (SQLAlchemy)
-├── presentation/              # UI & presentation logic
-│   └── dash/                  # Dash-specific components
+├── web/                       # Next.js admin interface
 tests/                          # Test suites
 docs/                          # Documentation
 ```
@@ -401,7 +394,7 @@ docs/                          # Documentation
 ### Build, Test, and Development Commands
 - `make setup-dev`: Clean Python 3.12 virtualenv + dependencies
 - `make run-local`: Start FastAPI on port 8080
-- `make run-dash`: Start Dash UI on port 8050
+- `make run-web`: Start Next.js admin interface on port 3000
 - `make all`: Full quality gate (format, lint, type-check, tests)
 - `make format`: Black + Ruff formatting
 - `make lint`: Ruff + Flake8 linting
@@ -450,7 +443,7 @@ make all                    # Complete quality gate
 - **Domain Modeling**: Full Pydantic entities with business rules
 - **Application Services**: Clean use case orchestration
 - **Infrastructure**: SQLAlchemy repositories with proper separation
-- **UI/UX**: Professional Dash interface with Bootstrap components
+- **UI/UX**: Next.js admin experience with shadcn/ui components
 - **Quality Assurance**: Type-safe throughout, ready for production
 
 ### Architecture Improvements

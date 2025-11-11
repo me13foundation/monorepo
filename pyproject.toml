@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "MED13 Resource Library - Curated biomedical data for research"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [ "fastapi>=0.115.0", "uvicorn[standard]>=0.30.0", "pydantic>=2.8.0", "pydantic-settings>=2.3.0", "sqlalchemy>=2.0.0", "psycopg2-binary>=2.9.0", "asyncpg>=0.29.0", "alembic>=1.13.0", "google-cloud-secretmanager>=2.16.0", "google-cloud-storage>=2.10.0", "httpx>=0.27.0", "pandas>=2.2.0", "numpy>=1.26.0", "plotly>=5.17.0", "dash>=2.17.0", "dash-bootstrap-components>=1.6.0", "gradio>=4.44.1",]
+dependencies = [ "fastapi>=0.115.0", "uvicorn[standard]>=0.30.0", "pydantic>=2.8.0", "pydantic-settings>=2.3.0", "sqlalchemy>=2.0.0", "psycopg2-binary>=2.9.0", "asyncpg>=0.29.0", "alembic>=1.13.0", "google-cloud-secretmanager>=2.16.0", "google-cloud-storage>=2.10.0", "httpx>=0.27.0", "pandas>=2.2.0", "numpy>=1.26.0", "gradio>=4.44.1",]
 [[project.authors]]
 name = "MED13 Foundation"
 
@@ -40,14 +40,8 @@ disallow_any_generics = true
 disallow_any_unimported = true
 disallow_any_expr = false
 [[tool.mypy.overrides]]
-module = [ "alembic.*", "plotly.*", "dash.*", "dash_bootstrap_components.*", "requests.*", "requests", "dash_table", "dash_table.*",]
+module = [ "alembic.*", "requests.*", "requests",]
 ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = [ "src.presentation.dash.*", "src.dash_app",]
-disallow_any_generics = false
-disallow_any_unimported = false
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [ "src.type_definitions.json_utils", "src.application.packaging.*",]
@@ -100,9 +94,7 @@ exclude_lines = [ "pragma: no cover", "def __repr__", "if self.debug:", "if sett
 "src/web/**" = [ "T20", "ARG", "ERA",]
 "scripts/**" = [ "E402", "S107", "TRY400", "PLC0415", "BLE001", "C901", "PLR0911",]
 "tests/**" = [ "S101", "ARG", "ERA", "PLR2004", "SLF001", "E402", "S106", "PT011", "B017", "N806", "PLC0415", "PTH123", "EM102", "TRY003", "S105", "INP001", "B007", "PERF102", "RET504", "PTH110", "SIM222", "PLR0913", "PT003", "TRY002", "BLE001", "B023",]
-"src/dash_app.py" = [ "ARG001", "PLR0913", "PLR0912", "C901", "TRY300", "TRY401", "TRY400", "G004", "BLE001", "PLC0415", "PLW0603",]
 "src/routes/**" = [ "B008", "BLE001", "B904", "TRY300", "RET504", "ARG001", "PLR0913", "FBT001", "FBT003", "TRY301", "SLF001", "C901", "S106", "TC001", "TC002", "TC003",]
 "src/domain/transform/**" = [ "TID252", "C901", "PLR0911", "PLR0912", "PLR2004", "BLE001", "T201", "ERA001", "TRY003", "EM101", "EM102", "SIM102", "PLC0415", "PERF401", "ARG002", "RET504", "SIM105", "DTZ007", "DTZ001", "N817", "PLC0105", "FBT001", "FBT002", "TRY300", "TRY400", "G004", "SLF001", "TC003", "PLC0206",]
 "src/domain/validation/**" = [ "TID", "TC001", "TC002", "TC003", "C901", "FBT001", "FBT002", "PERF401", "SIM118", "A002", "UP007", "PLR0913", "PLR2004", "TRY003", "EM102", "SLF001", "PLC0415", "PLR0912",]
-"src/presentation/dash/**" = [ "ARG", "ERA", "INP001", "PLR0911", "PLR0912", "PERF401", "PGH003", "FBT001", "FBT002", "G004", "TRY003", "TRY004", "EM101", "EM102", "TC002",]
 "src/repositories/**" = [ "TRY003", "EM101", "EM102", "DTZ003", "RET504", "A002", "TRY300", "B904",]

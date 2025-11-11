@@ -7,6 +7,7 @@ RESTful endpoints for evidence management linking variants and phenotypes.
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.application.container import get_legacy_dependency_container
@@ -25,6 +26,30 @@ if TYPE_CHECKING:
     from src.application.services.evidence_service import EvidenceApplicationService
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
+
+
+class VariantEvidenceResponse(BaseModel):
+    """Response model for variant evidence collections."""
+
+    variant_id: int
+    total_count: int
+    evidence: list[EvidenceResponse]
+
+
+class PhenotypeEvidenceResponse(BaseModel):
+    """Response model for phenotype evidence collections."""
+
+    phenotype_id: int
+    total_count: int
+    evidence: list[EvidenceResponse]
+
+
+class EvidenceSearchResponse(BaseModel):
+    """Response model for evidence search results."""
+
+    query: str
+    total_results: int
+    results: list[EvidenceResponse]
 
 
 def get_evidence_service(
@@ -77,8 +102,7 @@ async def get_evidence(
         )
 
         evidence_responses = [
-            EvidenceResponse.model_validate(serialize_evidence(evidence))
-            for evidence in evidence_list
+            serialize_evidence(evidence) for evidence in evidence_list
         ]
 
         total_pages = (total + per_page - 1) // per_page
@@ -117,7 +141,7 @@ async def get_evidence_by_id(
                 status_code=404,
                 detail=f"Evidence {evidence_id} not found",
             )
-        return EvidenceResponse.model_validate(serialize_evidence(evidence))
+        return serialize_evidence(evidence)
     except HTTPException:
         raise
     except Exception as e:
@@ -163,7 +187,7 @@ async def create_evidence(
             reviewer_notes=evidence_data.reviewer_notes,
         )
 
-        return EvidenceResponse.model_validate(serialize_evidence(evidence))
+        return serialize_evidence(evidence)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -200,7 +224,7 @@ async def update_evidence(
         )
 
         evidence = service.update_evidence(evidence_id, updates)
-        return EvidenceResponse.model_validate(serialize_evidence(evidence))
+        return serialize_evidence(evidence)
     except HTTPException:
         raise
     except ValueError as e:
@@ -242,7 +266,11 @@ async def delete_evidence(
         )
 
 
-@router.get("/variant/{variant_id}", summary="Get evidence for a variant")
+@router.get(
+    "/variant/{variant_id}",
+    summary="Get evidence for a variant",
+    response_model=VariantEvidenceResponse,
+)
 async def get_evidence_by_variant(
     variant_id: int,
     limit: int
@@ -253,7 +281,7 @@ async def get_evidence_by_variant(
         description="Maximum number of results",
     ),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> dict[str, Any]:
+) -> VariantEvidenceResponse:
     """
     Retrieve all evidence associated with a specific variant.
     """
@@ -263,11 +291,13 @@ async def get_evidence_by_variant(
         if limit:
             evidence_list = evidence_list[:limit]
 
-        return {
-            "variant_id": variant_id,
-            "total_count": len(evidence_list),
-            "evidence": [serialize_evidence(ev) for ev in evidence_list],
-        }
+        evidence_payload = [serialize_evidence(ev) for ev in evidence_list]
+
+        return VariantEvidenceResponse(
+            variant_id=variant_id,
+            total_count=len(evidence_payload),
+            evidence=evidence_payload,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -275,7 +305,11 @@ async def get_evidence_by_variant(
         )
 
 
-@router.get("/phenotype/{phenotype_id}", summary="Get evidence for a phenotype")
+@router.get(
+    "/phenotype/{phenotype_id}",
+    summary="Get evidence for a phenotype",
+    response_model=PhenotypeEvidenceResponse,
+)
 async def get_evidence_by_phenotype(
     phenotype_id: int,
     limit: int
@@ -286,7 +320,7 @@ async def get_evidence_by_phenotype(
         description="Maximum number of results",
     ),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> dict[str, Any]:
+) -> PhenotypeEvidenceResponse:
     """
     Retrieve all evidence associated with a specific phenotype.
     """
@@ -296,11 +330,13 @@ async def get_evidence_by_phenotype(
         if limit:
             evidence_list = evidence_list[:limit]
 
-        return {
-            "phenotype_id": phenotype_id,
-            "total_count": len(evidence_list),
-            "evidence": [serialize_evidence(ev) for ev in evidence_list],
-        }
+        evidence_payload = [serialize_evidence(ev) for ev in evidence_list]
+
+        return PhenotypeEvidenceResponse(
+            phenotype_id=phenotype_id,
+            total_count=len(evidence_payload),
+            evidence=evidence_payload,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -308,14 +344,18 @@ async def get_evidence_by_phenotype(
         )
 
 
-@router.get("/search/", summary="Search evidence", response_model=dict[str, Any])
+@router.get(
+    "/search/",
+    summary="Search evidence",
+    response_model=EvidenceSearchResponse,
+)
 async def search_evidence(
     query: str = Query(..., min_length=1, description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
     variant_id: str | None = Query(None, description="Filter by variant ID"),
     phenotype_id: str | None = Query(None, description="Filter by phenotype ID"),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> dict[str, Any]:
+) -> EvidenceSearchResponse:
     """
     Search evidence records by description, summary, or other text fields.
     """
@@ -328,11 +368,13 @@ async def search_evidence(
 
         evidence_list = service.search_evidence(query, limit, filters)
 
-        return {
-            "query": query,
-            "total_results": len(evidence_list),
-            "results": [serialize_evidence(ev) for ev in evidence_list],
-        }
+        evidence_payload = [serialize_evidence(ev) for ev in evidence_list]
+
+        return EvidenceSearchResponse(
+            query=query,
+            total_results=len(evidence_payload),
+            results=evidence_payload,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,

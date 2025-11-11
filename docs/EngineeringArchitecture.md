@@ -9,7 +9,7 @@ The MED13 Resource Library implements a robust **Clean Architecture** with compl
 ┌─────────────────────────────────────────────────────────────┐
 │                    Presentation Layer                       │
 │  ┌─────────────────────────────────────────────────────────┐ │
-│  │                 FastAPI REST API • Dash UI              │ │
+│  │                 FastAPI REST API • Next.js UI           │ │
 │  └─────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
                                  │
@@ -53,7 +53,7 @@ The MED13 Resource Library implements a robust **Clean Architecture** with compl
 - **Domain Layer**: UserDataSource, SourceTemplate, IngestionJob entities
 - **Application Layer**: CRUD services with business logic orchestration
 - **Infrastructure Layer**: SQLAlchemy repositories, API clients, file parsers
-- **Presentation Layer**: REST API endpoints + Dash UI management interface
+- **Presentation Layer**: REST API endpoints + Next.js management interface
 - **Quality Assurance**: Comprehensive testing, type safety, validation
 
 ### ✅ **Production Infrastructure - ESTABLISHED**
@@ -81,8 +81,8 @@ Our solid Clean Architecture foundation enables **organic, sustainable growth** 
 
 **Presentation Layer Growth:**
 ```
-Current: FastAPI + Dash
-Future:  FastAPI + Next.js Admin + Dash Researcher + Mobile API + CLI Tools
+Current: FastAPI + Next.js Admin
+Future:  FastAPI + Next.js Admin + Mobile API + CLI Tools
 
 Benefits:
 ✅ Independent scaling per interface

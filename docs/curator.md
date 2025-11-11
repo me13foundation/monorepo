@@ -1,5 +1,7 @@
 # **MED13 Curation Dashboard – User Experience Design Overview**
 
+> **Legacy Notice**: The Dash-based curator experience described below has been retired in favor of the unified Next.js admin interface. This document is retained for historical reference.
+
 ## **1. Purpose & Vision**
 
 The MED13 Curation Dashboard is designed as a **clinical reasoning workspace**, not a data-management tool. Its goal is to make variant and phenotype curation intuitive, visually clear, and scientifically rigorous. The interface turns evidence evaluation into an engaging, traceable process that reflects MED13 Foundation’s guiding UX principle:

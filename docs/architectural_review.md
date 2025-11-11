@@ -22,7 +22,7 @@ The MED13 Resource Library demonstrates **mixed architectural compliance** with 
 
 | Layer | Status | Evidence | Compliance |
 |-------|--------|----------|------------|
-| **Presentation** | ✅ Complete | FastAPI routes (`src/routes/`), Dash UI (`src/presentation/dash/`), Next.js (`src/web/`) | 100% |
+| **Presentation** | ✅ Complete | FastAPI routes (`src/routes/`) and Next.js UI (`src/web/`) – Dash UI retired | 100% |
 | **Application** | ✅ Complete | 15+ services in `src/application/services/` orchestrating use cases | 100% |
 | **Domain** | ✅ Complete | Domain services depend solely on repository interfaces (`src/domain/services/`) | 100% |
 | **Infrastructure** | ✅ Complete | SQLAlchemy repos (`src/infrastructure/repositories/`), API clients, mappers | 100% |
@@ -39,7 +39,7 @@ The MED13 Resource Library demonstrates **mixed architectural compliance** with 
 - ✅ Domain entities: `UserDataSource`, `SourceTemplate`, `IngestionJob` (Pydantic models)
 - ✅ Application services: `SourceManagementService`, `TemplateManagementService`, `DataSourceAuthorizationService`
 - ✅ Infrastructure: SQLAlchemy repositories with proper separation
-- ✅ Presentation: REST API endpoints + Dash UI management interface
+- ✅ Presentation: REST API endpoints + Next.js admin interface (Dash UI retired)
 - ✅ Quality Assurance: Comprehensive testing, type safety, validation
 
 **Compliance**: 100% - Matches documented architecture exactly
@@ -88,7 +88,7 @@ disallow_any_expr = true  # Strict: no Any in expressions
 - ✅ Configuration is strict (`disallow_any_expr = true`)
 - ❌ **Domain layer uses `Any`**: Found in `src/domain/events/`, `src/domain/services/source_plugins/`, `src/domain/transform/`, `src/domain/validation/`
 - ❌ **Type definitions use `Any`**: `src/type_definitions/domain.py:20` has `typing.Any` in `DomainOperationResult`
-- ⚠️ Module overrides disable strict checking for Dash (acceptable for UI layer)
+- ⚠️ Module overrides existed for Dash-specific code (now retired)
 
 **Compliance**: 60% - Configuration is strict but domain code doesn't comply
 

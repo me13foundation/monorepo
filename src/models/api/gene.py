@@ -7,9 +7,10 @@ Extends the basic gene models with API-specific fields.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from .variant import VariantSummaryResponse
 
 
 class GeneType(str, Enum):
@@ -96,6 +97,13 @@ class GeneUpdate(BaseModel):
     uniprot_id: str | None = Field(None, pattern=r"^[A-Z0-9_-]+$")
 
 
+class GenePhenotypeSummary(BaseModel):
+    """Compact representation of gene-associated phenotypes."""
+
+    phenotype_id: str = Field(..., description="Phenotype identifier (HPO ID)")
+    name: str = Field(..., description="Phenotype display name")
+
+
 class GeneResponse(BaseModel):
     """
     Complete gene response schema for API endpoints.
@@ -142,13 +150,13 @@ class GeneResponse(BaseModel):
     )
 
     # Optional relationships (included based on query parameters)
-    variants: list[dict[str, Any]] | None = Field(
+    variants: list[VariantSummaryResponse] | None = Field(
         None,
-        description="Associated variants (optional)",
+        description="Associated variant summaries",
     )
-    phenotypes: list[dict[str, Any]] | None = Field(
+    phenotypes: list[GenePhenotypeSummary] | None = Field(
         None,
-        description="Associated phenotypes (optional)",
+        description="Associated phenotype summaries",
     )
 
 

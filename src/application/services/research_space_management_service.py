@@ -7,13 +7,14 @@ research space management use cases with proper business logic.
 
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
 from uuid import UUID, uuid4
 
 from src.domain.entities.research_space import ResearchSpace, SpaceStatus
 from src.domain.repositories.research_space_repository import (
     ResearchSpaceRepository,
 )
+from src.type_definitions.common import JSONObject
 
 
 @dataclass
@@ -24,7 +25,7 @@ class CreateSpaceRequest:
     name: str
     slug: str
     description: str = ""
-    settings: dict[str, Any] | None = None
+    settings: JSONObject | None = None
     tags: list[str] | None = None
 
     def __post_init__(self) -> None:
@@ -42,7 +43,7 @@ class UpdateSpaceRequest:
         self,
         name: str | None = None,
         description: str | None = None,
-        settings: dict[str, Any] | None = None,
+        settings: JSONObject | None = None,
         tags: list[str] | None = None,
         status: SpaceStatus | None = None,
     ):
@@ -300,7 +301,7 @@ class ResearchSpaceManagementService:
         """
         return self._space_repository.search_by_name(query, skip, limit)
 
-    def get_space_statistics(self, owner_id: UUID) -> dict[str, Any]:
+    def get_space_statistics(self, owner_id: UUID) -> JSONObject:
         """
         Get statistics about a user's research spaces.
 
@@ -319,18 +320,21 @@ class ResearchSpaceManagementService:
             ),
         )
 
-        return {
-            "total_spaces": total_spaces,
-            "active_spaces": active_spaces,
-            "archived_spaces": total_spaces - active_spaces,
-        }
+        return cast(
+            "JSONObject",
+            {
+                "total_spaces": total_spaces,
+                "active_spaces": active_spaces,
+                "archived_spaces": total_spaces - active_spaces,
+            },
+        )
 
     @staticmethod
     def _normalize_settings(
-        settings: dict[str, Any] | None,
-    ) -> dict[str, Any]:
+        settings: JSONObject | None,
+    ) -> JSONObject:
         """Normalize arbitrary dicts into research space settings dict."""
-        return dict(settings or {})
+        return cast("JSONObject", dict(settings or {}))
 
     def validate_space(self, space: ResearchSpace) -> list[str]:
         """

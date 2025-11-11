@@ -6,9 +6,10 @@ Pydantic models for publication-related API requests and responses.
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .evidence import EvidenceResponse
 
 
 class PublicationType(str, Enum):
@@ -202,9 +203,9 @@ class PublicationResponse(BaseModel):
     )
 
     # Optional relationships (included based on query parameters)
-    evidence: list[dict[str, Any]] | None = Field(
+    evidence: list[EvidenceResponse] | None = Field(
         None,
-        description="Associated evidence",
+        description="Associated evidence records",
     )
 
 

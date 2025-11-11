@@ -6,10 +6,12 @@ Pydantic models for variant-related API requests and responses.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
+
+from .common import GeneSummary
+from .evidence import EvidenceSummaryResponse
 
 
 class VariantType(str, Enum):
@@ -224,10 +226,23 @@ class VariantResponse(BaseModel):
     )
 
     # Optional relationships (included based on query parameters)
-    gene: dict[str, Any] | None = Field(None, description="Gene details (optional)")
-    evidence: list[dict[str, Any]] | None = Field(
+    gene: GeneSummary | None = Field(None, description="Gene details (optional)")
+    evidence: list[EvidenceSummaryResponse] | None = Field(
         None,
-        description="Associated evidence (optional)",
+        description="Associated evidence summaries",
+    )
+
+
+class VariantSummaryResponse(BaseModel):
+    """Minimal variant summary used in nested DTOs."""
+
+    variant_id: str = Field(..., description="Variant identifier")
+    clinvar_id: str | None = Field(None, description="ClinVar accession")
+    chromosome: str = Field(..., description="Chromosome")
+    position: int = Field(..., description="Genomic position")
+    clinical_significance: str | None = Field(
+        None,
+        description="Clinical significance label",
     )
 
 

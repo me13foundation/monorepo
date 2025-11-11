@@ -5,8 +5,7 @@ Orchestrates template operations including creation, approval workflow,
 usage tracking, and community template management.
 """
 
-from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from src.domain.entities.source_template import (
     SourceTemplate,
@@ -16,6 +15,7 @@ from src.domain.entities.source_template import (
 )
 from src.domain.entities.user_data_source import SourceType
 from src.domain.repositories.source_template_repository import SourceTemplateRepository
+from src.type_definitions.common import JSONObject
 
 TEMPLATE_NAME_MAX_LEN = 200
 MAX_TAGS = 10
@@ -32,7 +32,7 @@ class CreateTemplateRequest:
         description: str,
         category: TemplateCategory,
         source_type: SourceType,
-        schema_definition: dict[str, Any],
+        schema_definition: JSONObject,
         validation_rules: list[ValidationRule] | None = None,
         ui_config: TemplateUIConfig | None = None,
         tags: list[str] | None = None,
@@ -58,7 +58,7 @@ class UpdateTemplateRequest:
         name: str | None = None,
         description: str | None = None,
         category: TemplateCategory | None = None,
-        schema_definition: dict[str, Any] | None = None,
+        schema_definition: JSONObject | None = None,
         validation_rules: list[ValidationRule] | None = None,
         ui_config: TemplateUIConfig | None = None,
         tags: list[str] | None = None,
@@ -107,7 +107,7 @@ class TemplateManagementService:
 
         # Create the template entity
         template = SourceTemplate(
-            id=UUID(),  # Will be set by repository
+            id=uuid4(),
             created_by=request.creator_id,
             name=request.name,
             description=request.description,
@@ -117,7 +117,7 @@ class TemplateManagementService:
             validation_rules=request.validation_rules,
             ui_config=request.ui_config,
             is_public=request.is_public,
-            tags=request.tags,
+            tags=request.tags or [],
             approved_at=None,
         )
 
@@ -413,7 +413,7 @@ class TemplateManagementService:
         """
         return self._template_repository.get_popular_templates(limit)
 
-    def get_template_statistics(self) -> dict[str, Any]:
+    def get_template_statistics(self) -> JSONObject:
         """
         Get overall statistics about templates.
 

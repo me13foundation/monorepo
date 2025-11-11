@@ -60,6 +60,9 @@ from src.infrastructure.repositories.phenotype_repository import (
 from src.infrastructure.repositories.publication_repository import (
     SqlAlchemyPublicationRepository,
 )
+from src.infrastructure.repositories.source_template_repository import (
+    SqlAlchemySourceTemplateRepository,
+)
 from src.infrastructure.repositories.sqlalchemy_session_repository import (
     SqlAlchemySessionRepository,
 )
@@ -410,10 +413,11 @@ class DependencyContainer:
         """Create a source management service with the given session."""
         # Create repositories
         user_data_source_repo = SqlAlchemyUserDataSourceRepository(session)
+        template_repo = SqlAlchemySourceTemplateRepository(session)
 
         return SourceManagementService(
             user_data_source_repository=user_data_source_repo,
-            source_template_repository=None,
+            source_template_repository=template_repo,
         )
 
     def create_data_discovery_service(self, session: Session) -> DataDiscoveryService:
@@ -428,6 +432,7 @@ class DependencyContainer:
 
         # Create source management service
         source_service = self.create_source_management_service(session)
+        template_repo = SqlAlchemySourceTemplateRepository(session)
 
         return DataDiscoveryService(
             data_discovery_session_repository=session_repo,
@@ -435,7 +440,7 @@ class DependencyContainer:
             query_result_repository=query_repo,
             source_query_client=query_client,
             source_management_service=source_service,
-            source_template_repository=None,  # TODO: Implement when needed
+            source_template_repository=template_repo,
         )
 
 

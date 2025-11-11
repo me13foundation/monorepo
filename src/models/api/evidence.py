@@ -6,9 +6,10 @@ Pydantic models for evidence-related API requests and responses.
 
 from datetime import date, datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from .common import PhenotypeSummary, PublicationSummary, VariantLinkSummary
 
 
 class EvidenceLevel(str, Enum):
@@ -189,12 +190,27 @@ class EvidenceResponse(BaseModel):
     updated_at: datetime = Field(..., description="Last update timestamp")
 
     # Optional relationships (included based on query parameters)
-    variant: dict[str, Any] | None = Field(None, description="Variant details")
-    phenotype: dict[str, Any] | None = Field(None, description="Phenotype details")
-    publication: dict[str, Any] | None = Field(
+    variant: VariantLinkSummary | None = Field(None, description="Variant details")
+    phenotype: PhenotypeSummary | None = Field(None, description="Phenotype details")
+    publication: PublicationSummary | None = Field(
         None,
         description="Publication details",
     )
+
+
+# Lightweight DTO for embedding evidence summaries in other responses
+class EvidenceSummaryResponse(BaseModel):
+    """
+    Minimal evidence summary used in nested collections.
+
+    Matches the legacy `EvidenceSummary` structure but provides a typed DTO.
+    """
+
+    id: int | None = Field(None, description="Evidence identifier")
+    evidence_level: str = Field(..., description="Evidence confidence level label")
+    evidence_type: str = Field(..., description="Evidence type label")
+    description: str = Field(..., description="Evidence description")
+    reviewed: bool = Field(..., description="Whether evidence has been reviewed")
 
 
 # Type aliases for API documentation

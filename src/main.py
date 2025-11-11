@@ -79,7 +79,6 @@ def create_app() -> FastAPI:
             "https://admin.med13foundation.org",
             "http://localhost:3000",  # Next.js admin interface
             "http://localhost:3001",  # Next.js admin interface (alternate port)
-            "http://localhost:8050",  # Dash curation interface
             "http://localhost:8080",  # FastAPI backend
         ],
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],

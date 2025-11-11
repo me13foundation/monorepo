@@ -9,7 +9,12 @@ from src.domain.entities.variant import (
     VariantType,
 )
 from src.domain.value_objects.confidence import Confidence, EvidenceLevel
-from src.domain.value_objects.identifiers import GeneIdentifier, VariantIdentifier
+from src.domain.value_objects.identifiers import (
+    GeneIdentifier,
+    PhenotypeIdentifier,
+    PublicationIdentifier,
+    VariantIdentifier,
+)
 from src.routes.serializers import (
     build_activity_feed_item,
     build_dashboard_summary,
@@ -49,6 +54,7 @@ def build_variant() -> Variant:
             reviewed=True,
         ),
     )
+    variant.id = 1
     return variant
 
 
@@ -56,9 +62,11 @@ def test_serialize_variant_includes_summary() -> None:
     variant = build_variant()
     payload = serialize_variant(variant)
 
-    assert payload["variant_id"] == "chr1:123:A>T"
-    assert payload["evidence_count"] == 1
-    assert payload["evidence"][0]["evidence_level"] == "strong"
+    assert payload.variant_id == "chr1:123:A>T"
+    assert payload.evidence_count == 1
+    assert payload.evidence is not None
+    first_evidence = payload.evidence[0]
+    assert first_evidence.evidence_level == "strong"
 
 
 def test_serialize_gene_includes_optional_sections() -> None:
@@ -72,6 +80,7 @@ def test_serialize_gene_includes_optional_sections() -> None:
         created_at=datetime(2024, 1, 1, tzinfo=UTC),
         updated_at=datetime(2024, 1, 2, tzinfo=UTC),
     )
+    gene.id = 1
 
     variant_summary = VariantSummary(
         variant_id="chr1:123:A>T",
@@ -91,9 +100,11 @@ def test_serialize_gene_includes_optional_sections() -> None:
         phenotypes=phenotypes,
     )
 
-    assert payload["variant_count"] == 1
-    assert payload["variants"][0]["variant_id"] == "chr1:123:A>T"
-    assert payload["phenotypes"] == phenotypes
+    assert payload.variant_count == 1
+    assert payload.variants is not None
+    assert payload.variants[0].variant_id == "chr1:123:A>T"
+    assert payload.phenotypes is not None
+    assert payload.phenotypes[0].phenotype_id == "HP:0000001"
 
 
 def test_serialize_evidence_brief() -> None:
@@ -105,13 +116,11 @@ def test_serialize_evidence_brief() -> None:
         reviewed=False,
     )
     payload = serialize_evidence_brief(summary)
-    assert payload == {
-        "id": 5,
-        "evidence_level": "moderate",
-        "evidence_type": "literature_review",
-        "description": "Published case study",
-        "reviewed": False,
-    }
+    assert payload.id == 5
+    assert payload.evidence_level == "moderate"
+    assert payload.evidence_type == "literature_review"
+    assert payload.description == "Published case study"
+    assert payload.reviewed is False
 
 
 def test_build_dashboard_summary() -> None:
@@ -123,8 +132,8 @@ def test_build_dashboard_summary() -> None:
         rejected_count=1,
     )
 
-    assert summary["total_items"] == TOTAL_ITEMS_EXPECTED
-    assert summary["entity_counts"]["genes"] == GENE_COUNT_EXPECTED
+    assert summary.total_items == TOTAL_ITEMS_EXPECTED
+    assert summary.entity_counts["genes"] == GENE_COUNT_EXPECTED
 
 
 def test_serialize_full_evidence() -> None:
@@ -141,10 +150,30 @@ def test_serialize_full_evidence() -> None:
         created_at=datetime(2024, 1, 4, tzinfo=UTC),
         updated_at=datetime(2024, 1, 5, tzinfo=UTC),
     )
+    evidence.id = 42
+    evidence.variant_summary = VariantSummary(
+        variant_id="chr1:123:A>T",
+        clinvar_id="VCV1",
+        chromosome="chr1",
+        position=123,
+        clinical_significance="pathogenic",
+    )
+    evidence.phenotype_identifier = PhenotypeIdentifier(
+        hpo_id="HP:0000001",
+        hpo_term="Phenotype",
+    )
+    evidence.publication_identifier = PublicationIdentifier(pubmed_id="123456")
+    evidence.publication_id = 7
 
     payload = serialize_evidence(evidence)
-    assert payload["confidence_score"] == EXPECTED_CONFIDENCE
-    assert payload["review_date"] == evidence.review_date.isoformat()
+    assert payload.confidence_score == EXPECTED_CONFIDENCE
+    assert payload.review_date == evidence.review_date
+    assert payload.variant is not None
+    assert payload.variant.variant_id == "chr1:123:A>T"
+    assert payload.phenotype is not None
+    assert payload.phenotype.hpo_id == "HP:0000001"
+    assert payload.publication is not None
+    assert payload.publication.pubmed_id == "123456"
 
 
 def test_build_activity_feed_item() -> None:
@@ -155,5 +184,5 @@ def test_build_activity_feed_item() -> None:
         icon="mdi:check",
         timestamp=now,
     )
-    assert item["category"] == "success"
-    assert item["created_at"] == now.isoformat()
+    assert item.category == "success"
+    assert item.created_at == now.isoformat()

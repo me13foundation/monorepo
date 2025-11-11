@@ -66,7 +66,6 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         allowed_origins = [
             "http://localhost:3000",
             "http://localhost:3001",
-            "http://localhost:8050",
             "http://localhost:8080",
             "https://med13foundation.org",
             "https://curate.med13foundation.org",

@@ -19,7 +19,7 @@ The MED13 Resource Library demonstrates **strong architectural alignment** with 
 
 | Layer | Status | Evidence |
 |-------|--------|----------|
-| **Presentation** | ✅ Complete | FastAPI routes (`src/routes/`), Dash UI (`src/presentation/dash/`), Next.js (`src/web/`) |
+| **Presentation** | ✅ Complete | FastAPI routes (`src/routes/`) and Next.js UI (`src/web/`) – Dash UI retired |
 | **Application** | ✅ Complete | Services in `src/application/services/` (12 services) |
 | **Domain** | ✅ Complete | Entities (`src/domain/entities/`), Repositories (`src/domain/repositories/`), Services (`src/domain/services/`) |
 | **Infrastructure** | ✅ Complete | SQLAlchemy repos (`src/infrastructure/repositories/`), API clients, mappers |
@@ -37,7 +37,7 @@ The MED13 Resource Library demonstrates **strong architectural alignment** with 
 - ✅ Domain entities: `UserDataSource`, `SourceTemplate`, `IngestionJob`
 - ✅ Application services: `SourceManagementService`, `TemplateManagementService`, `DataSourceAuthorizationService`
 - ✅ Infrastructure: SQLAlchemy repositories implemented
-- ✅ Presentation: REST API endpoints (`/admin/data-sources`) + Dash UI components
+- ✅ Presentation: REST API endpoints (`/admin/data-sources`) + Next.js UI components (Dash UI retired)
 - ✅ Quality: Comprehensive testing structure in place
 
 ### ⚠️ **PARTIAL** - Production Infrastructure
@@ -95,10 +95,10 @@ The MED13 Resource Library demonstrates **strong architectural alignment** with 
 - ✅ Strict MyPy settings enabled
 - ✅ `disallow_any_generics = true`
 - ✅ `disallow_untyped_defs = true`
-- ⚠️ **Exceptions**: Dash UI components excluded from strict checks (lines 102-109)
+- ⚠️ **Note**: Legacy Dash UI components previously excluded from strict checks (service retired)
 - ⚠️ **Exceptions**: Some transform/validation modules have relaxed rules
 
-**Gap**: Dash UI exclusion is documented but may need review for gradual tightening.
+**Gap**: None for Dash (service retired); focus shifts to transform/validation strictness.
 
 ### ✅ **IMPLEMENTED** - Pydantic Models
 
@@ -308,7 +308,7 @@ The MED13 Resource Library demonstrates **strong architectural alignment** with 
 ### ✅ **Strong Alignment** (85%+)
 
 - **Clean Architecture**: ✅ 100% aligned
-- **Type Safety Patterns**: ✅ 90% aligned (Dash exceptions documented)
+- **Type Safety Patterns**: ✅ 90% aligned (legacy Dash exceptions removed)
 - **Next.js Foundation**: ✅ 100% aligned
 - **Quality Assurance**: ✅ 95% aligned
 

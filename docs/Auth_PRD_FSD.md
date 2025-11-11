@@ -2013,7 +2013,7 @@ ACCOUNT_LOCKOUT_DURATION_MINUTES=30
 MAX_CONCURRENT_SESSIONS=5
 
 # Optional - CORS
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8050
+ALLOWED_ORIGINS=http://localhost:3000
 
 # Optional - Monitoring
 PROMETHEUS_ENABLED=true

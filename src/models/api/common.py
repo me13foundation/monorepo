@@ -90,3 +90,68 @@ class HealthResponse(BaseModel):
         None,
         description="Component health statuses",
     )
+
+
+class DashboardSummary(BaseModel):
+    """Aggregate dashboard summary statistics."""
+
+    pending_count: int = Field(..., ge=0, description="Pending item count")
+    approved_count: int = Field(..., ge=0, description="Approved item count")
+    rejected_count: int = Field(..., ge=0, description="Rejected item count")
+    total_items: int = Field(..., ge=0, description="Total tracked items")
+    entity_counts: dict[str, int] = Field(
+        default_factory=dict,
+        description="Entity-specific counts",
+    )
+
+
+class ActivityFeedItem(BaseModel):
+    """Entry representing a dashboard activity feed item."""
+
+    message: str = Field(..., description="Activity message")
+    category: str = Field(..., description="Activity category/level")
+    icon: str | None = Field(None, description="Optional icon identifier")
+    created_at: str = Field(..., description="ISO8601 timestamp")
+
+
+class GeneSummary(BaseModel):
+    """Compact gene representation for nested responses."""
+
+    model_config = ConfigDict(strict=True)
+
+    id: int | None = Field(None, description="Internal gene identifier")
+    gene_id: str | None = Field(None, description="Public gene ID")
+    symbol: str | None = Field(None, description="Gene symbol")
+    name: str | None = Field(None, description="Gene name")
+
+
+class VariantLinkSummary(BaseModel):
+    """Compact variant representation for nested responses."""
+
+    model_config = ConfigDict(strict=True)
+
+    id: int | None = Field(None, description="Variant primary key")
+    variant_id: str | None = Field(None, description="Public variant ID")
+    clinvar_id: str | None = Field(None, description="ClinVar accession")
+    gene_symbol: str | None = Field(None, description="Associated gene symbol")
+
+
+class PhenotypeSummary(BaseModel):
+    """Compact phenotype representation for nested responses."""
+
+    model_config = ConfigDict(strict=True)
+
+    id: int | None = Field(None, description="Phenotype primary key")
+    hpo_id: str | None = Field(None, description="HPO identifier")
+    name: str | None = Field(None, description="Phenotype name")
+
+
+class PublicationSummary(BaseModel):
+    """Compact publication representation for nested responses."""
+
+    model_config = ConfigDict(strict=True)
+
+    id: int | None = Field(None, description="Publication primary key")
+    title: str | None = Field(None, description="Publication title")
+    pubmed_id: str | None = Field(None, description="PubMed identifier")
+    doi: str | None = Field(None, description="DOI")
