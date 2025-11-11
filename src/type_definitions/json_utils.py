@@ -7,7 +7,10 @@ parsers and normalizers can operate without falling back to `Any`.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from dataclasses import asdict, is_dataclass
+from datetime import date, datetime
+from enum import Enum
+from typing import TYPE_CHECKING, Any, cast
 
 from .common import JSONObject, JSONValue  # noqa: TC001
 
@@ -83,3 +86,35 @@ def extend_unique(collection: list[str], new_values: Iterable[str]) -> None:
     for value in new_values:
         if value not in collection:
             collection.append(value)
+
+
+def to_json_value(value: object) -> JSONValue:
+    """
+    Convert arbitrary Python objects into a JSONValue structure.
+
+    Dataclasses, enums, datetime objects, and nested containers are serialised
+    into JSON-compatible primitives so downstream code can avoid `Any`.
+    """
+
+    result: JSONValue
+    if value is None or isinstance(value, (str, int, float, bool)):
+        result = value
+    elif isinstance(value, (datetime, date)):
+        result = value.isoformat()
+    elif isinstance(value, Enum):
+        enum_value = value.value
+        if isinstance(enum_value, (str, int, float, bool)):
+            result = enum_value
+        else:
+            result = str(enum_value)
+    elif is_dataclass(value):
+        dataclass_dict = asdict(cast("Any", value))
+        result = {key: to_json_value(item) for key, item in dataclass_dict.items()}
+    elif isinstance(value, dict):
+        result = {str(key): to_json_value(item) for key, item in value.items()}
+    elif isinstance(value, (list, tuple, set)):
+        result = [to_json_value(item) for item in value]
+    else:
+        result = str(value)
+
+    return result

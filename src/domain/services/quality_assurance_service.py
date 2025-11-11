@@ -7,9 +7,8 @@ suggestions for data sources in the MED13 Resource Library.
 
 import statistics
 from datetime import UTC, datetime
-from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.domain.entities.user_data_source import (
     SourceConfiguration,
@@ -17,6 +16,15 @@ from src.domain.entities.user_data_source import (
 )
 from src.domain.services.api_source_service import APIRequestResult
 from src.domain.services.file_upload_service import DataRecord
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import to_json_value
+
+
+def _as_json_object(payload: object) -> JSONObject:
+    json_payload = to_json_value(payload)
+    if isinstance(json_payload, dict):
+        return json_payload
+    return {}
 
 
 class QualityScore(BaseModel):
@@ -28,16 +36,16 @@ class QualityScore(BaseModel):
     timeliness: float
     validity: float
 
-    details: dict[str, Any] = {}
+    details: JSONObject = Field(default_factory=dict)
 
 
 class QualityReport(BaseModel):
     """Comprehensive quality report."""
 
     score: QualityScore
-    issues: list[str] = []
-    recommendations: list[str] = []
-    metrics: dict[str, Any] = {}
+    issues: list[str] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    metrics: JSONObject = Field(default_factory=dict)
     assessed_at: datetime
 
 
@@ -103,15 +111,17 @@ class QualityAssuranceService:
         )
 
         # Additional metrics
-        metrics = {
-            "total_records": len(records),
-            "valid_records": len([r for r in records if not r.validation_errors]),
-            "invalid_records": len([r for r in records if r.validation_errors]),
-            "columns": self._extract_columns(records),
-            "data_types": self._infer_data_types(records),
-            "duplicate_count": self._count_duplicates(records),
-            "null_value_stats": self._calculate_null_stats(records),
-        }
+        metrics = _as_json_object(
+            {
+                "total_records": len(records),
+                "valid_records": len([r for r in records if not r.validation_errors]),
+                "invalid_records": len([r for r in records if r.validation_errors]),
+                "columns": self._extract_columns(records),
+                "data_types": self._infer_data_types(records),
+                "duplicate_count": self._count_duplicates(records),
+                "null_value_stats": self._calculate_null_stats(records),
+            },
+        )
 
         return QualityReport(
             score=QualityScore(
@@ -120,11 +130,15 @@ class QualityAssuranceService:
                 consistency=consistency,
                 timeliness=timeliness,
                 validity=validity,
-                details={
-                    "completeness_breakdown": self._get_completeness_breakdown(records),
-                    "consistency_checks": self._get_consistency_checks(records),
-                    "validity_errors": self._get_validity_errors(records),
-                },
+                details=_as_json_object(
+                    {
+                        "completeness_breakdown": self._get_completeness_breakdown(
+                            records,
+                        ),
+                        "consistency_checks": self._get_consistency_checks(records),
+                        "validity_errors": self._get_validity_errors(records),
+                    },
+                ),
             ),
             issues=issues,
             recommendations=recommendations,
@@ -175,22 +189,21 @@ class QualityAssuranceService:
         )
 
         # API-specific metrics
-        metrics = {
+        metrics_payload: dict[str, JSONValue] = {
             "response_time_ms": result.response_time_ms,
             "status_code": result.status_code,
             "record_count": result.record_count,
             "data_size_bytes": len(str(result.data)) if result.data else 0,
-            "api_endpoint": result.metadata.get("request_url"),
+            "api_endpoint": to_json_value(result.metadata.get("request_url")),
         }
 
         if records:
-            metrics.update(
-                {
-                    "columns": self._extract_columns(records),
-                    "data_types": self._infer_data_types(records),
-                    "duplicate_count": self._count_duplicates(records),
-                },
+            metrics_payload["columns"] = to_json_value(self._extract_columns(records))
+            metrics_payload["data_types"] = to_json_value(
+                self._infer_data_types(records),
             )
+            metrics_payload["duplicate_count"] = self._count_duplicates(records)
+        metrics = _as_json_object(metrics_payload)
 
         return QualityReport(
             score=QualityScore(
@@ -199,12 +212,14 @@ class QualityAssuranceService:
                 consistency=consistency,
                 timeliness=timeliness,
                 validity=validity,
-                details={
-                    "api_performance": {
-                        "response_time_ms": result.response_time_ms,
-                        "status_code": result.status_code,
+                details=_as_json_object(
+                    {
+                        "api_performance": {
+                            "response_time_ms": result.response_time_ms,
+                            "status_code": result.status_code,
+                        },
                     },
-                },
+                ),
             ),
             issues=issues,
             recommendations=recommendations,
@@ -222,13 +237,13 @@ class QualityAssuranceService:
         Returns:
             Health assessment report
         """
-        metrics = source.quality_metrics
+        existing_metrics = source.quality_metrics
 
         # Use existing metrics if available
-        completeness = metrics.completeness_score or 0.0
-        consistency = metrics.consistency_score or 0.0
+        completeness = existing_metrics.completeness_score or 0.0
+        consistency = existing_metrics.consistency_score or 0.0
         timeliness = self._calculate_source_timeliness(source)
-        validity = metrics.overall_score or 0.0
+        validity = existing_metrics.overall_score or 0.0
 
         overall = self._calculate_overall_score(
             completeness,
@@ -263,17 +278,21 @@ class QualityAssuranceService:
             ),
             issues=issues,
             recommendations=recommendations,
-            metrics={
-                "last_ingested_at": (
-                    source.last_ingested_at.isoformat()
-                    if source.last_ingested_at
-                    else None
-                ),
-                "status": source.status.value,
-                "ingestion_count": (
-                    metrics.last_assessed.isoformat() if metrics.last_assessed else None
-                ),
-            },
+            metrics=_as_json_object(
+                {
+                    "last_ingested_at": (
+                        source.last_ingested_at.isoformat()
+                        if source.last_ingested_at
+                        else None
+                    ),
+                    "status": source.status.value,
+                    "ingestion_count": (
+                        existing_metrics.last_assessed.isoformat()
+                        if existing_metrics.last_assessed
+                        else None
+                    ),
+                },
+            ),
             assessed_at=datetime.now(UTC),
         )
 
@@ -521,7 +540,7 @@ class QualityAssuranceService:
 
         return stats
 
-    def _api_data_to_records(self, data: Any) -> list[DataRecord]:
+    def _api_data_to_records(self, data: JSONValue) -> list[DataRecord]:
         """Convert API response data to DataRecord format."""
         records = []
 
@@ -532,8 +551,9 @@ class QualityAssuranceService:
         elif isinstance(data, dict):
             # Look for data arrays in common API response formats
             for key in ["data", "results", "records", "items"]:
-                if key in data and isinstance(data[key], list):
-                    for i, item in enumerate(data[key]):
+                value = data.get(key)
+                if isinstance(value, list):
+                    for i, item in enumerate(value):
                         if isinstance(item, dict):
                             records.append(DataRecord(data=item, line_number=i + 1))
                     break
@@ -550,15 +570,16 @@ class QualityAssuranceService:
         """Get completeness breakdown by column."""
         return self._calculate_null_stats(records)
 
-    def _get_consistency_checks(self, records: list[DataRecord]) -> dict[str, Any]:
+    def _get_consistency_checks(self, records: list[DataRecord]) -> JSONObject:
         """Get consistency check results."""
         types = self._infer_data_types(records)
-        return {
+        payload = {
             "inferred_types": types,
             "columns_with_mixed_types": [
                 col for col, typ in types.items() if typ == "mixed"
             ],
         }
+        return _as_json_object(payload)
 
     def _get_validity_errors(self, records: list[DataRecord]) -> dict[str, int]:
         """Get breakdown of validation errors."""
@@ -580,7 +601,7 @@ class QualityAssuranceService:
             ),
             issues=["No data to analyze"],
             recommendations=["Upload data for quality assessment"],
-            metrics={},
+            metrics=_as_json_object({}),
             assessed_at=datetime.now(UTC),
         )
 
@@ -596,6 +617,6 @@ class QualityAssuranceService:
             ),
             issues=errors,
             recommendations=["Fix configuration issues and retry"],
-            metrics={},
+            metrics=_as_json_object({}),
             assessed_at=datetime.now(UTC),
         )

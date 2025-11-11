@@ -6,7 +6,8 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from statistics import mean
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..rules.base_rules import ValidationRuleEngine
 
@@ -36,10 +37,10 @@ class PerformanceBenchmark:
         self,
         entity_type: str,
         rule_name: str,
-        payload: Iterable[dict[str, Any]],
+        payload: Iterable[JSONObject],
         iterations: int = 5,
     ) -> BenchmarkResult:
-        payload_list: list[dict[str, Any]] = list(payload)
+        payload_list: list[JSONObject] = list(payload)
         if not payload_list:
             payload_list = [{"placeholder": True}]
         execution_times = self._time_iterations(
@@ -56,10 +57,10 @@ class PerformanceBenchmark:
     def benchmark_entity_validation(
         self,
         entity_type: str,
-        payload: Iterable[dict[str, Any]],
+        payload: Iterable[JSONObject],
         iterations: int = 3,
     ) -> BenchmarkResult:
-        payload_list: list[dict[str, Any]] = list(payload)
+        payload_list: list[JSONObject] = list(payload)
         execution_times = self._time_iterations(
             lambda: self.rule_engine.validate_batch(entity_type, payload_list),
             iterations,
@@ -78,9 +79,9 @@ class PerformanceBenchmark:
         self,
         entity_type: str,
         batch_sizes: Iterable[int],
-        payload: Iterable[dict[str, Any]],
+        payload: Iterable[JSONObject],
     ) -> dict[int, dict[str, float]]:
-        payload_list: list[dict[str, Any]] = list(payload)
+        payload_list: list[JSONObject] = list(payload)
         results: dict[int, dict[str, float]] = {}
         for batch_size in batch_sizes:
             start = time.perf_counter()
@@ -93,7 +94,7 @@ class PerformanceBenchmark:
         return results
 
     def run_comprehensive_benchmark(self, iterations: int = 3) -> dict[str, object]:
-        sample = [{"symbol": "TP53", "source": "test"}]
+        sample: list[JSONObject] = [{"symbol": "TP53", "source": "test"}]
         rule_result = self.benchmark_validation_rule(
             "gene",
             "hgnc_nomenclature",

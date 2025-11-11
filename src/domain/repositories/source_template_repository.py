@@ -6,7 +6,6 @@ enabling users to discover and use pre-configured source configurations.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
 from uuid import UUID
 
 from src.domain.entities.source_template import (
@@ -14,6 +13,7 @@ from src.domain.entities.source_template import (
     TemplateCategory,
 )
 from src.domain.entities.user_data_source import SourceType
+from src.type_definitions.common import JSONObject
 
 
 class SourceTemplateRepository(ABC):
@@ -319,7 +319,7 @@ class SourceTemplateRepository(ABC):
         """
 
     @abstractmethod
-    def get_template_statistics(self) -> dict[str, Any]:
+    def get_template_statistics(self) -> JSONObject:
         """
         Get overall statistics about templates.
 

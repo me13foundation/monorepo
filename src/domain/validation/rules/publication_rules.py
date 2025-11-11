@@ -5,7 +5,9 @@ Validation helpers for publication metadata.
 from __future__ import annotations
 
 import re
-from typing import Any
+
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import as_str
 
 from .base_rules import (
     ValidationLevel,
@@ -14,7 +16,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = dict[str, Any]
+IssueDict = JSONObject
 
 
 class PublicationValidationRules:
@@ -24,25 +26,23 @@ class PublicationValidationRules:
 
     @staticmethod
     def validate_doi_format_and_accessibility(
-        _placeholder: Any,
+        _placeholder: JSONValue,
         field: str = "doi",
     ) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
-            if value is None:
+        def validator(value: JSONValue) -> ValidationOutcome:
+            doi_value = as_str(value)
+            if doi_value is None:
                 return True, "", None
-            if isinstance(value, str) and not value.strip():
+            if not doi_value.strip():
                 return (
                     False,
                     "DOI is required",
                     "Provide a DOI in the format 10.xxxx/…",
                 )
-            if not isinstance(
-                value,
-                str,
-            ) or not PublicationValidationRules._DOI_PATTERN.fullmatch(value):
+            if not PublicationValidationRules._DOI_PATTERN.fullmatch(doi_value):
                 return (
                     False,
-                    f"Invalid DOI format: {value}",
+                    f"Invalid DOI format: {doi_value}",
                     "DOIs must start with 10.xxxx/",
                 )
             return True, "", None
@@ -57,19 +57,17 @@ class PublicationValidationRules:
 
     @staticmethod
     def validate_author_information(
-        _placeholder: Any,
+        _placeholder: JSONValue,
         field: str = "authors",
     ) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if value in (None, []):
                 return (
                     False,
                     "At least one author is required",
                     "Provide the author list",
                 )
-            if not isinstance(value, list) or not all(
-                isinstance(author, dict | str) for author in value
-            ):
+            if not isinstance(value, list):
                 return (
                     False,
                     "Author list must contain dictionaries or strings",
@@ -84,14 +82,19 @@ class PublicationValidationRules:
                             "Author names cannot be empty",
                             "Provide the author's full name",
                         )
-                elif (
-                    not isinstance(author.get("name"), str)
-                    or not author["name"].strip()
-                ):
+                elif isinstance(author, dict):
+                    name = as_str(author.get("name"))
+                    if not name or not name.strip():
+                        return (
+                            False,
+                            "Author name is required",
+                            "Provide the author's full name",
+                        )
+                else:
                     return (
                         False,
-                        "Author name is required",
-                        "Provide the author's full name",
+                        "Author entries must be strings or mappings",
+                        "Provide structured author information",
                     )
 
             return True, "", None
@@ -106,7 +109,7 @@ class PublicationValidationRules:
 
     @staticmethod
     def validate_publication_comprehensively(
-        publication: dict[str, Any],
+        publication: JSONObject,
     ) -> list[IssueDict]:
         issues: list[IssueDict] = []
 

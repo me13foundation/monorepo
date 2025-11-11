@@ -6,7 +6,8 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..rules.base_rules import ValidationResult
 
@@ -46,14 +47,14 @@ class ValidationCache:
         self._stats["hits"] += 1
         return value
 
-    def get_cache_key(self, entity_type: str, payload: dict[str, Any]) -> str:
+    def get_cache_key(self, entity_type: str, payload: JSONObject) -> str:
         serialised = json.dumps([entity_type, payload], sort_keys=True)
         return hashlib.sha256(serialised.encode("utf-8")).hexdigest()
 
     def cache_validation_result(
         self,
         entity_type: str,
-        payload: dict[str, Any],
+        payload: JSONObject,
         result: ValidationResult,
     ) -> None:
         key = self.get_cache_key(entity_type, payload)
@@ -62,7 +63,7 @@ class ValidationCache:
     def get_cached_validation_result(
         self,
         entity_type: str,
-        payload: dict[str, Any],
+        payload: JSONObject,
     ) -> ValidationResult | None:
         key = self.get_cache_key(entity_type, payload)
         cached = self.get(key)

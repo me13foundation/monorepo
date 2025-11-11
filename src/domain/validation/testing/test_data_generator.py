@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Any, ClassVar
+from typing import ClassVar
+
+from src.type_definitions.common import JSONObject
 
 
 @dataclass
 class SyntheticDataset:
-    data: list[dict[str, Any]]
+    data: list[JSONObject]
 
 
 class TestDataGenerator:
@@ -28,10 +30,10 @@ class TestDataGenerator:
             self._random = random.Random(seed)  # noqa: S311  # nosec B311
 
     def generate_gene_dataset(self, count: int, quality: str) -> SyntheticDataset:
-        records: list[dict[str, Any]] = []
+        records: list[JSONObject] = []
         for index in range(count):
             if quality == "poor":
-                record: dict[str, Any] = {
+                record: JSONObject = {
                     "symbol": f"gene{index}",  # lower-case to trigger validation error
                     "source": "test",
                     "confidence_score": -0.5,

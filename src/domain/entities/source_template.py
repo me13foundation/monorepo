@@ -12,6 +12,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.type_definitions.common import JSONObject
+
 from .user_data_source import SourceType
 
 
@@ -61,11 +63,11 @@ class ValidationRule(BaseModel):
 class TemplateUIConfig(BaseModel):
     """UI configuration for template forms."""
 
-    sections: list[dict[str, Any]] = Field(
+    sections: list[JSONObject] = Field(
         default_factory=list,
         description="Form sections",
     )
-    fields: dict[str, dict[str, Any]] = Field(
+    fields: dict[str, JSONObject] = Field(
         default_factory=dict,
         description="Field configurations",
     )
@@ -77,13 +79,16 @@ class TemplateUIConfig(BaseModel):
 
     @field_validator("sections")
     @classmethod
-    def validate_sections(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def validate_sections(cls, v: list[JSONObject]) -> list[JSONObject]:
         """Validate section configurations."""
         for section in v:
             if "name" not in section:
                 msg = "Each section must have a 'name' field"
                 raise ValueError(msg)
         return v
+
+
+UpdatePayload = dict[str, object]
 
 
 class SourceTemplate(BaseModel):
@@ -113,7 +118,7 @@ class SourceTemplate(BaseModel):
         ...,
         description="Type of source this template supports",
     )
-    schema_definition: dict[str, Any] = Field(..., description="Expected data schema")
+    schema_definition: JSONObject = Field(..., description="Expected data schema")
     validation_rules: list[ValidationRule] = Field(
         default_factory=list,
         description="Validation rules",
@@ -197,7 +202,7 @@ class SourceTemplate(BaseModel):
 
     @field_validator("schema_definition")
     @classmethod
-    def validate_schema(cls, v: dict[str, Any]) -> dict[str, Any]:
+    def validate_schema(cls, v: JSONObject) -> JSONObject:
         """Validate schema definition has required structure."""
         return v
 
@@ -207,43 +212,52 @@ class SourceTemplate(BaseModel):
             return False
         return self.is_public or (user_id == self.created_by)
 
+    def _clone_with_updates(self, updates: UpdatePayload) -> "SourceTemplate":
+        """Internal helper to maintain immutability with typed updates."""
+        return self.model_copy(update=updates)
+
     def increment_usage(self) -> "SourceTemplate":
         """Create new instance with incremented usage count."""
-        return self.model_copy(
-            update={
-                "usage_count": self.usage_count + 1,
-                "updated_at": datetime.now(UTC),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "usage_count": self.usage_count + 1,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def update_success_rate(self, new_rate: float) -> "SourceTemplate":
         """Create new instance with updated success rate."""
-        return self.model_copy(
-            update={"success_rate": new_rate, "updated_at": datetime.now(UTC)},
-        )
+        update_payload: UpdatePayload = {
+            "success_rate": new_rate,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def approve(self, _approved_by: UUID) -> "SourceTemplate":
         """Create new instance with approval status."""
         now = datetime.now(UTC)
-        return self.model_copy(
-            update={"is_approved": True, "approved_at": now, "updated_at": now},
-        )
+        update_payload: UpdatePayload = {
+            "is_approved": True,
+            "approved_at": now,
+            "updated_at": now,
+        }
+        return self._clone_with_updates(update_payload)
 
     def make_public(self) -> "SourceTemplate":
         """Create new instance as publicly available."""
-        return self.model_copy(
-            update={"is_public": True, "updated_at": datetime.now(UTC)},
-        )
+        update_payload: UpdatePayload = {
+            "is_public": True,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
-    def update_schema(self, schema: dict[str, Any]) -> "SourceTemplate":
+    def update_schema(self, schema: JSONObject) -> "SourceTemplate":
         """Create new instance with updated schema."""
-        return self.model_copy(
-            update={
-                "schema_definition": schema,
-                "updated_at": datetime.now(UTC),
-                "version": self._increment_version(),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "schema_definition": schema,
+            "updated_at": datetime.now(UTC),
+            "version": self._increment_version(),
+        }
+        return self._clone_with_updates(update_payload)
 
     def _increment_version(self) -> str:
         """Increment version number."""

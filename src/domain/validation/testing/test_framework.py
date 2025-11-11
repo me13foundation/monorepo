@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 
+from src.type_definitions.common import JSONObject
+
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 
 
@@ -22,8 +24,8 @@ class TestCase:
     description: str
     test_type: TestType
     entity_type: str
-    input_data: dict[str, object]
-    expected_result: dict[str, object]
+    input_data: JSONObject
+    expected_result: JSONObject
 
 
 @dataclass

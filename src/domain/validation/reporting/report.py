@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import cast
+
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import to_json_value
 
 from .dashboard import ValidationDashboard
 from .error_reporting import ErrorReporter, ErrorSummary
@@ -19,12 +22,12 @@ class ValidationReport:
     title: str
     generated_at: datetime
     time_range_hours: int
-    executive_summary: dict[str, Any]
-    detailed_findings: dict[str, Any]
+    executive_summary: JSONObject
+    detailed_findings: JSONObject
     recommendations: list[str]
     data_quality_score: float
     system_health_score: float
-    appendices: dict[str, Any]
+    appendices: JSONObject
 
 
 class ValidationReportGenerator:
@@ -49,22 +52,28 @@ class ValidationReportGenerator:
             time_range_hours=time_range_hours,
         )
 
-        executive_summary = {
+        quality_score_metric = self._extract_performance_metric(
+            quality_report,
+            "quality_score",
+        )
+        executive_summary: JSONObject = {
             "system_health": dashboard_data.system_health,
-            "quality_score": quality_report["metrics"].get("quality_score"),
+            "quality_score": quality_score_metric,
             "total_errors": error_summary.total_errors,
         }
 
-        detailed_findings = {
+        alerts_json = self._json_list(dashboard_data.alerts)
+
+        detailed_findings: JSONObject = {
             "performance_metrics": dashboard_data.performance_metrics,
             "quality_metrics": dashboard_data.quality_metrics,
-            "alerts": dashboard_data.alerts,
+            "alerts": alerts_json,
         }
 
         recommendations = self._build_recommendations(error_summary)
 
-        appendices = {
-            "error_summary": asdict(error_summary),
+        appendices: JSONObject = {
+            "error_summary": cast("JSONObject", to_json_value(error_summary)),
             "performance_report": quality_report,
         }
 
@@ -76,10 +85,9 @@ class ValidationReportGenerator:
             executive_summary=executive_summary,
             detailed_findings=detailed_findings,
             recommendations=recommendations,
-            data_quality_score=dashboard_data.quality_metrics.get(
-                "quality_score",
-                {},
-            ).get("average", 0.0),
+            data_quality_score=self._average_quality_score(
+                dashboard_data.quality_metrics,
+            ),
             system_health_score=dashboard_data.system_health,
             appendices=appendices,
         )
@@ -89,22 +97,25 @@ class ValidationReportGenerator:
         error_trends = self._errors.get_error_trends(time_range_hours)
         performance_report = self._metrics.get_performance_report(time_range_hours)
 
-        executive_summary = {
+        error_trends_json = self._json_list(error_trends)
+        alerts_json = self._json_list(dashboard_data.alerts)
+
+        executive_summary: JSONObject = {
             "system_health": dashboard_data.system_health,
-            "recent_alerts": dashboard_data.alerts,
+            "recent_alerts": alerts_json,
         }
 
-        detailed_findings = {
-            "error_trends": error_trends,
+        detailed_findings: JSONObject = {
+            "error_trends": error_trends_json,
             "performance_metrics": dashboard_data.performance_metrics,
             "quality_metrics": dashboard_data.quality_metrics,
         }
 
         recommendations = self._build_recommendations(self._errors.get_error_summary())
 
-        appendices = {
+        appendices: JSONObject = {
             "performance_report": performance_report,
-            "alerts": dashboard_data.alerts,
+            "alerts": alerts_json,
         }
 
         return ValidationReport(
@@ -115,10 +126,9 @@ class ValidationReportGenerator:
             executive_summary=executive_summary,
             detailed_findings=detailed_findings,
             recommendations=recommendations,
-            data_quality_score=dashboard_data.quality_metrics.get(
-                "quality_score",
-                {},
-            ).get("average", 0.0),
+            data_quality_score=self._average_quality_score(
+                dashboard_data.quality_metrics,
+            ),
             system_health_score=dashboard_data.system_health,
             appendices=appendices,
         )
@@ -132,8 +142,12 @@ class ValidationReportGenerator:
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
 
-        payload = asdict(report)
-        payload["generated_at"] = report.generated_at.isoformat()
+        serialized = to_json_value(report)
+        if not isinstance(serialized, dict):
+            msg = "ValidationReport serialised to a non-object payload"
+            raise TypeError(msg)
+        payload_dict: dict[str, JSONValue] = serialized
+        payload: JSONObject = payload_dict
 
         if output_format.lower() == "json":
             target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -167,6 +181,31 @@ class ValidationReportGenerator:
                 "Review critical validation errors and schedule remediation work.",
             )
         return recommendations
+
+    @staticmethod
+    def _json_list(values: list[JSONObject]) -> list[JSONValue]:
+        return [cast("JSONValue", value) for value in values]
+
+    @staticmethod
+    def _extract_performance_metric(
+        performance_report: JSONObject,
+        metric_name: str,
+    ) -> float | None:
+        metrics_section = performance_report.get("metrics")
+        if isinstance(metrics_section, dict):
+            raw_value = metrics_section.get(metric_name)
+            if isinstance(raw_value, (int, float)):
+                return float(raw_value)
+        return None
+
+    @staticmethod
+    def _average_quality_score(quality_metrics: JSONObject) -> float:
+        score_block = quality_metrics.get("quality_score")
+        if isinstance(score_block, dict):
+            average_value = score_block.get("average")
+            if isinstance(average_value, (int, float)):
+                return float(average_value)
+        return 0.0
 
 
 __all__ = ["ValidationReport", "ValidationReportGenerator"]

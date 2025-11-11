@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from typing import Any, ClassVar
+from typing import ClassVar
+
+from src.type_definitions.common import JSONObject, JSONValue
 
 from .base_rules import (
     ValidationLevel,
@@ -19,7 +21,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = dict[str, Any]
+IssueDict = JSONObject
 
 
 class VariantValidationRules:
@@ -41,12 +43,12 @@ class VariantValidationRules:
 
     @staticmethod
     def validate_hgvs_notation_comprehensive(
-        _hgvs_notation: Any,
+        _hgvs_notation: JSONValue,
         notation_type: str,
     ) -> ValidationRule:
         pattern = VariantValidationRules._HGVS_PATTERNS.get(notation_type)
 
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             notation: str | None = None
             if isinstance(value, dict):
                 raw_value = value.get(notation_type)
@@ -81,10 +83,10 @@ class VariantValidationRules:
 
     @staticmethod
     def validate_clinical_significance_comprehensive(
-        _clinical_sig: Any,
+        _clinical_sig: JSONValue,
         field: str = "clinical_significance",
     ) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if value in (None, ""):
                 return True, "", None
             if not isinstance(value, str):
@@ -113,10 +115,10 @@ class VariantValidationRules:
 
     @staticmethod
     def validate_population_frequencies(
-        _frequencies: Any,
+        _frequencies: JSONValue,
         field: str = "population_frequencies",
     ) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if value in (None, {}):
                 return True, "", None
             if not isinstance(value, dict):
@@ -168,7 +170,7 @@ class VariantValidationRules:
         )
 
     @staticmethod
-    def validate_variant_comprehensively(variant: dict[str, Any]) -> list[IssueDict]:
+    def validate_variant_comprehensively(variant: JSONObject) -> list[IssueDict]:
         issues: list[IssueDict] = []
 
         for rule in VariantValidationRules.get_all_rules():

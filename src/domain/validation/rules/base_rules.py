@@ -10,15 +10,20 @@ strict MyPy settings.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import (
-    Any,
-)
+from typing import Protocol, cast
+
+from src.type_definitions.common import JSONObject, JSONValue
+
+
+class ValidatorFn(Protocol):
+    def __call__(self, value: JSONValue) -> tuple[bool, str, str | None]:
+        ...
+
 
 ValidationOutcome = tuple[bool, str, str | None]
-ValidatorFn = Callable[[Any], ValidationOutcome]
 
 
 class ValidationLevel(Enum):
@@ -53,17 +58,21 @@ class ValidationIssue:
     """A single validation issue discovered for an entity."""
 
     field: str
-    value: Any
+    value: JSONValue
     rule: str
     message: str
     severity: ValidationSeverity
     suggestion: str | None = None
 
-    def __getitem__(self, key: str) -> Any:
-        return getattr(self, key)
+    def __getitem__(self, key: str) -> JSONValue | str | None:
+        return cast("JSONValue | str | None", getattr(self, key))
 
-    def get(self, key: str, default: Any | None = None) -> Any:
-        return getattr(self, key, default)
+    def get(
+        self,
+        key: str,
+        default: JSONValue | str | None = None,
+    ) -> JSONValue | str | None:
+        return cast("JSONValue | str | None", getattr(self, key, default))
 
 
 @dataclass
@@ -89,7 +98,7 @@ class DataQualityValidator:
     def validate_entity(
         self,
         entity_type: str,
-        payload: dict[str, Any],
+        payload: JSONObject,
     ) -> ValidationResult:
         """Validate a single entity payload and return the aggregated result."""
 
@@ -99,7 +108,7 @@ class DataQualityValidator:
             if not self._rule_is_applicable(rule):
                 continue
 
-            value = payload.get(rule.field)
+            value: JSONValue = payload.get(rule.field)
             is_valid, message, suggestion = rule.validator(value)
 
             if not is_valid:
@@ -124,7 +133,7 @@ class DataQualityValidator:
     def validate_batch(
         self,
         entity_type: str,
-        entities: Iterable[dict[str, Any]],
+        entities: Iterable[JSONObject],
     ) -> list[ValidationResult]:
         """Validate a collection of entities."""
 
@@ -226,7 +235,7 @@ class DataQualityValidator:
     # --------------------------------------------------------------------- #
 
     @staticmethod
-    def _validate_gene_symbol(value: Any) -> ValidationOutcome:
+    def _validate_gene_symbol(value: JSONValue) -> ValidationOutcome:
         if not isinstance(value, str) or not value:
             return False, "Gene symbol is required", "Provide a valid HGNC gene symbol"
 
@@ -240,7 +249,7 @@ class DataQualityValidator:
         return True, "", None
 
     @staticmethod
-    def _validate_chromosome(value: Any) -> ValidationOutcome:
+    def _validate_chromosome(value: JSONValue) -> ValidationOutcome:
         if not isinstance(value, str):
             return False, "Chromosome must be a string", "Provide chromosome as text"
 
@@ -256,7 +265,7 @@ class DataQualityValidator:
 
     @staticmethod
     def _validate_numeric_range(
-        value: Any,
+        value: JSONValue,
         minimum: float,
         maximum: float,
     ) -> ValidationOutcome:
@@ -279,7 +288,7 @@ class DataQualityValidator:
 
     @staticmethod
     def _validate_integer_range(
-        value: Any,
+        value: JSONValue,
         minimum: int,
         maximum: int,
     ) -> ValidationOutcome:
@@ -300,7 +309,7 @@ class DataQualityValidator:
         return True, "", None
 
     @staticmethod
-    def _validate_allele(value: Any) -> ValidationOutcome:
+    def _validate_allele(value: JSONValue) -> ValidationOutcome:
         if not isinstance(value, str) or not value:
             return (
                 False,
@@ -316,7 +325,7 @@ class DataQualityValidator:
         return True, "", None
 
     @staticmethod
-    def _validate_pubmed_id(value: Any) -> ValidationOutcome:
+    def _validate_pubmed_id(value: JSONValue) -> ValidationOutcome:
         if value is None:
             return False, "PubMed ID is required", "Provide the PubMed identifier"
         if isinstance(value, int):
@@ -341,7 +350,7 @@ class DataQualityValidator:
 
     @staticmethod
     def _validate_string_length(
-        value: Any,
+        value: JSONValue,
         *,
         min_len: int = 0,
         max_len: int = 1024,
@@ -372,7 +381,7 @@ class DataQualityValidator:
         return True, "", None
 
     @staticmethod
-    def _validate_author_list(value: Any) -> ValidationOutcome:
+    def _validate_author_list(value: JSONValue) -> ValidationOutcome:
         if value is None:
             return True, "", None  # optional field
 
@@ -441,7 +450,7 @@ class ValidationRuleEngine:
     def validate_entity(
         self,
         entity_type: str,
-        entity_data: dict[str, Any],
+        entity_data: JSONObject,
         rule_names: Sequence[str] | None = None,
     ) -> ValidationResult:
         rules = self._select_rules(entity_type, rule_names)
@@ -461,10 +470,10 @@ class ValidationRuleEngine:
             if not self._rule_is_applicable(rule):
                 continue
 
-            value = (
-                entity_data.get(rule.field)
-                if rule.field != "relationship"
-                else entity_data
+            value: JSONValue = (
+                entity_data
+                if rule.field == "relationship"
+                else entity_data.get(rule.field)
             )
             is_valid, message, suggestion = rule.validator(value)
             if not is_valid:
@@ -488,7 +497,7 @@ class ValidationRuleEngine:
     def validate_batch(
         self,
         entity_type: str,
-        entities: Iterable[dict[str, Any]],
+        entities: Iterable[JSONObject],
         rule_names: Sequence[str] | None = None,
     ) -> list[ValidationResult]:
         return [

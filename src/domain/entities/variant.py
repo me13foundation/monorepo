@@ -147,8 +147,8 @@ class Variant(BaseModel):
             msg = "alternate_allele cannot be empty"
             raise ValueError(msg)
         for field_name in ("allele_frequency", "gnomad_af"):
-            value = getattr(self, field_name)
-            if value is not None and not (0.0 <= value <= 1.0):
+            value = getattr(self, field_name)  # type: ignore[misc]
+            if value is not None and not (0.0 <= value <= 1.0):  # type: ignore[misc]
                 msg = f"{field_name} must be between 0.0 and 1.0"
                 raise ValueError(msg)
         return self

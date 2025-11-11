@@ -6,7 +6,8 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from typing import Any
+
+from src.type_definitions.common import JSONObject, JSONValue
 
 from .base_rules import (
     ValidationLevel,
@@ -15,7 +16,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = dict[str, Any]
+IssueDict = JSONObject
 
 
 class PhenotypeValidationRules:
@@ -25,10 +26,10 @@ class PhenotypeValidationRules:
 
     @staticmethod
     def validate_hpo_term_format(
-        _placeholder: Any,
+        _placeholder: JSONValue,
         field: str = "hpo_id",
     ) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if not isinstance(
                 value,
                 str,
@@ -50,10 +51,10 @@ class PhenotypeValidationRules:
 
     @staticmethod
     def validate_phenotype_name_consistency(
-        _config: Any,
+        _config: JSONValue,
         field: str = "metadata",
     ) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if value is None:
                 return True, "", None
             if not isinstance(value, dict):
@@ -103,7 +104,7 @@ class PhenotypeValidationRules:
 
     @staticmethod
     def validate_phenotype_comprehensively(
-        phenotype: dict[str, Any],
+        phenotype: JSONObject,
     ) -> list[IssueDict]:
         issues: list[IssueDict] = []
 

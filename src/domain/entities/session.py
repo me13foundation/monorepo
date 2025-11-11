@@ -7,10 +7,11 @@ Manages user sessions, JWT token tracking, and session lifecycle.
 import hashlib
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from src.type_definitions.common import JSONObject
 
 
 class SessionStatus(str, Enum):
@@ -124,7 +125,7 @@ class UserSession(BaseModel):
         self,
         ip_address: str,
         user_agent: str,
-        additional_data: dict[str, Any] | None = None,
+        additional_data: JSONObject | None = None,
     ) -> str:
         """Generate a device fingerprint for session tracking."""
 

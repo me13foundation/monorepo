@@ -8,9 +8,10 @@ import abc
 from datetime import datetime
 from typing import Any, Protocol, TypedDict, TypeVar
 
-from .common import EntityStatus, PriorityLevel, ValidationResult
+from .common import EntityStatus, JSONObject, JSONValue, PriorityLevel, ValidationResult
 
 # Generic types for domain operations
+T = TypeVar("T")  # Generic entity type
 T_contra = TypeVar(
     "T_contra",
     contravariant=True,
@@ -31,7 +32,7 @@ class DomainOperationResult(TypedDict, total=False):
     """Result of a domain operation."""
 
     success: bool
-    entity: Any | None
+    entity: Any | None  # Keep Any for now - would need Protocol for proper typing
     errors: list[str]
     warnings: list[str]
     validation_result: ValidationResult
@@ -163,20 +164,20 @@ class DomainEvent(TypedDict):
     entity_id: str
     timestamp: datetime
     user_id: str | None
-    details: dict[str, Any]
+    details: JSONObject
 
 
 class GeneCreatedEvent(DomainEvent):
     """Gene created event."""
 
-    gene_data: dict[str, Any]
+    gene_data: JSONObject
 
 
 class VariantUpdatedEvent(DomainEvent):
     """Variant updated event."""
 
-    changes: dict[str, Any]
-    old_values: dict[str, Any]
+    changes: JSONObject
+    old_values: JSONObject
 
 
 class EvidenceValidatedEvent(DomainEvent):
@@ -186,38 +187,38 @@ class EvidenceValidatedEvent(DomainEvent):
 
 
 # Validation rule types
-class ValidationRule(Protocol):
+class ValidationRule(Protocol[T_contra]):
     """Protocol for validation rules."""
 
     @abc.abstractmethod
-    def validate(self, entity: Any) -> ValidationResult:
+    def validate(self, entity: T_contra) -> ValidationResult:
         """Validate an entity against this rule."""
         ...
 
 
-class SyntacticValidationRule(ValidationRule):
+class SyntacticValidationRule(ValidationRule[T_contra]):
     """Syntactic validation rule (format/structure)."""
 
     @abc.abstractmethod
-    def validate(self, entity: Any) -> ValidationResult:
+    def validate(self, entity: T_contra) -> ValidationResult:
         """Validate entity syntax."""
         ...
 
 
-class SemanticValidationRule(ValidationRule):
+class SemanticValidationRule(ValidationRule[T_contra]):
     """Semantic validation rule (business logic)."""
 
     @abc.abstractmethod
-    def validate(self, entity: Any) -> ValidationResult:
+    def validate(self, entity: T_contra) -> ValidationResult:
         """Validate entity semantics."""
         ...
 
 
-class CompletenessValidationRule(ValidationRule):
+class CompletenessValidationRule(ValidationRule[T_contra]):
     """Completeness validation rule (required fields)."""
 
     @abc.abstractmethod
-    def validate(self, entity: Any) -> ValidationResult:
+    def validate(self, entity: T_contra) -> ValidationResult:
         """Validate entity completeness."""
         ...
 
@@ -268,11 +269,11 @@ class EvidenceDerivedProperties(TypedDict):
 class NormalizationResult(TypedDict, total=False):
     """Result of data normalization."""
 
-    original_value: Any
-    normalized_value: Any
+    original_value: JSONValue
+    normalized_value: JSONValue
     normalization_method: str
     confidence_score: float
-    alternatives: list[Any]
+    alternatives: list[JSONValue]
 
 
 class IdentifierNormalizationResult(NormalizationResult):
@@ -297,7 +298,7 @@ class ProvenanceChain(TypedDict):
 
 
 # Quality metrics types
-class QualityMetrics(TypedDict):
+class QualityMetrics(TypedDict, total=False):
     """Quality metrics for data entities."""
 
     completeness_score: float

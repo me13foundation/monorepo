@@ -9,7 +9,9 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import JSONObject
+from src.type_definitions.json_utils import as_object, as_str
 
 
 class PublicationIdentifierType(Enum):
@@ -61,7 +63,7 @@ class PublicationNormalizer:
 
     def normalize(
         self,
-        raw_publication_data: dict[str, Any],
+        raw_publication_data: JSONObject,
         source: str = "unknown",
     ) -> NormalizedPublication | None:
         """
@@ -87,11 +89,11 @@ class PublicationNormalizer:
 
     def _normalize_pubmed_publication(
         self,
-        publication_data: dict[str, Any],
+        publication_data: JSONObject,
     ) -> NormalizedPublication | None:
         """Normalize publication data from PubMed."""
-        pubmed_id = publication_data.get("pubmed_id")
-        title = publication_data.get("title")
+        pubmed_id = as_str(publication_data.get("pubmed_id"))
+        title = as_str(publication_data.get("title"))
 
         if not pubmed_id:
             return None
@@ -106,15 +108,16 @@ class PublicationNormalizer:
         journal = self._extract_pubmed_journal(publication_data)
 
         # Extract publication date
-        publication_date = publication_data.get("publication_date")
+        raw_date = publication_data.get("publication_date")
+        publication_date = raw_date if isinstance(raw_date, datetime) else None
 
         # Extract identifiers
-        doi = publication_data.get("doi")
-        pmc_id = publication_data.get("pmc_id")
+        doi = self.standardize_doi(as_str(publication_data.get("doi")) or "")
+        pmc_id = as_str(publication_data.get("pmc_id"))
 
         # Build cross-references
         cross_refs = {"PUBMED": [pubmed_id]}
-        if doi:
+        if doi and doi != "":  # standardize_doi returns empty string when input empty
             cross_refs["DOI"] = [doi]
         if pmc_id:
             cross_refs["PMC"] = [pmc_id]
@@ -126,7 +129,7 @@ class PublicationNormalizer:
             authors=authors,
             journal=journal,
             publication_date=publication_date,
-            doi=doi,
+            doi=doi or None,
             pmc_id=pmc_id,
             pubmed_id=pubmed_id,
             cross_references=cross_refs,
@@ -139,12 +142,12 @@ class PublicationNormalizer:
 
     def _normalize_uniprot_publication(
         self,
-        publication_data: dict[str, Any],
+        publication_data: JSONObject,
     ) -> NormalizedPublication | None:
         """Normalize publication data from UniProt."""
-        citation = publication_data.get("citation", {})
-        title = citation.get("title")
-        pubmed_id = citation.get("pubmedId")
+        citation = as_object(publication_data.get("citation"))
+        title = as_str(citation.get("title"))
+        pubmed_id = as_str(citation.get("pubmedId"))
 
         if not title and not pubmed_id:
             return None
@@ -158,10 +161,25 @@ class PublicationNormalizer:
             id_type = PublicationIdentifierType.OTHER
 
         # Extract authors
-        authors = citation.get("authors", [])
+        authors_data = citation.get("authors")
+        authors: list[str] = []
+        if isinstance(authors_data, list):
+            for entry in authors_data:
+                if isinstance(entry, dict):
+                    name = as_str(entry.get("name"))
+                    if name:
+                        authors.append(name)
+                else:
+                    name = as_str(entry, fallback=None)
+                    if name:
+                        authors.append(name)
 
         # Extract publication date
-        pub_date_str = citation.get("publicationDate", {}).get("value")
+        pub_date_value = citation.get("publicationDate")
+        if isinstance(pub_date_value, dict):
+            pub_date_str = as_str(pub_date_value.get("value"))
+        else:
+            pub_date_str = as_str(pub_date_value)
         publication_date = None
         if pub_date_str:
             try:
@@ -190,20 +208,28 @@ class PublicationNormalizer:
 
     def _normalize_generic_publication(
         self,
-        publication_data: dict[str, Any],
+        publication_data: JSONObject,
         source: str,
     ) -> NormalizedPublication | None:
         """Normalize publication data from generic sources."""
         # Try to extract common fields
-        pub_id = (
+        pub_id = as_str(
             publication_data.get("id")
             or publication_data.get("publication_id")
             or publication_data.get("pubmed_id")
-            or publication_data.get("doi")
+            or publication_data.get("doi"),
         )
 
-        title = publication_data.get("title")
-        authors = publication_data.get("authors", [])
+        title = as_str(publication_data.get("title"))
+        authors_value = publication_data.get("authors", [])
+        authors: list[str] = []
+        if isinstance(authors_value, list):
+            for author in authors_value:
+                name = as_str(author)
+                if name:
+                    authors.append(name)
+        elif isinstance(authors_value, str):
+            authors = [authors_value]
 
         if not pub_id and not title:
             return None
@@ -214,20 +240,25 @@ class PublicationNormalizer:
             primary_id = pub_id
         else:
             id_type = PublicationIdentifierType.OTHER
-            primary_id = title
+            primary_id = title if title is not None else "unknown"
 
         # Extract other identifiers if available
-        doi = publication_data.get("doi")
-        pmc_id = publication_data.get("pmc_id")
-        pubmed_id = publication_data.get("pubmed_id")
+        doi = as_str(publication_data.get("doi"))
+        pmc_id = as_str(publication_data.get("pmc_id"))
+        pubmed_id = as_str(publication_data.get("pubmed_id"))
+
+        parsed_date_str = as_str(publication_data.get("publication_date"))
+        publication_date = (
+            self._parse_date_string(parsed_date_str) if parsed_date_str else None
+        )
 
         normalized = NormalizedPublication(
             primary_id=primary_id,
             id_type=id_type,
             title=title,
-            authors=authors if isinstance(authors, list) else [authors],
-            journal=publication_data.get("journal"),
-            publication_date=publication_data.get("publication_date"),
+            authors=authors,
+            journal=as_str(publication_data.get("journal")),
+            publication_date=publication_date,
             doi=doi,
             pmc_id=pmc_id,
             pubmed_id=pubmed_id,
@@ -249,7 +280,7 @@ class PublicationNormalizer:
             return PublicationIdentifierType.PMC_ID
         return PublicationIdentifierType.OTHER
 
-    def _extract_pubmed_authors(self, publication_data: dict[str, Any]) -> list[str]:
+    def _extract_pubmed_authors(self, publication_data: JSONObject) -> list[str]:
         """Extract author names from PubMed data."""
         authors = []
 
@@ -258,8 +289,13 @@ class PublicationNormalizer:
             for author in author_data:
                 if isinstance(author, dict):
                     # PubMed author format
-                    last_name = author.get("last_name") or author.get("LastName")
-                    first_name = author.get("first_name") or author.get("ForeName")
+                    author_obj = as_object(author)
+                    last_name = as_str(
+                        author_obj.get("last_name") or author_obj.get("LastName"),
+                    )
+                    first_name = as_str(
+                        author_obj.get("first_name") or author_obj.get("ForeName"),
+                    )
                     if last_name:
                         full_name = last_name
                         if first_name:
@@ -272,13 +308,14 @@ class PublicationNormalizer:
 
     def _extract_pubmed_journal(
         self,
-        publication_data: dict[str, Any],
+        publication_data: JSONObject,
     ) -> str | None:
         """Extract journal information from PubMed data."""
         journal_data = publication_data.get("journal", {})
 
         if isinstance(journal_data, dict):
-            return journal_data.get("title") or journal_data.get("Title")
+            journal_obj = as_object(journal_data)
+            return as_str(journal_obj.get("title") or journal_obj.get("Title"))
         if isinstance(journal_data, str):
             return journal_data
 

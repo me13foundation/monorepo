@@ -9,12 +9,20 @@ import csv
 import json
 import logging
 import uuid
+from collections.abc import Callable as TypingCallable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+else:  # pragma: no cover
+    Callable = TypingCallable
 
 from pydantic import BaseModel
 
 from src.domain.entities.user_data_source import SourceConfiguration
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import to_json_value
 
 # Prefer defusedxml for safe XML parsing; fall back disabled
 try:  # pragma: no cover - import guard
@@ -35,13 +43,13 @@ class FileUploadResult(BaseModel):
     file_size: int = 0
     detected_format: str | None = None
     errors: list[str] = []
-    metadata: dict[str, Any] = {}
+    metadata: JSONObject = {}
 
 
 class DataRecord(BaseModel):
     """Represents a single data record from uploaded files."""
 
-    data: dict[str, Any]
+    data: JSONObject
     line_number: int | None = None
     validation_errors: list[str] = []
 
@@ -132,11 +140,12 @@ class FileUploadService:
         validation_errors = self._validate_records(records, configuration)
 
         # Calculate metadata
-        metadata = {
+        metadata_payload = {
             "columns": self._extract_columns(records),
             "data_types": self._infer_data_types(records),
-            "sample_records": records[:5],  # First 5 records as samples
+            "sample_records": [record.model_dump() for record in records[:5]],
         }
+        metadata = cast("JSONObject", to_json_value(metadata_payload))
 
         success = len(validation_errors) == 0
         all_errors = validation_errors
@@ -318,9 +327,9 @@ class FileUploadService:
         # TSV is essentially CSV with tab delimiter
         return self._parse_csv(content.replace("\t", ","), max_records)
 
-    def _xml_element_to_dict(self, element: Any) -> dict[str, Any]:
+    def _xml_element_to_dict(self, element: Any) -> JSONObject:
         """Convert XML element to dictionary."""
-        result: dict[str, Any] = {}
+        result: JSONObject = {}
 
         # Add attributes
         if element.attrib:
@@ -415,34 +424,58 @@ class FileUploadService:
                         errors.append(error)
         return errors
 
-    def _validate_data_type(self, value: Any, expected_type: str) -> bool:
+    def _validate_data_type(self, value: JSONValue, expected_type: str) -> bool:
         """Validate a value against an expected data type."""
-        valid = True
-        if expected_type == "string":
-            valid = isinstance(value, str)
-        elif expected_type == "integer":
+        validators: dict[str, Callable[[JSONValue], bool]] = {
+            "string": lambda v: isinstance(v, str),
+            "integer": self._is_integer_like,
+            "float": self._is_float_like,
+            "boolean": self._is_boolean_like,
+        }
+
+        def _accept_any(_value: JSONValue) -> bool:
+            return True
+
+        validator = validators.get(expected_type, _accept_any)
+        return validator(value)
+
+    @staticmethod
+    def _is_integer_like(value: JSONValue) -> bool:
+        if isinstance(value, bool):
+            return False
+        if isinstance(value, int):
+            return True
+        if isinstance(value, str):
             try:
                 int(value)
-                valid = True
-            except (ValueError, TypeError):
-                valid = False
-        elif expected_type == "float":
+            except ValueError:
+                return False
+            else:
+                return True
+        return False
+
+    @staticmethod
+    def _is_float_like(value: JSONValue) -> bool:
+        if isinstance(value, bool):
+            return False
+        if isinstance(value, (int, float)):
+            return True
+        if isinstance(value, str):
             try:
                 float(value)
-                valid = True
-            except (ValueError, TypeError):
-                valid = False
-        elif expected_type == "boolean":
-            if isinstance(value, bool):
-                valid = True
-            elif isinstance(value, str):
-                valid = value.lower() in ("true", "false", "1", "0")
+            except ValueError:
+                return False
             else:
-                valid = False
-        else:
-            valid = True  # Unknown type, accept
+                return True
+        return False
 
-        return valid
+    @staticmethod
+    def _is_boolean_like(value: JSONValue) -> bool:
+        if isinstance(value, bool):
+            return True
+        if isinstance(value, str):
+            return value.lower() in {"true", "false", "1", "0"}
+        return False
 
     def _extract_columns(self, records: list[DataRecord]) -> list[str]:
         """Extract column names from records."""

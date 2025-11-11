@@ -11,9 +11,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any
+
+from src.type_definitions.common import RawRecord
 
 from .etl_transformer import ETLTransformer
+
+type RawSourceData = dict[str, list[RawRecord]]
 
 
 class PipelineMode(Enum):
@@ -42,8 +45,8 @@ class PipelineResult:
     """Result of pipeline execution."""
 
     success: bool
-    transformed_data: dict[str, Any]
-    metrics: dict[str, Any]
+    transformed_data: dict[str, object]
+    metrics: dict[str, object]
     errors: list[str]
     execution_time: float
     stages_completed: list[str]
@@ -73,7 +76,7 @@ class TransformationPipeline:
 
     async def execute_pipeline(
         self,
-        raw_data: dict[str, list[dict[str, Any]]],
+        raw_data: RawSourceData,
         gene_symbol: str | None = None,
     ) -> PipelineResult:
         """
@@ -104,11 +107,26 @@ class TransformationPipeline:
 
             execution_time = asyncio.get_event_loop().time() - start_time
 
+            metadata_block = result.get("metadata")
+            metrics_block: dict[str, object] = {}
+            errors_block: list[str] = []
+            if isinstance(metadata_block, dict):
+                metrics_candidate = metadata_block.get("metrics")
+                if isinstance(metrics_candidate, dict):
+                    metrics_block = metrics_candidate
+                errors_candidate = metadata_block.get("errors")
+                if isinstance(errors_candidate, list):
+                    errors_block = [
+                        str(err) for err in errors_candidate if isinstance(err, str)
+                    ]
+
+            error_flag = result.get("error")
+
             pipeline_result = PipelineResult(
-                success=result.get("error") is None,
+                success=not bool(error_flag),
                 transformed_data=result,
-                metrics=result.get("metadata", {}).get("metrics", {}),
-                errors=result.get("metadata", {}).get("errors", []),
+                metrics=metrics_block,
+                errors=errors_block,
                 execution_time=execution_time,
                 stages_completed=list(result.keys()),
             )
@@ -138,8 +156,8 @@ class TransformationPipeline:
 
     async def _execute_sequential(
         self,
-        raw_data: dict[str, list[dict[str, Any]]],
-    ) -> dict[str, Any]:
+        raw_data: RawSourceData,
+    ) -> dict[str, object]:
         """Execute pipeline in sequential mode."""
         self._update_progress("Starting sequential transformation", 0.0)
 
@@ -154,8 +172,8 @@ class TransformationPipeline:
 
     async def _execute_parallel(
         self,
-        raw_data: dict[str, list[dict[str, Any]]],
-    ) -> dict[str, Any]:
+        raw_data: RawSourceData,
+    ) -> dict[str, object]:
         """Execute pipeline in parallel mode."""
         self._update_progress("Starting parallel transformation", 0.0)
 
@@ -169,9 +187,9 @@ class TransformationPipeline:
 
     async def _execute_incremental(
         self,
-        raw_data: dict[str, list[dict[str, Any]]],
+        raw_data: RawSourceData,
         gene_symbol: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> dict[str, object]:
         """Execute pipeline in incremental mode."""
         self._update_progress("Starting incremental transformation", 0.0)
 
@@ -217,7 +235,7 @@ class TransformationPipeline:
 
         return errors
 
-    def get_pipeline_status(self) -> dict[str, Any]:
+    def get_pipeline_status(self) -> dict[str, object]:
         """
         Get current pipeline execution status.
 
@@ -292,7 +310,7 @@ class TransformationPipeline:
 
 
 async def run_quick_transformation(
-    raw_data: dict[str, list[dict[str, Any]]],
+    raw_data: RawSourceData,
     progress_callback: Callable[[str, float], None] | None = None,
 ) -> PipelineResult:
     """
@@ -330,7 +348,7 @@ async def run_quick_transformation(
 
 
 async def run_parallel_transformation(
-    raw_data: dict[str, list[dict[str, Any]]],
+    raw_data: RawSourceData,
     max_concurrent: int = 2,
 ) -> PipelineResult:
     """

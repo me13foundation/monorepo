@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from typing import Any
+from typing import cast
+
+from src.type_definitions.common import JSONObject, JSONValue
 
 from .base_rules import (
     ValidationLevel,
@@ -20,7 +22,7 @@ from .base_rules import (
     ValidationSeverity,
 )
 
-IssueDict = dict[str, Any]
+IssueDict = JSONObject
 
 
 class GeneValidationRules:
@@ -36,7 +38,7 @@ class GeneValidationRules:
 
     @staticmethod
     def validate_hgnc_nomenclature(field: str) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if not isinstance(value, str) or not value:
                 return (
                     False,
@@ -44,7 +46,8 @@ class GeneValidationRules:
                     "Provide an HGNC-approved symbol",
                 )
 
-            length = len(value)
+            symbol = value
+            length = len(symbol)
             if length < 2 or length > 20:
                 return (
                     False,
@@ -52,15 +55,15 @@ class GeneValidationRules:
                     "Symbols must be between 2 and 20 characters",
                 )
 
-            normalized = value.upper()
+            normalized = symbol.upper()
             if not GeneValidationRules._SYMBOL_PATTERN.fullmatch(normalized):
                 return (
                     False,
-                    f"Invalid gene symbol format: {value}",
+                    f"Invalid gene symbol format: {symbol}",
                     "Symbols must be 2-20 characters (A-Z, digits, '_' or '-')",
                 )
 
-            if value != normalized:
+            if symbol != normalized:
                 return False, "Gene symbol must be uppercase", f"Use {normalized}"
 
             return True, "", None
@@ -75,7 +78,7 @@ class GeneValidationRules:
 
     @staticmethod
     def validate_hgnc_id_format(field: str) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if value in (None, ""):
                 return True, "", None  # Optional field
 
@@ -101,7 +104,7 @@ class GeneValidationRules:
 
     @staticmethod
     def validate_cross_reference_consistency(field: str) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if value in (None, {}):
                 return True, "", None
 
@@ -122,7 +125,10 @@ class GeneValidationRules:
                         "Ensure each cross reference list contains strings",
                     )
 
-                unique_items = {item.strip().upper() for item in items if item}
+                string_items = cast("list[str]", items)
+                unique_items = {
+                    entry.strip().upper() for entry in string_items if entry.strip()
+                }
                 if key.upper() == "SYMBOL" and len(unique_items) > 1:
                     return (
                         False,
@@ -146,7 +152,7 @@ class GeneValidationRules:
         _default_start: int | None = None,
         _default_end: int | None = None,
     ) -> ValidationRule:
-        def validator(value: Any) -> ValidationOutcome:
+        def validator(value: JSONValue) -> ValidationOutcome:
             if value in (None, {}):
                 return True, "", None
 
@@ -212,7 +218,7 @@ class GeneValidationRules:
         )
 
     @staticmethod
-    def validate_gene_comprehensively(gene: dict[str, Any]) -> list[IssueDict]:
+    def validate_gene_comprehensively(gene: JSONObject) -> list[IssueDict]:
         issues: list[IssueDict] = []
 
         for rule in GeneValidationRules.get_all_rules():

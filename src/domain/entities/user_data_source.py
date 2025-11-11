@@ -155,6 +155,9 @@ class QualityMetrics(BaseModel):
     issues_count: int = Field(default=0, description="Number of quality issues found")
 
 
+UpdatePayload = dict[str, object]
+
+
 class UserDataSource(BaseModel):
     """
     Domain entity representing a user-managed data source.
@@ -278,20 +281,25 @@ class UserDataSource(BaseModel):
         """Check if source is eligible for data ingestion."""
         return self.status in [SourceStatus.ACTIVE, SourceStatus.DRAFT]
 
+    def _clone_with_updates(self, updates: UpdatePayload) -> "UserDataSource":
+        """Internal helper to preserve immutability with typed updates."""
+        return self.model_copy(update=updates)
+
     def update_status(self, new_status: SourceStatus) -> "UserDataSource":
         """Create new instance with updated status."""
-        return self.model_copy(
-            update={"status": new_status, "updated_at": datetime.now(UTC)},
-        )
+        update_payload: UpdatePayload = {
+            "status": new_status,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def update_quality_metrics(self, metrics: QualityMetrics) -> "UserDataSource":
         """Create new instance with updated quality metrics."""
-        return self.model_copy(
-            update={
-                "quality_metrics": metrics,
-                "updated_at": datetime.now(UTC),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "quality_metrics": metrics,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def record_ingestion(
         self,
@@ -299,22 +307,20 @@ class UserDataSource(BaseModel):
     ) -> "UserDataSource":
         """Create new instance with updated ingestion timestamp."""
         ingestion_time = timestamp or datetime.now(UTC)
-        return self.model_copy(
-            update={
-                "last_ingested_at": ingestion_time,
-                "updated_at": datetime.now(UTC),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "last_ingested_at": ingestion_time,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def update_configuration(self, config: SourceConfiguration) -> "UserDataSource":
         """Create new instance with updated configuration."""
-        return self.model_copy(
-            update={
-                "configuration": config,
-                "updated_at": datetime.now(UTC),
-                "version": self._increment_version(),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "configuration": config,
+            "updated_at": datetime.now(UTC),
+            "version": self._increment_version(),
+        }
+        return self._clone_with_updates(update_payload)
 
     def _increment_version(self) -> str:
         """Increment version number for configuration changes."""

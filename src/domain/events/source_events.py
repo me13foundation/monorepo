@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from typing import Any
+from uuid import UUID  # noqa: TC003
 
 from src.domain.entities.user_data_source import (  # noqa: TC001
     SourceStatus,
     UserDataSource,
 )
+from src.type_definitions.common import JSONObject  # noqa: TC001
 
 from .base import DomainEvent
 
 
-def _serialize_uuid(value: Any) -> str | None:
+def _serialize_uuid(value: UUID | str | None) -> str | None:
     return str(value) if value is not None else None
 
 
@@ -19,16 +20,17 @@ class SourceCreatedEvent(DomainEvent):
 
     @classmethod
     def from_source(cls, source: UserDataSource) -> SourceCreatedEvent:
+        payload: JSONObject = {
+            "owner_id": _serialize_uuid(source.owner_id),
+            "source_type": source.source_type.value,
+            "status": source.status.value,
+            "research_space_id": _serialize_uuid(source.research_space_id),
+        }
         return cls(
             event_type="source.created",
             entity_type="UserDataSource",
             entity_id=str(source.id),
-            payload={
-                "owner_id": _serialize_uuid(source.owner_id),
-                "source_type": source.source_type.value,
-                "status": source.status.value,
-                "research_space_id": _serialize_uuid(source.research_space_id),
-            },
+            payload=payload,
         )
 
 
@@ -42,15 +44,16 @@ class SourceUpdatedEvent(DomainEvent):
         *,
         changed_fields: list[str],
     ) -> SourceUpdatedEvent:
+        payload: JSONObject = {
+            "owner_id": _serialize_uuid(source.owner_id),
+            "source_type": source.source_type.value,
+            "changed_fields": list(changed_fields),
+        }
         return cls(
             event_type="source.updated",
             entity_type="UserDataSource",
             entity_id=str(source.id),
-            payload={
-                "owner_id": _serialize_uuid(source.owner_id),
-                "source_type": source.source_type.value,
-                "changed_fields": changed_fields,
-            },
+            payload=payload,
         )
 
 

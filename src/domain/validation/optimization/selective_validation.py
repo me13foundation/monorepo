@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 
@@ -37,7 +38,7 @@ class SelectiveValidator:
     def validate_selectively(
         self,
         entity_type: str,
-        payload: dict[str, Any],
+        payload: JSONObject,
     ) -> ValidationResult:
         self._stats["attempted"] += 1
 
@@ -50,7 +51,7 @@ class SelectiveValidator:
     def update_confidence_score(
         self,
         entity_type: str,
-        payload: dict[str, Any],
+        payload: JSONObject,
         score: float,
     ) -> None:
         key = self._cache_key(entity_type, payload)
@@ -92,7 +93,7 @@ class SelectiveValidator:
     # Helpers
     # ------------------------------------------------------------------ #
 
-    def _should_skip(self, entity_type: str, payload: dict[str, Any]) -> bool:
+    def _should_skip(self, entity_type: str, payload: JSONObject) -> bool:
         profile = (
             self._profiles.get(self._active_profile) if self._active_profile else None
         )
@@ -115,9 +116,9 @@ class SelectiveValidator:
         return False
 
     @staticmethod
-    def _cache_key(entity_type: str, payload: dict[str, Any]) -> str:
-        key_fields = (entity_type, tuple(sorted(payload.items())))
-        return str(key_fields)
+    def _cache_key(entity_type: str, payload: JSONObject) -> str:
+        key_fields = tuple((key, repr(value)) for key, value in sorted(payload.items()))
+        return f"{entity_type}:{key_fields}"
 
 
 __all__ = ["SelectionStrategy", "SelectiveValidator"]

@@ -5,7 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..rules.base_rules import ValidationSeverity
 
@@ -38,7 +39,7 @@ class ErrorReport:
     rule: str
     message: str
     suggestion: str | None
-    context: dict[str, Any]
+    context: JSONObject
     timestamp: datetime
     source: str
     resolved: bool = False
@@ -74,7 +75,7 @@ class ErrorReporter:
         message: str,
         severity: ValidationSeverity = ValidationSeverity.ERROR,
         suggestion: str | None = None,
-        context: dict[str, Any] | None = None,
+        context: JSONObject | None = None,
         source: str = "validation",
     ) -> ErrorReport:
         report = ErrorReport(
@@ -145,7 +146,7 @@ class ErrorReporter:
             critical_issues=critical,
         )
 
-    def get_error_trends(self, time_range_hours: int = 24) -> list[dict[str, Any]]:
+    def get_error_trends(self, time_range_hours: int = 24) -> list[JSONObject]:
         summary = self.get_error_summary(time_range_hours=time_range_hours)
         return [
             {"category": category, "count": count}

@@ -6,7 +6,6 @@ related to data discovery sessions, source catalogs, and query testing.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
 from uuid import UUID
 
 from src.domain.entities.data_discovery_session import (
@@ -15,6 +14,7 @@ from src.domain.entities.data_discovery_session import (
     QueryTestResult,
     SourceCatalogEntry,
 )
+from src.type_definitions.common import JSONObject
 
 
 class DataDiscoverySessionRepository(ABC):
@@ -265,7 +265,7 @@ class SourceQueryClient(ABC):
         catalog_entry: SourceCatalogEntry,
         parameters: QueryParameters,
         timeout_seconds: int = 30,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Execute a query against an external data source.
 

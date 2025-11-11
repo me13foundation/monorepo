@@ -6,7 +6,8 @@ import asyncio
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..reporting.metrics import MetricsCollector
 from ..rules.base_rules import ValidationResult, ValidationSeverity
@@ -41,7 +42,7 @@ class QualityGateOrchestrator:
     async def execute_pipeline(
         self,
         name: str,
-        payload: dict[str, Sequence[dict[str, Any]]],
+        payload: dict[str, Sequence[JSONObject]],
     ) -> PipelineExecutionResult | None:
         pipeline = self._pipelines.get(name)
         if pipeline is None:
@@ -76,7 +77,7 @@ class QualityGateOrchestrator:
     async def _process_stages(
         self,
         pipeline: ValidationPipeline,
-        payload: dict[str, Sequence[dict[str, Any]]],
+        payload: dict[str, Sequence[JSONObject]],
         pipeline_name: str,
     ) -> tuple[dict[str, dict[str, object]], list[ValidationResult], bool]:
         stage_results: dict[str, dict[str, object]] = {}
@@ -144,7 +145,7 @@ class QualityGateOrchestrator:
 
     async def execute_all_pipelines(
         self,
-        payloads: dict[str, dict[str, Sequence[dict[str, Any]]]],
+        payloads: dict[str, dict[str, Sequence[JSONObject]]],
     ) -> BatchExecutionResult:
         start = time.perf_counter()
         tasks = [

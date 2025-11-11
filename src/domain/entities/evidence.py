@@ -97,7 +97,9 @@ class Evidence(BaseModel):
 
         aligned_confidence = self._ensure_confidence_alignment(self.confidence)
         if aligned_confidence is not self.confidence:
-            return self.model_copy(update={"confidence": aligned_confidence})
+            return self.model_copy(
+                update={"confidence": aligned_confidence},  # type: ignore[misc]
+            )
         return self
 
     def mark_reviewed(

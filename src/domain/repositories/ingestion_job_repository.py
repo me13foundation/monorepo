@@ -7,7 +7,6 @@ providing monitoring and tracking capabilities for data source ingestion.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
 from src.domain.entities.ingestion_job import (
@@ -17,6 +16,7 @@ from src.domain.entities.ingestion_job import (
     IngestionTrigger,
     JobMetrics,
 )
+from src.type_definitions.common import JSONObject
 
 
 class IngestionJobRepository(ABC):
@@ -336,7 +336,7 @@ class IngestionJobRepository(ABC):
         """
 
     @abstractmethod
-    def get_job_statistics(self, source_id: UUID | None = None) -> dict[str, Any]:
+    def get_job_statistics(self, source_id: UUID | None = None) -> JSONObject:
         """
         Get statistics about ingestion jobs, optionally for a specific source.
 

@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from .error_reporting import ErrorReporter, ErrorSummary
 from .metrics import MetricsCollector
@@ -21,10 +22,10 @@ class DashboardConfig:
 class DashboardData:
     timestamp: datetime
     system_health: float
-    quality_metrics: dict[str, Any]
+    quality_metrics: JSONObject
     error_summary: ErrorSummary
-    performance_metrics: dict[str, Any]
-    alerts: list[dict[str, Any]]
+    performance_metrics: JSONObject
+    alerts: list[JSONObject]
 
 
 class ValidationDashboard:
@@ -97,7 +98,7 @@ class ValidationDashboard:
         throughput_summary = self._metrics.get_metric_summary("pipeline.throughput")
         execution_summary = self._metrics.get_metric_summary("pipeline.execution_time")
 
-        quality_metrics: dict[str, Any] = {}
+        quality_metrics: JSONObject = {}
         if quality_summary:
             quality_metrics["quality_score"] = {
                 "average": quality_summary.average,
@@ -105,7 +106,7 @@ class ValidationDashboard:
                 "max": quality_summary.maximum,
             }
 
-        performance_metrics: dict[str, Any] = {}
+        performance_metrics: JSONObject = {}
         if throughput_summary:
             performance_metrics[
                 "throughput_items_per_second"

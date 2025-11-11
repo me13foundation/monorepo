@@ -310,8 +310,12 @@ class TemplateValidationService:
                 required.append(field_name)
 
         # Check schema for required fields
-        schema_required = template.schema_definition.get("required", [])
-        required.extend(schema_required)
+        schema_required_value = template.schema_definition.get("required", [])
+        if isinstance(schema_required_value, list):
+            required_fields = [
+                field for field in schema_required_value if isinstance(field, str)
+            ]
+            required.extend(required_fields)
 
         return list(set(required))  # Remove duplicates
 

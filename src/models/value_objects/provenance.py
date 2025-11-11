@@ -75,11 +75,15 @@ class Provenance(BaseModel):
 
     def update_quality_score(self, score: float) -> "Provenance":
         """Create new Provenance with updated quality score."""
-        return self.model_copy(update={"quality_score": score})
+        return self.model_copy(
+            update={"quality_score": score},
+        )
 
     def mark_validated(self, status: str = "validated") -> "Provenance":
         """Create new Provenance with updated validation status."""
-        return self.model_copy(update={"validation_status": status})
+        return self.model_copy(
+            update={"validation_status": status},
+        )
 
     @property
     def is_validated(self) -> bool:

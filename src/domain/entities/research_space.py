@@ -1,13 +1,14 @@
 import re
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.type_definitions.common import JSONObject
 
-def _default_space_settings() -> dict[str, Any]:
+
+def _default_space_settings() -> JSONObject:
     return {}
 
 
@@ -18,6 +19,9 @@ class SpaceStatus(str, Enum):
     INACTIVE = "inactive"
     ARCHIVED = "archived"
     SUSPENDED = "suspended"
+
+
+UpdatePayload = dict[str, object]
 
 
 class ResearchSpace(BaseModel):
@@ -52,7 +56,7 @@ class ResearchSpace(BaseModel):
     status: SpaceStatus = Field(default=SpaceStatus.ACTIVE)
 
     # Configuration
-    settings: dict[str, Any] = Field(
+    settings: JSONObject = Field(
         default_factory=_default_space_settings,
         description="Space-specific settings (flexible dict for arbitrary key-value pairs)",
     )
@@ -61,6 +65,10 @@ class ResearchSpace(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Searchable tags")
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    def _clone_with_updates(self, updates: UpdatePayload) -> "ResearchSpace":
+        """Internal helper to create updated immutable instances."""
+        return self.model_copy(update=updates)
 
     @field_validator("slug")
     @classmethod
@@ -95,20 +103,31 @@ class ResearchSpace(BaseModel):
 
     def with_updated_at(self) -> "ResearchSpace":
         """Return a new instance with updated_at set to now."""
-        return self.model_copy(update={"updated_at": datetime.now(UTC)})
+        update_payload: UpdatePayload = {
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def with_status(self, status: SpaceStatus) -> "ResearchSpace":
         """Return a new instance with updated status."""
-        return self.model_copy(
-            update={"status": status, "updated_at": datetime.now(UTC)},
-        )
+        update_payload: UpdatePayload = {
+            "status": status,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
-    def with_settings(self, settings: dict[str, Any]) -> "ResearchSpace":
+    def with_settings(self, settings: JSONObject) -> "ResearchSpace":
         """Return a new instance with updated settings."""
-        return self.model_copy(
-            update={"settings": settings, "updated_at": datetime.now(UTC)},
-        )
+        update_payload: UpdatePayload = {
+            "settings": settings,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def with_tags(self, tags: list[str]) -> "ResearchSpace":
         """Return a new instance with updated tags."""
-        return self.model_copy(update={"tags": tags, "updated_at": datetime.now(UTC)})
+        update_payload: UpdatePayload = {
+            "tags": tags,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)

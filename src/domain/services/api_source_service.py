@@ -17,24 +17,25 @@ import httpx
 from pydantic import BaseModel
 
 from src.domain.entities.user_data_source import SourceConfiguration  # noqa: TC001
-from src.type_definitions.common import SourceMetadata  # noqa: TC001
 
 AuthHeaders = dict[str, str]
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from src.type_definitions.common import JSONObject, SourceMetadata
+
 
 class APIRequestResult(BaseModel):
     """Result of an API request operation."""
 
     success: bool
-    data: Any | None = None
+    data: JSONObject | None = None
     record_count: int = 0
     response_time_ms: float = 0.0
     status_code: int | None = None
     errors: list[str] = []
-    metadata: dict[str, Any] = {}
+    metadata: JSONObject = {}
 
 
 class APIConnectionTest(BaseModel):
@@ -45,7 +46,7 @@ class APIConnectionTest(BaseModel):
     status_code: int | None = None
     error_message: str | None = None
     response_headers: dict[str, str] = {}
-    sample_data: Any | None = None
+    sample_data: JSONObject | None = None
 
 
 class APISourceService:

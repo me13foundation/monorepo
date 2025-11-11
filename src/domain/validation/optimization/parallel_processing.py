@@ -5,7 +5,8 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 
@@ -28,7 +29,7 @@ class ParallelValidator:
     async def validate_batch_parallel(
         self,
         entity_type: str,
-        payload: Sequence[dict[str, Any]],
+        payload: Sequence[JSONObject],
     ) -> list[ValidationResult]:
         if not payload:
             return []
@@ -49,7 +50,7 @@ class ParallelValidator:
     async def validate_with_adaptive_parallelism(
         self,
         entity_type: str,
-        payload: Sequence[dict[str, Any]],
+        payload: Sequence[JSONObject],
     ) -> list[ValidationResult]:
         if len(payload) <= self.config.chunk_size:
             return self.rule_engine.validate_batch(entity_type, list(payload))
@@ -57,9 +58,9 @@ class ParallelValidator:
 
     def _chunk_payload(
         self,
-        payload: Sequence[dict[str, Any]],
+        payload: Sequence[JSONObject],
         chunk_size: int,
-    ) -> Iterable[Sequence[dict[str, Any]]]:
+    ) -> Iterable[Sequence[JSONObject]]:
         for index in range(0, len(payload), chunk_size):
             yield payload[index : index + chunk_size]
 

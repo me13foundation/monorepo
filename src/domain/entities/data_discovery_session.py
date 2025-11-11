@@ -8,10 +8,12 @@ and validating data sources before adding them to Research Spaces.
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, assert_never
+from typing import assert_never
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from src.type_definitions.common import JSONObject
 
 
 class QueryParameterType(str, Enum):
@@ -210,7 +212,7 @@ class QueryTestResult(BaseModel):
     status: TestResultStatus = Field(..., description="Outcome status of the test")
 
     # Results
-    response_data: dict[str, Any] | None = Field(
+    response_data: JSONObject | None = Field(
         None,
         description="Raw response data from the source",
     )
@@ -249,6 +251,9 @@ class QueryTestResult(BaseModel):
         if self.completed_at is None:
             return None
         return int((self.completed_at - self.started_at).total_seconds() * 1000)
+
+
+UpdatePayload = dict[str, object]
 
 
 class DataDiscoverySession(BaseModel):
@@ -320,15 +325,18 @@ class DataDiscoverySession(BaseModel):
         description="When the session was last used",
     )
 
+    def _clone_with_updates(self, updates: UpdatePayload) -> "DataDiscoverySession":
+        """Internal helper to maintain immutability with typed updates."""
+        return self.model_copy(update=updates)
+
     def update_parameters(self, parameters: QueryParameters) -> "DataDiscoverySession":
         """Create new session with updated parameters."""
-        return self.model_copy(
-            update={
-                "current_parameters": parameters,
-                "updated_at": datetime.now(UTC),
-                "last_activity_at": datetime.now(UTC),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "current_parameters": parameters,
+            "updated_at": datetime.now(UTC),
+            "last_activity_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def record_test(
         self,
@@ -340,15 +348,14 @@ class DataDiscoverySession(BaseModel):
         new_tested_sources = list({*self.tested_sources, catalog_entry_id})
         new_successful_tests = self.successful_tests + (1 if success else 0)
 
-        return self.model_copy(
-            update={
-                "tested_sources": new_tested_sources,
-                "total_tests_run": self.total_tests_run + 1,
-                "successful_tests": new_successful_tests,
-                "updated_at": datetime.now(UTC),
-                "last_activity_at": datetime.now(UTC),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "tested_sources": new_tested_sources,
+            "total_tests_run": self.total_tests_run + 1,
+            "successful_tests": new_successful_tests,
+            "updated_at": datetime.now(UTC),
+            "last_activity_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def toggle_source_selection(self, catalog_entry_id: str) -> "DataDiscoverySession":
         """Create new session with source selection toggled."""
@@ -358,13 +365,12 @@ class DataDiscoverySession(BaseModel):
             else [s for s in self.selected_sources if s != catalog_entry_id]
         )
 
-        return self.model_copy(
-            update={
-                "selected_sources": new_selected,
-                "updated_at": datetime.now(UTC),
-                "last_activity_at": datetime.now(UTC),
-            },
-        )
+        update_payload: UpdatePayload = {
+            "selected_sources": new_selected,
+            "updated_at": datetime.now(UTC),
+            "last_activity_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def is_source_selected(self, catalog_entry_id: str) -> bool:
         """Check if a source is selected."""
@@ -380,14 +386,19 @@ class DataDiscoverySession(BaseModel):
         Args:
             source_ids: Iterable of catalog entry IDs to persist
         """
-        deduped = list(dict.fromkeys(source_ids))
-        return self.model_copy(
-            update={
-                "selected_sources": deduped,
-                "updated_at": datetime.now(UTC),
-                "last_activity_at": datetime.now(UTC),
-            },
-        )
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for source_id in source_ids:
+            if source_id in seen:
+                continue
+            seen.add(source_id)
+            deduped.append(source_id)
+        update_payload: UpdatePayload = {
+            "selected_sources": deduped,
+            "updated_at": datetime.now(UTC),
+            "last_activity_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def is_source_tested(self, catalog_entry_id: str) -> bool:
         """Check if a source has been tested."""

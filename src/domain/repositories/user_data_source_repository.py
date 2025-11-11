@@ -6,7 +6,6 @@ providing a clean separation between domain logic and data persistence.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
 from uuid import UUID
 
 from src.domain.entities.user_data_source import (
@@ -17,6 +16,7 @@ from src.domain.entities.user_data_source import (
     SourceType,
     UserDataSource,
 )
+from src.type_definitions.common import JSONObject
 
 
 class UserDataSourceRepository(ABC):
@@ -306,7 +306,7 @@ class UserDataSourceRepository(ABC):
         """
 
     @abstractmethod
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> JSONObject:
         """
         Get overall statistics about data sources.
 

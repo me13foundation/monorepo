@@ -6,7 +6,8 @@ import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass
 from statistics import mean
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..rules.base_rules import ValidationResult, ValidationRuleEngine
 from .quality_gate import GateResult, QualityGate
@@ -64,7 +65,7 @@ class ValidationPipeline:
     async def validate_stage(
         self,
         stage_name: str,
-        payload: dict[str, Sequence[dict[str, Any]]],
+        payload: dict[str, Sequence[JSONObject]],
     ) -> dict[str, object]:
         checkpoint = self.checkpoints.get(stage_name)
         if not checkpoint:
@@ -88,7 +89,7 @@ class ValidationPipeline:
 
     def _collect_results(
         self,
-        payload: dict[str, Sequence[dict[str, Any]]],
+        payload: dict[str, Sequence[JSONObject]],
     ) -> list[ValidationResult]:
         results: list[ValidationResult] = []
         for entity_collection, items in payload.items():

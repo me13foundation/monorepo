@@ -9,7 +9,6 @@ correlation analysis.
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 from src.domain.transform.normalizers.phenotype_normalizer import (
     NormalizedPhenotype,
@@ -19,6 +18,8 @@ from src.domain.transform.normalizers.variant_normalizer import (
     NormalizedVariant,
     VariantNormalizer,
 )
+from src.type_definitions.common import JSONObject
+from src.type_definitions.json_utils import as_str, list_of_strings
 
 
 class VariantPhenotypeRelationship(Enum):
@@ -72,7 +73,7 @@ class VariantPhenotypeMapper:
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: dict[str, Any] | None = None,
+        evidence_data: JSONObject | None = None,
     ) -> VariantPhenotypeLink | None:
         """
         Determine the relationship between a variant and phenotype.
@@ -132,15 +133,16 @@ class VariantPhenotypeMapper:
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: dict[str, Any] | None,
+        evidence_data: JSONObject | None,
     ) -> VariantPhenotypeRelationship | None:
         """Determine the type of relationship between variant and phenotype."""
 
         # Check clinical significance from variant
-        clinical_sig = variant.clinical_significance
-        if clinical_sig:
-            sig_lower = clinical_sig.lower()
-
+        clinical_sig_raw = variant.clinical_significance
+        sig_lower = (
+            clinical_sig_raw.lower() if isinstance(clinical_sig_raw, str) else None
+        )
+        if sig_lower:
             if any(term in sig_lower for term in ["pathogenic", "likely pathogenic"]):
                 return VariantPhenotypeRelationship.CAUSATIVE
 
@@ -155,7 +157,11 @@ class VariantPhenotypeMapper:
 
         # Check evidence data
         if evidence_data:
-            evidence_type = evidence_data.get("evidence_type", "").lower()
+            evidence_type_raw = as_str(
+                evidence_data.get("evidence_type"),
+                fallback="",
+            )
+            evidence_type = evidence_type_raw.lower() if evidence_type_raw else ""
 
             if "causative" in evidence_type or "pathogenic" in evidence_type:
                 return VariantPhenotypeRelationship.CAUSATIVE
@@ -176,7 +182,7 @@ class VariantPhenotypeMapper:
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: dict[str, Any] | None,
+        evidence_data: JSONObject | None,
     ) -> float:
         """Calculate confidence score for variant-phenotype relationship."""
         confidence = 0.3  # Base confidence
@@ -186,7 +192,7 @@ class VariantPhenotypeMapper:
             confidence += 0.4
 
         # Higher confidence for pathogenic/likely pathogenic variants
-        if variant.clinical_significance:
+        if isinstance(variant.clinical_significance, str):
             sig_lower = variant.clinical_significance.lower()
             if "pathogenic" in sig_lower:
                 confidence += 0.2
@@ -207,20 +213,20 @@ class VariantPhenotypeMapper:
         self,
         variant: NormalizedVariant,
         phenotype: NormalizedPhenotype,
-        evidence_data: dict[str, Any] | None,
+        evidence_data: JSONObject | None,
     ) -> list[str]:
         """Collect evidence sources for the relationship."""
-        sources = [variant.source, phenotype.source]
+        sources = [source for source in (variant.source, phenotype.source) if source]
 
         if evidence_data:
-            sources.extend(evidence_data.get("sources", []))
+            sources.extend(list_of_strings(evidence_data.get("sources")))
 
         return list(set(sources))
 
     def _infer_inheritance_pattern(
         self,
         _variant: NormalizedVariant,
-        _evidence_data: dict[str, Any] | None,
+        _evidence_data: JSONObject | None,
     ) -> str | None:
         """Infer inheritance pattern from available data."""
         # This would typically require more sophisticated analysis
@@ -230,7 +236,7 @@ class VariantPhenotypeMapper:
     def _infer_penetrance(
         self,
         _variant: NormalizedVariant,
-        _evidence_data: dict[str, Any] | None,
+        _evidence_data: JSONObject | None,
     ) -> str | None:
         """Infer penetrance from available data."""
         # This would require detailed analysis of clinical data
@@ -290,7 +296,7 @@ class VariantPhenotypeMapper:
             ]
         ]
 
-    def get_relationship_statistics(self) -> dict[str, Any]:
+    def get_relationship_statistics(self) -> JSONObject:
         """Compute aggregate statistics for mapped relationships."""
 
         total_relationships = 0
@@ -312,12 +318,15 @@ class VariantPhenotypeMapper:
                 else:
                     confidence_distribution["low"] += 1
 
+        relationship_types_json: JSONObject = dict(relationship_types)
+        confidence_distribution_json: JSONObject = dict(confidence_distribution)
+
         return {
             "total_relationships": total_relationships,
             "variants_with_phenotypes": len(self.variant_to_phenotypes),
             "phenotypes_with_variants": len(self.phenotype_to_variants),
-            "relationship_types": relationship_types,
-            "confidence_distribution": confidence_distribution,
+            "relationship_types": relationship_types_json,
+            "confidence_distribution": confidence_distribution_json,
         }
 
     def validate_mapping(self, link: VariantPhenotypeLink) -> list[str]:

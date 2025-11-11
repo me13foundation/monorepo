@@ -6,7 +6,10 @@ that go beyond basic format validation.
 """
 
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
+
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import as_object, as_str, list_of_strings
 
 from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
@@ -23,18 +26,18 @@ class SemanticValidator:
     def validate_gene_variant_relationship(
         self,
         gene_id: str,
-        variant_data: dict[str, Any],
+        variant_data: JSONObject,
     ) -> ValidationResult:
         """Validate relationship between gene and variant."""
         issues = []
 
         # Check if variant is associated with the correct gene
-        variant_gene_refs = variant_data.get("gene_references", [])
+        variant_gene_refs = list_of_strings(variant_data.get("gene_references"))
         if gene_id not in variant_gene_refs:
             issues.append(
                 ValidationIssue(
                     field="gene_references",
-                    value=variant_gene_refs,
+                    value=cast("JSONValue", variant_gene_refs),
                     rule="gene_variant_relationship",
                     message=f"Variant not associated with gene {gene_id}",
                     severity=ValidationSeverity.ERROR,
@@ -69,18 +72,23 @@ class SemanticValidator:
     def validate_phenotype_gene_association(
         self,
         _phenotype_id: str,
-        gene_data: dict[str, Any],
+        gene_data: JSONObject,
     ) -> ValidationResult:
         """Validate phenotype-gene associations."""
         issues = []
 
         # Check if gene has associated phenotypes
-        associated_phenotypes = gene_data.get("associated_phenotypes", [])
+        associated_phenotypes_raw = gene_data.get("associated_phenotypes", [])
+        associated_phenotypes = (
+            associated_phenotypes_raw
+            if isinstance(associated_phenotypes_raw, list)
+            else []
+        )
         if not associated_phenotypes:
             issues.append(
                 ValidationIssue(
                     field="associated_phenotypes",
-                    value=associated_phenotypes,
+                    value=cast("JSONValue", associated_phenotypes),
                     rule="phenotype_association_required",
                     message="Gene must have at least one associated phenotype",
                     severity=ValidationSeverity.WARNING,
@@ -89,9 +97,10 @@ class SemanticValidator:
 
         # Validate HPO ID format for phenotypes
         for phenotype in associated_phenotypes:
-            if not isinstance(phenotype, dict) or "hpo_id" not in phenotype:
+            phenotype_obj = as_object(phenotype)
+            hpo_id = as_str(phenotype_obj.get("hpo_id"))
+            if not hpo_id:
                 continue
-            hpo_id = phenotype["hpo_id"]
             if not hpo_id.startswith("HP:") or len(hpo_id) != 10:
                 issues.append(
                     ValidationIssue(
@@ -107,7 +116,7 @@ class SemanticValidator:
 
     def validate_publication_evidence(
         self,
-        publication_data: dict[str, Any],
+        publication_data: JSONObject,
     ) -> ValidationResult:
         """Validate publication evidence quality."""
         issues = []
@@ -127,7 +136,7 @@ class SemanticValidator:
                 )
 
         # Validate DOI format if present
-        doi = publication_data.get("doi")
+        doi = as_str(publication_data.get("doi"))
         if doi and not doi.startswith("10."):
             issues.append(
                 ValidationIssue(
@@ -149,13 +158,13 @@ class SemanticValidator:
 
     def validate_cross_references(
         self,
-        entity_data: dict[str, Any],
+        entity_data: JSONObject,
         entity_type: str,
     ) -> ValidationResult:
         """Validate cross-references between different entity types."""
         issues = []
 
-        cross_refs = entity_data.get("cross_references", {})
+        cross_refs = as_object(entity_data.get("cross_references"))
 
         if entity_type == "gene":
             # Genes should have variant and phenotype references

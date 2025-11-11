@@ -16,11 +16,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 from statistics import mean
-from typing import Any, ClassVar, Union
+from typing import ClassVar
 
-from ..rules.base_rules import ValidationResult, ValidationSeverity
+from src.type_definitions.common import JSONObject
 
-Number = Union[int, float]
+from ..gates.quality_gate import GateResult
+from ..rules.base_rules import ValidationResult
+
+Number = float | int
 
 
 class MetricType(Enum):
@@ -55,13 +58,34 @@ class MetricSummary:
     time_range_hours: int
 
 
+@dataclass
+class AlertRecord:
+    """Alert raised when metric thresholds are exceeded."""
+
+    metric: str
+    value: float
+    threshold: float
+    timestamp: datetime
+    tags: dict[str, str]
+
+    def as_json(self) -> JSONObject:
+        tags_json: JSONObject = dict(self.tags)
+        return {
+            "metric": self.metric,
+            "value": self.value,
+            "threshold": self.threshold,
+            "timestamp": self.timestamp.isoformat(),
+            "tags": tags_json,
+        }
+
+
 class MetricsCollector:
     """Lightweight in-memory metrics collector."""
 
     def __init__(self, retention_hours: int = 168) -> None:
         self._retention = timedelta(hours=retention_hours)
         self._metrics: dict[str, list[MetricValue]] = {}
-        self._alerts: list[dict[str, Any]] = []
+        self._alerts: list[AlertRecord] = []
         self._thresholds: dict[str, float] = {
             "validation.error_rate": 0.1,
             "validation.quality_score": 0.75,
@@ -98,11 +122,7 @@ class MetricsCollector:
 
             severity_counts: dict[str, int] = {"error": 0, "warning": 0, "info": 0}
             for issue in result.issues:
-                severity_value = issue.get("severity", ValidationSeverity.INFO)
-                if isinstance(severity_value, ValidationSeverity):
-                    key = severity_value.name.lower()
-                else:
-                    key = str(severity_value).lower()
+                key = issue.severity.name.lower()
                 severity_counts.setdefault(key, 0)
                 severity_counts[key] += 1
 
@@ -185,13 +205,13 @@ class MetricsCollector:
     def collect_gate_metrics(
         self,
         gate_name: str,
-        gate_result: Any,
+        gate_result: GateResult,
         pipeline_name: str = "default",
     ) -> None:
         tags = {"pipeline": pipeline_name, "gate": gate_name}
-        status_value = 1.0 if getattr(gate_result, "status", None) == "passed" else 0.0
-        quality_score = float(getattr(gate_result, "quality_score", 0.0))
-        evaluation_time = float(getattr(gate_result, "evaluation_time", 0.0))
+        status_value = 1.0 if gate_result.passed else 0.0
+        quality_score = float(gate_result.quality_score)
+        evaluation_time = float(gate_result.evaluation_time)
 
         self.record_metric("gate.status", status_value, MetricType.GAUGE, tags)
         self.record_metric("gate.quality_score", quality_score, MetricType.GAUGE, tags)
@@ -202,8 +222,7 @@ class MetricsCollector:
             tags,
         )
 
-        issue_counts = getattr(gate_result, "issue_counts", {})
-        for severity, count in issue_counts.items():
+        for severity, count in gate_result.issue_counts.items():
             self.record_metric(
                 f"gate.issues.{severity}",
                 float(count),
@@ -265,11 +284,11 @@ class MetricsCollector:
 
         return round(score, 4)
 
-    def get_alerts(self, time_range_hours: int = 1) -> list[dict[str, Any]]:
+    def get_alerts(self, time_range_hours: int = 1) -> list[JSONObject]:
         cutoff = datetime.now(UTC) - timedelta(hours=time_range_hours)
-        return [alert for alert in self._alerts if alert["timestamp"] >= cutoff]
+        return [alert.as_json() for alert in self._alerts if alert.timestamp >= cutoff]
 
-    def get_performance_report(self, time_range_hours: int = 24) -> dict[str, Any]:
+    def get_performance_report(self, time_range_hours: int = 24) -> JSONObject:
         quality = self.get_metric_summary("validation.quality_score", time_range_hours)
         error = self.get_metric_summary("validation.error_rate", time_range_hours)
         throughput = self.get_metric_summary("pipeline.throughput", time_range_hours)
@@ -344,13 +363,13 @@ class MetricsCollector:
 
         if should_alert:
             self._alerts.append(
-                {
-                    "metric": sample.name,
-                    "value": sample.value,
-                    "threshold": threshold,
-                    "timestamp": sample.timestamp,
-                    "tags": sample.tags,
-                },
+                AlertRecord(
+                    metric=sample.name,
+                    value=sample.value,
+                    threshold=threshold,
+                    timestamp=sample.timestamp,
+                    tags=sample.tags,
+                ),
             )
 
 

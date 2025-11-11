@@ -7,12 +7,12 @@ providing monitoring, error handling, and provenance tracking.
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.models.value_objects import Provenance
+from src.type_definitions.common import JSONObject
 
 
 class IngestionStatus(str, Enum):
@@ -82,7 +82,7 @@ class IngestionError(BaseModel):
 
     error_type: str = Field(..., description="Type of error that occurred")
     error_message: str = Field(..., description="Human-readable error message")
-    error_details: dict[str, Any] = Field(
+    error_details: JSONObject = Field(
         default_factory=dict,
         description="Additional error details",
     )
@@ -103,6 +103,9 @@ class IngestionError(BaseModel):
             "service_unavailable",
         ]
         return self.error_type in recoverable_errors
+
+
+UpdatePayload = dict[str, object]
 
 
 class IngestionJob(BaseModel):
@@ -164,23 +167,29 @@ class IngestionJob(BaseModel):
 
     # Provenance and metadata
     provenance: Provenance = Field(..., description="Data provenance information")
-    metadata: dict[str, Any] = Field(
+    metadata: JSONObject = Field(
         default_factory=dict,
         description="Additional job metadata",
     )
 
     # Configuration snapshot (what was used for this job)
-    source_config_snapshot: dict[str, Any] = Field(
+    source_config_snapshot: JSONObject = Field(
         default_factory=dict,
         description="Source configuration at job time",
     )
 
+    def _clone_with_updates(self, updates: UpdatePayload) -> "IngestionJob":
+        """Internal helper to produce updated immutable ingestion job instances."""
+        return self.model_copy(update=updates)
+
     def start_execution(self) -> "IngestionJob":
         """Create new instance with execution started."""
         now = datetime.now(UTC)
-        return self.model_copy(
-            update={"status": IngestionStatus.RUNNING, "started_at": now},
-        )
+        update_payload: UpdatePayload = {
+            "status": IngestionStatus.RUNNING,
+            "started_at": now,
+        }
+        return self._clone_with_updates(update_payload)
 
     def complete_successfully(self, metrics: JobMetrics) -> "IngestionJob":
         """Create new instance with successful completion."""
@@ -188,42 +197,48 @@ class IngestionJob(BaseModel):
         updated_metrics = metrics.model_copy()
         updated_metrics.calculate_rate()
 
-        return self.model_copy(
-            update={
-                "status": IngestionStatus.COMPLETED,
-                "completed_at": now,
-                "metrics": updated_metrics,
-            },
-        )
+        update_payload: UpdatePayload = {
+            "status": IngestionStatus.COMPLETED,
+            "completed_at": now,
+            "metrics": updated_metrics,
+        }
+        return self._clone_with_updates(update_payload)
 
     def fail(self, error: IngestionError) -> "IngestionJob":
         """Create new instance with failure status."""
         now = datetime.now(UTC)
-        return self.model_copy(
-            update={
-                "status": IngestionStatus.FAILED,
-                "completed_at": now,
-                "errors": [*self.errors, error],
-            },
-        )
+        update_payload: UpdatePayload = {
+            "status": IngestionStatus.FAILED,
+            "completed_at": now,
+            "errors": [*self.errors, error],
+        }
+        return self._clone_with_updates(update_payload)
 
     def add_error(self, error: IngestionError) -> "IngestionJob":
         """Create new instance with additional error."""
-        return self.model_copy(update={"errors": [*self.errors, error]})
+        update_payload: UpdatePayload = {
+            "errors": [*self.errors, error],
+        }
+        return self._clone_with_updates(update_payload)
 
     def cancel(self) -> "IngestionJob":
         """Create new instance with cancelled status."""
         now = datetime.now(UTC)
-        return self.model_copy(
-            update={"status": IngestionStatus.CANCELLED, "completed_at": now},
-        )
+        update_payload: UpdatePayload = {
+            "status": IngestionStatus.CANCELLED,
+            "completed_at": now,
+        }
+        return self._clone_with_updates(update_payload)
 
     def update_metrics(self, metrics: JobMetrics) -> "IngestionJob":
         """Create new instance with updated metrics."""
         updated_metrics = metrics.model_copy()
         updated_metrics.calculate_rate()
 
-        return self.model_copy(update={"metrics": updated_metrics})
+        update_payload: UpdatePayload = {
+            "metrics": updated_metrics,
+        }
+        return self._clone_with_updates(update_payload)
 
     @property
     def is_running(self) -> bool:

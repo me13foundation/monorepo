@@ -4,11 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from src.domain.transform.normalizers.variant_normalizer import GenomicLocation
+    from src.type_definitions.common import JSONValue
+else:
+    GenomicLocation = object  # pragma: no cover
+    JSONValue = object  # type: ignore[assignment]
 
 UPSTREAM_PADDING_BP = 2000
 DOWNSTREAM_PADDING_BP = 500
 SPLICE_BORDER_BP = 10
+
+IssueDict = dict[str, JSONValue]
 
 
 class GeneVariantRelationship(Enum):
@@ -30,6 +39,16 @@ class GeneVariantLink:
     functional_impact: str | None
 
 
+class GeneLike(Protocol):
+    primary_id: str
+
+
+class VariantLike(Protocol):
+    primary_id: str
+    genomic_location: GenomicLocation | None
+    source: str
+
+
 class GeneVariantMapper:
     def __init__(self) -> None:
         self.gene_coordinates: dict[str, tuple[str, int, int]] = {}
@@ -47,17 +66,17 @@ class GeneVariantMapper:
 
     def map_gene_variant_relationship(
         self,
-        gene: Any,
-        variant: Any,
+        gene: GeneLike,
+        variant: VariantLike,
     ) -> GeneVariantLink | None:
-        gene_coords = self.gene_coordinates.get(getattr(gene, "primary_id", ""))
-        variant_location = getattr(variant, "genomic_location", None)
+        gene_coords = self.gene_coordinates.get(gene.primary_id)
+        variant_location = variant.genomic_location
 
         if not gene_coords or variant_location is None:
             return None
 
-        chromosome = getattr(variant_location, "chromosome", None)
-        position = getattr(variant_location, "position", None)
+        chromosome = variant_location.chromosome
+        position = variant_location.position
         if chromosome is None or position is None:
             return None
 
@@ -75,11 +94,11 @@ class GeneVariantMapper:
             return None
 
         link = GeneVariantLink(
-            gene_id=getattr(gene, "primary_id", ""),
-            variant_id=getattr(variant, "primary_id", ""),
+            gene_id=gene.primary_id,
+            variant_id=variant.primary_id,
             relationship_type=relationship,
             confidence_score=0.8,
-            evidence_sources=[getattr(variant, "source", "unknown")],
+            evidence_sources=[variant.source or "unknown"],
             genomic_distance=self._calculate_distance(gene_start, gene_end, position),
             functional_impact=None,
         )
@@ -106,9 +125,9 @@ class GeneVariantMapper:
             errors.append("Invalid genomic distance")
         return errors
 
-    def export_mappings(self) -> dict[str, list[dict[str, Any]]]:
+    def export_mappings(self) -> dict[str, list[dict[str, JSONValue]]]:
         return {
-            gene_id: [link.__dict__ for link in links]
+            gene_id: [self._serialize_link(link) for link in links]
             for gene_id, links in self.gene_to_variants.items()
         }
 
@@ -117,7 +136,7 @@ class GeneVariantMapper:
         gene_start: int,
         gene_end: int,
         variant_pos: int,
-        _variant: Any | None = None,
+        _variant: VariantLike | None = None,
     ) -> GeneVariantRelationship | None:
         extended_start = gene_start - UPSTREAM_PADDING_BP
         extended_end = gene_end + DOWNSTREAM_PADDING_BP
@@ -142,6 +161,18 @@ class GeneVariantMapper:
         if variant_pos < gene_start:
             return gene_start - variant_pos
         return variant_pos - gene_end
+
+    @staticmethod
+    def _serialize_link(link: GeneVariantLink) -> dict[str, JSONValue]:
+        return {
+            "gene_id": link.gene_id,
+            "variant_id": link.variant_id,
+            "relationship_type": link.relationship_type.value,
+            "confidence_score": link.confidence_score,
+            "evidence_sources": list(link.evidence_sources),
+            "genomic_distance": link.genomic_distance,
+            "functional_impact": link.functional_impact,
+        }
 
 
 __all__ = ["GeneVariantLink", "GeneVariantMapper", "GeneVariantRelationship"]

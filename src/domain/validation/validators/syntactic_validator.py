@@ -8,7 +8,8 @@ requirements according to defined schemas and patterns.
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+
+from src.type_definitions.common import JSONObject
 
 from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
@@ -107,7 +108,7 @@ class SyntacticValidator:
 
     def validate_data_types(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
         schema: dict[str, type],
     ) -> ValidationResult:
         """Validate data types against schema."""
@@ -131,7 +132,7 @@ class SyntacticValidator:
 
     def validate_json_structure(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
         required_fields: list[str],
     ) -> ValidationResult:
         """Validate JSON structure has required fields."""

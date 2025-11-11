@@ -15,6 +15,9 @@ class MembershipRole(str, Enum):
     VIEWER = "viewer"
 
 
+UpdatePayload = dict[str, object]
+
+
 class ResearchSpaceMembership(BaseModel):
     """
     Domain entity representing a user's membership in a research space.
@@ -58,6 +61,10 @@ class ResearchSpaceMembership(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
+    def _clone_with_updates(self, updates: UpdatePayload) -> "ResearchSpaceMembership":
+        """Internal helper to maintain immutability with typed updates."""
+        return self.model_copy(update=updates)
+
     def has_permission(self, required_role: MembershipRole) -> bool:
         """
         Check if the member has the required role or higher.
@@ -99,19 +106,27 @@ class ResearchSpaceMembership(BaseModel):
 
     def with_role(self, role: MembershipRole) -> "ResearchSpaceMembership":
         """Return a new instance with updated role."""
-        return self.model_copy(update={"role": role, "updated_at": datetime.now(UTC)})
+        update_payload: UpdatePayload = {
+            "role": role,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def with_joined_at(self, joined_at: datetime) -> "ResearchSpaceMembership":
         """Return a new instance with joined_at set."""
-        return self.model_copy(
-            update={"joined_at": joined_at, "updated_at": datetime.now(UTC)},
-        )
+        update_payload: UpdatePayload = {
+            "joined_at": joined_at,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def with_status(self, *, is_active: bool) -> "ResearchSpaceMembership":
         """Return a new instance with updated active status."""
-        return self.model_copy(
-            update={"is_active": is_active, "updated_at": datetime.now(UTC)},
-        )
+        update_payload: UpdatePayload = {
+            "is_active": is_active,
+            "updated_at": datetime.now(UTC),
+        }
+        return self._clone_with_updates(update_payload)
 
     def is_pending_invitation(self) -> bool:
         """Check if this is a pending invitation."""

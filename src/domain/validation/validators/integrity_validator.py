@@ -6,7 +6,10 @@ and consistency between related entities.
 """
 
 from dataclasses import dataclass
-from typing import Any
+from typing import cast
+
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import as_str, list_of_strings
 
 from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
@@ -22,7 +25,7 @@ class IntegrityValidator:
 
     def validate_foreign_keys(
         self,
-        entity_data: dict[str, Any],
+        entity_data: JSONObject,
         entity_type: str,
         valid_references: dict[str, set[str]],
     ) -> ValidationResult:
@@ -42,45 +45,44 @@ class IntegrityValidator:
 
         expected_refs = fk_fields.get(entity_type, [])
         for ref_field in expected_refs:
-            if ref_field in entity_data:
-                references = entity_data[ref_field]
-                if isinstance(references, list):
-                    for ref in references:
-                        if ref_field.replace("_references", "s") in valid_references:
-                            valid_set = valid_references[
-                                ref_field.replace("_references", "s")
-                            ]
-                            if ref not in valid_set:
-                                issues.append(
-                                    ValidationIssue(
-                                        field=ref_field,
-                                        value=ref,
-                                        rule="foreign_key_integrity",
-                                        message=f"Reference '{ref}' not found in {ref_field.replace('_references', 's')}",
-                                        severity=ValidationSeverity.ERROR,
-                                    ),
-                                )
+            references = list_of_strings(entity_data.get(ref_field))
+            if references:
+                reference_collection = ref_field.replace("_references", "s")
+                valid_set = valid_references.get(reference_collection)
+                if not valid_set:
+                    continue
+                for ref in references:
+                    if ref not in valid_set:
+                        issues.append(
+                            ValidationIssue(
+                                field=ref_field,
+                                value=ref,
+                                rule="foreign_key_integrity",
+                                message=f"Reference '{ref}' not found in {reference_collection}",
+                                severity=ValidationSeverity.ERROR,
+                            ),
+                        )
 
         return ValidationResult(is_valid=len(issues) == 0, issues=issues)
 
     def validate_relationship_consistency(
         self,
-        entity_data: dict[str, Any],
+        entity_data: JSONObject,
         entity_type: str,
-        related_entities: dict[str, Any],
+        related_entities: dict[str, dict[str, JSONObject]],
     ) -> ValidationResult:
         """Validate consistency between bidirectional relationships."""
         issues = []
 
         if entity_type == "gene":
             # Check that variants reference this gene
-            gene_id = entity_data.get("gene_id")
+            gene_id = as_str(entity_data.get("gene_id")) or ""
             if gene_id:
-                variant_refs = entity_data.get("variant_references", [])
+                variant_refs = list_of_strings(entity_data.get("variant_references"))
                 for variant_id in variant_refs:
                     variant_data = related_entities.get("variants", {}).get(variant_id)
                     if variant_data:
-                        gene_refs = variant_data.get("gene_references", [])
+                        gene_refs = list_of_strings(variant_data.get("gene_references"))
                         if gene_id not in gene_refs:
                             issues.append(
                                 ValidationIssue(
@@ -94,13 +96,15 @@ class IntegrityValidator:
 
         elif entity_type == "variant":
             # Check that genes reference this variant
-            variant_id = entity_data.get("variant_id")
+            variant_id = as_str(entity_data.get("variant_id")) or ""
             if variant_id:
-                gene_refs = entity_data.get("gene_references", [])
+                gene_refs = list_of_strings(entity_data.get("gene_references"))
                 for gene_id in gene_refs:
                     gene_data = related_entities.get("genes", {}).get(gene_id)
                     if gene_data:
-                        variant_refs = gene_data.get("variant_references", [])
+                        variant_refs = list_of_strings(
+                            gene_data.get("variant_references"),
+                        )
                         if variant_id not in variant_refs:
                             issues.append(
                                 ValidationIssue(
@@ -116,14 +120,14 @@ class IntegrityValidator:
 
     def validate_no_orphaned_records(
         self,
-        entity_data: dict[str, Any],
+        entity_data: JSONObject,
         entity_type: str,
-        _all_entities: dict[str, Any],
+        _all_entities: dict[str, dict[str, JSONObject]],
     ) -> ValidationResult:
         """Validate that entity is referenced by at least one other entity."""
         issues = []
 
-        entity_id = entity_data.get(f"{entity_type}_id")
+        entity_id = as_str(entity_data.get(f"{entity_type}_id"))
         if not entity_id:
             return ValidationResult(
                 is_valid=True,
@@ -136,36 +140,40 @@ class IntegrityValidator:
         if entity_type == "gene":
             # Check if gene is referenced by variants or phenotypes
             for variant in _all_entities.get("variants", {}).values():
-                if entity_id in variant.get("gene_references", []):
+                if entity_id in list_of_strings(variant.get("gene_references")):
                     is_referenced = True
                     break
             if not is_referenced:
                 for phenotype in _all_entities.get("phenotypes", {}).values():
-                    if entity_id in phenotype.get("gene_references", []):
+                    if entity_id in list_of_strings(phenotype.get("gene_references")):
                         is_referenced = True
                         break
 
         elif entity_type == "variant":
             # Check if variant is referenced by genes or evidence
             for gene in _all_entities.get("genes", {}).values():
-                if entity_id in gene.get("variant_references", []):
+                if entity_id in list_of_strings(gene.get("variant_references")):
                     is_referenced = True
                     break
             if not is_referenced:
                 for evidence in _all_entities.get("evidence", {}).values():
-                    if entity_id in evidence.get("variant_references", []):
+                    if entity_id in list_of_strings(
+                        evidence.get("variant_references"),
+                    ):
                         is_referenced = True
                         break
 
         elif entity_type == "phenotype":
             # Check if phenotype is referenced by genes or evidence
             for gene in _all_entities.get("genes", {}).values():
-                if entity_id in gene.get("phenotype_references", []):
+                if entity_id in list_of_strings(gene.get("phenotype_references")):
                     is_referenced = True
                     break
             if not is_referenced:
                 for evidence in _all_entities.get("evidence", {}).values():
-                    if entity_id in evidence.get("phenotype_references", []):
+                    if entity_id in list_of_strings(
+                        evidence.get("phenotype_references"),
+                    ):
                         is_referenced = True
                         break
 
@@ -184,9 +192,9 @@ class IntegrityValidator:
 
     def validate_unique_constraints(
         self,
-        entity_data: dict[str, Any],
+        entity_data: JSONObject,
         entity_type: str,
-        existing_entities: dict[str, Any],
+        existing_entities: dict[str, dict[str, JSONObject]],
     ) -> ValidationResult:
         """Validate unique constraints across entities."""
         issues = []
@@ -226,28 +234,28 @@ class IntegrityValidator:
 
     def validate_circular_references(
         self,
-        entity_data: dict[str, Any],
+        entity_data: JSONObject,
         entity_type: str,
-        _all_entities: dict[str, Any],
+        _all_entities: dict[str, dict[str, JSONObject]],
     ) -> ValidationResult:
         """Validate that there are no circular reference chains."""
         issues = []
 
         # This is a simplified check - full circular reference detection
         # would require graph traversal algorithms
-        entity_id = entity_data.get(f"{entity_type}_id")
+        entity_id = as_str(entity_data.get(f"{entity_type}_id"))
         if not entity_id:
             return ValidationResult(is_valid=True, issues=[])
 
         # Basic check: ensure entity doesn't reference itself
         ref_fields = ["gene_references", "variant_references", "phenotype_references"]
         for field in ref_fields:
-            refs = entity_data.get(field, [])
-            if isinstance(refs, list) and entity_id in refs:
+            refs = list_of_strings(entity_data.get(field))
+            if entity_id in refs:
                 issues.append(
                     ValidationIssue(
                         field=field,
-                        value=refs,
+                        value=cast("JSONValue", list(refs)),
                         rule="circular_reference",
                         message=f"Entity {entity_id} cannot reference itself",
                         severity=ValidationSeverity.ERROR,

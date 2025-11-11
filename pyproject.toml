@@ -50,9 +50,13 @@ disallow_any_unimported = false
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = [ "src.domain.transform.*", "src.domain.validation.*", "src.application.packaging.*", "src.application.curation.*", "src.infrastructure.validation.api_response_validator",]
+module = [ "src.type_definitions.json_utils", "src.application.packaging.*",]
 disallow_any_expr = false
-disallow_any_generics = false
+
+[[tool.mypy.overrides]]
+module = [ "src.domain.events.*", "src.domain.entities.*", "src.type_definitions.domain",]
+disallow_any_expr = true
+
 
 [tool.flake8]
 max-line-length = 88
