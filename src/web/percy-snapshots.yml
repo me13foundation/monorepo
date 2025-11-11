@@ -1,4 +1,3 @@
-version: 2
 snapshots:
   - name: Landing Page
     url: /

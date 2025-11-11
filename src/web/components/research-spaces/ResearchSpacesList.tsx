@@ -25,7 +25,7 @@ export function ResearchSpacesList() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -36,24 +36,24 @@ export function ResearchSpacesList() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Research Spaces</h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="mt-1 text-muted-foreground">
               Manage your research workspaces and teams
             </p>
           </div>
           <Button asChild>
             <Link href="/spaces/new">
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 size-4" />
               Create Space
             </Link>
           </Button>
         </div>
         <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
-          <p className="text-sm text-destructive mb-4">
+          <p className="mb-4 text-sm text-destructive">
             Failed to load research spaces: {error.message}
           </p>
           <Button asChild>
             <Link href="/spaces/new">
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="mr-2 size-4" />
               Create Your First Space
             </Link>
           </Button>
@@ -67,13 +67,13 @@ export function ResearchSpacesList() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Research Spaces</h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="mt-1 text-muted-foreground">
             Manage your research workspaces and teams
           </p>
         </div>
         <Button asChild>
           <Link href="/spaces/new">
-            <Plus className="h-4 w-4 mr-2" />
+            <Plus className="mr-2 size-4" />
             Create Space
           </Link>
         </Button>
@@ -92,7 +92,7 @@ export function ResearchSpacesList() {
 
       {filteredSpaces && filteredSpaces.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
-          <p className="text-muted-foreground mb-4">
+          <p className="mb-4 text-muted-foreground">
             {searchQuery
               ? 'No spaces match your search.'
               : 'No research spaces found.'}
@@ -100,7 +100,7 @@ export function ResearchSpacesList() {
           {!searchQuery && (
             <Button asChild>
               <Link href="/spaces/new">
-                <Plus className="h-4 w-4 mr-2" />
+                <Plus className="mr-2 size-4" />
                 Create your first space
               </Link>
             </Button>

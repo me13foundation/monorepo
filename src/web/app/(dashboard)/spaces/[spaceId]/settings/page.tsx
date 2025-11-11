@@ -24,7 +24,7 @@ export default function SpaceSettingsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -33,7 +33,7 @@ export default function SpaceSettingsPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Space Settings</h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="mt-1 text-muted-foreground">
           Configure settings for {spaceData?.name || 'this research space'}
         </p>
       </div>
@@ -41,7 +41,7 @@ export default function SpaceSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
+            <Settings className="size-5" />
             General Settings
           </CardTitle>
           <CardDescription>
@@ -52,21 +52,21 @@ export default function SpaceSettingsPage() {
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium">Space Name</label>
-              <p className="text-sm text-muted-foreground mt-1">{spaceData?.name}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{spaceData?.name}</p>
             </div>
             <div>
               <label className="text-sm font-medium">Slug</label>
-              <p className="text-sm text-muted-foreground mt-1 font-mono">{spaceData?.slug}</p>
+              <p className="mt-1 font-mono text-sm text-muted-foreground">{spaceData?.slug}</p>
             </div>
             {spaceData?.description && (
               <div>
                 <label className="text-sm font-medium">Description</label>
-                <p className="text-sm text-muted-foreground mt-1">{spaceData.description}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{spaceData.description}</p>
               </div>
             )}
             <div>
               <label className="text-sm font-medium">Status</label>
-              <p className="text-sm text-muted-foreground mt-1 capitalize">{spaceData?.status}</p>
+              <p className="mt-1 text-sm capitalize text-muted-foreground">{spaceData?.status}</p>
             </div>
           </div>
         </CardContent>

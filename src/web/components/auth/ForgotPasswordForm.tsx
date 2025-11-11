@@ -49,7 +49,7 @@ export function ForgotPasswordForm({ onSubmit, isLoading }: ForgotPasswordFormPr
       </div>
 
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
         Send Reset Link
       </Button>
     </form>

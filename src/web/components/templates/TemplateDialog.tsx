@@ -162,7 +162,7 @@ export function TemplateDialog({
                 </FormItem>
               )}
             />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="category"
@@ -170,7 +170,7 @@ export function TemplateDialog({
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <FormControl>
-                      <select {...field} className="border rounded-md px-3 py-2 text-sm">
+                      <select {...field} className="rounded-md border px-3 py-2 text-sm">
                         {templateCategories.map((cat) => (
                           <option key={cat} value={cat}>
                             {cat.replace('_', ' ')}
@@ -189,7 +189,7 @@ export function TemplateDialog({
                   <FormItem>
                     <FormLabel>Source Type</FormLabel>
                     <FormControl>
-                      <select {...field} className="border rounded-md px-3 py-2 text-sm">
+                      <select {...field} className="rounded-md border px-3 py-2 text-sm">
                         {templateSourceTypes.map((type) => (
                           <option key={type} value={type}>
                             {type.replace('_', ' ')}
@@ -237,7 +237,7 @@ export function TemplateDialog({
                     type="checkbox"
                     checked={field.value}
                     onChange={(event) => field.onChange(event.target.checked)}
-                    className="h-4 w-4 rounded border"
+                    className="size-4 rounded border"
                   />
                   <FormLabel className="!mt-0">Public template</FormLabel>
                 </FormItem>
@@ -249,7 +249,7 @@ export function TemplateDialog({
                 Cancel
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {form.formState.isSubmitting && <Loader2 className="mr-2 size-4 animate-spin" />}
                 {mode === 'create' ? 'Create Template' : 'Save Changes'}
               </Button>
             </DialogFooter>

@@ -39,7 +39,7 @@
   --secondary-foreground: 0 0% 18%;
   --muted: 0 0% 96%;
   --muted-foreground: 0 0% 45%;
-  --accent: 43 100% 96%;               /* Sunlight Yellow - Hope & optimism */
+  --accent: 43 100% 70%;               /* Sunlight Yellow - Hope & optimism */
   --accent-foreground: 0 0% 18%;
   --destructive: 15 74% 63%;
   --destructive-foreground: 0 0% 100%;
@@ -198,6 +198,11 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
   }
 }
 
@@ -220,7 +225,7 @@
     content: "";
     pointer-events: none;
     position: absolute;
-    inset: 0px;
+    inset: 0;
     border-radius: inherit;
     z-index: -1;
   }
@@ -248,7 +253,7 @@
     content: "";
     pointer-events: none;
     position: absolute;
-    inset: 0px;
+    inset: 0;
     border-radius: inherit;
     z-index: 999;
   }
@@ -266,8 +271,7 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after,
   .border.active-elevate:not(.no-active-interaction-elevate)::after,
   .border.hover-elevate-2:not(.no-hover-interaction-elevate)::after,
-  .border.active-elevate-2:not(.no-active-interaction-elevate)::after,
-  .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
+  .border.active-elevate-2:not(.no-active-interaction-elevate)::after {
     inset: -1px;
   }
 }

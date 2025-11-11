@@ -25,11 +25,11 @@ export function ParameterBar({ parameters, onParametersChange }: ParameterBarPro
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-card/50 rounded-lg border border-border">
+    <div className="mb-6 grid grid-cols-1 gap-4 rounded-lg border border-border bg-card/50 p-4 md:grid-cols-2">
       <div>
         <Label
           htmlFor="geneSymbol"
-          className="block text-sm font-medium text-foreground mb-1"
+          className="mb-1 block text-sm font-medium text-foreground"
         >
           Gene Symbol
         </Label>
@@ -46,7 +46,7 @@ export function ParameterBar({ parameters, onParametersChange }: ParameterBarPro
       <div>
         <Label
           htmlFor="searchTerm"
-          className="block text-sm font-medium text-foreground mb-1"
+          className="mb-1 block text-sm font-medium text-foreground"
         >
           Phenotype / Search Term
         </Label>

@@ -47,10 +47,10 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-primary/8 via-background to-brand-secondary/8 px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-heading font-bold text-foreground">
+        <div className="mb-8 text-center">
+          <h1 className="font-heading text-3xl font-bold text-foreground">
             MED13 Admin
           </h1>
           <p className="mt-2 text-muted-foreground">
@@ -68,14 +68,14 @@ export default function ForgotPasswordPage() {
           <CardContent>
             {error && (
               <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="h-4 w-4" />
+                <AlertCircle className="size-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
             {success && (
               <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-                <CheckCircle className="h-4 w-4" />
+                <CheckCircle className="size-4" />
                 <AlertDescription>{success}</AlertDescription>
               </Alert>
             )}

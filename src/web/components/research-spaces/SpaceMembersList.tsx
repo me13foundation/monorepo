@@ -55,7 +55,7 @@ export function SpaceMembersList({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -75,13 +75,13 @@ export function SpaceMembersList({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold tracking-tight">Members</h2>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             {memberships.length} member{memberships.length !== 1 ? 's' : ''}
           </p>
         </div>
         {canManage && onInvite && (
           <Button onClick={onInvite}>
-            <UserPlus className="h-4 w-4 mr-2" />
+            <UserPlus className="mr-2 size-4" />
             Invite Member
           </Button>
         )}
@@ -89,10 +89,10 @@ export function SpaceMembersList({
 
       {memberships.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
-          <p className="text-muted-foreground mb-4">No members yet.</p>
+          <p className="mb-4 text-muted-foreground">No members yet.</p>
           {canManage && onInvite && (
             <Button onClick={onInvite} variant="outline">
-              <UserPlus className="h-4 w-4 mr-2" />
+              <UserPlus className="mr-2 size-4" />
               Invite your first member
             </Button>
           )}
@@ -127,13 +127,13 @@ export function SpaceMembersList({
                   </TableCell>
                   <TableCell>
                     {membership.is_active ? (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                      <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
                         Active
                       </Badge>
                     ) : membership.joined_at ? (
                       <Badge variant="outline">Inactive</Badge>
                     ) : (
-                      <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                      <Badge variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-700">
                         Pending
                       </Badge>
                     )}

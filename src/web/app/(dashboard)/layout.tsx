@@ -17,7 +17,7 @@ export default function DashboardLayout({
         <div className="min-h-screen bg-background">
           <Header />
           <SpaceNavigation />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <Breadcrumbs />
             {children}
           </main>

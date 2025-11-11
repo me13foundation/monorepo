@@ -11,8 +11,8 @@ interface FloatingActionBarProps {
 
 export function FloatingActionBar({ selectedCount, onGenerate, isGenerating = false }: FloatingActionBarProps) {
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-sm border-t border-border p-4">
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
+    <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/80 p-4 backdrop-blur-sm">
+      <div className="mx-auto flex max-w-7xl items-center justify-between">
         <div className="text-sm font-medium text-foreground">
           <span
             className={`font-bold ${
@@ -29,7 +29,7 @@ export function FloatingActionBar({ selectedCount, onGenerate, isGenerating = fa
 
         <Button onClick={onGenerate} disabled={selectedCount === 0 || isGenerating} size="lg" className="flex items-center space-x-2 shadow-lg">
           <span>{isGenerating ? 'Generating...' : 'Generate Results'}</span>
-          <Search className={`w-4 h-4 ${isGenerating ? 'animate-pulse' : ''}`} />
+          <Search className={`size-4 ${isGenerating ? 'animate-pulse' : ''}`} />
         </Button>
       </div>
     </div>

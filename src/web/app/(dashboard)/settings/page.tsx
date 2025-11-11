@@ -35,7 +35,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <User className="h-5 w-5" />
+                <User className="size-5" />
                 <CardTitle>Profile</CardTitle>
               </div>
               <CardDescription>
@@ -81,7 +81,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
+                <Bell className="size-5" />
                 <CardTitle>Notifications</CardTitle>
               </div>
               <CardDescription>
@@ -99,7 +99,7 @@ export default function SettingsPage() {
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="size-4 rounded border-gray-300"
                 />
               </div>
               <div className="flex items-center justify-between">
@@ -112,7 +112,7 @@ export default function SettingsPage() {
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="size-4 rounded border-gray-300"
                 />
               </div>
             </CardContent>
@@ -122,7 +122,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
+                <Shield className="size-5" />
                 <CardTitle>Security</CardTitle>
               </div>
               <CardDescription>
@@ -161,7 +161,7 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
+                <Settings className="size-5" />
                 <CardTitle>Application</CardTitle>
               </div>
               <CardDescription>
@@ -204,12 +204,12 @@ export default function SettingsPage() {
         <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
             <>
-              <Settings className="h-4 w-4 mr-2 animate-spin" />
+              <Settings className="mr-2 size-4 animate-spin" />
               Saving...
             </>
           ) : (
             <>
-              <Save className="h-4 w-4 mr-2" />
+              <Save className="mr-2 size-4" />
               Save Changes
             </>
           )}

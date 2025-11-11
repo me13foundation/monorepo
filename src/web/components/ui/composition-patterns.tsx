@@ -25,7 +25,7 @@ export function StatCard({
   return (
     <Card className="h-full shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-heading font-medium">{title}</CardTitle>
+        <CardTitle className="font-heading text-sm font-medium">{title}</CardTitle>
         {icon}
       </CardHeader>
       <CardContent>
@@ -33,7 +33,7 @@ export function StatCard({
           {isLoading ? <span className="text-muted-foreground">—</span> : value}
         </div>
         {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         )}
         {footer && <div className="mt-3">{footer}</div>}
       </CardContent>
@@ -66,7 +66,7 @@ export function DashboardSection({
               <CardDescription>{description}</CardDescription>
             )}
           </div>
-          {actions && <div className="flex-shrink-0">{actions}</div>}
+          {actions && <div className="shrink-0">{actions}</div>}
         </div>
       </CardHeader>
       <CardContent>{children}</CardContent>
@@ -76,7 +76,7 @@ export function DashboardSection({
 
 export function SectionGrid({ children }: { children: ReactNode }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+    <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
       {children}
     </div>
   )
@@ -115,15 +115,15 @@ export function PageHero({
               {eyebrow}
             </p>
           )}
-          <h1 className="text-2xl sm:text-3xl font-heading font-bold">{title}</h1>
+          <h1 className="font-heading text-2xl font-bold sm:text-3xl">{title}</h1>
           {description && (
-            <p className="text-sm sm:text-base text-muted-foreground mt-2 max-w-2xl">
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
               {description}
             </p>
           )}
         </div>
         {actions && (
-          <div className="flex-shrink-0">
+          <div className="shrink-0">
             {actions}
           </div>
         )}

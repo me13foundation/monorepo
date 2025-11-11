@@ -64,6 +64,20 @@ npm run visual-test       # Percy-powered visual regression suite (requires PERC
 - **Accessibility**: WCAG AA compliance with semantic HTML and ARIA
 - **Performance**: Optimized with React.memo, lazy loading, and code splitting
 
+### ✅ **CSS Architecture & Token Management**
+- **Single Source of Truth**: Global tokens live in `src/web/app/globals.css` inside `@layer base`. Update colors/spacing/shadows there first, then mirror the token in `src/web/tailwind.config.ts` so utility classes and CSS variables never diverge.
+- **Layering Rules**: Base typography/resets sit in `@layer base`, component-level overrides belong in `@layer components`, and one-off utilities go in `@layer utilities`. Avoid inline `<style>` blocks—extend Tailwind or create a co-located `styles.ts` helper when necessary.
+- **Design Token Usage**: Components reference tokens through Tailwind utilities (`bg-brand-primary`, `shadow-brand-md`) or `class-variance-authority` variants. No raw hex values or pixel shadows in JSX—everything must defer to the documented design tokens.
+- **Theming**: Dark mode relies on `next-themes` toggling the `.dark` class. Any new token requires both light and dark values defined side-by-side in `globals.css`.
+- **shadcn/ui Extensions**: Regenerate components with `pnpm dlx shadcn-ui@latest add <component>` into `src/web/components/ui/`, then wrap project-specific variants in `/components/shared/`. Keep brand-specific classes in those wrappers, not inside vendor files, so upstream updates stay painless.
+- **Scoped Styling**: If a feature needs bespoke styles, add a CSS module or recipe under `src/web/styles/<feature>.css` and import it into the relevant component. Avoid scattering bespoke Tailwind class strings when multiple components share the same pattern—extract a utility instead.
+
+### ✅ **CSS Quality & Tooling Expectations**
+- **Linting**: `npm run lint` (with `eslint-plugin-tailwindcss`) enforces JSX/Tailwind class ordering, while `npm run lint:styles` runs Stylelint with the Tailwind-aware config to guard tokens, `@layer` usage, and property ordering.
+- **Class Hygiene**: Use `tailwind-merge`/`clsx` helpers (already installed) to prevent conflicting utility stacks and to keep class strings deterministic for Percy snapshots.
+- **Visual Regression**: Treat `npm run visual-test` as mandatory whenever token values change; Percy catches unintended color/spacing shifts.
+- **Documentation Sync**: Any change to tokens, spacing, or interaction states must be reflected in `docs/frontend/design_gidelines.md` and linked in the PR description so the design <> implementation contract stays tight.
+
 ### ✅ **State Management Strategy - ESTABLISHED**
 - **Server State**: React Query for API data with caching and synchronization
 - **Client State**: React hooks with proper state management patterns

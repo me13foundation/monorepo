@@ -93,7 +93,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -110,7 +110,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <div className="flex items-center gap-3 mb-2">
+          <div className="mb-2 flex items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight">{spaceData.name}</h1>
             <Badge
               className={cn(
@@ -122,12 +122,12 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
             </Badge>
           </div>
           <p className="text-muted-foreground">{spaceData.description}</p>
-          <p className="text-sm text-muted-foreground mt-1 font-mono">{spaceData.slug}</p>
+          <p className="mt-1 font-mono text-sm text-muted-foreground">{spaceData.slug}</p>
         </div>
         {canManage && (
           <div className="flex gap-2">
             <Button variant="outline" size="sm">
-              <Settings className="h-4 w-4 mr-2" />
+              <Settings className="mr-2 size-4" />
               Settings
             </Button>
             {userRole === MembershipRole.OWNER && (
@@ -137,7 +137,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
                 onClick={handleDeleteSpace}
                 disabled={deleteMutation.isPending}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
+                <Trash2 className="mr-2 size-4" />
                 Delete
               </Button>
             )}
@@ -149,7 +149,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="members">
-            <Users className="h-4 w-4 mr-2" />
+            <Users className="mr-2 size-4" />
             Members
           </TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -171,7 +171,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
               </div>
               {spaceData.tags.length > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Tags</p>
+                  <p className="mb-2 text-sm font-medium text-muted-foreground">Tags</p>
                   <div className="flex flex-wrap gap-2">
                     {spaceData.tags.map((tag) => (
                       <Badge key={tag} variant="outline">

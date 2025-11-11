@@ -27,9 +27,9 @@ export function UserMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="relative h-9 w-9 rounded-full hover:bg-accent border border-border p-0">
-          <div className="flex h-full w-full items-center justify-center rounded-full bg-primary/10">
-            <User className="h-4 w-4 text-primary" />
+        <Button variant="ghost" size="sm" className="relative size-9 rounded-full border border-border p-0 hover:bg-accent">
+          <div className="flex size-full items-center justify-center rounded-full bg-primary/10">
+            <User className="size-4 text-primary" />
           </div>
           <span className="sr-only">Open user menu</span>
         </Button>
@@ -45,7 +45,7 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link href="/settings" className="cursor-pointer">
-            <Settings className="mr-2 h-4 w-4" />
+            <Settings className="mr-2 size-4" />
             <span>Settings</span>
           </Link>
         </DropdownMenuItem>
@@ -56,12 +56,12 @@ export function UserMenu() {
         >
           {theme === 'light' ? (
             <>
-              <Moon className="mr-2 h-4 w-4" />
+              <Moon className="mr-2 size-4" />
               <span>Dark mode</span>
             </>
           ) : (
             <>
-              <Sun className="mr-2 h-4 w-4" />
+              <Sun className="mr-2 size-4" />
               <span>Light mode</span>
             </>
           )}
@@ -74,12 +74,12 @@ export function UserMenu() {
         >
           {isSigningOut ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 size-4 animate-spin" />
               <span>Signing out...</span>
             </>
           ) : (
             <>
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="mr-2 size-4" />
               <span>Sign out</span>
             </>
           )}

@@ -26,7 +26,7 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
   if (isLoading) {
     return (
       <Button variant="outline" disabled>
-        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+        <Loader2 className="mr-2 size-4 animate-spin" />
         <span className="text-sm">Loading...</span>
       </Button>
     )
@@ -35,9 +35,9 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
   if (spaces.length === 0) {
     return (
       <Button variant="outline" onClick={() => setModalOpen(true)}>
-        <Folder className="h-4 w-4 mr-2" />
+        <Folder className="mr-2 size-4" />
         <span className="text-sm">No spaces</span>
-        <ChevronDown className="h-4 w-4 ml-2" />
+        <ChevronDown className="ml-2 size-4" />
       </Button>
     )
   }
@@ -47,22 +47,22 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
       <Button
         variant="outline"
         onClick={() => setModalOpen(true)}
-        className="w-full sm:w-auto sm:min-w-[200px] justify-between"
+        className="w-full justify-between sm:w-auto sm:min-w-[200px]"
       >
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Folder className="h-4 w-4 flex-shrink-0" />
-          <div className="flex flex-col items-start flex-1 min-w-0">
-            <span className="text-sm font-medium truncate w-full">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Folder className="size-4 shrink-0" />
+          <div className="flex min-w-0 flex-1 flex-col items-start">
+            <span className="w-full truncate text-sm font-medium">
               {currentSpace?.name || 'Select a space'}
             </span>
             {currentSpace && (
-              <span className="text-xs text-muted-foreground font-mono truncate w-full hidden sm:block">
+              <span className="hidden w-full truncate font-mono text-xs text-muted-foreground sm:block">
                 {currentSpace.slug}
               </span>
             )}
           </div>
         </div>
-        <ChevronDown className="h-4 w-4 ml-2 flex-shrink-0" />
+        <ChevronDown className="ml-2 size-4 shrink-0" />
       </Button>
       <SpaceSelectorModal
         open={modalOpen}

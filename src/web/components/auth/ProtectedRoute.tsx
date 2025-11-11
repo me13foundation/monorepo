@@ -38,9 +38,9 @@ export function ProtectedRoute({
   // Show loading spinner while checking authentication
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="size-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -50,9 +50,9 @@ export function ProtectedRoute({
   // Don't render anything if not authenticated - redirect is happening
   if (!session) {
     return fallback || (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="size-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Redirecting to login...</p>
         </div>
       </div>
@@ -62,9 +62,9 @@ export function ProtectedRoute({
   // Check role permissions
   if (requiredRole && session.user?.role !== requiredRole) {
     return fallback || (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="size-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Checking permissions...</p>
         </div>
       </div>

@@ -10,23 +10,23 @@ export function Header() {
   const { currentSpaceId } = useSpaceContext()
 
   return (
-    <header className="bg-card shadow-sm border-b border-border sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center py-4 gap-3 sm:gap-0">
-          <div className="flex items-center gap-3 sm:gap-6 min-w-0 flex-1">
-            <Link href="/dashboard" className="flex items-center gap-2 flex-shrink-0">
-              <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6" />
-              <span className="text-lg sm:text-xl font-bold">MED13 Admin</span>
+    <header className="sticky top-0 z-50 border-b border-border bg-card shadow-sm">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+          <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-6">
+            <Link href="/dashboard" className="flex shrink-0 items-center gap-2">
+              <LayoutDashboard className="size-5 sm:size-6" />
+              <span className="text-lg font-bold sm:text-xl">MED13 Admin</span>
             </Link>
-            <Link href="/data-discovery" className="flex items-center gap-2 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors">
-              <Library className="h-5 w-5 sm:h-6 sm:w-6" />
-              <span className="text-sm sm:text-base font-medium">Data Discovery</span>
+            <Link href="/data-discovery" className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
+              <Library className="size-5 sm:size-6" />
+              <span className="text-sm font-medium sm:text-base">Data Discovery</span>
             </Link>
-            <Link href="/templates" className="flex items-center gap-2 flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors">
-              <Files className="h-5 w-5 sm:h-6 sm:w-6" />
-              <span className="text-sm sm:text-base font-medium">Templates</span>
+            <Link href="/templates" className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
+              <Files className="size-5 sm:size-6" />
+              <span className="text-sm font-medium sm:text-base">Templates</span>
             </Link>
-            <div className="min-w-0 flex-1 max-w-xs">
+            <div className="min-w-0 max-w-xs flex-1">
               <SpaceSelector currentSpaceId={currentSpaceId || undefined} />
             </div>
           </div>

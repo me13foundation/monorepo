@@ -43,11 +43,11 @@ export function ResearchSpaceCard({
   onSettings,
 }: ResearchSpaceCardProps) {
   return (
-    <Card className="hover:shadow-lg transition-shadow">
+    <Card className="transition-shadow hover:shadow-lg">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <CardTitle className="text-xl mb-2">
+            <CardTitle className="mb-2 text-xl">
               <Link
                 href={`/spaces/${space.id}`}
                 className="hover:underline"
@@ -77,12 +77,12 @@ export function ResearchSpaceCard({
           </div>
           {memberCount !== undefined && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Users className="h-4 w-4" />
+              <Users className="size-4" />
               <span>{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
             </div>
           )}
           {space.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
+            <div className="mt-2 flex flex-wrap gap-1">
               {space.tags.slice(0, 3).map((tag) => (
                 <Badge key={tag} variant="outline" className="text-xs">
                   {tag}
@@ -112,7 +112,7 @@ export function ResearchSpaceCard({
             size="sm"
             onClick={() => onManage(space.id)}
           >
-            <Users className="h-4 w-4 mr-1" />
+            <Users className="mr-1 size-4" />
             Members
           </Button>
         )}
@@ -122,7 +122,7 @@ export function ResearchSpaceCard({
             size="sm"
             onClick={() => onSettings(space.id)}
           >
-            <Settings className="h-4 w-4" />
+            <Settings className="size-4" />
           </Button>
         )}
       </CardFooter>

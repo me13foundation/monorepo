@@ -39,7 +39,7 @@ export default function SpaceCurationPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -49,25 +49,25 @@ export default function SpaceCurationPage() {
       title: 'Pending Review',
       value: statsData?.pending ?? 0,
       description: 'Items awaiting review',
-      icon: <Clock className="h-4 w-4 text-muted-foreground" />,
+      icon: <Clock className="size-4 text-muted-foreground" />,
     },
     {
       title: 'Approved',
       value: statsData?.approved ?? 0,
       description: 'Approved items',
-      icon: <CheckCircle2 className="h-4 w-4 text-muted-foreground" />,
+      icon: <CheckCircle2 className="size-4 text-muted-foreground" />,
     },
     {
       title: 'Rejected',
       value: statsData?.rejected ?? 0,
       description: 'Rejected items',
-      icon: <AlertCircle className="h-4 w-4 text-muted-foreground" />,
+      icon: <AlertCircle className="size-4 text-muted-foreground" />,
     },
     {
       title: 'Total Curated',
       value: statsData?.total ?? 0,
       description: 'All curated submissions',
-      icon: <FileText className="h-4 w-4 text-muted-foreground" />,
+      icon: <FileText className="size-4 text-muted-foreground" />,
     },
   ]
 
@@ -103,14 +103,14 @@ export default function SpaceCurationPage() {
       >
         {queueLoading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
         ) : queueData && queueData.items.length > 0 ? (
           <div className="space-y-4">
             {queueData.items.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex items-center justify-between rounded-lg border p-4"
               >
                 <div className="flex-1">
                   <div className="font-medium">
@@ -130,10 +130,10 @@ export default function SpaceCurationPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No curation items yet</h3>
-            <p className="text-muted-foreground mb-4">
+          <div className="py-12 text-center">
+            <FileText className="mx-auto mb-4 size-12 text-muted-foreground" />
+            <h3 className="mb-2 text-lg font-semibold">No curation items yet</h3>
+            <p className="mb-4 text-muted-foreground">
               Start curating data by connecting data sources and reviewing imported items.
             </p>
           </div>

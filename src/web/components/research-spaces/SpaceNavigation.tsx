@@ -64,9 +64,9 @@ export function SpaceNavigation() {
 
   return (
     <nav className="border-b border-border bg-card">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex overflow-x-auto">
-          <div className="flex space-x-1 min-w-0">
+          <div className="flex min-w-0 space-x-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
               const Icon = item.icon
@@ -85,7 +85,7 @@ export function SpaceNavigation() {
                   )}
                   title={item.description}
                 >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
+                  <Icon className="size-4 shrink-0" />
                   <span className="hidden sm:inline">{item.label}</span>
                   <span className="sm:hidden">{item.label.split(' ')[0]}</span>
                 </Link>

@@ -117,9 +117,9 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
             disabled={isLoading}
           >
             {showPassword ? (
-              <EyeOff className="h-4 w-4" />
+              <EyeOff className="size-4" />
             ) : (
-              <Eye className="h-4 w-4" />
+              <Eye className="size-4" />
             )}
           </Button>
         </div>
@@ -147,9 +147,9 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
             disabled={isLoading}
           >
             {showConfirmPassword ? (
-              <EyeOff className="h-4 w-4" />
+              <EyeOff className="size-4" />
             ) : (
-              <Eye className="h-4 w-4" />
+              <Eye className="size-4" />
             )}
           </Button>
         </div>
@@ -159,7 +159,7 @@ export function RegisterForm({ onSubmit, isLoading }: RegisterFormProps) {
       </div>
 
       <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
         Create Account
       </Button>
     </form>

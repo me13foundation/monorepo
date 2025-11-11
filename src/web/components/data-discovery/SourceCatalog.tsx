@@ -168,12 +168,12 @@ export function SourceCatalog({
   if (!session?.user?.access_token) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-center max-w-md">
-          <LogIn className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-semibold text-foreground mb-2">
+        <div className="max-w-md text-center">
+          <LogIn className="mx-auto mb-4 size-12 text-muted-foreground" />
+          <h3 className="mb-2 text-lg font-semibold text-foreground">
             Authentication Required
           </h3>
-          <p className="text-muted-foreground mb-4">
+          <p className="mb-4 text-muted-foreground">
             You need to be logged in to access the data source catalog.
           </p>
           <Button asChild>
@@ -189,7 +189,7 @@ export function SourceCatalog({
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <Loader2 className="mx-auto mb-4 size-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading data sources...</p>
         </div>
       </div>
@@ -200,7 +200,7 @@ export function SourceCatalog({
   if (error) {
     return (
       <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
+        <AlertCircle className="size-4" />
         <AlertDescription>
           Failed to load data sources. Please try refreshing the page.
         </AlertDescription>
@@ -209,20 +209,20 @@ export function SourceCatalog({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
       {/* Filter Sidebar */}
-      <div className="lg:col-span-1 min-w-0 overflow-hidden">
+      <div className="min-w-0 overflow-hidden lg:col-span-1">
         <Button
           variant="outline"
           onClick={() => setShowFilters(!showFilters)}
-          className="lg:hidden w-full flex items-center justify-between mb-4"
+          className="mb-4 flex w-full items-center justify-between lg:hidden"
         >
           <span className="font-medium">Filter Categories</span>
-          <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`size-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
         </Button>
 
-        <div className={`${showFilters ? 'block' : 'hidden'} lg:block min-w-0`}>
-          <h2 className="text-lg font-semibold mb-3 px-2 text-foreground">Categories</h2>
+        <div className={`${showFilters ? 'block' : 'hidden'} min-w-0 lg:block`}>
+          <h2 className="mb-3 px-2 text-lg font-semibold text-foreground">Categories</h2>
           <div className="flex flex-col space-y-1">
             {CATEGORIES.map((category) => {
               const IconComponent = CATEGORY_ICONS[category] || Database
@@ -231,10 +231,10 @@ export function SourceCatalog({
                   key={category}
                   variant={activeCategory === category ? "default" : "ghost"}
                   onClick={() => setActiveCategory(category)}
-                  className="w-full justify-start h-auto py-2 px-3 min-w-0"
+                  className="h-auto w-full min-w-0 justify-start px-3 py-2"
                 >
-                  <IconComponent className="w-4 h-4 mr-2 flex-shrink-0" />
-                  <span className="text-left break-words whitespace-normal flex-1 min-w-0">{category}</span>
+                  <IconComponent className="mr-2 size-4 shrink-0" />
+                  <span className="min-w-0 flex-1 whitespace-normal break-words text-left">{category}</span>
                 </Button>
               )
             })}
@@ -245,7 +245,7 @@ export function SourceCatalog({
       {/* Source List */}
       <div className="lg:col-span-3">
         <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
             value={searchQuery}
@@ -255,7 +255,7 @@ export function SourceCatalog({
           />
         </div>
 
-        <div className="flex justify-between items-center mb-4">
+        <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-foreground">
             {activeCategory} ({filteredSources.length})
           </h2>
@@ -266,10 +266,10 @@ export function SourceCatalog({
             disabled={isBulkUpdating || filteredSources.length === 0}
             className="flex items-center space-x-2"
           >
-            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-              allInCategorySelected ? 'bg-primary border-primary' : 'border-muted-foreground'
+            <div className={`flex size-4 items-center justify-center rounded border-2 ${
+              allInCategorySelected ? 'border-primary bg-primary' : 'border-muted-foreground'
             }`}>
-              {allInCategorySelected && <Check className="w-3 h-3 text-primary-foreground" />}
+              {allInCategorySelected && <Check className="size-3 text-primary-foreground" />}
             </div>
             <span>
               {isBulkUpdating
@@ -281,7 +281,7 @@ export function SourceCatalog({
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {filteredSources.length > 0 ? (
             filteredSources.map((source) => (
               <SourceCard
@@ -292,8 +292,8 @@ export function SourceCatalog({
               />
             ))
           ) : (
-            <div className="md:col-span-2 text-center text-muted-foreground py-10">
-              <Filter className="w-12 h-12 mx-auto mb-4" />
+            <div className="py-10 text-center text-muted-foreground md:col-span-2">
+              <Filter className="mx-auto mb-4 size-12" />
               <h3 className="text-lg font-medium">No Data Sources Found</h3>
               <p>Try adjusting your search query or filter.</p>
             </div>
@@ -314,24 +314,24 @@ function SourceCard({ source, isSelected, onToggle }: SourceCardProps) {
   const IconComponent = CATEGORY_ICONS[source.category] || Database
 
   return (
-    <Card className={`transition-all cursor-pointer ${
+    <Card className={`cursor-pointer transition-all ${
       isSelected ? 'border-primary shadow-md' : 'border-border hover:shadow-sm'
     }`}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3 flex-1 min-w-0">
-            <IconComponent className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-foreground mb-1 truncate">
+          <div className="flex min-w-0 flex-1 items-start space-x-3">
+            <IconComponent className="mt-0.5 size-5 shrink-0 text-primary" />
+            <div className="min-w-0 flex-1">
+              <h3 className="mb-1 truncate font-semibold text-foreground">
                 {source.name}
               </h3>
-              <p className="text-xs text-muted-foreground mb-2">
+              <p className="mb-2 text-xs text-muted-foreground">
                 {source.category}
               </p>
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+              <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
                 {source.description}
               </p>
-              <div className="flex flex-wrap gap-1 mb-3">
+              <div className="mb-3 flex flex-wrap gap-1">
                 {source.tags.slice(0, 3).map((tag) => (
                   <Badge key={tag} variant="secondary" className="text-xs">
                     {tag}
@@ -350,14 +350,14 @@ function SourceCard({ source, isSelected, onToggle }: SourceCardProps) {
               e.stopPropagation()
               onToggle()
             }}
-            className="flex-shrink-0 p-1"
+            className="shrink-0 p-1"
           >
-            <div className={`w-6 h-6 rounded-md flex items-center justify-center border-2 transition-all ${
+            <div className={`flex size-6 items-center justify-center rounded-md border-2 transition-all ${
               isSelected
-                ? 'bg-primary border-primary'
-                : 'bg-background border-muted-foreground hover:border-primary'
+                ? 'border-primary bg-primary'
+                : 'border-muted-foreground bg-background hover:border-primary'
             }`}>
-              {isSelected && <Check className="w-4 h-4 text-primary-foreground" />}
+              {isSelected && <Check className="size-4 text-primary-foreground" />}
             </div>
           </button>
         </div>

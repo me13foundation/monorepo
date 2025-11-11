@@ -6,7 +6,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB_DIR="$ROOT_DIR/src/web"
-PORT="${PERCY_STATIC_PORT:-4173}"
+PORT="${PERCY_PREVIEW_PORT:-4183}"
 
 if [ -z "${PERCY_TOKEN:-}" ]; then
     echo "❌ PERCY_TOKEN is not set. Visual snapshots require a Percy project token."
@@ -16,14 +16,20 @@ fi
 echo "▶ Building Next.js application..."
 (cd "$WEB_DIR" && npm run build >/dev/null)
 
-echo "▶ Exporting static assets..."
-(cd "$WEB_DIR" && npx next export >/dev/null)
-
-echo "▶ Serving exported site on port ${PORT}..."
-pushd "$WEB_DIR/out" >/dev/null
-python3 -m http.server "$PORT" >/tmp/percy-static-server.log 2>&1 &
+echo "▶ Starting Next.js server on port ${PORT}..."
+(cd "$WEB_DIR" && PORT="$PORT" npm run start >/tmp/percy-next-server.log 2>&1) &
 SERVER_PID=$!
-popd >/dev/null
+
+# Wait for the server to come online (max 30s)
+ATTEMPTS=0
+until curl -sSf "http://localhost:${PORT}" >/dev/null 2>&1; do
+    ATTEMPTS=$((ATTEMPTS + 1))
+    if [ "$ATTEMPTS" -ge 30 ]; then
+        echo "❌ Next.js server did not become ready on port ${PORT} (see /tmp/percy-next-server.log)."
+        exit 1
+    fi
+    sleep 1
+done
 
 cleanup() {
     if ps -p $SERVER_PID >/dev/null 2>&1; then

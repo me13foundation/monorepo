@@ -87,7 +87,7 @@ export default function TemplateDetailPage({ params }: TemplateDetailPageProps) 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
@@ -108,20 +108,20 @@ export default function TemplateDetailPage({ params }: TemplateDetailPageProps) 
         <div>
           <Button variant="ghost" asChild className="mb-2">
             <Link href="/templates">
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="mr-2 size-4" />
               Back to Templates
             </Link>
           </Button>
-          <h1 className="text-2xl font-heading font-bold">{data.name}</h1>
+          <h1 className="font-heading text-2xl font-bold">{data.name}</h1>
           <p className="text-muted-foreground">{data.description || 'No description provided.'}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setEditOpen(true)}>
-            <Pencil className="h-4 w-4 mr-2" />
+            <Pencil className="mr-2 size-4" />
             Edit
           </Button>
           <Button variant="destructive" onClick={() => setDeleteOpen(true)}>
-            <Trash2 className="h-4 w-4 mr-2" />
+            <Trash2 className="mr-2 size-4" />
             Delete
           </Button>
         </div>
@@ -157,7 +157,7 @@ export default function TemplateDetailPage({ params }: TemplateDetailPageProps) 
             <CardDescription>Current JSON schema for this template.</CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="bg-muted rounded-md p-4 overflow-auto text-xs">
+            <pre className="overflow-auto rounded-md bg-muted p-4 text-xs">
               {JSON.stringify(data.schema_definition, null, 2)}
             </pre>
           </CardContent>
@@ -186,7 +186,7 @@ export default function TemplateDetailPage({ params }: TemplateDetailPageProps) 
                       <span>{rule.field}</span>
                       <Badge variant="secondary">{rule.rule_type.replace('_', ' ')}</Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">{rule.error_message}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{rule.error_message}</p>
                     {rule.parameters && Object.keys(rule.parameters).length > 0 && (
                       <pre className="mt-2 rounded-md bg-muted p-2 text-[11px]">
                         {JSON.stringify(rule.parameters, null, 2)}
@@ -215,13 +215,13 @@ export default function TemplateDetailPage({ params }: TemplateDetailPageProps) 
             </div>
             <div className="flex flex-col gap-3">
               <Button onClick={handleApprove} disabled={data.is_approved || approvalLoading} variant="secondary">
-                {approvalLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <ShieldCheck className="mr-2 h-4 w-4" />
+                {approvalLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                <ShieldCheck className="mr-2 size-4" />
                 Approve
               </Button>
               <Button onClick={handlePublish} disabled={data.is_public || publishLoading}>
-                {publishLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <Eye className="mr-2 h-4 w-4" />
+                {publishLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
+                <Eye className="mr-2 size-4" />
                 Make Public
               </Button>
             </div>
@@ -252,7 +252,7 @@ export default function TemplateDetailPage({ params }: TemplateDetailPageProps) 
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleteLoading}>
-              {deleteLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {deleteLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
               Delete
             </Button>
           </DialogFooter>
@@ -266,7 +266,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-right">{value}</span>
+      <span className="text-right font-medium">{value}</span>
     </div>
   )
 }

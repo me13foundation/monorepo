@@ -53,28 +53,28 @@ export function Breadcrumbs() {
   }
 
   return (
-    <nav className="flex items-center space-x-2 text-sm text-muted-foreground mb-4">
+    <nav className="mb-4 flex items-center space-x-2 text-sm text-muted-foreground">
       {breadcrumbs.map((crumb, index) => (
         <div key={crumb.href || index} className="flex items-center space-x-2">
           {index === 0 ? (
             <Link
               href={crumb.href || '#'}
-              className="hover:text-foreground transition-colors"
+              className="transition-colors hover:text-foreground"
             >
-              <Home className="h-4 w-4" />
+              <Home className="size-4" />
             </Link>
           ) : (
             <>
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="size-4" />
               {crumb.href ? (
                 <Link
                   href={crumb.href}
-                  className="hover:text-foreground transition-colors"
+                  className="transition-colors hover:text-foreground"
                 >
                   {crumb.label}
                 </Link>
               ) : (
-                <span className="text-foreground font-medium">{crumb.label}</span>
+                <span className="font-medium text-foreground">{crumb.label}</span>
               )}
             </>
           )}

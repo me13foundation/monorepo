@@ -66,14 +66,14 @@ export default function RegisterPage() {
     >
       {error && (
         <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
+          <AlertCircle className="size-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
       {success && (
         <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-          <CheckCircle className="h-4 w-4" />
+          <CheckCircle className="size-4" />
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}

@@ -25,10 +25,10 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold">Template Catalog</h1>
-          <p className="text-muted-foreground text-sm">
+          <h1 className="font-heading text-2xl font-bold">Template Catalog</h1>
+          <p className="text-sm text-muted-foreground">
             Manage reusable configurations for common data sources.
           </p>
         </div>
@@ -40,7 +40,7 @@ export default function TemplatesPage() {
           }}
           className="w-full sm:w-auto"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus className="mr-2 size-4" />
           Create Template
         </Button>
       </div>
@@ -54,7 +54,7 @@ export default function TemplatesPage() {
         <TabsContent value={scope} className="mt-4">
           {templatesQuery.isLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <Loader2 className="size-8 animate-spin text-muted-foreground" />
             </div>
           ) : templates.length === 0 ? (
             <Card>
@@ -127,7 +127,7 @@ function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) {
   return (
     <Card>
       <CardHeader className="space-y-2">
-        <div className="flex justify-between items-start gap-2">
+        <div className="flex items-start justify-between gap-2">
           <div>
             <CardTitle className="text-lg">{template.name}</CardTitle>
             <CardDescription>{template.description || 'No description'}</CardDescription>
@@ -136,7 +136,7 @@ function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) {
             {template.is_public && <Badge variant="outline">Public</Badge>}
             <Button variant="ghost" size="icon" asChild>
               <Link href={`/templates/${template.id}`}>
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="size-4" />
                 <span className="sr-only">View details</span>
               </Link>
             </Button>
@@ -144,11 +144,11 @@ function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="h-4 w-4 mr-2" />
+            <Pencil className="mr-2 size-4" />
             Edit
           </Button>
           <Button variant="ghost" size="sm" onClick={onDelete}>
-            <Trash2 className="h-4 w-4 mr-2" />
+            <Trash2 className="mr-2 size-4" />
             Delete
           </Button>
         </div>
@@ -203,7 +203,7 @@ function ConfirmDeleteDialog({ template, onCancel, onConfirm, isPending }: Confi
             Cancel
           </Button>
           <Button variant="destructive" onClick={() => onConfirm()} disabled={isPending}>
-            {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
             Delete
           </Button>
         </DialogFooter>

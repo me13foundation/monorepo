@@ -104,7 +104,7 @@ export function ResultsView({
     return (
       <Card className="py-12 text-center">
         <CardContent>
-          <Loader2 className="w-8 h-8 mx-auto mb-4 animate-spin text-primary" />
+          <Loader2 className="mx-auto mb-4 size-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Loading generated results...</p>
         </CardContent>
       </Card>
@@ -113,15 +113,15 @@ export function ResultsView({
 
   if (results.length === 0) {
     return (
-      <Card className="text-center py-12">
+      <Card className="py-12 text-center">
         <CardContent>
-          <FolderOpen className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-xl font-semibold text-foreground mb-2">No Results Generated</h2>
-          <p className="text-muted-foreground mb-4">
+          <FolderOpen className="mx-auto mb-4 size-16 text-muted-foreground" />
+          <h2 className="mb-2 text-xl font-semibold text-foreground">No Results Generated</h2>
+          <p className="mb-4 text-muted-foreground">
             Go back to the &ldquo;Select Data Sources&rdquo; tab to choose sources and generate results.
           </p>
           <Button onClick={onBackToSelect}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="mr-2 size-4" />
             Back to Selection
           </Button>
         </CardContent>
@@ -136,7 +136,7 @@ export function ResultsView({
           <CardTitle className="flex items-center justify-between">
             <span>Generated Results</span>
             <Button variant="outline" size="sm" onClick={onBackToSelect}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+              <ArrowLeft className="mr-2 size-4" />
               Back to Selection
             </Button>
           </CardTitle>
@@ -215,10 +215,10 @@ function ResultCard({
   return (
     <Card className="border-border">
       <CardContent className="p-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between w-full">
-          <div className="flex items-center space-x-3 mb-3 md:mb-0">
-            <div className="flex-shrink-0">
-              <IconComponent className="w-5 h-5 text-primary" />
+        <div className="flex w-full flex-col justify-between md:flex-row md:items-center">
+          <div className="mb-3 flex items-center space-x-3 md:mb-0">
+            <div className="shrink-0">
+              <IconComponent className="size-5 text-primary" />
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-foreground">{displayName}</h3>
@@ -228,7 +228,7 @@ function ResultCard({
             </div>
           </div>
 
-          <div className="flex items-center space-x-3 flex-shrink-0">
+          <div className="flex shrink-0 items-center space-x-3">
             {getStatusBadge(result.status)}
 
             {isParamMissing && <span className="text-xs text-yellow-600 dark:text-yellow-400">Missing parameters</span>}
@@ -240,7 +240,7 @@ function ResultCard({
                 size="sm"
                 className="flex items-center space-x-2"
               >
-                {isRunningTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Terminal className="w-4 h-4" />}
+                {isRunningTest ? <Loader2 className="size-4 animate-spin" /> : <Terminal className="size-4" />}
                 <span>{isRunningTest ? 'Running...' : 'Run API'}</span>
               </Button>
             ) : result.response_url ? (
@@ -251,7 +251,7 @@ function ResultCard({
                   rel="noopener noreferrer"
                   className="flex items-center space-x-2"
                 >
-                  <ExternalLink className="w-4 h-4" />
+                  <ExternalLink className="size-4" />
                   <span>View Response</span>
                 </a>
               </Button>
@@ -260,7 +260,7 @@ function ResultCard({
             <Button variant="secondary" size="sm" onClick={onAddToSpace} disabled={isParamMissing || isAddingToSpace}>
               {isAddingToSpace ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  <Loader2 className="mr-2 size-4 animate-spin" />
                   Saving...
                 </>
               ) : (
@@ -270,7 +270,7 @@ function ResultCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 text-sm">
+        <div className="mt-4 grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
           <div>
             <p className="text-muted-foreground">Parameters Used</p>
             <p>Gene: {result.parameters.gene_symbol || '—'}</p>

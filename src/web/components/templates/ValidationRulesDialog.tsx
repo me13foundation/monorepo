@@ -117,11 +117,11 @@ export function ValidationRulesDialog({ open, onOpenChange, rules, onSave, isSav
               </div>
             ) : (
               drafts.map((draft) => (
-                <div key={draft.id} className="rounded-lg border p-4 space-y-3">
+                <div key={draft.id} className="space-y-3 rounded-lg border p-4">
                   <div className="flex items-center justify-between">
                     <Badge variant="outline">{draft.rule_type}</Badge>
                     <Button variant="ghost" size="sm" onClick={() => removeDraft(draft.id)}>
-                      <Trash2 className="mr-2 h-4 w-4" />
+                      <Trash2 className="mr-2 size-4" />
                       Remove
                     </Button>
                   </div>
@@ -169,7 +169,7 @@ export function ValidationRulesDialog({ open, onOpenChange, rules, onSave, isSav
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex items-center justify-between">
           <Button type="button" variant="outline" onClick={addDraft}>
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="mr-2 size-4" />
             Add Rule
           </Button>
           <DialogFooter className="gap-2">
@@ -177,7 +177,7 @@ export function ValidationRulesDialog({ open, onOpenChange, rules, onSave, isSav
               Cancel
             </Button>
             <Button type="button" onClick={handleSave} disabled={isSaving || drafts.length === 0}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
               Save Rules
             </Button>
           </DialogFooter>

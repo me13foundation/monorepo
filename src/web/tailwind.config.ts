@@ -85,11 +85,24 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        brand: {
+          primary: "hsl(var(--primary) / <alpha-value>)",
+          secondary: "hsl(var(--secondary) / <alpha-value>)",
+          accent: "hsl(var(--accent) / <alpha-value>)",
+        },
+      },
+      boxShadow: {
+        "brand-xs": "var(--shadow-xs)",
+        "brand-sm": "var(--shadow-sm)",
+        "brand-md": "var(--shadow-md)",
+        "brand-lg": "var(--shadow-lg)",
+        "brand-xl": "var(--shadow-xl)",
+        "brand-2xl": "var(--shadow-2xl)",
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
-        heading: ["Nunito Sans", "system-ui", "-apple-system", "sans-serif"],
-        serif: ["Playfair Display", "Georgia", "serif"],
+        sans: ["var(--font-body)", "system-ui", "-apple-system", "sans-serif"],
+        heading: ["var(--font-heading)", "system-ui", "-apple-system", "sans-serif"],
+        serif: ["var(--font-display)", "Georgia", "serif"],
         mono: ["JetBrains Mono", "Fira Code", "Menlo", "monospace"],
       },
       keyframes: {

@@ -288,7 +288,7 @@ export default function DataDiscoveryPage() {
             : 'Review generated outputs and promote sources into spaces.'
         }
       >
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="mb-4 flex flex-wrap gap-2">
           <button
             onClick={() => setActiveView('select')}
             className={cn(

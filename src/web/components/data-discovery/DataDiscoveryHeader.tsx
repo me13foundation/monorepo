@@ -4,21 +4,21 @@ import { Search } from 'lucide-react'
 
 export function DataDiscoveryHeader() {
   return (
-    <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 pb-6 border-b border-border">
-      <div className="flex items-center space-x-3 mb-4 md:mb-0">
-        <div className="p-2 bg-primary rounded-lg">
-          <Search className="w-8 h-8 text-primary-foreground" />
+    <div className="mb-6 flex flex-col border-b border-border pb-6 md:flex-row md:items-center md:justify-between">
+      <div className="mb-4 flex items-center space-x-3 md:mb-0">
+        <div className="rounded-lg bg-primary p-2">
+          <Search className="size-8 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+          <h1 className="text-2xl font-bold text-foreground md:text-3xl">
             Data Source Discovery
           </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <p className="text-sm text-muted-foreground md:text-base">
             Discover, test, and select biomedical data sources for your research.
           </p>
         </div>
       </div>
-      <div className="text-xs text-muted-foreground bg-muted p-2 rounded-lg text-center md:text-right">
+      <div className="rounded-lg bg-muted p-2 text-center text-xs text-muted-foreground md:text-right">
         Based on the Data Ecosystem Report for <br />
         <span className="font-semibold text-foreground">MED13-Related Syndrome Research</span>
       </div>

@@ -13,18 +13,18 @@ interface AuthShellProps {
 
 export function AuthShell({ title, description, children, footer, isLoading = false }: AuthShellProps) {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-sidebar-primary/15 via-background to-secondary/10 px-4 py-8">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-primary/8 via-background to-brand-secondary/8 px-4 py-8">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">MED13 Foundation</p>
-          <h1 className="text-3xl font-heading font-bold text-foreground mt-2">{title}</h1>
+          <h1 className="mt-2 font-heading text-3xl font-bold text-foreground">{title}</h1>
           <p className="mt-2 text-muted-foreground">{description}</p>
         </div>
 
-        <Card className="shadow-xl border-border/60">
+        <Card className="border-border/60 shadow-xl">
           <CardContent className="pt-6">
             {isLoading ? (
-              <div className="text-center text-muted-foreground py-6">Loading…</div>
+              <div className="py-6 text-center text-muted-foreground">Loading…</div>
             ) : (
               children
             )}
