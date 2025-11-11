@@ -53,6 +53,7 @@ npm run lint              # ESLint with Next.js rules
 npm run type-check        # TypeScript strict checking
 npm test                  # Jest with React Testing Library
 npm run test:coverage     # Coverage reporting (75.71% achieved)
+npm run visual-test       # Percy-powered visual regression suite (requires PERCY_TOKEN)
 ```
 
 ### ✅ **Component Architecture - PRODUCTION READY**
@@ -76,6 +77,7 @@ npm run test:coverage     # Coverage reporting (75.71% achieved)
 - **E2E Ready**: Playwright setup prepared for critical user journeys
 - **Coverage Goals**: 70%+ coverage achieved across all metrics
 - **Test Patterns**: React Testing Library best practices implemented
+- **Visual Regression**: Percy snapshots executed via `npm run visual-test`
 
 ## Evolutionary Growth Strategy
 
@@ -220,8 +222,9 @@ Benefits:
 #### **API Integration Layer**
 ```typescript
 // src/lib/api/client.ts
-// Centralized API client with error handling and caching
-// Supports different authentication methods and environments
+// Centralized API client with interceptors, retries, and cancellation
+// Typed helpers (apiGet/apiPost/etc.) remove `any` from API calls
+// Built-in auth header helpers + request ID propagation for tracing
 ```
 
 #### **State Management Abstractions**

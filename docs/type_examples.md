@@ -10,6 +10,8 @@ This document demonstrates how to effectively use the comprehensive type safety 
 4. [Domain Service Testing](#domain-service-testing)
 5. [External API Integration](#external-api-integration)
 6. [Publishing Pipeline Types](#publishing-pipeline-types)
+7. [Property-Based Testing](#property-based-testing)
+8. [JSON Packaging Helpers](#json-packaging-helpers)
 
 ## Typed Test Fixtures
 
@@ -379,6 +381,78 @@ async def create_typed_release() -> str:
 
     return release_info["doi"]
 ```
+
+## Property-Based Testing
+
+Hypothesis is part of the default development toolchain and is used to encode invariants for value objects and domain services.
+
+```python
+from hypothesis import given, strategies as st
+from src.domain.services.gene_domain_service import GeneDomainService
+from src.domain.value_objects.identifiers import GeneIdentifier
+
+identifier_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-"
+identifier_text = st.text(alphabet=list(identifier_chars), min_size=1, max_size=12)
+service = GeneDomainService()
+
+@st.composite
+def gene_identifier_inputs(draw):
+    symbol = draw(identifier_text)
+    gene_id = draw(identifier_text)
+    return GeneIdentifier(gene_id=gene_id, symbol=symbol)
+
+@given(identifier=gene_identifier_inputs())
+def test_normalize_gene_identifiers(identifier: GeneIdentifier) -> None:
+    """Gene identifiers are always uppercased and never empty."""
+    normalized = service.normalize_gene_identifiers(identifier)
+    assert normalized.symbol == normalized.symbol.upper()
+    assert normalized.gene_id == normalized.gene_id.upper()
+```
+
+The production property suite lives in `tests/unit/domain/test_gene_identifier_properties.py`. Add similar generators for other entities whenever you need to guarantee cross-field constraints that would otherwise require numerous example-based tests.
+
+## JSON Packaging Helpers
+
+Packaging modules now rely on `JSONObject` and `list_of_objects` helpers to keep RO-Crate metadata type-safe.
+
+```python
+from src.type_definitions.common import JSONObject
+from src.type_definitions.json_utils import list_of_objects
+
+def build_rocrate_metadata(
+    data_files: list[JSONObject],
+    provenance: JSONObject | None = None,
+) -> JSONObject:
+    file_entities: list[JSONObject] = []
+    for file_info in data_files:
+        path = file_info.get("path")
+        if not isinstance(path, str):
+            raise ValueError("file_info.path must be a string")
+
+        entity: JSONObject = {
+            "@id": path,
+            "@type": "File",
+            "name": file_info.get("name") or path,
+        }
+        file_entities.append(entity)
+
+    if provenance:
+        for source in list_of_objects(provenance.get("sources")):
+            file_entities.append(
+                {
+                    "@type": "DataDownload",
+                    "name": source.get("name"),
+                    "contentUrl": source.get("url"),
+                },
+            )
+
+    return {
+        "@context": {"@vocab": "https://schema.org/"},
+        "@graph": file_entities,
+    }
+```
+
+See `src/application/packaging/rocrate/builder.py` and `src/application/packaging/provenance/metadata.py` for full implementations that avoid `typing.Any` while still modelling flexible JSON payloads.
 
 ## Best Practices
 

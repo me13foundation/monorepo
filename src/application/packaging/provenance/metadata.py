@@ -12,6 +12,12 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
+    from src.type_definitions.common import JSONObject, JSONValue
+else:  # pragma: no cover - runtime fallback for type checking only import
+    JSONObject = dict[str, Any]
+    JSONValue = object
+
+if TYPE_CHECKING:
     from src.models.value_objects.provenance import Provenance
 
 
@@ -22,18 +28,18 @@ class DatasetMetadata:
     # Core metadata
     title: str
     description: str
-    creators: list[dict[str, Any]] = field(default_factory=list)
-    contributors: list[dict[str, Any]] = field(default_factory=list)
+    creators: list[JSONObject] = field(default_factory=list)
+    contributors: list[JSONObject] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
 
     # Temporal metadata
     date_created: datetime | None = None
     date_modified: datetime | None = None
     date_published: datetime | None = None
-    temporal_coverage: dict[str, Any] | None = None
+    temporal_coverage: JSONObject | None = None
 
     # Spatial metadata
-    spatial_coverage: dict[str, Any] | None = None
+    spatial_coverage: JSONObject | None = None
 
     # Licensing and rights
     license_url: str | None = None
@@ -56,9 +62,9 @@ class DatasetMetadata:
     # Provenance metadata
     provenance: Provenance | None = None
 
-    def to_ro_crate_metadata(self) -> dict[str, Any]:
+    def to_ro_crate_metadata(self) -> JSONObject:
         """Convert to RO-Crate metadata format."""
-        metadata: dict[str, Any] = {
+        metadata: JSONObject = {
             "@context": ["https://w3id.org/ro/crate/1.1/context", {"@base": None}],
             "@graph": [
                 {
@@ -81,21 +87,27 @@ class DatasetMetadata:
                     "datePublished": (
                         self.date_published.isoformat() if self.date_published else None
                     ),
-                    "keywords": self.keywords,
-                    "conformsTo": [{"@id": standard} for standard in self.conforms_to],
+                    "keywords": cast("list[JSONValue]", self.keywords),
+                    "conformsTo": cast(
+                        "list[JSONValue]",
+                        [{"@id": standard} for standard in self.conforms_to],
+                    ),
                 },
             ],
         }
 
-        graph_nodes = cast("list[dict[str, Any]]", metadata["@graph"])
+        graph_nodes = cast("list[JSONObject]", metadata["@graph"])
 
         # Add creators
         if self.creators:
-            graph_nodes[1]["creator"] = self.creators
+            graph_nodes[1]["creator"] = cast("list[JSONValue]", self.creators)
 
         # Add license
         if self.license_url:
-            graph_nodes[1]["license"] = {"@id": self.license_url}
+            graph_nodes[1]["license"] = cast(
+                "JSONObject",
+                {"@id": self.license_url},
+            )
 
         return metadata
 

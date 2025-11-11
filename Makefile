@@ -96,7 +96,7 @@ define run_with_postgres_env
 	@/bin/bash -lc 'set -a; source "$(POSTGRES_ENV_FILE)"; set +a; $(1)'
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-dash stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage web-visual-test
 
 # Default target
 help: ## Show this help message
@@ -629,6 +629,9 @@ web-test: ## Run Next.js tests
 
 web-test-coverage: ## Run Next.js tests with coverage report
 	cd src/web && npm run test:coverage
+
+web-visual-test: ## Run Percy-powered visual regression snapshots (requires PERCY_TOKEN)
+	./scripts/run_visual_snapshots.sh
 
 test-web: web-test ## Alias for web-test
 

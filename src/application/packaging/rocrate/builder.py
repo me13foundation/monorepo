@@ -10,7 +10,12 @@ import shutil
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import list_of_objects
+
+JSONMetadata = JSONObject
 
 
 class ROCrateBuilder:
@@ -82,7 +87,7 @@ class ROCrateBuilder:
         """Update the crate license identifier."""
         self.license_id = value
 
-    def create_crate_structure(self) -> dict[str, Any]:
+    def create_crate_structure(self) -> dict[str, Path]:
         """
         Create RO-Crate directory structure.
 
@@ -127,11 +132,24 @@ class ROCrateBuilder:
 
         return f"data/{target_name}"
 
+    def _coerce_path(self, file_info: JSONObject) -> str:
+        """Extract and validate the required path field from file info."""
+        path_value = file_info.get("path")
+        if not isinstance(path_value, str) or not path_value:
+            msg = "file_info entry must include a non-empty 'path' string"
+            raise ValueError(msg)
+        return path_value
+
+    def _string_or_none(self, payload: JSONObject, field: str) -> str | None:
+        """Safely read string fields from JSON metadata objects."""
+        value = payload.get(field)
+        return value if isinstance(value, str) else None
+
     def generate_metadata(
         self,
-        data_files: list[dict[str, Any]],
-        provenance_info: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        data_files: list[JSONObject],
+        provenance_info: JSONObject | None = None,
+    ) -> JSONMetadata:
         """
         Generate RO-Crate metadata.json.
 
@@ -145,71 +163,76 @@ class ROCrateBuilder:
         root_dataset_id = "./"
 
         # Build context with RO-Crate vocabulary
-        context = {
+        context: JSONObject = {
             "@vocab": "https://schema.org/",
             "ro-crate": "https://w3id.org/ro/crate#",
         }
 
         # Root dataset entity
-        root_dataset: dict[str, Any] = {
+        license_info: JSONObject = {
+            "@id": f"https://spdx.org/licenses/{self.license_id}.html",
+            "@type": "CreativeWork",
+            "name": self.license_id,
+        }
+        creator_info: JSONObject = {
+            "@type": "Organization",
+            "name": self.author,
+        }
+        keyword_values: list[str] = [
+            "MED13",
+            "genetics",
+            "variants",
+            "phenotypes",
+            "biomedical data",
+            "FAIR data",
+        ]
+        root_dataset: JSONObject = {
             "@id": root_dataset_id,
             "@type": "Dataset",
             "name": self.name,
             "description": self.description,
             "version": self.version,
-            "license": {
-                "@id": f"https://spdx.org/licenses/{self.license_id}.html",
-                "@type": "CreativeWork",
-                "name": self.license_id,
-            },
-            "creator": {
-                "@type": "Organization",
-                "name": self.author,
-            },
+            "license": license_info,
+            "creator": creator_info,
             "datePublished": self.created_at,
-            "keywords": [
-                "MED13",
-                "genetics",
-                "variants",
-                "phenotypes",
-                "biomedical data",
-                "FAIR data",
-            ],
+            "keywords": cast("list[JSONValue]", keyword_values),
         }
 
-        has_part: list[dict[str, Any]] = []
+        has_part: list[JSONMetadata] = []
 
         # Add provenance if available
         if provenance_info:
-            has_part.extend(
-                [
-                    {
-                        "@type": "DataDownload",
-                        "name": source.get("name"),
-                        "contentUrl": source.get("url"),
-                        "datePublished": source.get("date"),
-                    }
-                    for source in provenance_info.get("sources", [])
-                ],
-            )
+            sources = list_of_objects(provenance_info.get("sources"))
+            for source in sources:
+                download_entry: JSONMetadata = {
+                    "@type": "DataDownload",
+                    "name": self._string_or_none(source, "name"),
+                    "contentUrl": self._string_or_none(source, "url"),
+                    "datePublished": self._string_or_none(source, "date"),
+                }
+                has_part.append(download_entry)
 
         # Build file entities
-        file_entities: list[dict[str, Any]] = []
+        file_entities: list[JSONMetadata] = []
         for file_info in data_files:
-            file_entity = {
-                "@id": file_info["path"],
+            file_path = self._coerce_path(file_info)
+            file_entity: JSONMetadata = {
+                "@id": file_path,
                 "@type": "File",
-                "name": file_info.get("name", Path(file_info["path"]).name),
+                "name": self._string_or_none(file_info, "name") or Path(file_path).name,
             }
 
-            if file_info.get("description"):
-                file_entity["description"] = file_info["description"]
+            description = self._string_or_none(file_info, "description")
+            if description:
+                file_entity["description"] = description
 
-            if file_info.get("encodingFormat"):
-                file_entity["encodingFormat"] = file_info["encodingFormat"]
+            encoding = self._string_or_none(file_info, "encodingFormat")
+            if encoding:
+                file_entity["encodingFormat"] = encoding
 
-            if file_info.get("dateCreated"):
-                file_entity["dateCreated"] = file_info["dateCreated"]
+            date_created = self._string_or_none(file_info, "dateCreated")
+            if date_created:
+                file_entity["dateCreated"] = date_created
 
             file_entities.append(file_entity)
 
@@ -217,7 +240,7 @@ class ROCrateBuilder:
             has_part.extend(file_entities)
 
         if has_part:
-            root_dataset["hasPart"] = has_part
+            root_dataset["hasPart"] = cast("list[JSONValue]", has_part)
 
         # Build complete metadata structure
         return {
@@ -227,8 +250,8 @@ class ROCrateBuilder:
 
     def build(
         self,
-        data_files: list[dict[str, Any]],
-        provenance_info: dict[str, Any] | None = None,
+        data_files: list[JSONObject],
+        provenance_info: JSONObject | None = None,
     ) -> Path:
         """
         Build complete RO-Crate package.
