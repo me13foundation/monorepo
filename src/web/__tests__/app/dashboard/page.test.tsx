@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import DashboardPage from '@/app/(dashboard)/dashboard/page'
+import DashboardClient from '@/app/(dashboard)/dashboard/dashboard-client'
 import { ThemeProvider } from '@/components/theme-provider'
 // Mock ThemeProvider to avoid DOM prop warnings
 jest.mock('@/components/theme-provider', () => ({
@@ -94,13 +94,13 @@ const renderWithProviders = (component: React.ReactElement) => {
 
 describe('DashboardPage', () => {
   it('renders the main dashboard heading', () => {
-    renderWithProviders(<DashboardPage />)
+    renderWithProviders(<DashboardClient />)
     const heading = screen.getByRole('heading', { level: 1 })
     expect(heading).toHaveTextContent('MED13 Admin Dashboard')
   })
 
   it('renders the dashboard subtitle', () => {
-    renderWithProviders(<DashboardPage />)
+    renderWithProviders(<DashboardClient />)
     expect(screen.getByText('Welcome back, Test Admin')).toBeInTheDocument()
   })
 
@@ -109,7 +109,7 @@ describe('DashboardPage', () => {
 
   describe('Statistics Cards', () => {
     it('renders all metric cards', () => {
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
 
       expect(screen.getByText('Data Sources')).toBeInTheDocument()
       expect(screen.getByText('Total Records')).toBeInTheDocument()
@@ -118,7 +118,7 @@ describe('DashboardPage', () => {
     })
 
     it('displays metric values from API', () => {
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
       expect(screen.getByText('1')).toBeInTheDocument() // Data Sources (evidence count)
       expect(screen.getByText('10')).toBeInTheDocument() // Total Records
       expect(screen.getByText('2')).toBeInTheDocument() // Genes count
@@ -126,7 +126,7 @@ describe('DashboardPage', () => {
     })
 
     it('displays metric descriptions', () => {
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
       expect(screen.getByText(/Approved 9/i)).toBeInTheDocument()
       expect(screen.getByText(/Total records across entities/i)).toBeInTheDocument()
       expect(screen.getByText(/Entities in knowledge base/i)).toBeInTheDocument()
@@ -136,14 +136,14 @@ describe('DashboardPage', () => {
 
   describe('Data Sources Section', () => {
     it('renders data sources section', () => {
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
 
       expect(screen.getByText('Recent Data Sources')).toBeInTheDocument()
       expect(screen.getByText('Latest data source configurations and status')).toBeInTheDocument()
     })
 
     it('shows data source guidance message', () => {
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
       expect(screen.getByText(/Connect data sources/i)).toBeInTheDocument()
     })
 
@@ -152,21 +152,21 @@ describe('DashboardPage', () => {
 
   describe('System Activity Section', () => {
     it('renders system activity section', () => {
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
 
       expect(screen.getByText('System Activity')).toBeInTheDocument()
       expect(screen.getByText('Recent system events and ingestion jobs')).toBeInTheDocument()
     })
 
     it('renders activity feed', () => {
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
       expect(screen.getByText('Ingestion finished')).toBeInTheDocument()
       expect(screen.getByText('Validation warning')).toBeInTheDocument()
     })
   })
 
   it('has proper semantic structure', () => {
-    renderWithProviders(<DashboardPage />)
+    renderWithProviders(<DashboardClient />)
 
     // Check heading hierarchy
     const h1 = screen.getByRole('heading', { level: 1 })
@@ -176,7 +176,7 @@ describe('DashboardPage', () => {
   })
 
   it('is responsive with grid layouts', () => {
-    renderWithProviders(<DashboardPage />)
+    renderWithProviders(<DashboardClient />)
 
     // Check responsive grid classes
     const statsGrid = screen.getByText('Data Sources').closest('.grid')
@@ -207,7 +207,7 @@ describe('DashboardPage', () => {
         isLoading: false,
       })
 
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
 
       const dataSourcesLink = screen.getByRole('link', { name: /discover data sources/i })
       expect(dataSourcesLink).toBeInTheDocument()
@@ -221,7 +221,7 @@ describe('DashboardPage', () => {
         isLoading: false,
       })
 
-      renderWithProviders(<DashboardPage />)
+      renderWithProviders(<DashboardClient />)
 
       expect(screen.queryByRole('link', { name: /data sources/i })).not.toBeInTheDocument()
     })

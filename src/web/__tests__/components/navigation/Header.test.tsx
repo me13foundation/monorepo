@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Header } from '@/components/navigation/Header'
 import { useSignOut } from '@/hooks/use-sign-out'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { SpaceSelector } from '@/components/research-spaces/SpaceSelector'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Mock dependencies
 jest.mock('next-auth/react', () => ({
@@ -31,6 +32,13 @@ jest.mock('@/components/navigation/UserMenu', () => ({
 import { useSession } from 'next-auth/react'
 
 describe('Header Component', () => {
+  const renderWithClient = (ui: React.ReactElement) =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        {ui}
+      </QueryClientProvider>,
+    )
+
   const mockUseSession = useSession as jest.MockedFunction<typeof useSession>
   const mockUseSignOut = useSignOut as jest.MockedFunction<typeof useSignOut>
   const mockUseSpaceContext = useSpaceContext as jest.MockedFunction<typeof useSpaceContext>
@@ -67,7 +75,7 @@ describe('Header Component', () => {
 
   describe('Rendering', () => {
     it('renders all navigation elements', () => {
-      render(<Header />)
+      renderWithClient(<Header />)
 
       expect(screen.getByText('MED13 Admin')).toBeInTheDocument()
       expect(screen.getByTestId('space-selector')).toBeInTheDocument()
@@ -81,20 +89,20 @@ describe('Header Component', () => {
         isLoading: false,
       })
 
-      render(<Header />)
+      renderWithClient(<Header />)
 
       // Data Sources button is no longer in the header
       expect(screen.queryByRole('link', { name: /data sources/i })).not.toBeInTheDocument()
     })
 
     it('renders UserMenu component', () => {
-      render(<Header />)
+      renderWithClient(<Header />)
 
       expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
 
     it('renders dashboard logo link', () => {
-      render(<Header />)
+      renderWithClient(<Header />)
 
       const logoLink = screen.getByRole('link', { name: /med13 admin/i })
       expect(logoLink).toBeInTheDocument()
@@ -104,7 +112,7 @@ describe('Header Component', () => {
 
   describe('UserMenu Integration', () => {
     it('renders UserMenu component', () => {
-      render(<Header />)
+      renderWithClient(<Header />)
 
       expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
@@ -118,7 +126,7 @@ describe('Header Component', () => {
         isLoading: false,
       })
 
-      render(<Header />)
+      renderWithClient(<Header />)
 
       expect(SpaceSelector).toHaveBeenCalledWith(
         { currentSpaceId: 'space-456' },
@@ -133,7 +141,7 @@ describe('Header Component', () => {
         isLoading: false,
       })
 
-      render(<Header />)
+      renderWithClient(<Header />)
 
       expect(SpaceSelector).toHaveBeenCalledWith(
         { currentSpaceId: undefined },
@@ -150,7 +158,7 @@ describe('Header Component', () => {
         update: jest.fn(),
       } as any)
 
-      render(<Header />)
+      renderWithClient(<Header />)
 
       // Should still render, but role might not be visible
       expect(screen.getByText('MED13 Admin')).toBeInTheDocument()
@@ -169,7 +177,7 @@ describe('Header Component', () => {
         update: jest.fn(),
       } as any)
 
-      render(<Header />)
+      renderWithClient(<Header />)
 
       // UserMenu component handles role display now
       expect(screen.getByTestId('user-menu')).toBeInTheDocument()

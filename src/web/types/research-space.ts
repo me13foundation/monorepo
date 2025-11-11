@@ -15,6 +15,19 @@ export enum MembershipRole {
   VIEWER = 'viewer',
 }
 
+export interface ResearchSpaceSettings {
+  auto_approve?: boolean
+  require_review?: boolean
+  review_threshold?: number
+  max_data_sources?: number
+  allowed_source_types?: string[]
+  public_read?: boolean
+  allow_invites?: boolean
+  email_notifications?: boolean
+  notification_frequency?: string
+  custom?: Record<string, string | number | boolean | null>
+}
+
 export interface ResearchSpace {
   id: string
   slug: string
@@ -22,7 +35,7 @@ export interface ResearchSpace {
   description: string
   owner_id: string
   status: SpaceStatus
-  settings: Record<string, unknown>
+  settings: ResearchSpaceSettings
   tags: string[]
   created_at: string
   updated_at: string
@@ -46,14 +59,15 @@ export interface CreateSpaceRequest {
   name: string
   slug: string
   description?: string
-  settings?: Record<string, unknown>
+  settings?: ResearchSpaceSettings
   tags?: string[]
 }
 
 export interface UpdateSpaceRequest {
+  slug?: string
   name?: string
   description?: string
-  settings?: Record<string, unknown>
+  settings?: ResearchSpaceSettings
   tags?: string[]
   status?: SpaceStatus
 }

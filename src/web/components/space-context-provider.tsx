@@ -1,20 +1,24 @@
-"use client"
+'use client'
 
-import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from 'react'
 import { usePathname } from 'next/navigation'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import type { ResearchSpace } from '@/types/research-space'
 
-// Helper to check if we're on an auth page
+const AUTH_PATHS = new Set(['/auth', '/login', '/register', '/forgot-password', '/'])
+
 function isAuthPage(pathname: string): boolean {
-  return pathname.startsWith('/auth') ||
-         pathname === '/' ||
-         pathname === '/login' ||
-         pathname === '/register' ||
-         pathname === '/forgot-password'
+  return AUTH_PATHS.has(pathname) || pathname.startsWith('/auth/')
 }
 
-interface SpaceContextValue {
+export interface SpaceContextValue {
   currentSpaceId: string | null
   setCurrentSpaceId: (spaceId: string | null) => void
   isLoading: boolean
@@ -22,39 +26,49 @@ interface SpaceContextValue {
 
 const SpaceContext = createContext<SpaceContextValue | undefined>(undefined)
 
+interface SpaceContextProviderProps {
+  children: ReactNode
+  initialSpaces?: ResearchSpace[]
+  initialSpaceId?: string | null
+}
+
 export function useSpaceContext() {
   const context = useContext(SpaceContext)
-  if (context === undefined) {
-    throw new Error('useSpaceContext must be used within a SpaceContextProvider')
+  if (!context) {
+    throw new Error('useSpaceContext must be used within SpaceContextProvider')
   }
   return context
 }
 
-interface SpaceContextProviderProps {
-  children: ReactNode
-}
-
-export function SpaceContextProvider({ children }: SpaceContextProviderProps) {
+export function SpaceContextProvider({
+  children,
+  initialSpaces = [],
+  initialSpaceId = null,
+}: SpaceContextProviderProps) {
   const pathname = usePathname()
-
   const onAuthPage = isAuthPage(pathname)
 
-  // useResearchSpaces internally prevents execution when not authenticated
   const { data, isLoading: queryLoading } = useResearchSpaces()
 
   const spaces = useMemo<ResearchSpace[]>(() => {
     if (onAuthPage) {
       return []
     }
-    return data?.spaces ?? []
-  }, [onAuthPage, data])
+    return data?.spaces ?? initialSpaces
+  }, [data?.spaces, initialSpaces, onAuthPage])
 
   const isLoading = onAuthPage ? false : queryLoading
 
-  const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(null)
+  const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(() => {
+    if (initialSpaceId) {
+      return initialSpaceId
+    }
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('currentSpaceId')
+    }
+    return null
+  })
 
-  // Extract space ID from URL if on a space-specific route
-  // Only run this logic when NOT on auth pages
   useEffect(() => {
     if (onAuthPage) {
       setCurrentSpaceIdState(null)
@@ -72,9 +86,8 @@ export function SpaceContextProvider({ children }: SpaceContextProviderProps) {
     }
 
     const savedSpaceId = localStorage.getItem('currentSpaceId')
-    const savedSpaceExists = savedSpaceId
-      ? spaces.some((space) => space.id === savedSpaceId)
-      : false
+    const savedSpaceExists =
+      savedSpaceId !== null && spaces.some((space) => space.id === savedSpaceId)
 
     if (savedSpaceId && savedSpaceExists) {
       if (savedSpaceId !== currentSpaceId) {

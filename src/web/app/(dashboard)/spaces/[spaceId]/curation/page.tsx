@@ -1,144 +1,55 @@
-'use client'
-
-import { useSpaceContext } from '@/components/space-context-provider'
-import { useParams } from 'next/navigation'
-import { useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { QueryClient, dehydrate } from '@tanstack/react-query'
+import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
 import {
-  useResearchSpace,
-  useSpaceCurationStats,
-  useSpaceCurationQueue,
-} from '@/lib/queries/research-spaces'
-import { Loader2, FileText, CheckCircle2, Clock, AlertCircle } from 'lucide-react'
-import type { ResearchSpace } from '@/types/research-space'
-import type { CurationQueueResponse, CurationStats } from '@/lib/api/research-spaces'
-import { PageHero, StatCard, DashboardSection } from '@/components/ui/composition-patterns'
-import { Button } from '@/components/ui/button'
+  fetchResearchSpace,
+  fetchSpaceMembers,
+  fetchSpaceCurationStats,
+  fetchSpaceCurationQueue,
+} from '@/lib/api/research-spaces'
+import { HydrationBoundary } from '@tanstack/react-query'
+import SpaceCurationClient from '../space-curation-client'
 
-export default function SpaceCurationPage() {
-  const params = useParams()
-  const spaceId = params.spaceId as string
-  const { setCurrentSpaceId } = useSpaceContext()
-  const { data: space, isLoading: spaceLoading } = useResearchSpace(spaceId)
-  const { data: stats, isLoading: statsLoading } = useSpaceCurationStats(spaceId)
-  const { data: queue, isLoading: queueLoading } = useSpaceCurationQueue(spaceId, {
-    limit: 10,
-  })
+interface SpaceCurationPageProps {
+  params: {
+    spaceId: string
+  }
+}
 
-  useEffect(() => {
-    if (spaceId) {
-      setCurrentSpaceId(spaceId)
-    }
-  }, [spaceId, setCurrentSpaceId])
+export default async function SpaceCurationPage({ params }: SpaceCurationPageProps) {
+  const session = await getServerSession(authOptions)
+  const token = session?.user?.access_token
 
-  const spaceData = space as ResearchSpace | undefined
-  const statsData = stats as CurationStats | undefined
-  const queueData = queue as CurationQueueResponse | undefined
-  const isLoading = spaceLoading || statsLoading
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+  if (!session || !token) {
+    redirect('/auth/login?error=SessionExpired')
   }
 
-  const statCards = [
-    {
-      title: 'Pending Review',
-      value: statsData?.pending ?? 0,
-      description: 'Items awaiting review',
-      icon: <Clock className="size-4 text-muted-foreground" />,
-    },
-    {
-      title: 'Approved',
-      value: statsData?.approved ?? 0,
-      description: 'Approved items',
-      icon: <CheckCircle2 className="size-4 text-muted-foreground" />,
-    },
-    {
-      title: 'Rejected',
-      value: statsData?.rejected ?? 0,
-      description: 'Rejected items',
-      icon: <AlertCircle className="size-4 text-muted-foreground" />,
-    },
-    {
-      title: 'Total Curated',
-      value: statsData?.total ?? 0,
-      description: 'All curated submissions',
-      icon: <FileText className="size-4 text-muted-foreground" />,
-    },
-  ]
+  const queryClient = new QueryClient()
+
+  await Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.detail(params.spaceId),
+      queryFn: () => fetchResearchSpace(params.spaceId, token),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.members(params.spaceId),
+      queryFn: () => fetchSpaceMembers(params.spaceId, undefined, token),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.curationStats(params.spaceId),
+      queryFn: () => fetchSpaceCurationStats(params.spaceId, token),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.curationQueue(params.spaceId, { limit: 10 }),
+      queryFn: () => fetchSpaceCurationQueue(params.spaceId, { limit: 10 }, token),
+    }),
+  ])
 
   return (
-    <div className="space-y-6">
-      <PageHero
-        title="Data Curation"
-        description={`Review and curate data for ${spaceData?.name ?? 'this research space'}`}
-        variant="research"
-        actions={
-          <Button variant="outline" size="sm">
-            Refresh Stats
-          </Button>
-        }
-      />
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card) => (
-          <StatCard
-            key={card.title}
-            title={card.title}
-            value={card.value}
-            description={card.description}
-            icon={card.icon}
-            isLoading={statsLoading}
-          />
-        ))}
-      </div>
-
-      <DashboardSection
-        title="Curation Queue"
-        description="Review and approve data items for this research space"
-      >
-        {queueLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : queueData && queueData.items.length > 0 ? (
-          <div className="space-y-4">
-            {queueData.items.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-lg border p-4"
-              >
-                <div className="flex-1">
-                  <div className="font-medium">
-                    {item.entity_type} - {item.entity_id}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Priority: {item.priority} • Status: {item.status}
-                    {item.quality_score !== null && ` • Score: ${item.quality_score}`}
-                  </div>
-                </div>
-                {item.last_updated && (
-                  <div className="text-xs text-muted-foreground">
-                    {new Date(item.last_updated).toLocaleDateString()}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 text-center">
-            <FileText className="mx-auto mb-4 size-12 text-muted-foreground" />
-            <h3 className="mb-2 text-lg font-semibold">No curation items yet</h3>
-            <p className="mb-4 text-muted-foreground">
-              Start curating data by connecting data sources and reviewing imported items.
-            </p>
-          </div>
-        )}
-      </DashboardSection>
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <SpaceCurationClient spaceId={params.spaceId} />
+    </HydrationBoundary>
   )
 }

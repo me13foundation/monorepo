@@ -11,17 +11,25 @@ import {
   LayoutDashboard,
   Users,
 } from 'lucide-react'
+import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 
 interface NavItem {
   label: string
   href: string
   icon: React.ComponentType<{ className?: string }>
   description?: string
+  prefetch?: (spaceId: string) => void
 }
 
 export function SpaceNavigation() {
   const { currentSpaceId } = useSpaceContext()
   const pathname = usePathname()
+  const {
+    prefetchSpaceDetail,
+    prefetchSpaceMembers,
+    prefetchSpaceCuration,
+    prefetchDataDiscovery,
+  } = usePrefetchOnHover()
 
   if (!currentSpaceId) {
     return null
@@ -35,30 +43,35 @@ export function SpaceNavigation() {
       href: basePath,
       icon: LayoutDashboard,
       description: 'Space details and information',
+      prefetch: prefetchSpaceDetail,
     },
     {
       label: 'Data Sources',
       href: '/data-discovery',
       icon: Database,
       description: 'Discover and test data sources',
+      prefetch: () => prefetchDataDiscovery(),
     },
     {
       label: 'Data Curation',
       href: `${basePath}/curation`,
       icon: FileText,
       description: 'Curate and review data',
+      prefetch: prefetchSpaceCuration,
     },
     {
       label: 'Members',
       href: `${basePath}/members`,
       icon: Users,
       description: 'Manage team members',
+      prefetch: prefetchSpaceMembers,
     },
     {
       label: 'Settings',
       href: `${basePath}/settings`,
       icon: Settings,
       description: 'Space configuration',
+      prefetch: prefetchSpaceDetail,
     },
   ]
 
@@ -84,6 +97,17 @@ export function SpaceNavigation() {
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   title={item.description}
+                  onMouseEnter={() => {
+                    if (item.prefetch && currentSpaceId) {
+                      item.prefetch(currentSpaceId)
+                    }
+                  }}
+                  onFocus={() => {
+                    if (item.prefetch && currentSpaceId) {
+                      item.prefetch(currentSpaceId)
+                    }
+                  }}
+                  prefetch={true}
                 >
                   <Icon className="size-4 shrink-0" />
                   <span className="hidden sm:inline">{item.label}</span>

@@ -1,36 +1,48 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { QueryClient, dehydrate } from '@tanstack/react-query'
+import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
+import { fetchResearchSpace, fetchSpaceMembers } from '@/lib/api/research-spaces'
+import { HydrationBoundary } from '@tanstack/react-query'
+import SpaceDataSourcesClient from '../space-data-sources-client'
+import { dataSourceKeys } from '@/lib/query-keys/data-sources'
+import { fetchDataSourcesBySpace } from '@/lib/api/data-sources'
 
-import { useEffect } from 'react'
-import { useParams } from 'next/navigation'
-import { useSpaceContext } from '@/components/space-context-provider'
-import { DataSourcesList } from '@/components/data-sources/DataSourcesList'
-import { PageHero, DashboardSection } from '@/components/ui/composition-patterns'
+interface SpaceDataSourcesPageProps {
+  params: {
+    spaceId: string
+  }
+}
 
-export default function SpaceDataSourcesPage() {
-  const params = useParams()
-  const spaceId = params.spaceId as string
-  const { setCurrentSpaceId } = useSpaceContext()
+export default async function SpaceDataSourcesPage({ params }: SpaceDataSourcesPageProps) {
+  const session = await getServerSession(authOptions)
+  const token = session?.user?.access_token
 
-  useEffect(() => {
-    if (spaceId) {
-      setCurrentSpaceId(spaceId)
-    }
-  }, [spaceId, setCurrentSpaceId])
-
-  if (!spaceId) {
-    return null
+  if (!session || !token) {
+    redirect('/auth/login?error=SessionExpired')
   }
 
+  const queryClient = new QueryClient()
+
+  await Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.detail(params.spaceId),
+      queryFn: () => fetchResearchSpace(params.spaceId, token),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.members(params.spaceId),
+      queryFn: () => fetchSpaceMembers(params.spaceId, undefined, token),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: dataSourceKeys.space(params.spaceId),
+      queryFn: () => fetchDataSourcesBySpace(params.spaceId, {}, token),
+    }),
+  ])
+
   return (
-    <div className="space-y-6">
-      <PageHero
-        title="Space Data Sources"
-        description="Manage ingestion pipelines, review quality metrics, and keep this research space’s data sources aligned with curation goals."
-        variant="research"
-      />
-      <DashboardSection title="Sources" description="All data sources attached to this space">
-        <DataSourcesList spaceId={spaceId} />
-      </DashboardSection>
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <SpaceDataSourcesClient spaceId={params.spaceId} />
+    </HydrationBoundary>
   )
 }

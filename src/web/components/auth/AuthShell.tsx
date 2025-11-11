@@ -13,7 +13,7 @@ interface AuthShellProps {
 
 export function AuthShell({ title, description, children, footer, isLoading = false }: AuthShellProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-primary/8 via-background to-brand-secondary/8 px-4 py-8">
+    <div className="from-brand-primary/8 to-brand-secondary/8 flex min-h-screen items-center justify-center bg-gradient-to-br via-background px-4 py-8">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
           <p className="text-sm uppercase tracking-[0.3em] text-muted-foreground">MED13 Foundation</p>

@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import DashboardPage from '@/app/(dashboard)/dashboard/page'
+import DashboardClient from '@/app/(dashboard)/dashboard/dashboard-client'
 
 // Mock NextAuth session
 const mockSession = {
@@ -68,7 +68,7 @@ describe('Theme Integration', () => {
   // Note: Theme toggle is now in Header component, tested separately
 
   it('dashboard maintains functionality with theme system', () => {
-    render(<DashboardPage />)
+    render(<DashboardClient />)
 
     // Verify all dashboard elements are present
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('MED13 Admin Dashboard')

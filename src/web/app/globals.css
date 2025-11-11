@@ -198,6 +198,7 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+
     font-family: var(--font-body);
   }
 

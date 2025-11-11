@@ -5,24 +5,42 @@ import { useSpaceContext } from '@/components/space-context-provider'
 import { UserMenu } from './UserMenu'
 import { LayoutDashboard, Library, Files } from 'lucide-react'
 import Link from 'next/link'
+import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 
 export function Header() {
   const { currentSpaceId } = useSpaceContext()
+  const { prefetchDashboard, prefetchResearchSpaces, prefetchDataDiscovery } = usePrefetchOnHover()
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card shadow-sm">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
           <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-6">
-            <Link href="/dashboard" className="flex shrink-0 items-center gap-2">
+            <Link
+              href="/dashboard"
+              className="flex shrink-0 items-center gap-2"
+              onMouseEnter={prefetchDashboard}
+              onFocus={prefetchDashboard}
+              prefetch={true}
+            >
               <LayoutDashboard className="size-5 sm:size-6" />
               <span className="text-lg font-bold sm:text-xl">MED13 Admin</span>
             </Link>
-            <Link href="/data-discovery" className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
+            <Link
+              href="/data-discovery"
+              className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+              onMouseEnter={prefetchDataDiscovery}
+              onFocus={prefetchDataDiscovery}
+              prefetch={true}
+            >
               <Library className="size-5 sm:size-6" />
               <span className="text-sm font-medium sm:text-base">Data Discovery</span>
             </Link>
-            <Link href="/templates" className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground">
+            <Link
+              href="/templates"
+              className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+              prefetch={true}
+            >
               <Files className="size-5 sm:size-6" />
               <span className="text-sm font-medium sm:text-base">Templates</span>
             </Link>

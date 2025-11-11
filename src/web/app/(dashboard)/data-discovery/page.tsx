@@ -1,363 +1,74 @@
-"use client"
-
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { AxiosError } from 'axios'
-import { ParameterBar } from '@/components/data-discovery/ParameterBar'
-import { SourceCatalog } from '@/components/data-discovery/SourceCatalog'
-import { ResultsView } from '@/components/data-discovery/ResultsView'
-import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
-import { useSpaceContext } from '@/components/space-context-provider'
-import type { QueryParameters, QueryTestResult } from '@/lib/types/data-discovery'
+import { redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { QueryClient, dehydrate } from '@tanstack/react-query'
+import { dataDiscoveryKeys } from '@/lib/query-keys/data-discovery'
 import {
-  useAddDiscoverySourceToSpace,
-  useCreateDataDiscoverySession,
-  useDataDiscoverySessions,
-  useExecuteDataDiscoveryTest,
-  useSessionTestResults,
-  useSourceCatalog,
-  useToggleDataDiscoverySourceSelection,
-  useUpdateDataDiscoverySessionParameters,
-  useSetDataDiscoverySelections,
-} from '@/lib/queries/data-discovery'
-import { toast } from 'sonner'
+  fetchDataDiscoverySessions,
+  fetchSessionTestResults,
+  fetchSourceCatalog,
+} from '@/lib/api/data-discovery'
+import { HydrationBoundary } from '@tanstack/react-query'
+import DataDiscoveryClient from './data-discovery-client'
 import { syncDiscoverySessionState } from '@/lib/state/discovery-session-sync'
-import { PageHero, DashboardSection } from '@/components/ui/composition-patterns'
-import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import type { DataDiscoverySession } from '@/lib/types/data-discovery'
 
-const DEFAULT_PARAMETERS: QueryParameters = {
-  gene_symbol: 'MED13L',
-  search_term: 'atrial septal defect',
-}
+export default async function DataDiscoveryPage() {
+  const session = await getServerSession(authOptions)
+  const token = session?.user?.access_token
 
-export default function DataDiscoveryPage() {
-  const [activeView, setActiveView] = useState<'select' | 'results'>('select')
-  const [parameters, setParameters] = useState<QueryParameters>(DEFAULT_PARAMETERS)
-  const [selectedSources, setSelectedSources] = useState<string[]>([])
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [isGenerating, setIsGenerating] = useState(false)
-  const createRequestedRef = useRef(false)
+  if (!session || !token) {
+    redirect('/auth/login?error=SessionExpired')
+  }
 
-  const { currentSpaceId } = useSpaceContext()
+  const queryClient = new QueryClient()
 
-  const catalogQuery = useSourceCatalog()
-  const sessionsQuery = useDataDiscoverySessions()
-  const testsQuery = useSessionTestResults(activeSessionId)
-  const refetchSessions = sessionsQuery.refetch
-
-  const createSessionMutation = useCreateDataDiscoverySession()
-  const updateSessionParamsMutation = useUpdateDataDiscoverySessionParameters()
-  const toggleSourceMutation = useToggleDataDiscoverySourceSelection()
-  const executeTestMutation = useExecuteDataDiscoveryTest()
-  const addToSpaceMutation = useAddDiscoverySourceToSpace()
-  const setSelectionsMutation = useSetDataDiscoverySelections()
-  const {
-    mutate: createSession,
-    isPending: isCreatingSession,
-    isError: isCreateSessionError,
-  } = createSessionMutation
-
-  const catalog = catalogQuery.data ?? []
-  const testResults = testsQuery.data ?? []
-  const catalogError = catalogQuery.error instanceof Error ? catalogQuery.error : null
-
-  // Initialize or adopt existing session
-  useEffect(() => {
-    if (!sessionsQuery.isSuccess) {
-      return
-    }
-
-    const {
-      nextSessionId,
-      nextParameters,
-      nextSelectedSources,
-      shouldCreateSession,
-    } = syncDiscoverySessionState(sessionsQuery.data ?? [])
-
-    if (shouldCreateSession) {
-      setActiveSessionId(null)
-      setSelectedSources([])
-      if (!isCreatingSession && !createRequestedRef.current) {
-        createRequestedRef.current = true
-        createSession({
-          name: 'Discovery Session',
-          research_space_id: currentSpaceId ?? undefined,
-          initial_parameters: parameters,
-        })
-      }
-      return
-    }
-
-    createRequestedRef.current = false
-
-    if (nextSessionId && activeSessionId !== nextSessionId) {
-      setActiveSessionId(nextSessionId)
-    }
-
-    if (!areArraysEqual(selectedSources, nextSelectedSources)) {
-      setSelectedSources(nextSelectedSources)
-    }
-
-    if (nextParameters && !isSameParameters(parameters, nextParameters)) {
-      setParameters(nextParameters)
-    }
-  }, [
-    sessionsQuery.isSuccess,
-    sessionsQuery.data,
-    activeSessionId,
-    selectedSources,
-    parameters,
-    isCreatingSession,
-    createSession,
-    currentSpaceId,
+  // Prefetch with error handling - failures won't block page render
+  const prefetchResults = await Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: dataDiscoveryKeys.catalog(undefined),
+      queryFn: () => fetchSourceCatalog(token),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: dataDiscoveryKeys.sessions(),
+      queryFn: () => fetchDataDiscoverySessions(token),
+    }),
   ])
 
-  useEffect(() => {
-    if (isCreateSessionError) {
-      createRequestedRef.current = false
+  // Log prefetch failures (client will retry)
+  prefetchResults.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      const queryName = index === 0 ? 'source catalog' : 'data discovery sessions'
+      console.error(`[Server Prefetch] Failed to prefetch ${queryName}:`, result.reason)
+      // Don't throw - let client retry
     }
-  }, [isCreateSessionError])
+  })
 
-  const handleParametersChange = useCallback(
-    (newParams: QueryParameters) => {
-      setParameters(newParams)
-      if (!activeSessionId) {
-        return
-      }
-      updateSessionParamsMutation.mutate({
-        sessionId: activeSessionId,
-        payload: { parameters: newParams },
-      })
-    },
-    [activeSessionId, updateSessionParamsMutation],
-  )
+  const sessionsData =
+    queryClient.getQueryData<DataDiscoverySession[]>(dataDiscoveryKeys.sessions()) ?? []
 
-  const handleToggleSource = useCallback(
-    async (sourceId: string) => {
-      if (!activeSessionId) {
-        return
-      }
-      try {
-        const session = await toggleSourceMutation.mutateAsync({
-          sessionId: activeSessionId,
-          catalogEntryId: sourceId,
-        })
-        setSelectedSources(session.selected_sources)
-      } catch (error: unknown) {
-        console.error(error)
-        if (error instanceof AxiosError && error.response?.status === 404) {
-          createRequestedRef.current = false
-          await refetchSessions()
-          toast.error('Session expired. Recreating discovery session…')
-          return
-        }
-        toast.error('Failed to update source selection')
-      }
-    },
-    [activeSessionId, toggleSourceMutation, refetchSessions],
-  )
+  const { nextSessionId, nextParameters, nextSelectedSources } =
+    syncDiscoverySessionState(sessionsData)
 
-  const applySelectionUpdate = useCallback(
-    async (nextSelections: string[]) => {
-      if (!activeSessionId) {
-        return
-      }
-      const uniqueSelections = Array.from(new Set(nextSelections))
-      try {
-        const session = await setSelectionsMutation.mutateAsync({
-          sessionId: activeSessionId,
-          sourceIds: uniqueSelections,
-        })
-        setSelectedSources(session.selected_sources)
-      } catch (error) {
-        console.error(error)
-        if (error instanceof AxiosError && error.response?.status === 404) {
-          createRequestedRef.current = false
-          await refetchSessions()
-          toast.error('Session expired. Recreating discovery session…')
-          return
-        }
-        toast.error('Failed to update source selection')
-      }
-    },
-    [activeSessionId, setSelectionsMutation, refetchSessions],
-  )
-
-  const handleSelectAllInCategory = useCallback(
-    async (_category: string, sourceIds: string[]) => {
-      if (!activeSessionId || sourceIds.length === 0) {
-        return
-      }
-      const uniqueCategoryIds = Array.from(new Set(sourceIds))
-      const allSelected = uniqueCategoryIds.every((id) => selectedSources.includes(id))
-      const nextSelections = allSelected
-        ? selectedSources.filter((id) => !uniqueCategoryIds.includes(id))
-        : Array.from(new Set([...selectedSources, ...uniqueCategoryIds]))
-      await applySelectionUpdate(nextSelections)
-    },
-    [activeSessionId, selectedSources, applySelectionUpdate],
-  )
-
-  const handleGenerateResults = useCallback(async () => {
-    if (!activeSessionId || selectedSources.length === 0) {
-      toast.error('Select at least one data source before generating results')
-      return
-    }
-
-    setIsGenerating(true)
+  if (nextSessionId) {
     try {
-      for (const sourceId of selectedSources) {
-        await executeTestMutation.mutateAsync({
-          sessionId: activeSessionId,
-          payload: { catalog_entry_id: sourceId },
-        })
-      }
-      setActiveView('results')
-      toast.success('Data discovery tests executed')
+      await queryClient.prefetchQuery({
+        queryKey: dataDiscoveryKeys.sessionTests(nextSessionId),
+        queryFn: () => fetchSessionTestResults(nextSessionId, token),
+      })
     } catch (error) {
-      console.error(error)
-      toast.error('Failed to execute discovery tests')
-    } finally {
-      setIsGenerating(false)
+      console.error('[Server Prefetch] Failed to prefetch session test results:', error)
+      // Don't throw - let client retry
     }
-  }, [activeSessionId, selectedSources, executeTestMutation])
-
-  const handleRunSingleTest = useCallback(
-    async (catalogEntryId: string) => {
-      if (!activeSessionId) {
-        return
-      }
-      try {
-        await executeTestMutation.mutateAsync({
-          sessionId: activeSessionId,
-          payload: { catalog_entry_id: catalogEntryId },
-        })
-        toast.success('Test executed')
-      } catch (error) {
-        console.error(error)
-        toast.error('Failed to execute test')
-      }
-    },
-    [activeSessionId, executeTestMutation],
-  )
-
-  const handleAddResultToSpace = useCallback(
-    async (result: QueryTestResult, spaceId: string) => {
-      if (!activeSessionId) {
-        throw new Error('Session required before adding sources')
-      }
-      try {
-        await addToSpaceMutation.mutateAsync({
-          sessionId: activeSessionId,
-          payload: {
-            catalog_entry_id: result.catalog_entry_id,
-            research_space_id: spaceId,
-            source_config: {},
-          },
-        })
-        toast.success('Source added to research space')
-      } catch (error) {
-        console.error(error)
-        toast.error('Failed to add source to space')
-      }
-    },
-    [activeSessionId, addToSpaceMutation],
-  )
+  }
 
   return (
-    <div className="space-y-6">
-      <PageHero
-        title="Data Source Discovery"
-        description="Discover, test, and promote the highest-quality biomedical data sources for MED13 research workflows."
-        variant="research"
-        actions={<Badge variant="secondary">Workbench Beta</Badge>}
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <DataDiscoveryClient
+        initialSessionId={nextSessionId}
+        initialParameters={nextParameters}
+        initialSelectedSources={nextSelectedSources}
       />
-
-      <DashboardSection
-        title="Query Parameters"
-        description="Tune gene and phenotype filters to personalize discovery runs."
-      >
-        <ParameterBar parameters={parameters} onParametersChange={handleParametersChange} />
-      </DashboardSection>
-
-      <DashboardSection
-        title={activeView === 'select' ? 'Select Data Sources' : 'View Generated Results'}
-        description={
-          activeView === 'select'
-            ? 'Browse the catalog and choose sources to test.'
-            : 'Review generated outputs and promote sources into spaces.'
-        }
-      >
-        <div className="mb-4 flex flex-wrap gap-2">
-          <button
-            onClick={() => setActiveView('select')}
-            className={cn(
-              'px-4 py-2 rounded-md font-medium transition-colors',
-              activeView === 'select'
-                ? 'bg-primary text-primary-foreground shadow'
-                : 'text-muted-foreground bg-muted hover:bg-muted/80',
-            )}
-          >
-            1. Select Data Sources
-          </button>
-          <button
-            onClick={() => setActiveView('results')}
-            className={cn(
-              'px-4 py-2 rounded-md font-medium transition-colors',
-              activeView === 'results'
-                ? 'bg-primary text-primary-foreground shadow'
-                : 'text-muted-foreground bg-muted hover:bg-muted/80',
-            )}
-          >
-            2. View Generated Results
-          </button>
-        </div>
-
-        {activeView === 'select' ? (
-          <SourceCatalog
-            catalog={catalog}
-            isLoading={catalogQuery.isLoading}
-            error={catalogError}
-            selectedSources={selectedSources}
-            onToggleSource={handleToggleSource}
-            onSelectAllInCategory={handleSelectAllInCategory}
-          />
-        ) : (
-          <ResultsView
-            parameters={parameters}
-            currentSpaceId={currentSpaceId}
-            catalog={catalog}
-            results={testResults}
-            isLoading={testsQuery.isLoading}
-            onBackToSelect={() => setActiveView('select')}
-            onAddToSpace={handleAddResultToSpace}
-            onRunTest={handleRunSingleTest}
-          />
-        )}
-      </DashboardSection>
-
-      {activeView === 'select' && (
-        <FloatingActionBar
-          selectedCount={selectedSources.length}
-          onGenerate={handleGenerateResults}
-          isGenerating={isGenerating}
-        />
-      )}
-    </div>
+    </HydrationBoundary>
   )
-}
-
-function areArraysEqual(first: string[], second: string[]): boolean {
-  if (first === second) {
-    return true
-  }
-  if (first.length !== second.length) {
-    return false
-  }
-
-  return first.every((value, index) => value === second[index])
-}
-
-function isSameParameters(left: QueryParameters, right: QueryParameters): boolean {
-  return left.gene_symbol === right.gene_symbol && left.search_term === right.search_term
 }

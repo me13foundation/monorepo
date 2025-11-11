@@ -1,16 +1,54 @@
 "use client"
 
-import { ReactNode } from 'react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import React, { ReactNode } from 'react'
+import {
+  QueryClient,
+  QueryClientProvider,
+  HydrationBoundary,
+  type DehydratedState,
+} from '@tanstack/react-query'
+import dynamic from 'next/dynamic'
 
-const client = new QueryClient()
+const ReactQueryDevtools =
+  process.env.NODE_ENV !== 'production'
+    ? dynamic(
+        async () => {
+          const mod = await import('@tanstack/react-query-devtools')
+          return mod.ReactQueryDevtools
+        },
+        { ssr: false },
+      )
+    : null
 
-export function QueryProvider({ children }: { children: ReactNode }) {
+interface QueryProviderProps {
+  children: ReactNode
+  initialState?: DehydratedState
+}
+
+export function QueryProvider({ children, initialState }: QueryProviderProps) {
+  const [client] = React.useState(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 5 * 60 * 1000,
+            gcTime: 10 * 60 * 1000,
+            refetchOnWindowFocus: false,
+            refetchOnMount: false,
+            refetchOnReconnect: true,
+            retry: 1,
+            retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+          },
+        },
+      }),
+  )
+
   return (
     <QueryClientProvider client={client}>
-      {children}
-      <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+      <HydrationBoundary state={initialState}>{children}</HydrationBoundary>
+      {ReactQueryDevtools ? (
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+      ) : null}
     </QueryClientProvider>
   )
 }

@@ -1,30 +1,42 @@
-'use client'
+import { redirect } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { QueryClient, dehydrate } from '@tanstack/react-query'
+import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
+import { fetchResearchSpace, fetchSpaceMembers } from '@/lib/api/research-spaces'
+import { HydrationBoundary } from '@tanstack/react-query'
+import SpaceMembersClient from '../space-members-client'
 
-import { useSpaceContext } from '@/components/space-context-provider'
-import { useParams } from 'next/navigation'
-import { useEffect } from 'react'
-import { ResearchSpaceDetail } from '@/components/research-spaces/ResearchSpaceDetail'
-import { PageHero } from '@/components/ui/composition-patterns'
+interface SpaceMembersPageProps {
+  params: {
+    spaceId: string
+  }
+}
 
-export default function SpaceMembersPage() {
-  const params = useParams()
-  const spaceId = params.spaceId as string
-  const { setCurrentSpaceId } = useSpaceContext()
+export default async function SpaceMembersPage({ params }: SpaceMembersPageProps) {
+  const session = await getServerSession(authOptions)
+  const token = session?.user?.access_token
 
-  useEffect(() => {
-    if (spaceId) {
-      setCurrentSpaceId(spaceId)
-    }
-  }, [spaceId, setCurrentSpaceId])
+  if (!session || !token) {
+    redirect('/auth/login?error=SessionExpired')
+  }
+
+  const queryClient = new QueryClient()
+
+  await Promise.allSettled([
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.detail(params.spaceId),
+      queryFn: () => fetchResearchSpace(params.spaceId, token),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.members(params.spaceId),
+      queryFn: () => fetchSpaceMembers(params.spaceId, undefined, token),
+    }),
+  ])
 
   return (
-    <div className="space-y-6">
-      <PageHero
-        title="Team Management"
-        description="Invite collaborators, assign roles, and manage membership for this research space."
-        variant="research"
-      />
-      <ResearchSpaceDetail spaceId={spaceId} defaultTab="members" />
-    </div>
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <SpaceMembersClient spaceId={params.spaceId} />
+    </HydrationBoundary>
   )
 }

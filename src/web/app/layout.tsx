@@ -6,6 +6,12 @@ import { SessionProvider } from '@/components/session-provider'
 import { QueryProvider } from '@/components/query-provider'
 import { SpaceContextProvider } from '@/components/space-context-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { QueryClient, dehydrate } from '@tanstack/react-query'
+import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
+import { fetchResearchSpaces } from '@/lib/api/research-spaces'
+import type { ResearchSpaceListResponse } from '@/types/research-space'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -33,17 +39,41 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const session = await getServerSession(authOptions)
+  const queryClient = new QueryClient()
+  const token = session?.user?.access_token
+  let initialSpaces: ResearchSpaceListResponse['spaces'] = []
+  let initialSpaceId: string | null = null
+
+  if (token) {
+    try {
+      await queryClient.prefetchQuery({
+        queryKey: researchSpaceKeys.list(),
+        queryFn: () => fetchResearchSpaces(undefined, token),
+      })
+      const prefetched = queryClient.getQueryData<ResearchSpaceListResponse>(
+        researchSpaceKeys.list(),
+      )
+      initialSpaces = prefetched?.spaces ?? []
+      initialSpaceId = prefetched?.spaces?.[0]?.id ?? null
+    } catch (error) {
+      console.error('Failed to prefetch research spaces', error)
+    }
+  }
+
+  const dehydratedState = dehydrate(queryClient)
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${nunitoSans.variable} ${playfairDisplay.variable} ${inter.className}`} suppressHydrationWarning>
-        <SessionProvider>
-          <QueryProvider>
-            <SpaceContextProvider>
+        <SessionProvider session={session}>
+          <QueryProvider initialState={dehydratedState}>
+            <SpaceContextProvider initialSpaces={initialSpaces} initialSpaceId={initialSpaceId}>
               <ThemeProvider
                 attribute="class"
                 defaultTheme="light"
