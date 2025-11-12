@@ -12,6 +12,9 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.application.services.data_source_activation_service import (
+    DataSourceActivationService,
+)
 from src.application.services.source_management_service import (
     CreateSourceRequest,
     SourceManagementService,
@@ -98,6 +101,7 @@ class DataDiscoveryService:
         source_query_client: SourceQueryClient,
         source_management_service: SourceManagementService,
         source_template_repository: SourceTemplateRepository | None = None,
+        activation_service: DataSourceActivationService | None = None,
     ):
         """
         Initialize the data discovery service.
@@ -116,6 +120,7 @@ class DataDiscoveryService:
         self._query_client = source_query_client
         self._source_service = source_management_service
         self._template_repo = source_template_repository
+        self._activation_service = activation_service
 
     def create_session(
         self,
@@ -266,6 +271,16 @@ class DataDiscoveryService:
                 session_id,
             )
             return None
+        if self._activation_service and not self._activation_service.is_source_active(
+            catalog_entry_id,
+            session.research_space_id,
+        ):
+            logger.warning(
+                "Catalog entry %s disabled for session %s",
+                catalog_entry_id,
+                session_id,
+            )
+            return None
 
         if catalog_entry.param_type != QueryParameterType.NONE:
             current_parameters = session.current_parameters
@@ -333,6 +348,19 @@ class DataDiscoveryService:
                     session_id,
                 )
                 continue
+            if (
+                self._activation_service
+                and not self._activation_service.is_source_active(
+                    catalog_entry_id,
+                    session.research_space_id,
+                )
+            ):
+                logger.warning(
+                    "Catalog entry %s disabled for session %s",
+                    catalog_entry_id,
+                    session_id,
+                )
+                continue
             if catalog_entry.param_type != QueryParameterType.NONE:
                 current_parameters = session.current_parameters
                 if not current_parameters.can_run_query(catalog_entry.param_type):
@@ -358,6 +386,7 @@ class DataDiscoveryService:
         self,
         category: str | None = None,
         search_query: str | None = None,
+        research_space_id: UUID | None = None,
     ) -> list[SourceCatalogEntry]:
         """
         Get the source catalog, optionally filtered.
@@ -370,10 +399,20 @@ class DataDiscoveryService:
             List of catalog entries
         """
         if search_query:
-            return self._catalog_repo.search(search_query, category)
-        if category:
-            return self._catalog_repo.find_by_category(category)
-        return self._catalog_repo.find_all_active()
+            entries = self._catalog_repo.search(search_query, category)
+        elif category:
+            entries = self._catalog_repo.find_by_category(category)
+        else:
+            entries = self._catalog_repo.find_all_active()
+
+        if not self._activation_service:
+            return entries
+
+        return [
+            entry
+            for entry in entries
+            if self._activation_service.is_source_active(entry.id, research_space_id)
+        ]
 
     async def execute_query_test(
         self,

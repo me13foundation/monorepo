@@ -7,6 +7,10 @@ const mockUseAdminUserStats = jest.fn()
 const mockUseAdminUserList = jest.fn()
 const mockUseAdminUserMutations = jest.fn()
 
+jest.mock('@/components/system-settings/DataSourceAvailabilitySection', () => ({
+  DataSourceAvailabilitySection: () => <div data-testid="data-source-availability-section" />,
+}))
+
 jest.mock('@/lib/queries/users', () => ({
   useSystemAdminAccess: () => mockUseSystemAdminAccess(),
   useAdminUserStats: () => mockUseAdminUserStats(),

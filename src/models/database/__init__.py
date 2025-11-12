@@ -10,6 +10,10 @@ from .data_discovery import (
     QueryTestResultModel,
     SourceCatalogEntryModel,
 )
+from .data_source_activation import (
+    ActivationScopeEnum,
+    DataSourceActivationModel,
+)
 from .evidence import EvidenceLevel, EvidenceModel, EvidenceType
 from .gene import GeneModel, GeneType
 from .ingestion_job import (
@@ -84,4 +88,6 @@ __all__ = [
     "UserModel",
     "VariantModel",
     "VariantType",
+    "DataSourceActivationModel",
+    "ActivationScopeEnum",
 ]

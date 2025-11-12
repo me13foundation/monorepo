@@ -1,3 +1,4 @@
+from .data_source_activation_repository import SqlAlchemyDataSourceActivationRepository
 from .evidence_repository import SqlAlchemyEvidenceRepository
 from .gene_repository import SqlAlchemyGeneRepository
 from .phenotype_repository import SqlAlchemyPhenotypeRepository
@@ -12,4 +13,5 @@ __all__ = [
     "SqlAlchemyPublicationRepository",
     "SqlAlchemySourceTemplateRepository",
     "SqlAlchemyVariantRepository",
+    "SqlAlchemyDataSourceActivationRepository",
 ]

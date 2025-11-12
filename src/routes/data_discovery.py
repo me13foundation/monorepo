@@ -637,11 +637,20 @@ async def add_source_to_space(
 async def get_source_catalog(
     category: str | None = Query(None, description="Filter by category"),
     search: str | None = Query(None, description="Search query"),
+    research_space_id: UUID
+    | None = Query(
+        None,
+        description="Optional research space context for availability filtering",
+    ),
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> list[SourceCatalogResponse]:
     """Get the source catalog with optional filtering."""
     try:
-        entries = service.get_source_catalog(category, search)
+        entries = service.get_source_catalog(
+            category,
+            search,
+            research_space_id=research_space_id,
+        )
         return [_catalog_entry_to_response(entry) for entry in entries]
 
     except Exception as e:

@@ -13,6 +13,10 @@ from .data_discovery_session import (
     SourceCatalogEntry,
     TestResultStatus,
 )
+from .data_source_activation import (
+    ActivationScope,
+    DataSourceActivation,
+)
 from .evidence import Evidence
 from .gene import Gene
 
@@ -69,4 +73,6 @@ __all__ = [
     "UserDataSource",
     "ValidationRule",
     "Variant",
+    "ActivationScope",
+    "DataSourceActivation",
 ]

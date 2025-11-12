@@ -3,17 +3,9 @@ import { getServerSession } from 'next-auth'
 import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query'
 import { authOptions } from '@/lib/auth'
 import SystemSettingsClient from './system-settings-client'
-import {
-  fetchUsers,
-  fetchUserStatistics,
-  type UserListParams,
-} from '@/lib/api/users'
+import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
 import { userKeys } from '@/lib/query-keys/users'
-
-export const INITIAL_USER_PARAMS: UserListParams = {
-  skip: 0,
-  limit: 25,
-}
+import { INITIAL_USER_PARAMS } from './constants'
 
 export default async function SystemSettingsPage() {
   const session = await getServerSession(authOptions)

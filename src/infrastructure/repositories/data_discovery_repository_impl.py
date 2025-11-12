@@ -320,6 +320,20 @@ class SQLAlchemySourceCatalogRepository(SourceCatalogRepository):
         )
         return [source_catalog_to_entity(model) for model in models]
 
+    def find_all(self) -> list[SourceCatalogEntry]:
+        """
+        Find all catalog entries regardless of activation state.
+
+        Returns:
+            List of catalog entry entities
+        """
+        models = (
+            self._session.query(SourceCatalogEntryModel)
+            .order_by(SourceCatalogEntryModel.category, SourceCatalogEntryModel.name)
+            .all()
+        )
+        return [source_catalog_to_entity(model) for model in models]
+
     def find_by_category(self, category: str) -> list[SourceCatalogEntry]:
         """
         Find catalog entries by category.

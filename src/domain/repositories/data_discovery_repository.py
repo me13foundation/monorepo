@@ -149,6 +149,15 @@ class SourceCatalogRepository(ABC):
         """
 
     @abstractmethod
+    def find_all(self) -> list[SourceCatalogEntry]:
+        """
+        Find all catalog entries regardless of status.
+
+        Returns:
+            List of entries
+        """
+
+    @abstractmethod
     def find_by_category(self, category: str) -> list[SourceCatalogEntry]:
         """
         Find catalog entries by category.

@@ -80,7 +80,7 @@ def build_sqlite_connect_args(
     return connect_args
 
 
-def retry_on_sqlite_lock[T](
+def retry_on_sqlite_lock(  # noqa: UP047 - Python 3.9 compatible generics
     operation: Callable[[], T],
     max_retries: int = MAX_RETRIES,
     initial_delay: float = INITIAL_RETRY_DELAY,

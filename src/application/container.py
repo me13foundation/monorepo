@@ -31,6 +31,9 @@ from src.application.search.search_service import UnifiedSearchService
 from src.application.services.authentication_service import AuthenticationService
 from src.application.services.authorization_service import AuthorizationService
 from src.application.services.data_discovery_service import DataDiscoveryService
+from src.application.services.data_source_activation_service import (
+    DataSourceActivationService,
+)
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
@@ -49,6 +52,9 @@ from src.infrastructure.repositories.data_discovery_repository_impl import (
     SQLAlchemyDataDiscoverySessionRepository,
     SQLAlchemyQueryTestResultRepository,
     SQLAlchemySourceCatalogRepository,
+)
+from src.infrastructure.repositories.data_source_activation_repository import (
+    SqlAlchemyDataSourceActivationRepository,
 )
 from src.infrastructure.repositories.evidence_repository import (
     SqlAlchemyEvidenceRepository,
@@ -432,7 +438,6 @@ class DependencyContainer:
         # Create repositories
         user_data_source_repo = SqlAlchemyUserDataSourceRepository(session)
         template_repo = SqlAlchemySourceTemplateRepository(session)
-
         return SourceManagementService(
             user_data_source_repository=user_data_source_repo,
             source_template_repository=template_repo,
@@ -451,6 +456,8 @@ class DependencyContainer:
         # Create source management service
         source_service = self.create_source_management_service(session)
         template_repo = SqlAlchemySourceTemplateRepository(session)
+        activation_repo = SqlAlchemyDataSourceActivationRepository(session)
+        activation_service = DataSourceActivationService(activation_repo)
 
         return DataDiscoveryService(
             data_discovery_session_repository=session_repo,
@@ -459,6 +466,7 @@ class DependencyContainer:
             source_query_client=query_client,
             source_management_service=source_service,
             source_template_repository=template_repo,
+            activation_service=activation_service,
         )
 
 

@@ -1,7 +1,7 @@
 import React from 'react'
 import type { ReactElement } from 'react'
 import SystemSettingsPage from '@/app/(dashboard)/system-settings/page'
-import { INITIAL_USER_PARAMS } from '@/app/(dashboard)/system-settings/page'
+import { INITIAL_USER_PARAMS } from '@/app/(dashboard)/system-settings/constants'
 import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
 import { getServerSession } from 'next-auth'
 

@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -41,7 +41,10 @@ import type {
   CreateUserRequest,
   UserListParams,
   UserPublic,
+  UserListResponse,
 } from '@/lib/api/users'
+import { DataSourceAvailabilitySection } from '@/components/system-settings/DataSourceAvailabilitySection'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface SystemSettingsClientProps {
   initialParams: UserListParams
@@ -107,9 +110,10 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
   const mutations = useAdminUserMutations()
 
   const currentUserId = session?.user?.id
+  const listData = userListQuery.data as UserListResponse | undefined
 
   const filteredUsers = useMemo(() => {
-    const users = userListQuery.data?.users ?? []
+    const users = listData?.users ?? []
     if (!search.trim()) {
       return users
     }
@@ -120,7 +124,7 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
         user.email.toLowerCase().includes(query) ||
         user.username.toLowerCase().includes(query),
     )
-  }, [userListQuery.data?.users, search])
+  }, [listData, search])
 
   const isLoading = userListQuery.isLoading || !isReady
 
@@ -227,38 +231,44 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total Users"
-          value={statsQuery.data?.total_users?.toLocaleString() ?? 0}
-          description="Across all roles"
-          icon={<Shield className="size-4 text-muted-foreground" />}
-          isLoading={statsQuery.isLoading}
-        />
-        <StatCard
-          title="Active"
-          value={statsQuery.data?.active_users ?? 0}
-          description="Currently enabled accounts"
-          icon={<CheckCircle className="size-4 text-emerald-500" />}
-          isLoading={statsQuery.isLoading}
-        />
-        <StatCard
-          title="Suspended"
-          value={statsQuery.data?.suspended_users ?? 0}
-          description="Locked for review"
-          icon={<Ban className="size-4 text-amber-500" />}
-          isLoading={statsQuery.isLoading}
-        />
-        <StatCard
-          title="Pending Verification"
-          value={statsQuery.data?.pending_verification ?? 0}
-          description="Awaiting onboarding"
-          icon={<AlertTriangle className="size-4 text-blue-500" />}
-          isLoading={statsQuery.isLoading}
-        />
-      </div>
+      <Tabs defaultValue="users" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="catalog">Data Sources</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users" className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Total Users"
+              value={statsQuery.data?.total_users?.toLocaleString() ?? 0}
+              description="Across all roles"
+              icon={<Shield className="size-4 text-muted-foreground" />}
+              isLoading={statsQuery.isLoading}
+            />
+            <StatCard
+              title="Active"
+              value={statsQuery.data?.active_users ?? 0}
+              description="Currently enabled accounts"
+              icon={<CheckCircle className="size-4 text-emerald-500" />}
+              isLoading={statsQuery.isLoading}
+            />
+            <StatCard
+              title="Suspended"
+              value={statsQuery.data?.suspended_users ?? 0}
+              description="Locked for review"
+              icon={<Ban className="size-4 text-amber-500" />}
+              isLoading={statsQuery.isLoading}
+            />
+            <StatCard
+              title="Pending Verification"
+              value={statsQuery.data?.pending_verification ?? 0}
+              description="Awaiting onboarding"
+              icon={<AlertTriangle className="size-4 text-blue-500" />}
+              isLoading={statsQuery.isLoading}
+            />
+          </div>
 
-      <Card>
+          <Card>
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -426,28 +436,32 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
                 </TableBody>
               </Table>
               <p className="mt-3 text-sm text-muted-foreground">
-                Showing {filteredUsers.length} of {userListQuery.data?.total ?? filteredUsers.length} users
+                Showing {filteredUsers.length} of {listData?.total ?? filteredUsers.length} users
               </p>
             </div>
           )}
         </CardContent>
-      </Card>
+        </Card>
+          <RoleDistributionCard isLoading={statsQuery.isLoading} roles={statsQuery.data?.by_role ?? {}} />
 
-      <RoleDistributionCard isLoading={statsQuery.isLoading} roles={statsQuery.data?.by_role ?? {}} />
+          <CreateUserDialog
+            open={isCreateOpen}
+            onOpenChange={setIsCreateOpen}
+            onSubmit={handleCreateUser}
+            isSubmitting={mutations.createUser.isPending}
+          />
 
-      <CreateUserDialog
-    open={isCreateOpen}
-    onOpenChange={setIsCreateOpen}
-    onSubmit={handleCreateUser}
-    isSubmitting={mutations.createUser.isPending}
-  />
-
-      <DeleteUserDialog
-        user={deleteTarget}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDeleteUser}
-        isPending={mutations.deleteUser.isPending && pendingUserId === deleteTarget?.id}
-      />
+          <DeleteUserDialog
+            user={deleteTarget}
+            onCancel={() => setDeleteTarget(null)}
+            onConfirm={handleDeleteUser}
+            isPending={mutations.deleteUser.isPending && pendingUserId === deleteTarget?.id}
+          />
+        </TabsContent>
+        <TabsContent value="catalog">
+          <DataSourceAvailabilitySection />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

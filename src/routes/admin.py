@@ -13,6 +13,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from src.application.services.data_source_activation_service import (
+    DataSourceActivationService,
+    DataSourceAvailabilitySummary,
+)
 from src.application.services.data_source_authorization_service import (
     DataSourceAuthorizationService,
 )
@@ -31,6 +35,11 @@ from src.application.services.template_management_service import (
     UpdateTemplateRequest as ServiceUpdateTemplateRequest,
 )
 from src.database.session import SessionLocal, get_session
+from src.domain.entities.data_discovery_session import SourceCatalogEntry
+from src.domain.entities.data_source_activation import (
+    ActivationScope,
+    DataSourceActivation,
+)
 from src.domain.entities.source_template import (
     SourceTemplate,
     TemplateCategory,
@@ -45,6 +54,12 @@ from src.domain.entities.user_data_source import (
 )
 from src.domain.entities.user_data_source import (
     SourceType as DomainSourceType,
+)
+from src.infrastructure.repositories.data_discovery_repository_impl import (
+    SQLAlchemySourceCatalogRepository,
+)
+from src.infrastructure.repositories.data_source_activation_repository import (
+    SqlAlchemyDataSourceActivationRepository,
 )
 from src.infrastructure.repositories.source_template_repository import (
     SqlAlchemySourceTemplateRepository,
@@ -87,6 +102,21 @@ def get_template_service() -> TemplateManagementService:
     return TemplateManagementService(template_repo)
 
 
+def get_activation_service() -> DataSourceActivationService:
+    """Get data source activation service instance."""
+    session = get_db_session()
+    activation_repo = SqlAlchemyDataSourceActivationRepository(session)
+    return DataSourceActivationService(activation_repo)
+
+
+def _get_catalog_entry(session: Session, catalog_entry_id: str) -> SourceCatalogEntry:
+    repo = SQLAlchemySourceCatalogRepository(session)
+    entry = repo.find_by_id(catalog_entry_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Catalog entry not found")
+    return entry
+
+
 async def get_auth_service() -> DataSourceAuthorizationService:
     """Get authorization service instance."""
     return DataSourceAuthorizationService()
@@ -95,6 +125,7 @@ async def get_auth_service() -> DataSourceAuthorizationService:
 # Request/Response Models
 
 DEFAULT_OWNER_ID = UUID("00000000-0000-0000-0000-000000000001")
+SYSTEM_ACTOR_ID = DEFAULT_OWNER_ID
 
 
 class TemplateScope(str, Enum):
@@ -159,6 +190,108 @@ class TemplateCreatePayload(BaseModel):
     ui_config: TemplateUIConfig | None = None
     tags: list[str] = Field(default_factory=list)
     is_public: bool = False
+
+
+class CatalogEntryResponse(BaseModel):
+    """Admin response model for source catalog entries."""
+
+    id: str
+    name: str
+    description: str
+    category: str
+    subcategory: str | None
+    tags: list[str]
+    param_type: str
+    is_active: bool
+    requires_auth: bool
+    usage_count: int
+    success_rate: float
+
+    @classmethod
+    def from_entity(cls, entry: SourceCatalogEntry) -> "CatalogEntryResponse":
+        return cls(
+            id=entry.id,
+            name=entry.name,
+            description=entry.description,
+            category=entry.category,
+            subcategory=entry.subcategory,
+            tags=entry.tags,
+            param_type=(
+                entry.param_type.value
+                if hasattr(entry.param_type, "value")
+                else entry.param_type
+            ),
+            is_active=entry.is_active,
+            requires_auth=entry.requires_auth,
+            usage_count=entry.usage_count,
+            success_rate=entry.success_rate,
+        )
+
+
+class ActivationRuleResponse(BaseModel):
+    """API response model for activation rule details."""
+
+    id: UUID
+    scope: ActivationScope
+    is_active: bool
+    research_space_id: UUID | None
+    updated_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class DataSourceAvailabilityResponse(BaseModel):
+    """Availability summary for a catalog entry."""
+
+    catalog_entry_id: str
+    effective_is_active: bool
+    global_rule: ActivationRuleResponse | None
+    project_rules: list[ActivationRuleResponse]
+
+
+class ActivationUpdateRequest(BaseModel):
+    """Payload for toggling activation status."""
+
+    is_active: bool = Field(..., description="Desired activation state")
+
+
+class BulkActivationUpdateRequest(BaseModel):
+    """Payload for applying a global activation to multiple catalog entries."""
+
+    is_active: bool = Field(..., description="Desired activation state")
+    catalog_entry_ids: list[str] | None = Field(
+        default=None,
+        description="Optional subset of catalog entries to update. Defaults to all entries.",
+    )
+
+
+def _activation_rule_to_response(rule: DataSourceActivation) -> ActivationRuleResponse:
+    return ActivationRuleResponse(
+        id=rule.id,
+        scope=rule.scope,
+        is_active=rule.is_active,
+        research_space_id=rule.research_space_id,
+        updated_by=rule.updated_by,
+        created_at=rule.created_at,
+        updated_at=rule.updated_at,
+    )
+
+
+def _availability_summary_to_response(
+    summary: DataSourceAvailabilitySummary,
+) -> DataSourceAvailabilityResponse:
+    return DataSourceAvailabilityResponse(
+        catalog_entry_id=summary.catalog_entry_id,
+        effective_is_active=summary.effective_is_active,
+        global_rule=(
+            _activation_rule_to_response(summary.global_rule)
+            if summary.global_rule
+            else None
+        ),
+        project_rules=[
+            _activation_rule_to_response(rule) for rule in summary.project_rules
+        ],
+    )
 
 
 class TemplateUpdatePayload(BaseModel):
@@ -455,6 +588,172 @@ async def list_data_sources(
             status_code=500,
             detail=f"Failed to list data sources: {e!s}",
         )
+
+
+@router.get(
+    "/data-catalog",
+    response_model=list[CatalogEntryResponse],
+    summary="List source catalog entries",
+    description="Retrieve the global data catalog entries.",
+)
+def list_catalog_entries(
+    category: str | None = Query(None, description="Filter by category"),
+    search: str | None = Query(None, description="Search query"),
+    session: Session = Depends(get_session),
+) -> list[CatalogEntryResponse]:
+    repo = SQLAlchemySourceCatalogRepository(session)
+    if search:
+        entries = repo.search(search, category)
+    elif category:
+        entries = repo.find_by_category(category)
+    else:
+        entries = repo.find_all()
+    return [CatalogEntryResponse.from_entity(entry) for entry in entries]
+
+
+@router.get(
+    "/data-catalog/availability",
+    response_model=list[DataSourceAvailabilityResponse],
+    summary="List catalog availability summaries",
+)
+def list_catalog_availability(
+    session: Session = Depends(get_session),
+    activation_service: DataSourceActivationService = Depends(get_activation_service),
+) -> list[DataSourceAvailabilityResponse]:
+    repo = SQLAlchemySourceCatalogRepository(session)
+    entries = repo.find_all()
+    summaries = activation_service.get_availability_summaries(
+        [entry.id for entry in entries],
+    )
+    return [_availability_summary_to_response(summary) for summary in summaries]
+
+
+@router.get(
+    "/data-catalog/{catalog_entry_id}/availability",
+    response_model=DataSourceAvailabilityResponse,
+    summary="Get catalog entry availability",
+)
+def get_catalog_entry_availability(
+    catalog_entry_id: str,
+    activation_service: DataSourceActivationService = Depends(get_activation_service),
+    session: Session = Depends(get_session),
+) -> DataSourceAvailabilityResponse:
+    _get_catalog_entry(session, catalog_entry_id)
+    summary = activation_service.get_availability_summary(catalog_entry_id)
+    return _availability_summary_to_response(summary)
+
+
+@router.put(
+    "/data-catalog/availability/global",
+    response_model=list[DataSourceAvailabilityResponse],
+    summary="Bulk set global catalog entry availability",
+)
+def bulk_set_global_catalog_entry_availability(
+    request: BulkActivationUpdateRequest,
+    session: Session = Depends(get_session),
+    activation_service: DataSourceActivationService = Depends(get_activation_service),
+) -> list[DataSourceAvailabilityResponse]:
+    repo = SQLAlchemySourceCatalogRepository(session)
+    if request.catalog_entry_ids:
+        target_ids: list[str] = []
+        for catalog_entry_id in request.catalog_entry_ids:
+            _get_catalog_entry(session, catalog_entry_id)
+            target_ids.append(catalog_entry_id)
+    else:
+        target_ids = [entry.id for entry in repo.find_all()]
+
+    if not target_ids:
+        return []
+
+    for catalog_entry_id in target_ids:
+        activation_service.set_global_activation(
+            catalog_entry_id=catalog_entry_id,
+            is_active=request.is_active,
+            updated_by=SYSTEM_ACTOR_ID,
+        )
+
+    summaries = activation_service.get_availability_summaries(target_ids)
+    return [_availability_summary_to_response(summary) for summary in summaries]
+
+
+@router.put(
+    "/data-catalog/{catalog_entry_id}/availability/global",
+    response_model=DataSourceAvailabilityResponse,
+    summary="Set global catalog entry availability",
+)
+def set_global_catalog_entry_availability(
+    catalog_entry_id: str,
+    request: ActivationUpdateRequest,
+    activation_service: DataSourceActivationService = Depends(get_activation_service),
+    session: Session = Depends(get_session),
+) -> DataSourceAvailabilityResponse:
+    _get_catalog_entry(session, catalog_entry_id)
+    activation_service.set_global_activation(
+        catalog_entry_id=catalog_entry_id,
+        is_active=request.is_active,
+        updated_by=SYSTEM_ACTOR_ID,
+    )
+    summary = activation_service.get_availability_summary(catalog_entry_id)
+    return _availability_summary_to_response(summary)
+
+
+@router.delete(
+    "/data-catalog/{catalog_entry_id}/availability/global",
+    response_model=DataSourceAvailabilityResponse,
+    summary="Clear global availability override",
+)
+def clear_global_catalog_entry_availability(
+    catalog_entry_id: str,
+    activation_service: DataSourceActivationService = Depends(get_activation_service),
+    session: Session = Depends(get_session),
+) -> DataSourceAvailabilityResponse:
+    _get_catalog_entry(session, catalog_entry_id)
+    activation_service.clear_global_activation(catalog_entry_id)
+    summary = activation_service.get_availability_summary(catalog_entry_id)
+    return _availability_summary_to_response(summary)
+
+
+@router.put(
+    "/data-catalog/{catalog_entry_id}/availability/research-spaces/{space_id}",
+    response_model=DataSourceAvailabilityResponse,
+    summary="Set project-specific availability",
+)
+def set_project_catalog_entry_availability(
+    catalog_entry_id: str,
+    space_id: UUID,
+    request: ActivationUpdateRequest,
+    activation_service: DataSourceActivationService = Depends(get_activation_service),
+    session: Session = Depends(get_session),
+) -> DataSourceAvailabilityResponse:
+    _get_catalog_entry(session, catalog_entry_id)
+    activation_service.set_project_activation(
+        catalog_entry_id=catalog_entry_id,
+        research_space_id=space_id,
+        is_active=request.is_active,
+        updated_by=SYSTEM_ACTOR_ID,
+    )
+    summary = activation_service.get_availability_summary(catalog_entry_id)
+    return _availability_summary_to_response(summary)
+
+
+@router.delete(
+    "/data-catalog/{catalog_entry_id}/availability/research-spaces/{space_id}",
+    response_model=DataSourceAvailabilityResponse,
+    summary="Clear project-specific availability override",
+)
+def clear_project_catalog_entry_availability(
+    catalog_entry_id: str,
+    space_id: UUID,
+    activation_service: DataSourceActivationService = Depends(get_activation_service),
+    session: Session = Depends(get_session),
+) -> DataSourceAvailabilityResponse:
+    _get_catalog_entry(session, catalog_entry_id)
+    activation_service.clear_project_activation(
+        catalog_entry_id=catalog_entry_id,
+        research_space_id=space_id,
+    )
+    summary = activation_service.get_availability_summary(catalog_entry_id)
+    return _availability_summary_to_response(summary)
 
 
 @router.post(

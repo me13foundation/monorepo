@@ -6,6 +6,7 @@ enabling dependency inversion and testability.
 """
 
 from .base import QuerySpecification, Repository
+from .data_source_activation_repository import DataSourceActivationRepository
 from .evidence_repository import EvidenceRepository
 from .gene_repository import GeneRepository
 from .ingestion_job_repository import IngestionJobRepository
@@ -28,4 +29,5 @@ __all__ = [
     "SourceTemplateRepository",
     "UserDataSourceRepository",
     "VariantRepository",
+    "DataSourceActivationRepository",
 ]

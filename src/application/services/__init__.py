@@ -5,6 +5,10 @@ These services coordinate domain services and repositories to implement
 application use cases while maintaining proper separation of concerns.
 """
 
+from .data_source_activation_service import (
+    DataSourceActivationService,
+    DataSourceAvailabilitySummary,
+)
 from .data_source_authorization_service import (
     DataSourceAuthorizationService,
     DataSourcePermission,
@@ -43,4 +47,6 @@ __all__ = [
     "UpdateTemplateRequest",
     "UserRole",
     "VariantApplicationService",
+    "DataSourceActivationService",
+    "DataSourceAvailabilitySummary",
 ]

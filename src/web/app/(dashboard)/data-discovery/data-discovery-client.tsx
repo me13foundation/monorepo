@@ -68,7 +68,9 @@ export default function DataDiscoveryClient({
 
   const { currentSpaceId } = useSpaceContext()
 
-  const catalogQuery = useSourceCatalog()
+  const catalogQuery = useSourceCatalog(
+    currentSpaceId ? { research_space_id: currentSpaceId } : undefined,
+  )
   const sessionsQuery = useDataDiscoverySessions()
   const testsQuery = useSessionTestResults(activeSessionId)
   const refetchSessions = sessionsQuery.refetch
