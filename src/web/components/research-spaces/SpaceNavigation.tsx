@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from 'react'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
@@ -30,8 +31,13 @@ export function SpaceNavigation() {
     prefetchSpaceCuration,
     prefetchDataDiscovery,
   } = usePrefetchOnHover()
+  const [isMounted, setIsMounted] = useState(false)
 
-  if (!currentSpaceId) {
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!isMounted || !currentSpaceId) {
     return null
   }
 

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import os
 
-from fastapi.testclient import TestClient
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 from src.application import container as container_module
 from src.database.session import SessionLocal, engine
@@ -28,8 +29,10 @@ from tests.test_types.fixtures import (
 
 TEST_ADMIN_PASSWORD = os.getenv("MED13_E2E_ADMIN_PASSWORD", "StrongPass!123")
 
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
-def _reset_container_services() -> None:
+
+async def _reset_container_services() -> None:
     """Ensure async services are rebuilt with the current event loop."""
     container = container_module.container
     container._authentication_service = None
@@ -38,6 +41,7 @@ def _reset_container_services() -> None:
     container._authorization_service_loop = None
     container._user_management_service = None
     container._user_management_service_loop = None
+    await container.engine.dispose()
     jwt_auth_module.SKIP_JWT_VALIDATION = True
 
 
@@ -158,23 +162,37 @@ def _seed_curation_context() -> None:
         session.close()
 
 
-def test_curation_detail_endpoint_returns_clinical_context() -> None:
+async def _get_auth_headers(client: AsyncClient) -> dict[str, str]:
+    email, password = _create_admin_user()
+    resp = await client.post(
+        "/auth/login",
+        json={"email": email, "password": password},
+    )
+    assert resp.status_code == 200
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+async def test_curation_detail_endpoint_returns_clinical_context() -> None:
     """Ensure curator detail endpoint returns phenotypes, evidence, and audit summary."""
     _seed_curation_context()
 
-    _reset_container_services()
+    await _reset_container_services()
     jwt_auth_module.SKIP_JWT_VALIDATION = True
     try:
         app = create_app()
-        client = TestClient(app)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            headers = await _get_auth_headers(client)
+            response = await client.get(
+                "/curation/variants/VCV-E2E-1",
+                headers=headers,
+            )
 
-        headers = _get_auth_headers(client)
-        response = client.get(
-            "/curation/variants/VCV-E2E-1",
-            headers=headers,
-        )
-
-        assert response.status_code == 200, response.json()
+            assert response.status_code == 200, response.json()
     finally:
         jwt_auth_module.SKIP_JWT_VALIDATION = False
     payload = response.json()
@@ -219,14 +237,3 @@ def _create_admin_user(
     finally:
         session.close()
     return email, resolved_password
-
-
-def _get_auth_headers(client: TestClient) -> dict[str, str]:
-    email, password = _create_admin_user()
-    resp = client.post(
-        "/auth/login",
-        json={"email": email, "password": password},
-    )
-    assert resp.status_code == 200
-    token = resp.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}

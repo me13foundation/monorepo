@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import importlib
+import logging
 import os
 from typing import TYPE_CHECKING, Protocol, cast
 
 if TYPE_CHECKING:
     from types import ModuleType
+
+logger = logging.getLogger(__name__)
 
 
 class RedisClientProtocol(Protocol):
@@ -80,6 +83,13 @@ class DistributedRateLimiter:
 
 def build_distributed_limiter() -> DistributedRateLimiter | None:
     """Create a distributed limiter if configuration is present."""
+    enabled = os.getenv("MED13_ENABLE_DISTRIBUTED_RATE_LIMIT", "1")
+    if enabled != "1":
+        logger.info(
+            "Distributed rate limiting disabled (MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=%s)",
+            enabled,
+        )
+        return None
     redis_url = os.getenv("MED13_RATE_LIMIT_REDIS_URL")
     if not redis_url:
         return None

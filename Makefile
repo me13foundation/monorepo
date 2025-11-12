@@ -162,7 +162,7 @@ ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest
 else
 	@$(MAKE) postgres-migrate
-	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest)
+	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest)
 endif
 
 test-verbose: ## Run tests with verbose output
@@ -171,7 +171,7 @@ ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest -v --tb=short
 else
 	@$(MAKE) postgres-migrate
-	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest -v --tb=short)
+	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest -v --tb=short)
 endif
 
 test-cov: ## Run tests with coverage report
@@ -180,7 +180,7 @@ ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest --cov=src --cov-report=html --cov-report=term-missing
 else
 	@$(MAKE) postgres-migrate
-	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest --cov=src --cov-report=html --cov-report=term-missing)
+	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest --cov=src --cov-report=html --cov-report=term-missing)
 endif
 
 test-watch: ## Run tests in watch mode
@@ -189,7 +189,7 @@ ifeq ($(POSTGRES_ACTIVE),)
 	$(USE_PYTHON) -m pytest-watch
 else
 	@$(MAKE) postgres-migrate
-	$(call run_with_postgres_env,$(USE_PYTHON) -m pytest-watch)
+	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest-watch)
 endif
 
 # Code Quality

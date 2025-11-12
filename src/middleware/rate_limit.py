@@ -1,9 +1,6 @@
-"""
-Rate limiting middleware for MED13 Resource Library API.
+"""Rate limiting middleware for MED13 Resource Library API."""
 
-Implements token bucket algorithm for rate limiting based on client IP.
-"""
-
+import logging
 import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
@@ -14,6 +11,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from src.middleware.distributed_rate_limit import build_distributed_limiter
+
+logger = logging.getLogger(__name__)
 
 
 class TokenBucket:
@@ -185,16 +184,23 @@ class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
             )
 
         if self.distributed_limiter:
-            allowed, retry_after = await self.distributed_limiter.allow(
-                f"{method}:{request.url.path}:{client_ip}",
-                bucket.capacity,
-            )
-            if not allowed:
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Global rate limit exceeded. Please try again later.",
-                    headers={"Retry-After": str(retry_after)},
+            try:
+                allowed, retry_after = await self.distributed_limiter.allow(
+                    f"{method}:{request.url.path}:{client_ip}",
+                    bucket.capacity,
                 )
+            except (ConnectionError, RuntimeError, TimeoutError):
+                logger.exception(
+                    "Distributed rate limiter failed; disabling for this process",
+                )
+                self.distributed_limiter = None
+            else:
+                if not allowed:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail="Global rate limit exceeded. Please try again later.",
+                        headers={"Retry-After": str(retry_after)},
+                    )
 
         response = await call_next(request)
 

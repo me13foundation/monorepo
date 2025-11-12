@@ -1,6 +1,7 @@
 import os
 
-from fastapi.testclient import TestClient
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 from src.application import container as container_module
 from src.database.session import SessionLocal, engine
@@ -13,8 +14,10 @@ from src.models.database.user import UserModel
 
 TEST_ADMIN_PASSWORD = os.getenv("MED13_E2E_ADMIN_PASSWORD", "StrongPass!123")
 
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
-def _reset_container_services() -> None:
+
+async def _reset_container_services() -> None:
     container = container_module.container
     container._authentication_service = None
     container._authentication_service_loop = None
@@ -22,6 +25,7 @@ def _reset_container_services() -> None:
     container._authorization_service_loop = None
     container._user_management_service = None
     container._user_management_service_loop = None
+    await container.engine.dispose()
     jwt_auth_module.SKIP_JWT_VALIDATION = True
 
 
@@ -49,9 +53,9 @@ def _create_admin_user(
     return email, resolved_password
 
 
-def _get_auth_headers(client: TestClient) -> dict[str, str]:
+async def _get_auth_headers(client: AsyncClient) -> dict[str, str]:
     email, password = _create_admin_user()
-    resp = client.post(
+    resp = await client.post(
         "/auth/login",
         json={"email": email, "password": password},
     )
@@ -60,58 +64,61 @@ def _get_auth_headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_curation_submit_list_approve_comment(tmp_path):
-    _reset_container_services()
+async def test_curation_submit_list_approve_comment() -> None:
+    await _reset_container_services()
     jwt_auth_module.SKIP_JWT_VALIDATION = True
     try:
         app = create_app()
-        client = TestClient(app)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+        ) as client:
+            # Ensure tables exist for the test
+            Base.metadata.create_all(engine)
+            headers = await _get_auth_headers(client)
 
-        # Ensure tables exist for the test
-        Base.metadata.create_all(engine)
-        headers = _get_auth_headers(client)
+            # Submit a record for review
+            resp = await client.post(
+                "/curation/submit",
+                json={"entity_type": "genes", "entity_id": "GENE1", "priority": "high"},
+                headers=headers,
+            )
+            assert resp.status_code == 201, resp.json()
+            created_id = resp.json()["id"]
+            assert isinstance(created_id, int)
 
-        # Submit a record for review
-        resp = client.post(
-            "/curation/submit",
-            json={"entity_type": "genes", "entity_id": "GENE1", "priority": "high"},
-            headers=headers,
-        )
-        assert resp.status_code == 201, resp.json()
-        created_id = resp.json()["id"]
-        assert isinstance(created_id, int)
+            # List queue and ensure our item appears
+            resp = await client.get(
+                "/curation/queue",
+                params={"entity_type": "genes", "status": "pending"},
+                headers=headers,
+            )
+            assert resp.status_code == 200, resp.json()
+            items = resp.json()
+            assert any(item["id"] == created_id for item in items)
 
-        # List queue and ensure our item appears
-        resp = client.get(
-            "/curation/queue",
-            params={"entity_type": "genes", "status": "pending"},
-            headers=headers,
-        )
-        assert resp.status_code == 200, resp.json()
-        items = resp.json()
-        assert any(item["id"] == created_id for item in items)
+            # Approve the item
+            resp = await client.post(
+                "/curation/bulk",
+                json={"ids": [created_id], "action": "approve"},
+                headers=headers,
+            )
+            assert resp.status_code == 200, resp.json()
+            assert resp.json()["updated"] >= 1
 
-        # Approve the item
-        resp = client.post(
-            "/curation/bulk",
-            json={"ids": [created_id], "action": "approve"},
-            headers=headers,
-        )
-        assert resp.status_code == 200, resp.json()
-        assert resp.json()["updated"] >= 1
-
-        # Leave a comment
-        resp = client.post(
-            "/curation/comment",
-            json={
-                "entity_type": "genes",
-                "entity_id": "GENE1",
-                "comment": "Looks good",
-                "user": "tester",
-            },
-            headers=headers,
-        )
-        assert resp.status_code == 201, resp.json()
-        assert isinstance(resp.json()["id"], int)
+            # Leave a comment
+            resp = await client.post(
+                "/curation/comment",
+                json={
+                    "entity_type": "genes",
+                    "entity_id": "GENE1",
+                    "comment": "Looks good",
+                    "user": "tester",
+                },
+                headers=headers,
+            )
+            assert resp.status_code == 201, resp.json()
+            assert isinstance(resp.json()["id"], int)
     finally:
         jwt_auth_module.SKIP_JWT_VALIDATION = False
