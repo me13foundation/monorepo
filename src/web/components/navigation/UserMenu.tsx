@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useSignOut } from '@/hooks/use-sign-out'
-import { User, LogOut, Loader2, Moon, Sun, Settings } from 'lucide-react'
+import { User, LogOut, Loader2, Moon, Sun, Settings, ShieldCheck } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import Link from 'next/link'
 
@@ -23,6 +23,7 @@ export function UserMenu() {
   const userEmail = session?.user?.email || 'User'
   const userName = session?.user?.full_name || userEmail
   const userRole = session?.user?.role || 'User'
+  const isAdmin = session?.user?.role === 'admin'
 
   return (
     <DropdownMenu>
@@ -49,6 +50,14 @@ export function UserMenu() {
             <span>Settings</span>
           </Link>
         </DropdownMenuItem>
+        {isAdmin && (
+          <DropdownMenuItem asChild>
+            <Link href="/system-settings" className="cursor-pointer">
+              <ShieldCheck className="mr-2 size-4" />
+              <span>System Settings</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}

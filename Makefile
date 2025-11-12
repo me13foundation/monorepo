@@ -384,7 +384,8 @@ stop-local: ## Stop the local FastAPI backend
 
 stop-web: ## Stop the Next.js admin interface
 	@echo "Stopping Next.js admin interface..."
-	@if [ -f "$(WEB_PID_FILE)" ]; then \
+	@handled=0; \
+	if [ -f "$(WEB_PID_FILE)" ]; then \
 		PID=$$(cat "$(WEB_PID_FILE)"); \
 		if kill -0 $$PID 2>/dev/null; then \
 			kill $$PID && echo "Stopped Next.js process $$PID."; \
@@ -392,8 +393,23 @@ stop-web: ## Stop the Next.js admin interface
 			echo "PID $$PID not running; cleaning up stale PID file."; \
 		fi; \
 		rm -f "$(WEB_PID_FILE)"; \
-	else \
-		pkill -f "npm run dev" >/dev/null 2>&1 && echo "Stopped npm dev process via pkill." || echo "No Next.js process found"; \
+		handled=1; \
+	fi; \
+	PORT_PIDS=$$(lsof -ti tcp:3000 2>/dev/null || true); \
+	if [ -n "$$PORT_PIDS" ]; then \
+		echo "Terminating processes on port 3000: $$PORT_PIDS"; \
+		kill $$PORT_PIDS >/dev/null 2>&1 || true; \
+		sleep 1; \
+		REMAINING=$$(lsof -ti tcp:3000 2>/dev/null || true); \
+		if [ -n "$$REMAINING" ]; then \
+			echo "Force killing stubborn processes on port 3000: $$REMAINING"; \
+			kill -9 $$REMAINING >/dev/null 2>&1 || true; \
+		fi; \
+		echo "Port 3000 cleared."; \
+		handled=1; \
+	fi; \
+	if [ $$handled -eq 0 ]; then \
+		echo "No Next.js process found"; \
 	fi
 
 stop-all: ## Stop FastAPI, Next.js, Postgres, and remove PID files/log hints

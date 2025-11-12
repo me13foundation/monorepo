@@ -177,9 +177,49 @@ describe('UserMenu Component', () => {
       await user.click(triggerButton)
 
       await waitFor(() => {
-        const settingsLink = screen.getByRole('link', { name: /settings/i })
+        const settingsLink = screen.getByRole('link', { name: /^settings$/i })
         expect(settingsLink).toBeInTheDocument()
         expect(settingsLink).toHaveAttribute('href', '/settings')
+      })
+    })
+
+    it('shows System Settings link for administrators', async () => {
+      const user = userEvent.setup()
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        const systemSettingsLink = screen.getByRole('link', { name: /system settings/i })
+        expect(systemSettingsLink).toBeInTheDocument()
+        expect(systemSettingsLink).toHaveAttribute('href', '/system-settings')
+      })
+    })
+
+    it('hides System Settings link for non-admin users', async () => {
+      const user = userEvent.setup()
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'user-3',
+            email: 'researcher@example.com',
+            role: 'researcher',
+            full_name: 'Researcher User',
+          },
+        },
+        status: 'authenticated',
+        update: jest.fn(),
+      } as any)
+
+      render(<UserMenu />)
+
+      const triggerButton = screen.getByRole('button', { name: /open user menu/i })
+      await user.click(triggerButton)
+
+      await waitFor(() => {
+        const maybeLink = screen.queryByRole('link', { name: /system settings/i })
+        expect(maybeLink).not.toBeInTheDocument()
       })
     })
 
