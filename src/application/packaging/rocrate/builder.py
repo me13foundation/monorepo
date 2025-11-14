@@ -11,15 +11,13 @@ import uuid
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
 
 from src.application.packaging.types import (
     ProvenanceMetadata,
-    ProvenanceSourceEntry,
     ROCrateFileEntry,
 )
 from src.type_definitions.common import JSONObject, JSONValue
-from src.type_definitions.json_utils import list_of_objects
+from src.type_definitions.json_utils import to_json_value
 
 JSONMetadata = JSONObject
 
@@ -155,39 +153,12 @@ class ROCrateBuilder:
         value = payload.get(field)
         return value if isinstance(value, str) else None
 
-    def generate_metadata(
+    def _create_root_dataset(
         self,
-        data_files: Sequence[ROCrateFileEntry],
-        provenance_info: ProvenanceMetadata | None = None,
-    ) -> JSONMetadata:
-        """
-        Generate RO-Crate metadata.json.
-
-        Args:
-            data_files: List of data file metadata dictionaries
-            provenance_info: Optional provenance information
-
-        Returns:
-            RO-Crate metadata dictionary
-        """
-        root_dataset_id = "./"
-
-        # Build context with RO-Crate vocabulary
-        context: JSONObject = {
-            "@vocab": "https://schema.org/",
-            "ro-crate": "https://w3id.org/ro/crate#",
-        }
-
-        # Root dataset entity
-        license_info: JSONObject = {
-            "@id": f"https://spdx.org/licenses/{self.license_id}.html",
-            "@type": "CreativeWork",
-            "name": self.license_id,
-        }
-        creator_info: JSONObject = {
-            "@type": "Organization",
-            "name": self.author,
-        }
+        *,
+        license_info: JSONObject,
+        creator_info: JSONObject,
+    ) -> JSONObject:
         keyword_values: list[str] = [
             "MED13",
             "genetics",
@@ -196,8 +167,12 @@ class ROCrateBuilder:
             "biomedical data",
             "FAIR data",
         ]
-        root_dataset: JSONObject = {
-            "@id": root_dataset_id,
+        keywords_json = self._json_list(
+            keyword_values,
+            error_message="Keywords must serialize to a JSON list",
+        )
+        return {
+            "@id": "./",
             "@type": "Dataset",
             "name": self.name,
             "description": self.description,
@@ -205,32 +180,38 @@ class ROCrateBuilder:
             "license": license_info,
             "creator": creator_info,
             "datePublished": self.created_at,
-            "keywords": cast("list[JSONValue]", keyword_values),
+            "keywords": keywords_json,
         }
 
-        has_part: list[JSONMetadata] = []
+    def _provenance_entries(
+        self,
+        provenance_info: ProvenanceMetadata | None,
+    ) -> list[JSONMetadata]:
+        entries: list[JSONMetadata] = []
+        if not provenance_info:
+            return entries
+        sources_value = provenance_info.get("sources")
+        if not isinstance(sources_value, list):
+            return entries
+        structured_sources: list[Mapping[str, object]] = [
+            source for source in sources_value if isinstance(source, Mapping)
+        ]
+        for source in structured_sources:
+            download_entry: JSONMetadata = {
+                "@type": self._string_or_none(source, "@type") or "DataDownload",
+                "name": self._string_or_none(source, "name"),
+                "contentUrl": self._string_or_none(source, "url"),
+                "datePublished": self._string_or_none(source, "datePublished"),
+                "version": self._string_or_none(source, "version"),
+            }
+            entries.append(download_entry)
+        return entries
 
-        # Add provenance if available
-        if provenance_info:
-            sources_raw = list_of_objects(
-                cast("JSONValue", provenance_info.get("sources")),
-            )
-            for source in sources_raw:
-                typed_source = cast("ProvenanceSourceEntry", source)
-                download_entry: JSONMetadata = {
-                    "@type": typed_source.get("@type", "DataDownload"),
-                    "name": self._string_or_none(typed_source, "name"),
-                    "contentUrl": self._string_or_none(typed_source, "url"),
-                    "datePublished": self._string_or_none(
-                        typed_source,
-                        "datePublished",
-                    ),
-                    "version": self._string_or_none(typed_source, "version"),
-                }
-                has_part.append(download_entry)
-
-        # Build file entities
-        file_entities: list[JSONMetadata] = []
+    def _build_file_entities(
+        self,
+        data_files: Sequence[ROCrateFileEntry],
+    ) -> list[JSONMetadata]:
+        entities: list[JSONMetadata] = []
         for file_info in data_files:
             file_path = self._coerce_path(file_info)
             file_entity: JSONMetadata = {
@@ -251,15 +232,64 @@ class ROCrateBuilder:
             if date_created:
                 file_entity["dateCreated"] = date_created
 
-            file_entities.append(file_entity)
+            entities.append(file_entity)
+        return entities
 
+    @staticmethod
+    def _json_list(value: object, *, error_message: str) -> list[JSONValue]:
+        converted = to_json_value(value)
+        if not isinstance(converted, list):
+            raise TypeError(error_message)
+        return converted
+
+    def generate_metadata(
+        self,
+        data_files: Sequence[ROCrateFileEntry],
+        provenance_info: ProvenanceMetadata | None = None,
+    ) -> JSONMetadata:
+        """
+        Generate RO-Crate metadata.json.
+
+        Args:
+            data_files: List of data file metadata dictionaries
+            provenance_info: Optional provenance information
+
+        Returns:
+            RO-Crate metadata dictionary
+        """
+        # Build context with RO-Crate vocabulary
+        context: JSONObject = {
+            "@vocab": "https://schema.org/",
+            "ro-crate": "https://w3id.org/ro/crate#",
+        }
+
+        # Root dataset entity
+        license_info: JSONObject = {
+            "@id": f"https://spdx.org/licenses/{self.license_id}.html",
+            "@type": "CreativeWork",
+            "name": self.license_id,
+        }
+        creator_info: JSONObject = {
+            "@type": "Organization",
+            "name": self.author,
+        }
+        root_dataset = self._create_root_dataset(
+            license_info=license_info,
+            creator_info=creator_info,
+        )
+
+        has_part = self._provenance_entries(provenance_info)
+
+        file_entities = self._build_file_entities(data_files)
         if file_entities:
             has_part.extend(file_entities)
 
         if has_part:
-            root_dataset["hasPart"] = cast("list[JSONValue]", has_part)
+            root_dataset["hasPart"] = self._json_list(
+                has_part,
+                error_message="hasPart entries must serialize to a JSON list",
+            )
 
-        # Build complete metadata structure
         return {
             "@context": context,
             "@graph": [root_dataset, *file_entities],

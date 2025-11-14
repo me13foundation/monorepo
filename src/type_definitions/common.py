@@ -217,27 +217,7 @@ AuthCredentials = (
 
 
 # Source-specific metadata types
-class SourceMetadata(TypedDict, total=False):
-    """Type-safe source-specific metadata."""
-
-    version: str
-    last_updated: str
-    record_count: int
-    data_format: str
-    encoding: str
-    compression: str
-    schema_version: str
-    custom_fields: dict[str, str | int | float | bool | None]
-    limit: int | None
-    method: str
-    query_params: dict[str, JSONValue]
-    headers: dict[str, str]
-    required_fields: list[str]
-    expected_types: dict[str, str]
-    ingest_mode: str
-    auth_type: str
-    connection_string: str
-    driver: str
+SourceMetadata = JSONObject
 
 
 # Research space settings types
@@ -268,6 +248,18 @@ class ResearchSpaceSettings(TypedDict, total=False):
 # Query specification types
 FilterValue = str | int | float | bool | None
 QueryFilters = dict[str, FilterValue]
+
+
+def clone_query_filters(
+    filters: Mapping[str, FilterValue] | QueryFilters | None,
+) -> QueryFilters | None:
+    """Create a shallow copy of query filters with normalized keys."""
+    if filters is None:
+        return None
+    normalized: QueryFilters = {}
+    for key, value in dict(filters).items():
+        normalized[str(key)] = value
+    return normalized
 
 
 # Statistics and health check types

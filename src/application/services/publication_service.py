@@ -5,13 +5,15 @@ Coordinates domain services and repositories to implement publication management
 use cases while preserving strong typing.
 """
 
-from typing import cast
-
 from src.domain.entities.publication import Publication, PublicationType
 from src.domain.repositories.evidence_repository import EvidenceRepository
 from src.domain.repositories.publication_repository import PublicationRepository
 from src.domain.value_objects.identifiers import PublicationIdentifier
-from src.type_definitions.common import PublicationUpdate, QueryFilters
+from src.type_definitions.common import (
+    PublicationUpdate,
+    QueryFilters,
+    clone_query_filters,
+)
 
 
 class PublicationApplicationService:
@@ -219,9 +221,7 @@ class PublicationApplicationService:
     def _normalize_filters(
         filters: QueryFilters | None,
     ) -> QueryFilters | None:
-        if filters is None:
-            return None
-        return cast("QueryFilters", dict(filters))
+        return clone_query_filters(filters)
 
 
 __all__ = ["PublicationApplicationService"]

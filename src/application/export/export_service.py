@@ -11,13 +11,18 @@ from collections.abc import Callable, Generator, Sequence
 from datetime import datetime
 from enum import Enum
 from io import StringIO
-from typing import TypeVar, cast
+from typing import TypeVar
 
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.variant_service import VariantApplicationService
-from src.type_definitions.common import JSONObject, JSONValue, QueryFilters
+from src.type_definitions.common import (
+    JSONObject,
+    JSONValue,
+    QueryFilters,
+    clone_query_filters,
+)
 
 
 class ExportFormat(str, Enum):
@@ -256,7 +261,7 @@ class BulkExportService:
         """Export data as JSON format."""
         serialized_items = [self._serialize_item(item) for item in items]
         data: JSONObject = {
-            entity_type: cast("JSONValue", serialized_items),
+            entity_type: serialized_items,
         }
 
         json_str = json.dumps(data, indent=2, default=str)
@@ -348,7 +353,7 @@ class BulkExportService:
         if isinstance(item, (list, tuple)):
             return self._serialize_sequence(item)
 
-        return cast("JSONValue", item)
+        return self._coerce_scalar(item)
 
     @staticmethod
     def _is_namedtuple(candidate: object) -> bool:
@@ -359,8 +364,13 @@ class BulkExportService:
 
     def _serialize_namedtuple(self, item: object) -> JSONObject:
         """Serialize a NamedTuple into a dictionary."""
-        fields = cast("Sequence[str]", getattr(item, "_fields", ()))
-        return {field: self._serialize_item(getattr(item, field)) for field in fields}
+        fields_attr = getattr(item, "_fields", ())
+        if not isinstance(fields_attr, Sequence):
+            return {}
+        field_names = [str(field) for field in fields_attr]
+        return {
+            field: self._serialize_item(getattr(item, field)) for field in field_names
+        }
 
     def _serialize_object(self, item: object) -> JSONObject:
         """Serialize a regular object, excluding private attributes."""
@@ -404,17 +414,27 @@ class BulkExportService:
 
         return row
 
-    @staticmethod
-    def _resolve_nested_value(source: JSONValue, path: Sequence[str]) -> JSONValue:
+    @classmethod
+    def _resolve_nested_value(
+        cls,
+        source: JSONValue,
+        path: Sequence[str],
+    ) -> JSONValue:
         current: JSONValue = source
         for part in path:
             if isinstance(current, dict):
                 current = current.get(part, "")
             elif hasattr(current, part):
-                current = cast("JSONValue", getattr(current, part, ""))
+                current = cls._coerce_scalar(getattr(current, part, ""))
             else:
                 return ""
         return current
+
+    @staticmethod
+    def _coerce_scalar(value: object) -> JSONValue:
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
 
     def _get_gene_fields(self) -> list[str]:
         """Get field names for gene CSV export."""
@@ -500,9 +520,7 @@ class BulkExportService:
 
     @staticmethod
     def _copy_filters(filters: QueryFilters | None) -> QueryFilters:
-        if filters is None:
-            return {}
-        return cast("QueryFilters", dict(filters))
+        return clone_query_filters(filters) or {}
 
     def get_export_info(self, entity_type: str) -> JSONObject:
         """

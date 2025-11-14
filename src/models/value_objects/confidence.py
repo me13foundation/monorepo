@@ -4,7 +4,7 @@ Immutable objects that quantify the strength of evidence in MED13.
 """
 
 from enum import Enum
-from typing import TypedDict, Unpack, cast
+from typing import TypedDict, Unpack
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
@@ -114,7 +114,7 @@ class ConfidenceScore(BaseModel):
     ) -> "ConfidenceScore":
         """Create ConfidenceScore from numeric score with automatic level
         classification."""
-        mutable_options = cast("ConfidenceScoreOptions", dict(options))
+        mutable_options: ConfidenceScoreOptions = {**options}
         if score >= LEVEL_DEFINITIVE:
             computed_level = EvidenceLevel.DEFINITIVE
         elif score >= LEVEL_STRONG:

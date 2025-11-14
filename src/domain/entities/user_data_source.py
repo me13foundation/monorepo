@@ -7,7 +7,6 @@ with additional biomedical data while maintaining provenance and quality standar
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -16,7 +15,7 @@ from src.type_definitions.common import AuthCredentials, SourceMetadata
 
 
 def _empty_source_metadata() -> SourceMetadata:
-    return cast("SourceMetadata", {})
+    return {}
 
 
 class SourceType(str, Enum):

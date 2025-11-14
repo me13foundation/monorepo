@@ -13,7 +13,7 @@ import contextlib
 import json
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import httpx
 
@@ -28,7 +28,6 @@ from src.domain.services.api_source_service import (
 from src.domain.services.api_source_service import (
     JSONValue as GatewayJSONValue,
 )
-from src.type_definitions.json_utils import to_json_value
 
 AuthHeaders = dict[str, str]
 QueryParamValue = str | int | float | bool | None
@@ -152,7 +151,10 @@ class HttpxAPISourceGateway(APISourceGateway):
 
                 metadata = self._metadata(configuration)
                 url = configuration.url
-                method = metadata.get("method", "GET").upper()
+                method_value = metadata.get("method")
+                method = (
+                    method_value.upper() if isinstance(method_value, str) else "GET"
+                )
                 query_params = metadata.get("query_params", {})
                 if isinstance(query_params, dict):
                     params.update(self._normalize_params(query_params))
@@ -189,15 +191,12 @@ class HttpxAPISourceGateway(APISourceGateway):
                         f"HTTP {response.status_code}: {response.text[:200]}",
                     )
 
-                metadata_payload: GatewayJSONObject = cast(
-                    "GatewayJSONObject",
-                    {
-                        "request_url": url,
-                        "params": dict(params),
-                        "method": method,
-                        "headers": dict(headers),
-                    },
-                )
+                metadata_payload: GatewayJSONObject = {
+                    "request_url": url,
+                    "params": {str(k): str(v) for k, v in params.items()},
+                    "method": method,
+                    "headers": dict(headers),
+                }
 
                 return APIRequestResult(
                     success=success,
@@ -206,7 +205,7 @@ class HttpxAPISourceGateway(APISourceGateway):
                     response_time_ms=response_time,
                     status_code=response.status_code,
                     errors=errors,
-                    metadata=cast("GatewayJSONObject", to_json_value(metadata_payload)),
+                    metadata=metadata_payload,
                 )
 
         except Exception as exc:  # noqa: BLE001
@@ -319,8 +318,22 @@ class HttpxAPISourceGateway(APISourceGateway):
         payload: object,
     ) -> GatewayJSONObject:
         if isinstance(payload, dict):
-            return cast("GatewayJSONObject", payload)
-        return cast("GatewayJSONObject", {"value": payload})
+            return {
+                str(key): self._coerce_json_value(value)
+                for key, value in payload.items()
+            }
+        return {"value": self._coerce_json_value(payload)}
+
+    def _coerce_json_value(self, value: object) -> GatewayJSONValue:
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        if isinstance(value, list):
+            return [self._coerce_json_value(item) for item in value]
+        if isinstance(value, dict):
+            return {
+                str(key): self._coerce_json_value(val) for key, val in value.items()
+            }
+        return str(value)
 
     def _auth_none(self, _config: AuthConfig) -> None:
         return None

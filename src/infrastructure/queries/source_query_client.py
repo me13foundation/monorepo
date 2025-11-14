@@ -8,7 +8,7 @@ for programmatic sources, following Clean Architecture principles.
 import asyncio
 import logging
 from collections.abc import MutableMapping
-from typing import TYPE_CHECKING, Protocol, assert_never, cast
+from typing import TYPE_CHECKING, Protocol, assert_never
 from urllib.parse import quote
 
 import aiohttp
@@ -82,7 +82,7 @@ class HTTPQueryClient(SourceQueryClient):
 
     def _create_session(self) -> SessionLike:
         """Create a requests session with retry strategy."""
-        session = requests.Session()
+        session: SessionLike = requests.Session()
 
         # Configure retry strategy
         retry_strategy = Retry(
@@ -104,7 +104,7 @@ class HTTPQueryClient(SourceQueryClient):
             },
         )
 
-        return cast("SessionLike", session)
+        return session
 
     async def execute_query(
         self,
@@ -297,7 +297,8 @@ class HTTPQueryClient(SourceQueryClient):
     ) -> JSONObject:
         """Parse API response payload with JSON/text fallback."""
         try:
-            data = cast("JSONValue", await response.json())
+            raw_payload = await response.json()
+            data = self._coerce_json_value(raw_payload)
         except aiohttp.ContentTypeError:
             text = await response.text()
             data = {"response": text, "content_type": response.content_type}
@@ -313,3 +314,16 @@ class HTTPQueryClient(SourceQueryClient):
         """Close the underlying HTTP session."""
         if hasattr(self, "_session"):
             self._session.close()
+
+    @staticmethod
+    def _coerce_json_value(value: object) -> JSONValue:
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        if isinstance(value, dict):
+            return {
+                str(key): HTTPQueryClient._coerce_json_value(val)
+                for key, val in value.items()
+            }
+        if isinstance(value, list):
+            return [HTTPQueryClient._coerce_json_value(item) for item in value]
+        return str(value)

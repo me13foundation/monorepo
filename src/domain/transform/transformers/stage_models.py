@@ -10,7 +10,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
+
+from ..parsers.clinvar_parser import ClinVarVariant
+from ..parsers.hpo_parser import HPOTerm
+from ..parsers.pubmed_parser import PubMedPublication
+from ..parsers.uniprot_parser import UniProtProtein
 
 if TYPE_CHECKING:
     from ..mappers.gene_variant_mapper import GeneVariantLink, GeneVariantMapper
@@ -22,10 +27,6 @@ if TYPE_CHECKING:
     from ..normalizers.phenotype_normalizer import NormalizedPhenotype
     from ..normalizers.publication_normalizer import NormalizedPublication
     from ..normalizers.variant_normalizer import NormalizedVariant
-    from ..parsers.clinvar_parser import ClinVarVariant
-    from ..parsers.hpo_parser import HPOTerm
-    from ..parsers.pubmed_parser import PubMedPublication
-    from ..parsers.uniprot_parser import UniProtProtein
 
 StageData = dict[str, object]
 
@@ -43,13 +44,19 @@ class ParsedDataBundle:
     def add(self, source: str, records: list[object]) -> None:
         """Persist parsed records under the appropriate collection."""
         if source == "clinvar":
-            self.clinvar = cast("list[ClinVarVariant]", records)
+            self.clinvar = [
+                record for record in records if isinstance(record, ClinVarVariant)
+            ]
         elif source == "pubmed":
-            self.pubmed = cast("list[PubMedPublication]", records)
+            self.pubmed = [
+                record for record in records if isinstance(record, PubMedPublication)
+            ]
         elif source == "hpo":
-            self.hpo = cast("list[HPOTerm]", records)
+            self.hpo = [record for record in records if isinstance(record, HPOTerm)]
         elif source == "uniprot":
-            self.uniprot = cast("list[UniProtProtein]", records)
+            self.uniprot = [
+                record for record in records if isinstance(record, UniProtProtein)
+            ]
         else:
             self.extras[source] = records
 

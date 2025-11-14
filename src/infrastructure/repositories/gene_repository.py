@@ -5,7 +5,7 @@ Data access layer for gene entities with specialized queries.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict
 
 from sqlalchemy import asc, delete, desc, func, or_, select, update
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from src.domain.entities.gene import Gene
     from src.domain.repositories.base import QuerySpecification
     from src.domain.value_objects.identifiers import GeneIdentifier
-    from src.type_definitions.common import GeneUpdate
+    from src.type_definitions.common import GeneUpdate, JSONObject
 
 
 class GeneStatistics(TypedDict):
@@ -248,7 +248,7 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         count = self.session.execute(stmt).scalar_one()
         return count > 0
 
-    def get_gene_statistics(self) -> dict[str, int | float | bool | str | None]:
+    def get_gene_statistics(self) -> JSONObject:
         """Get statistics about genes in the database."""
         total_genes = self.count()
         stats = GeneStatistics(
@@ -256,7 +256,11 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
             genes_with_variants=0,  # TODO: implement query
             genes_with_phenotypes=0,  # TODO: implement query
         )
-        return cast("dict[str, int | float | bool | str | None]", stats)
+        return {
+            "total_genes": stats["total_genes"],
+            "genes_with_variants": stats["genes_with_variants"],
+            "genes_with_phenotypes": stats["genes_with_phenotypes"],
+        }
 
     def search_by_name_or_symbol(self, query: str, limit: int = 10) -> list[Gene]:
         """Search genes by name or symbol containing the query string."""

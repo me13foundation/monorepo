@@ -5,7 +5,6 @@ Orchestrates domain services and repositories to implement
 data source management use cases with proper business logic.
 """
 
-from typing import cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -467,7 +466,13 @@ class SourceManagementService:
             Dictionary with various statistics
         """
         stats = self._source_repository.get_statistics()
-        return cast("StatisticsResponse", stats)
+        return {
+            "total_sources": stats["total_sources"],
+            "status_counts": stats["status_counts"],
+            "type_counts": stats["type_counts"],
+            "average_quality_score": stats["average_quality_score"],
+            "sources_with_quality_metrics": stats["sources_with_quality_metrics"],
+        }
 
     def validate_source_configuration(  # noqa: C901 - validator is intentionally comprehensive
         self,

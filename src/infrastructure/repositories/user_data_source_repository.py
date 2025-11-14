@@ -8,7 +8,7 @@ and efficient database operations.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict
 
 from sqlalchemy import and_, delete, desc, func, select, update
 
@@ -29,10 +29,9 @@ from src.models.database import UserDataSourceModel
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from uuid import UUID
 
-    from sqlalchemy.engine import CursorResult
     from sqlalchemy.orm import Session
 
-    from src.type_definitions.common import JSONObject
+    from src.type_definitions.common import StatisticsResponse
 
 
 class UserDataSourceStatistics(TypedDict):
@@ -61,6 +60,12 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
             message = "Session not provided"
             raise ValueError(message)
         return self._session
+
+    @staticmethod
+    def _rowcount(result: object) -> int:
+        """Safely extract rowcount information from SQLAlchemy results."""
+        count = getattr(result, "rowcount", None)
+        return int(count) if isinstance(count, int) else 0
 
     def save(self, source: UserDataSource) -> UserDataSource:
         """Save a user data source to the repository."""
@@ -299,8 +304,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         )
         result = self.session.execute(stmt)
         self.session.commit()
-        cursor = cast("CursorResult[tuple[()]]", result)
-        affected = int(cursor.rowcount or 0)
+        affected = self._rowcount(result)
         return affected > 0
 
     def count_by_owner(self, owner_id: UUID) -> int:
@@ -325,7 +329,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         stmt = select(func.count()).where(UserDataSourceModel.id == str(source_id))
         return self.session.execute(stmt).scalar_one() > 0
 
-    def get_statistics(self) -> JSONObject:
+    def get_statistics(self) -> StatisticsResponse:
         """Get overall statistics about data sources."""
         # Get counts by status
         status_counts: dict[str, int] = {}
@@ -368,13 +372,13 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
             select(func.count()).select_from(UserDataSourceModel),
         ).scalar_one()
 
-        stats = UserDataSourceStatistics(
-            total_sources=total_count,
-            status_counts=status_counts,
-            type_counts=type_counts,
-            average_quality_score=(
+        stats: StatisticsResponse = {
+            "total_sources": total_count,
+            "status_counts": status_counts,
+            "type_counts": type_counts,
+            "average_quality_score": (
                 float(avg_quality) if avg_quality is not None else None
             ),
-            sources_with_quality_metrics=int(total_with_quality),
-        )
-        return cast("JSONObject", stats)
+            "sources_with_quality_metrics": int(total_with_quality),
+        }
+        return stats

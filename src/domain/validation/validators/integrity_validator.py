@@ -6,10 +6,9 @@ and consistency between related entities.
 """
 
 from dataclasses import dataclass
-from typing import cast
 
-from src.type_definitions.common import JSONObject, JSONValue
-from src.type_definitions.json_utils import as_str, list_of_strings
+from src.type_definitions.common import JSONObject
+from src.type_definitions.json_utils import as_str, list_of_strings, to_json_value
 
 from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
@@ -255,7 +254,7 @@ class IntegrityValidator:
                 issues.append(
                     ValidationIssue(
                         field=field,
-                        value=cast("JSONValue", list(refs)),
+                        value=to_json_value(list(refs)),
                         rule="circular_reference",
                         message=f"Entity {entity_id} cannot reference itself",
                         severity=ValidationSeverity.ERROR,

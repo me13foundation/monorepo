@@ -1,6 +1,6 @@
 """Application-level orchestration for gene use cases."""
 
-from typing import cast
+from typing import Literal
 
 from src.domain.entities.gene import Gene
 from src.domain.entities.variant import VariantSummary
@@ -9,7 +9,19 @@ from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.value_objects.identifiers import GeneIdentifier
 from src.domain.value_objects.provenance import Provenance
-from src.type_definitions.common import GeneUpdate
+from src.type_definitions.common import GeneUpdate, JSONObject
+
+AllowedGeneField = Literal[
+    "name",
+    "description",
+    "gene_type",
+    "chromosome",
+    "start_position",
+    "end_position",
+    "ensembl_id",
+    "ncbi_gene_id",
+    "uniprot_id",
+]
 
 
 class GeneApplicationService:
@@ -224,7 +236,7 @@ class GeneApplicationService:
         """Update mutable gene fields by gene identifier."""
         gene = self._gene_repository.find_by_gene_id_or_fail(gene_id)
 
-        allowed_fields = {
+        allowed_fields: tuple[AllowedGeneField, ...] = (
             "name",
             "description",
             "gene_type",
@@ -234,12 +246,12 @@ class GeneApplicationService:
             "ensembl_id",
             "ncbi_gene_id",
             "uniprot_id",
-        }
-
-        sanitized_updates = cast(
-            "GeneUpdate",
-            {key: value for key, value in updates.items() if key in allowed_fields},
         )
+
+        sanitized_updates: GeneUpdate = {}
+        for field in allowed_fields:
+            if field in updates:
+                sanitized_updates[field] = updates[field]
 
         if not sanitized_updates:
             msg = "No valid fields provided for update"
@@ -341,7 +353,7 @@ class GeneApplicationService:
     def get_gene_statistics(
         self,
         gene_id: str | None = None,
-    ) -> dict[str, int | float | bool | str | None]:
+    ) -> JSONObject:
         """
         Get comprehensive statistics about genes.
 
@@ -359,17 +371,20 @@ class GeneApplicationService:
                 "has_location": gene.chromosome is not None,
             }
 
-        stats_raw: dict[
-            str,
-            int | float | bool | str | None,
-        ] = self._gene_repository.get_gene_statistics()
-        stats: dict[str, int | float | bool | str | None] = {
-            key: value
-            for key, value in stats_raw.items()
-            if isinstance(value, (int, float, bool, str)) or value is None
-        }
+        stats_raw = self._gene_repository.get_gene_statistics()
+        stats: JSONObject = {}
+        for key, value in stats_raw.items():
+            if isinstance(value, (int, float, bool, str)) or value is None:
+                stats[key] = value
 
-        total_genes = self._coerce_int(stats_raw.get("total_genes"))
+        total_genes_value = stats_raw.get("total_genes")
+        total_genes = self._coerce_int(
+            (
+                total_genes_value
+                if isinstance(total_genes_value, (int, float, str))
+                else None
+            ),
+        )
         stats["total_genes"] = total_genes
 
         # Add additional computed statistics

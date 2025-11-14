@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import logging
 import os
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol, TypeGuard
 
 if TYPE_CHECKING:
     from types import ModuleType
@@ -42,11 +42,11 @@ def _load_redis_factory() -> type[RedisFactory]:
         raise RuntimeError(msg) from exc
 
     factory_obj: object = getattr(module, "Redis", None)
-    if factory_obj is None:
+    if not _is_redis_factory(factory_obj):
         msg = "redis.asyncio.Redis not available"
         raise RuntimeError(msg)
 
-    return cast("type[RedisFactory]", factory_obj)
+    return factory_obj
 
 
 class DistributedRateLimiter:
@@ -94,3 +94,10 @@ def build_distributed_limiter() -> DistributedRateLimiter | None:
     if not redis_url:
         return None
     return DistributedRateLimiter(redis_url=redis_url)
+
+
+def _is_redis_factory(obj: object) -> TypeGuard[type[RedisFactory]]:
+    if obj is None or not hasattr(obj, "from_url"):
+        return False
+    from_url = obj.from_url
+    return callable(from_url)

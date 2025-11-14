@@ -5,7 +5,6 @@ Validation helpers for relationships between genes, variants, and phenotypes.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import cast
 
 from src.type_definitions.common import JSONObject, JSONValue
 from src.type_definitions.json_utils import as_object, list_of_strings
@@ -314,18 +313,25 @@ class RelationshipValidationRules:
         ci = data.get("confidence_interval")
         if ci is None:
             return None
-        if (
-            not isinstance(ci, (tuple, list))
-            or len(ci) != 2
-            or not all(isinstance(bound, (int, float)) for bound in ci)
-        ):
+        if not isinstance(ci, (tuple, list)) or len(ci) != 2:
             return (
                 False,
                 "Confidence interval must be a two-element numeric tuple",
                 "Provide (lower, upper) confidence interval bounds",
             )
-        lower = float(cast("int | float", ci[0]))
-        upper = float(cast("int | float", ci[1]))
+        lower_bound = ci[0]
+        upper_bound = ci[1]
+        if not isinstance(lower_bound, (int, float)) or not isinstance(
+            upper_bound,
+            (int, float),
+        ):
+            return (
+                False,
+                "Confidence interval entries must be numeric",
+                "Provide (lower, upper) confidence interval bounds",
+            )
+        lower = float(lower_bound)
+        upper = float(upper_bound)
         if lower > upper:
             return (
                 False,

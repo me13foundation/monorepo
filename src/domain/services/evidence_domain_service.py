@@ -7,7 +7,6 @@ and confidence scoring logic without infrastructure dependencies.
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from typing import cast
 
 from src.domain.entities.evidence import Evidence
 from src.domain.services.base import DomainService
@@ -379,7 +378,7 @@ class EvidenceDomainService(DomainService[Evidence]):
         evidence_list: Sequence[Evidence],
     ) -> list[dict[str, object]]:
         """Detect clinical significance conflicts."""
-        conflicts = []
+        conflicts: list[dict[str, object]] = []
 
         significances = [
             (ev.clinical_significance.lower(), ev.id)
@@ -388,20 +387,25 @@ class EvidenceDomainService(DomainService[Evidence]):
         ]
 
         # Check for pathogenic vs benign conflicts
-        pathogenic = [evid_id for sig, evid_id in significances if "pathogenic" in sig]
-        benign = [evid_id for sig, evid_id in significances if "benign" in sig]
+        pathogenic = [
+            evid_id
+            for sig, evid_id in significances
+            if "pathogenic" in sig and isinstance(evid_id, int)
+        ]
+        benign = [
+            evid_id
+            for sig, evid_id in significances
+            if "benign" in sig and isinstance(evid_id, int)
+        ]
 
         if pathogenic and benign:
             conflicts.append(
-                cast(
-                    "dict[str, object]",
-                    {
-                        "type": "significance_conflict",
-                        "description": f"Conflicting clinical significance: {len(pathogenic)} pathogenic vs {len(benign)} benign",
-                        "severity": "high",
-                        "evidence_ids": pathogenic + benign,
-                    },
-                ),
+                {
+                    "type": "significance_conflict",
+                    "description": f"Conflicting clinical significance: {len(pathogenic)} pathogenic vs {len(benign)} benign",
+                    "severity": "high",
+                    "evidence_ids": pathogenic + benign,
+                },
             )
 
         return conflicts
@@ -411,7 +415,7 @@ class EvidenceDomainService(DomainService[Evidence]):
         evidence_list: Sequence[Evidence],
     ) -> list[dict[str, object]]:
         """Detect frequency conflicts."""
-        conflicts = []
+        conflicts: list[dict[str, object]] = []
 
         frequencies: list[tuple[float, int | None]] = [
             (ev.allele_frequency, ev.id)
@@ -426,15 +430,16 @@ class EvidenceDomainService(DomainService[Evidence]):
             threshold = 0.05
             if freq_range > threshold:
                 conflicts.append(
-                    cast(
-                        "dict[str, object]",
-                        {
-                            "type": "frequency_conflict",
-                            "description": f"Large frequency discrepancy: {freq_range:.4f} across {len(frequencies)} sources",
-                            "severity": "medium",
-                            "evidence_ids": [evid_id for _, evid_id in frequencies],
-                        },
-                    ),
+                    {
+                        "type": "frequency_conflict",
+                        "description": f"Large frequency discrepancy: {freq_range:.4f} across {len(frequencies)} sources",
+                        "severity": "medium",
+                        "evidence_ids": [
+                            evid_id
+                            for _, evid_id in frequencies
+                            if isinstance(evid_id, int)
+                        ],
+                    },
                 )
 
         return conflicts

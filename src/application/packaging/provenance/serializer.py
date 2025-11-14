@@ -9,11 +9,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.models.value_objects.provenance import Provenance
     from src.type_definitions.common import JSONObject, JSONValue
+
+from src.type_definitions.json_utils import to_json_value
 
 
 @dataclass
@@ -75,8 +77,8 @@ class ProvenanceSerializer:
         if provenance.metadata:
             dataset_node["prov:qualifiedAttribution"] = provenance.metadata
 
-        jsonld_data: JSONObject = {**context, "@graph": [dataset_node]}
-        graph_nodes = cast("list[JSONObject]", jsonld_data["@graph"])
+        graph_nodes: list[JSONObject] = [dataset_node]
+        jsonld_data: JSONObject = {**context, "@graph": graph_nodes}
 
         # Add acquisition activity node
         activity_id = f"urn:med13:activity:acquisition:{source_name}"
@@ -208,11 +210,11 @@ class FAIRMetadataSerializer:
     ) -> JSONObject:
         """Create a complete FAIR metadata bundle."""
         base_context = self.provenance_serializer.get_jsonld_context().get("@context")
-        combined_context: dict[str, JSONValue]
+        combined_context: dict[str, JSONValue] = {}
         if isinstance(base_context, dict):
-            combined_context = cast("dict[str, JSONValue]", dict(base_context))
-        else:
-            combined_context = {}
+            combined_context = {
+                str(key): to_json_value(value) for key, value in base_context.items()
+            }
         combined_context.update(
             {
                 "fair": "https://www.go-fair.org/fair-principles/",

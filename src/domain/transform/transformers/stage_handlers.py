@@ -8,7 +8,7 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from ..mappers.cross_reference_mapper import CrossReferenceMapper
 from ..mappers.gene_variant_mapper import GeneVariantMapper
@@ -46,11 +46,21 @@ class BatchParser(Protocol[ParsedRecord]):
         ...
 
 
+class ParserExecutor(Protocol):
+    """Runtime parser interface used by the parsing stage."""
+
+    def parse_batch(self, raw_data: list[RawRecord]) -> list[object]:
+        ...
+
+    def validate_parsed_data(self, record: object) -> list[str]:
+        ...
+
+
 @dataclass
 class ParsingStageRunner:
     """Execute parsing across all configured sources."""
 
-    parsers: dict[str, BatchParser[object]]
+    parsers: dict[str, ParserExecutor]
 
     async def run(
         self,
@@ -145,15 +155,12 @@ class NormalizationStageRunner:
     ) -> None:
         for protein in parsed_data.uniprot:
             for gene in protein.genes:
-                record: RawRecord = cast(
-                    "RawRecord",
-                    {
-                        "symbol": gene.name,
-                        "name": gene.name,
-                        "id": gene.locus,
-                        "synonyms": gene.synonyms,
-                    },
-                )
+                record: RawRecord = {
+                    "symbol": gene.name,
+                    "name": gene.name,
+                    "id": gene.locus,
+                    "synonyms": list(gene.synonyms),
+                }
                 normalized_gene = self.gene_normalizer.normalize(
                     record,
                     source="uniprot",
@@ -172,14 +179,11 @@ class NormalizationStageRunner:
         seen_genes: set[str],
     ) -> None:
         for variant in parsed_data.clinvar:
-            gene_record: RawRecord = cast(
-                "RawRecord",
-                {
-                    "gene_symbol": variant.gene_symbol,
-                    "gene_id": variant.gene_id,
-                    "gene_name": variant.gene_name,
-                },
-            )
+            gene_record: RawRecord = {
+                "gene_symbol": variant.gene_symbol,
+                "gene_id": variant.gene_id,
+                "gene_name": variant.gene_name,
+            }
             normalized_gene = self.gene_normalizer.normalize(
                 gene_record,
                 source="clinvar",
@@ -202,20 +206,17 @@ class NormalizationStageRunner:
         normalized: NormalizedDataBundle,
     ) -> None:
         for variant in parsed_data.clinvar:
-            variant_record: RawRecord = cast(
-                "RawRecord",
-                {
-                    "clinvar_id": variant.clinvar_id,
-                    "variant_id": variant.variant_id,
-                    "variation_name": variant.variation_name,
-                    "gene_symbol": variant.gene_symbol,
-                    "chromosome": variant.chromosome,
-                    "start_position": variant.start_position,
-                    "reference_allele": variant.reference_allele,
-                    "alternate_allele": variant.alternate_allele,
-                    "clinical_significance": variant.clinical_significance.value,
-                },
-            )
+            variant_record: RawRecord = {
+                "clinvar_id": variant.clinvar_id,
+                "variant_id": variant.variant_id,
+                "variation_name": variant.variation_name,
+                "gene_symbol": variant.gene_symbol,
+                "chromosome": variant.chromosome,
+                "start_position": variant.start_position,
+                "reference_allele": variant.reference_allele,
+                "alternate_allele": variant.alternate_allele,
+                "clinical_significance": variant.clinical_significance.value,
+            }
             normalized_variant = self.variant_normalizer.normalize(
                 variant_record,
                 source="clinvar",
@@ -234,10 +235,7 @@ class NormalizationStageRunner:
     ) -> None:
         for variant in parsed_data.clinvar:
             for phenotype_name in variant.phenotypes:
-                phenotype_record: RawRecord = cast(
-                    "RawRecord",
-                    {"name": phenotype_name},
-                )
+                phenotype_record: RawRecord = {"name": phenotype_name}
                 normalized_phenotype = self.phenotype_normalizer.normalize(
                     phenotype_record,
                     source="clinvar",
@@ -315,8 +313,11 @@ class NormalizationStageRunner:
     ) -> None:
         for protein in parsed_data.uniprot:
             for reference in protein.references:
+                citation_record: RawRecord = {
+                    "citation": asdict(reference),
+                }
                 normalized_publication = self.publication_normalizer.normalize(
-                    cast("RawRecord", {"citation": asdict(reference)}),
+                    citation_record,
                     source="uniprot",
                 )
                 if normalized_publication:
@@ -554,6 +555,7 @@ __all__ = [
     "BatchParser",
     "ExportStageRunner",
     "MappingStageRunner",
+    "ParserExecutor",
     "NormalizationStageRunner",
     "ParsingStageRunner",
     "ValidationStageRunner",

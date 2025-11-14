@@ -7,7 +7,6 @@ research space management use cases with proper business logic.
 
 import re
 from dataclasses import dataclass
-from typing import cast
 from uuid import UUID, uuid4
 
 from src.domain.entities.research_space import ResearchSpace, SpaceStatus
@@ -320,21 +319,18 @@ class ResearchSpaceManagementService:
             ),
         )
 
-        return cast(
-            "JSONObject",
-            {
-                "total_spaces": total_spaces,
-                "active_spaces": active_spaces,
-                "archived_spaces": total_spaces - active_spaces,
-            },
-        )
+        return {
+            "total_spaces": total_spaces,
+            "active_spaces": active_spaces,
+            "archived_spaces": total_spaces - active_spaces,
+        }
 
     @staticmethod
     def _normalize_settings(
         settings: JSONObject | None,
     ) -> JSONObject:
         """Normalize arbitrary dicts into research space settings dict."""
-        return cast("JSONObject", dict(settings or {}))
+        return dict(settings or {})
 
     def validate_space(self, space: ResearchSpace) -> list[str]:
         """

@@ -7,7 +7,6 @@ templates into concrete configurations, and quality assurance checks.
 
 import re
 from collections.abc import Mapping
-from typing import cast
 
 import jsonschema
 from pydantic import BaseModel
@@ -25,7 +24,6 @@ from src.type_definitions.common import (
     AuthCredentials,
     JSONObject,
     JSONValue,
-    SourceMetadata,
 )
 
 TemplateParameters = Mapping[str, JSONValue]
@@ -466,12 +464,11 @@ class TemplateValidationService:
                 "template_id": str(template.id),
                 "template_name": template.name,
                 "validation_rules": [
-                    cast("JSONObject", rule.model_dump())
-                    for rule in template.validation_rules
+                    rule.model_dump() for rule in template.validation_rules
                 ],
             },
         )
-        metadata = cast("SourceMetadata", metadata_payload)
+        metadata = metadata_payload
 
         field_mapping = self._coerce_field_mapping(
             normalized_parameters.get("field_mapping"),

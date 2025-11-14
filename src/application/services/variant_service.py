@@ -1,14 +1,18 @@
 """Application-level orchestration for variant workflows."""
 
 from collections.abc import Sequence
-from typing import cast
 
 from src.domain.entities.evidence import Evidence
 from src.domain.entities.variant import EvidenceSummary, Variant
 from src.domain.repositories.evidence_repository import EvidenceRepository
 from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.variant_domain_service import VariantDomainService
-from src.type_definitions.common import JSONObject, QueryFilters, VariantUpdate
+from src.type_definitions.common import (
+    JSONObject,
+    QueryFilters,
+    VariantUpdate,
+    clone_query_filters,
+)
 
 
 class VariantApplicationService:
@@ -343,9 +347,7 @@ class VariantApplicationService:
     def _normalize_filters(
         filters: QueryFilters | None,
     ) -> QueryFilters | None:
-        if filters is None:
-            return None
-        return cast("QueryFilters", dict(filters))
+        return clone_query_filters(filters)
 
     @staticmethod
     def _summarize_evidence(

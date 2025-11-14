@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, TypedDict, Unpack
 
 if TYPE_CHECKING:
     from src.models.value_objects.provenance import Provenance
     from src.type_definitions.common import JSONObject, JSONValue
+
+from src.type_definitions.json_utils import to_json_value
 
 
 class DatasetMetadataOptions(TypedDict, total=False):
@@ -79,50 +81,61 @@ class DatasetMetadata:
 
     def to_ro_crate_metadata(self) -> JSONObject:
         """Convert to RO-Crate metadata format."""
-        metadata: JSONObject = {
-            "@context": ["https://w3id.org/ro/crate/1.1/context", {"@base": None}],
-            "@graph": [
-                {
-                    "@id": "ro-crate-metadata.json",
-                    "@type": "CreativeWork",
-                    "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
-                    "about": {"@id": "./"},
-                },
-                {
-                    "@id": "./",
-                    "@type": ["Dataset"],
-                    "name": self.title,
-                    "description": self.description,
-                    "dateCreated": (
-                        self.date_created.isoformat() if self.date_created else None
-                    ),
-                    "dateModified": (
-                        self.date_modified.isoformat() if self.date_modified else None
-                    ),
-                    "datePublished": (
-                        self.date_published.isoformat() if self.date_published else None
-                    ),
-                    "keywords": cast("list[JSONValue]", self.keywords),
-                    "conformsTo": cast(
-                        "list[JSONValue]",
-                        [{"@id": standard} for standard in self.conforms_to],
-                    ),
-                },
-            ],
+
+        def _as_object(value: object) -> JSONObject:
+            serialized = to_json_value(value)
+            if not isinstance(serialized, dict):
+                message = "Value must serialize to a JSON object"
+                raise TypeError(message)
+            return serialized
+
+        def _as_list(value: object) -> list[JSONValue]:
+            serialized = to_json_value(value)
+            if not isinstance(serialized, list):
+                message = "Value must serialize to a JSON list"
+                raise TypeError(message)
+            return serialized
+
+        dataset_node: JSONObject = {
+            "@id": "./",
+            "@type": ["Dataset"],
+            "name": self.title,
+            "description": self.description,
+            "dateCreated": self.date_created.isoformat() if self.date_created else None,
+            "dateModified": (
+                self.date_modified.isoformat() if self.date_modified else None
+            ),
+            "datePublished": (
+                self.date_published.isoformat() if self.date_published else None
+            ),
+            "keywords": _as_list(self.keywords),
+            "conformsTo": _as_list(
+                [{"@id": standard} for standard in self.conforms_to],
+            ),
         }
 
-        graph_nodes = cast("list[JSONObject]", metadata["@graph"])
+        graph_nodes: list[JSONObject] = [
+            {
+                "@id": "ro-crate-metadata.json",
+                "@type": "CreativeWork",
+                "conformsTo": {"@id": "https://w3id.org/ro/crate/1.1"},
+                "about": {"@id": "./"},
+            },
+            dataset_node,
+        ]
+
+        metadata: JSONObject = {
+            "@context": ["https://w3id.org/ro/crate/1.1/context", {"@base": None}],
+            "@graph": graph_nodes,
+        }
 
         # Add creators
         if self.creators:
-            graph_nodes[1]["creator"] = cast("list[JSONValue]", self.creators)
+            dataset_node["creator"] = _as_list(self.creators)
 
         # Add license
         if self.license_url:
-            graph_nodes[1]["license"] = cast(
-                "JSONObject",
-                {"@id": self.license_url},
-            )
+            dataset_node["license"] = {"@id": self.license_url}
 
         return metadata
 

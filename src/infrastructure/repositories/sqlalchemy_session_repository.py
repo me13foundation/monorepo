@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,9 +19,6 @@ from src.models.database.session import SessionModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from uuid import UUID
-
-    from sqlalchemy.engine import CursorResult
-
 
 SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
@@ -67,6 +64,12 @@ class SqlAlchemySessionRepository(SessionRepository):
     def _to_domain_list(models: list[SessionModel]) -> list[UserSession]:
         """Convert a list of SQLAlchemy models to domain entities."""
         return [UserSession.model_validate(model) for model in models]
+
+    @staticmethod
+    def _rowcount(result: object) -> int:
+        """Safely extract rowcount from SQLAlchemy result objects."""
+        count = getattr(result, "rowcount", None)
+        return int(count) if isinstance(count, int) else 0
 
     async def create(self, session_entity: UserSession) -> UserSession:
         """Create a new session."""
@@ -246,8 +249,7 @@ class SqlAlchemySessionRepository(SessionRepository):
             )
             result = await session.execute(stmt)
             await session.commit()
-            cursor = cast("CursorResult[tuple[()]]", result)
-            return int(cursor.rowcount or 0)
+            return self._rowcount(result)
 
     async def revoke_expired_sessions(self) -> int:
         """Revoke all expired sessions."""
@@ -265,8 +267,7 @@ class SqlAlchemySessionRepository(SessionRepository):
             )
             result = await session.execute(stmt)
             await session.commit()
-            cursor = cast("CursorResult[tuple[()]]", result)
-            return int(cursor.rowcount or 0)
+            return self._rowcount(result)
 
     async def cleanup_expired_sessions(
         self,
@@ -288,8 +289,7 @@ class SqlAlchemySessionRepository(SessionRepository):
             )
             result = await session.execute(stmt)
             await session.commit()
-            cursor = cast("CursorResult[tuple[()]]", result)
-            return int(cursor.rowcount or 0)
+            return self._rowcount(result)
 
     async def get_sessions_by_ip(self, ip_address: str) -> list[UserSession]:
         """Get sessions by IP address (for security monitoring)."""

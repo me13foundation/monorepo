@@ -10,7 +10,7 @@ import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from src.application.curation.repositories.review_repository import (
     ReviewFilter,
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from src.domain.entities.evidence import Evidence
     from src.domain.entities.variant import Variant
 from src.type_definitions.common import FilterValue, JSONObject, QueryFilters
+from src.type_definitions.json_utils import to_json_value
 
 ClinicalFilterValue = FilterValue | list[FilterValue]
 ClinicalFilters = Mapping[str, ClinicalFilterValue]
@@ -221,8 +222,7 @@ class CurationService:
             for ev in evidence_records
         ]
 
-        return cast(
-            "JSONObject",
+        return self._to_json_object(
             {
                 "id": variant.id,
                 "variant_id": variant.identifier.variant_id,
@@ -249,8 +249,8 @@ class CurationService:
                 "publications": publications,
                 "gnomad_af": variant.gnomad_af,
                 "allele_frequency": variant.allele_frequency,
-                "quality_score": 0.85,  # Placeholder - calculated in validation
-                "issues": 0,  # Placeholder - from validation results
+                "quality_score": 0.85,
+                "issues": 0,
                 "review_status": variant.review_status,
             },
         )
@@ -333,8 +333,7 @@ class CurationService:
             else (str(lu) if lu is not None else None)
         )
 
-        return cast(
-            "JSONObject",
+        return self._to_json_object(
             {
                 "id": review_record.get("id"),
                 "entity_id": review_record.get("entity_id"),
@@ -375,8 +374,7 @@ class CurationService:
             else (str(lu) if lu is not None else None)
         )
 
-        return cast(
-            "JSONObject",
+        return self._to_json_object(
             {
                 "id": review_record.get("id"),
                 "entity_id": review_record.get("entity_id"),
@@ -401,8 +399,7 @@ class CurationService:
             else (str(lu) if lu is not None else None)
         )
 
-        return cast(
-            "JSONObject",
+        return self._to_json_object(
             {
                 "id": review_record.get("id"),
                 "entity_id": review_record.get("entity_id"),
@@ -425,6 +422,15 @@ class CurationService:
         if isinstance(value, str | int | float | bool):
             return {key: value}
         return None
+
+    @staticmethod
+    def _to_json_object(payload: Mapping[str, object]) -> JSONObject:
+        """Convert arbitrary mapping payloads to JSON objects."""
+        json_value = to_json_value(payload)
+        if not isinstance(json_value, dict):
+            message = "Payload must serialize to a JSON object"
+            raise TypeError(message)
+        return json_value
 
     def _calculate_confidence_score(self, evidence_records: list[Evidence]) -> float:
         """Calculate overall confidence score from evidence."""

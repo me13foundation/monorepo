@@ -12,7 +12,7 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from src.domain.services.file_upload_service import (
     DataRecord,
@@ -104,14 +104,11 @@ class LocalFileUploadGateway(FileUploadGateway):
 
         validation_errors = self._validate_records(records, configuration)
 
-        metadata: JSONObject = cast(
-            "JSONObject",
-            {
-                "columns": self._extract_columns(records),
-                "inferred_types": self._infer_data_types(records),
-                "validation_errors": validation_errors,
-            },
-        )
+        metadata: JSONObject = {
+            "columns": self._to_json_value(self._extract_columns(records)),
+            "inferred_types": self._to_json_value(self._infer_data_types(records)),
+            "validation_errors": self._to_json_value(validation_errors),
+        }
 
         return FileUploadResult(
             success=len(validation_errors) == 0,
@@ -214,21 +211,17 @@ class LocalFileUploadGateway(FileUploadGateway):
         if isinstance(parsed, list):
             for i, item in enumerate(parsed[:max_records]):
                 if isinstance(item, dict):
-                    data = cast("JSONObject", item)
+                    data = self._to_json_object(item)
                 else:
-                    data = cast("JSONObject", {"value": item})
+                    data = {"value": self._to_json_value(item)}
                 records.append(DataRecord(data=data, line_number=i + 1))
         elif isinstance(parsed, dict):
-            data = cast("JSONObject", parsed)
+            data = self._to_json_object(parsed)
             records.append(DataRecord(data=data))
         elif isinstance(parsed, str):
-            value_payload = cast(
-                "JSONObject",
-                {"value": parsed},
-            )
             records.append(
                 DataRecord(
-                    data=value_payload,
+                    data={"value": parsed},
                     line_number=1,
                 ),
             )
@@ -254,10 +247,7 @@ class LocalFileUploadGateway(FileUploadGateway):
 
     def _row_to_json_object(self, row: Mapping[str, object]) -> JSONObject:
         """Convert CSV/TSV rows to typed JSON objects."""
-        normalized = {
-            str(key): (value if value is not None else "") for key, value in row.items()
-        }
-        return cast("JSONObject", normalized)
+        return {str(key): self._to_json_value(value) for key, value in row.items()}
 
     def _validate_records(
         self,
@@ -277,6 +267,26 @@ class LocalFileUploadGateway(FileUploadGateway):
         if expected_types:
             errors.extend(self._validate_expected_types(records, expected_types))
         return errors
+
+    @staticmethod
+    def _to_json_value(value: object) -> JSONValue:
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        if isinstance(value, dict):
+            return {
+                str(k): LocalFileUploadGateway._to_json_value(v)
+                for k, v in value.items()
+            }
+        if isinstance(value, list):
+            return [LocalFileUploadGateway._to_json_value(item) for item in value]
+        return str(value)
+
+    @staticmethod
+    def _to_json_object(payload: Mapping[str, object]) -> JSONObject:
+        return {
+            str(key): LocalFileUploadGateway._to_json_value(value)
+            for key, value in payload.items()
+        }
 
     @staticmethod
     def _as_str_list(value: object) -> list[str]:

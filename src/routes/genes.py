@@ -4,7 +4,8 @@ Gene API routes for MED13 Resource Library.
 RESTful endpoints for gene management with CRUD operations.
 """
 
-from typing import TYPE_CHECKING, cast
+from enum import Enum
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -15,12 +16,8 @@ from src.infrastructure.dependency_injection.container import (
 )
 from src.models.api import GeneCreate, GeneResponse, GeneUpdate, PaginatedResponse
 from src.routes.serializers import serialize_gene
-from src.type_definitions.common import (
-    GeneUpdate as GeneUpdatePayload,
-)
-from src.type_definitions.common import (
-    JSONObject,
-)
+from src.type_definitions.common import GeneUpdate as GeneUpdatePayload
+from src.type_definitions.common import JSONObject
 
 if TYPE_CHECKING:
     from src.application.services.gene_service import GeneApplicationService
@@ -34,6 +31,33 @@ def get_gene_service(db: Session = Depends(get_session)) -> "GeneApplicationServ
 
     container = get_legacy_dependency_container()
     return container.create_gene_application_service(db)
+
+
+def _enum_str(value: Enum | str) -> str:
+    return value.value if isinstance(value, Enum) else str(value)
+
+
+def _to_gene_update_payload(update: GeneUpdate) -> GeneUpdatePayload:
+    payload: GeneUpdatePayload = {}
+    if update.name is not None:
+        payload["name"] = update.name
+    if update.description is not None:
+        payload["description"] = update.description
+    if update.gene_type is not None:
+        payload["gene_type"] = _enum_str(update.gene_type)
+    if update.chromosome is not None:
+        payload["chromosome"] = update.chromosome
+    if update.start_position is not None:
+        payload["start_position"] = update.start_position
+    if update.end_position is not None:
+        payload["end_position"] = update.end_position
+    if update.ensembl_id is not None:
+        payload["ensembl_id"] = update.ensembl_id
+    if update.ncbi_gene_id is not None:
+        payload["ncbi_gene_id"] = update.ncbi_gene_id
+    if update.uniprot_id is not None:
+        payload["uniprot_id"] = update.uniprot_id
+    return payload
 
 
 @router.get("/", summary="List genes", response_model=PaginatedResponse[GeneResponse])
@@ -193,10 +217,7 @@ async def update_gene(
         if not existing_gene:
             raise HTTPException(status_code=404, detail=f"Gene {gene_id} not found")
 
-        update_data = cast(
-            "GeneUpdatePayload",
-            gene_update.model_dump(exclude_unset=True),
-        )
+        update_data = _to_gene_update_payload(gene_update)
 
         updated_gene = service.update_gene(gene_id, update_data)
         return serialize_gene(updated_gene)
@@ -263,8 +284,7 @@ async def get_gene_statistics(
         if not existing_gene:
             raise HTTPException(status_code=404, detail=f"Gene {gene_id} not found")
 
-        stats = service.get_gene_statistics(gene_id)
-        return cast("JSONObject", stats)
+        return service.get_gene_statistics(gene_id)
 
     except HTTPException:
         raise

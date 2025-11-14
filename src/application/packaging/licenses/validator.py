@@ -4,7 +4,7 @@ License validation utilities.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import yaml  # type: ignore[import-untyped]
 
@@ -15,7 +15,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from src.application.packaging.types import (
-        LicenseManifest,
         LicenseSourceEntry,
     )
     from src.type_definitions.common import JSONObject
@@ -102,13 +101,11 @@ class LicenseValidator:
 
             issues: list[str] = []
 
-            manifest_dict = cast("LicenseManifest", manifest_raw)
-
-            package_license_value = manifest_dict.get("package_license")
+            package_license_value = manifest_raw.get("package_license")
             if not isinstance(package_license_value, str):
                 issues.append("Missing package_license in manifest")
 
-            sources_value = manifest_dict.get("sources")
+            sources_value = manifest_raw.get("sources")
             sources: list[LicenseSourceEntry] | None = None
             if not isinstance(sources_value, list):
                 issues.append("Missing sources in manifest")

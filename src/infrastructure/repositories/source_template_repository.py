@@ -7,7 +7,7 @@ Provides persistence and query operations for reusable data source templates.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, TypedDict, cast
+from typing import TYPE_CHECKING, TypedDict
 
 from sqlalchemy import desc, func, or_, select
 
@@ -302,15 +302,14 @@ class SqlAlchemySourceTemplateRepository(SourceTemplateRepository):
             func.coalesce(func.avg(SourceTemplateModel.success_rate), 0.0),
         )
 
-        stats = SourceTemplateStatistics(
-            total_templates=int(self.session.execute(total_stmt).scalar_one()),
-            public_templates=int(self.session.execute(public_stmt).scalar_one()),
-            approved_templates=int(
+        return {
+            "total_templates": int(self.session.execute(total_stmt).scalar_one()),
+            "public_templates": int(self.session.execute(public_stmt).scalar_one()),
+            "approved_templates": int(
                 self.session.execute(approved_stmt).scalar_one(),
             ),
-            total_usage=int(self.session.execute(usage_sum_stmt).scalar_one()),
-            average_success_rate=float(
+            "total_usage": int(self.session.execute(usage_sum_stmt).scalar_one()),
+            "average_success_rate": float(
                 self.session.execute(success_avg_stmt).scalar_one(),
             ),
-        )
-        return cast("JSONObject", stats)
+        }

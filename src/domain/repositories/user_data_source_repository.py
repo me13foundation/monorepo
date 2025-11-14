@@ -16,7 +16,7 @@ from src.domain.entities.user_data_source import (
     SourceType,
     UserDataSource,
 )
-from src.type_definitions.common import JSONObject
+from src.type_definitions.common import StatisticsResponse
 
 
 class UserDataSourceRepository(ABC):
@@ -306,7 +306,7 @@ class UserDataSourceRepository(ABC):
         """
 
     @abstractmethod
-    def get_statistics(self) -> JSONObject:
+    def get_statistics(self) -> StatisticsResponse:
         """
         Get overall statistics about data sources.
 

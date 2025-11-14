@@ -6,7 +6,6 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
 
 from src.type_definitions.common import JSONObject, JSONValue
 from src.type_definitions.json_utils import to_json_value
@@ -72,8 +71,12 @@ class ValidationReportGenerator:
 
         recommendations = self._build_recommendations(error_summary)
 
+        error_summary_json = to_json_value(error_summary)
+        if not isinstance(error_summary_json, dict):
+            msg = "Error summary must serialize to a JSON object"
+            raise TypeError(msg)
         appendices: JSONObject = {
-            "error_summary": cast("JSONObject", to_json_value(error_summary)),
+            "error_summary": error_summary_json,
             "performance_report": quality_report,
         }
 
@@ -146,8 +149,7 @@ class ValidationReportGenerator:
         if not isinstance(serialized, dict):
             msg = "ValidationReport serialised to a non-object payload"
             raise TypeError(msg)
-        payload_dict: dict[str, JSONValue] = serialized
-        payload: JSONObject = payload_dict
+        payload: JSONObject = serialized
 
         if output_format.lower() == "json":
             target.write_text(json.dumps(payload, indent=2), encoding="utf-8")
@@ -184,7 +186,7 @@ class ValidationReportGenerator:
 
     @staticmethod
     def _json_list(values: list[JSONObject]) -> list[JSONValue]:
-        return [cast("JSONValue", value) for value in values]
+        return [to_json_value(value) for value in values]
 
     @staticmethod
     def _extract_performance_metric(

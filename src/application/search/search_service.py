@@ -6,7 +6,6 @@ Provides cross-entity search capabilities with relevance scoring and filtering.
 
 import logging
 from enum import Enum
-from typing import cast
 
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
@@ -16,7 +15,7 @@ from src.domain.entities.evidence import Evidence
 from src.domain.entities.gene import Gene
 from src.domain.entities.phenotype import Phenotype
 from src.domain.entities.variant import Variant
-from src.type_definitions.common import JSONObject, QueryFilters
+from src.type_definitions.common import JSONObject, QueryFilters, clone_query_filters
 
 
 class SearchEntity(str, Enum):
@@ -61,7 +60,7 @@ class SearchResult:
         if metadata is not None:
             metadata_payload: JSONObject = dict(metadata)
         else:
-            metadata_payload = cast("JSONObject", {})
+            metadata_payload = {}
         self.metadata = metadata_payload
 
     def to_dict(self) -> JSONObject:
@@ -464,9 +463,7 @@ class UnifiedSearchService:
 
     @staticmethod
     def _clone_filters(filters: QueryFilters | None) -> QueryFilters:
-        if filters is None:
-            return {}
-        return cast("QueryFilters", dict(filters))
+        return clone_query_filters(filters) or {}
 
 
 __all__ = ["SearchEntity", "SearchResult", "SearchResultType", "UnifiedSearchService"]

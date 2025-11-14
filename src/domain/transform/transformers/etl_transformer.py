@@ -8,8 +8,9 @@ normalizers, and relationship mappers in a strictly typed workflow.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import cast
+from typing import TypeGuard, TypeVar
 
 from src.type_definitions.common import RawRecord  # noqa: TC001
 
@@ -17,16 +18,17 @@ from ..normalizers.gene_normalizer import GeneNormalizer
 from ..normalizers.phenotype_normalizer import PhenotypeNormalizer
 from ..normalizers.publication_normalizer import PublicationNormalizer
 from ..normalizers.variant_normalizer import VariantNormalizer
-from ..parsers.clinvar_parser import ClinVarParser
-from ..parsers.hpo_parser import HPOParser
-from ..parsers.pubmed_parser import PubMedParser
-from ..parsers.uniprot_parser import UniProtParser
+from ..parsers.clinvar_parser import ClinVarParser, ClinVarVariant
+from ..parsers.hpo_parser import HPOParser, HPOTerm
+from ..parsers.pubmed_parser import PubMedParser, PubMedPublication
+from ..parsers.uniprot_parser import UniProtParser, UniProtProtein
 from .metrics_tracker import StageArtifacts, TransformationMetricsTracker
 from .stage_handlers import (
     BatchParser,
     ExportStageRunner,
     MappingStageRunner,
     NormalizationStageRunner,
+    ParserExecutor,
     ParsingStageRunner,
     ValidationStageRunner,
 )
@@ -44,6 +46,56 @@ from .stage_models import (
 )
 from .stage_utils import stage_errors, stage_to_dict
 
+ParsedRecordT = TypeVar("ParsedRecordT")
+
+
+def _is_record_type(  # noqa: UP047
+    record: object,
+    expected: type[ParsedRecordT],
+) -> TypeGuard[ParsedRecordT]:
+    return isinstance(record, expected)
+
+
+class _CallableParserExecutor(ParserExecutor):
+    """Parser executor backed by callables for parsing and validation."""
+
+    def __init__(
+        self,
+        parse_fn: Callable[[list[RawRecord]], list[object]],
+        validate_fn: Callable[[object], list[str]],
+    ) -> None:
+        self._parse = parse_fn
+        self._validate = validate_fn
+
+    def parse_batch(self, raw_data: list[RawRecord]) -> list[object]:
+        return self._parse(raw_data)
+
+    def validate_parsed_data(self, record: object) -> list[str]:
+        return self._validate(record)
+
+
+def _build_parser_executor(
+    parser: BatchParser[ParsedRecordT],
+    record_type: type[ParsedRecordT],
+) -> ParserExecutor:
+    """Wrap a strongly typed parser with runtime checks for the executor."""
+
+    def _parse(raw_data: list[RawRecord]) -> list[object]:
+        objects: list[object] = []
+        objects.extend(parser.parse_batch(raw_data))
+        return objects
+
+    def _validate(record: object) -> list[str]:
+        if not _is_record_type(record, record_type):
+            message = (
+                f"Record must be {record_type.__name__}, "
+                f"got {type(record).__name__}"
+            )
+            return [message]
+        return parser.validate_parsed_data(record)
+
+    return _CallableParserExecutor(_parse, _validate)
+
 
 class ETLTransformer:
     """
@@ -57,11 +109,11 @@ class ETLTransformer:
         self.output_dir = output_dir or Path("data/transformed")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.parsers: dict[str, BatchParser[object]] = {
-            "clinvar": cast("BatchParser[object]", ClinVarParser()),
-            "pubmed": cast("BatchParser[object]", PubMedParser()),
-            "hpo": cast("BatchParser[object]", HPOParser()),
-            "uniprot": cast("BatchParser[object]", UniProtParser()),
+        self.parsers: dict[str, ParserExecutor] = {
+            "clinvar": _build_parser_executor(ClinVarParser(), ClinVarVariant),
+            "pubmed": _build_parser_executor(PubMedParser(), PubMedPublication),
+            "hpo": _build_parser_executor(HPOParser(), HPOTerm),
+            "uniprot": _build_parser_executor(UniProtParser(), UniProtProtein),
         }
 
         self.gene_normalizer = GeneNormalizer()

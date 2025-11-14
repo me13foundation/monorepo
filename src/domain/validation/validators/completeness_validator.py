@@ -6,10 +6,9 @@ quality thresholds for data completeness.
 """
 
 from dataclasses import dataclass
-from typing import cast
 
-from src.type_definitions.common import JSONObject, JSONValue
-from src.type_definitions.json_utils import list_of_strings
+from src.type_definitions.common import JSONObject
+from src.type_definitions.json_utils import list_of_strings, to_json_value
 
 from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
@@ -150,7 +149,7 @@ class CompletenessValidator:
                 issues.append(
                     ValidationIssue(
                         field="gene_references",
-                        value=cast("JSONValue", list(gene_refs)),
+                        value=to_json_value(list(gene_refs)),
                         rule="relationship_completeness",
                         message="Variant must be associated with at least one gene",
                         severity=ValidationSeverity.ERROR,
@@ -164,7 +163,7 @@ class CompletenessValidator:
                 issues.append(
                     ValidationIssue(
                         field="source_references",
-                        value=cast("JSONValue", list(source_refs)),
+                        value=to_json_value(list(source_refs)),
                         rule="relationship_completeness",
                         message="Evidence must reference source entities",
                         severity=ValidationSeverity.ERROR,

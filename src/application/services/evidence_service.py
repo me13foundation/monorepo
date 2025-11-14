@@ -5,14 +5,20 @@ Coordinates domain services and repositories to implement evidence management
 use cases while preserving domain purity and strong typing.
 """
 
+from collections.abc import Mapping
 from datetime import date
-from typing import cast
 
 from src.domain.entities.evidence import Evidence, EvidenceType
 from src.domain.repositories.evidence_repository import EvidenceRepository
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.value_objects.confidence import Confidence, EvidenceLevel
-from src.type_definitions.common import EvidenceUpdate, JSONObject, QueryFilters
+from src.type_definitions.common import (
+    EvidenceUpdate,
+    JSONObject,
+    QueryFilters,
+    clone_query_filters,
+)
+from src.type_definitions.json_utils import to_json_value
 
 
 class EvidenceApplicationService:
@@ -240,7 +246,7 @@ class EvidenceApplicationService:
         conflicts = self._evidence_domain_service.detect_evidence_conflicts(
             evidence_list,
         )
-        return [cast("JSONObject", conflict) for conflict in conflicts]
+        return [self._to_json_object(conflict) for conflict in conflicts]
 
     def calculate_evidence_consensus(self, variant_id: int) -> JSONObject:
         """
@@ -256,7 +262,7 @@ class EvidenceApplicationService:
         consensus = self._evidence_domain_service.calculate_evidence_consensus(
             evidence_list,
         )
-        return cast("JSONObject", consensus)
+        return self._to_json_object(consensus)
 
     def score_evidence_quality(self, evidence_id: int) -> float:
         """
@@ -298,9 +304,15 @@ class EvidenceApplicationService:
     def _normalize_filters(
         filters: QueryFilters | None,
     ) -> QueryFilters | None:
-        if filters is None:
-            return None
-        return cast("QueryFilters", dict(filters))
+        return clone_query_filters(filters)
+
+    @staticmethod
+    def _to_json_object(payload: Mapping[str, object]) -> JSONObject:
+        json_value = to_json_value(payload)
+        if not isinstance(json_value, dict):
+            message = "Expected mapping to serialize to a JSON object"
+            raise TypeError(message)
+        return json_value
 
 
 __all__ = ["EvidenceApplicationService"]

@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Protocol, cast
+from typing import Protocol
 
 from src.type_definitions.common import JSONObject, JSONValue
 
@@ -64,15 +64,34 @@ class ValidationIssue:
     severity: ValidationSeverity
     suggestion: str | None = None
 
-    def __getitem__(self, key: str) -> JSONValue | str | None:
-        return cast("JSONValue | str | None", getattr(self, key))
+    def __getitem__(
+        self,
+        key: str,
+    ) -> JSONValue | str | ValidationSeverity | None:
+        if key == "field":
+            return self.field
+        if key == "value":
+            return self.value
+        if key == "rule":
+            return self.rule
+        if key == "message":
+            return self.message
+        if key == "severity":
+            return self.severity
+        if key == "suggestion":
+            return self.suggestion
+        message = f"Unknown validation issue attribute: {key}"
+        raise KeyError(message)
 
     def get(
         self,
         key: str,
         default: JSONValue | str | None = None,
-    ) -> JSONValue | str | None:
-        return cast("JSONValue | str | None", getattr(self, key, default))
+    ) -> JSONValue | str | ValidationSeverity | None:
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
 
 @dataclass

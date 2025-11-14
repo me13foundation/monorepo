@@ -10,10 +10,13 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from datetime import datetime
-from typing import cast
+from typing import TYPE_CHECKING
 
 from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.json_utils import to_json_value
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 SerializableMapping = Mapping[str, JSONValue]
 
@@ -118,28 +121,23 @@ class CuratedRecordDetailDTO:
     def to_serializable(self) -> JSONObject:
         """Convert the DTO to a plain mapping suitable for JSON responses."""
 
+        def _serialize_object(value: object) -> JSONObject:
+            serialized = to_json_value(value)
+            if not isinstance(serialized, dict):
+                message = "Serializable DTOs must produce JSON objects"
+                raise TypeError(message)
+            return serialized
+
         def _serialize_iter(items: Iterable[object]) -> list[JSONValue]:
-            return [
-                cast(
-                    "JSONValue",
-                    (
-                        dict(item.__dict__)
-                        if hasattr(item, "__dict__")
-                        else item  # pragma: no cover - defensive branch
-                    ),
-                )
-                for item in items
-            ]
+            json_items: list[JSONValue] = []
+            for item in items:
+                json_object = _serialize_object(item)
+                json_items.append(json_object)
+            return json_items
 
-        variant_payload = dict(self.variant.__dict__)
-
-        if isinstance(self.variant.created_at, datetime):
-            variant_payload["created_at"] = self.variant.created_at.isoformat()
-        if isinstance(self.variant.updated_at, datetime):
-            variant_payload["updated_at"] = self.variant.updated_at.isoformat()
-
+        variant_payload = _serialize_object(self.variant)
         payload: JSONObject = {
-            "variant": cast("JSONObject", variant_payload),
+            "variant": variant_payload,
             "phenotypes": _serialize_iter(self.phenotypes),
             "evidence": _serialize_iter(self.evidence),
             "conflicts": _serialize_iter(self.conflicts),
@@ -154,10 +152,7 @@ class CuratedRecordDetailDTO:
             }
 
         if self.audit is not None:
-            audit_dict = self.audit.__dict__.copy()
-            if isinstance(self.audit.last_updated_at, datetime):
-                audit_dict["last_updated_at"] = self.audit.last_updated_at.isoformat()
-            payload["audit"] = cast("JSONObject", audit_dict)
+            payload["audit"] = _serialize_object(self.audit)
 
         return payload
 

@@ -6,10 +6,14 @@ that go beyond basic format validation.
 """
 
 from dataclasses import dataclass
-from typing import cast
 
-from src.type_definitions.common import JSONObject, JSONValue
-from src.type_definitions.json_utils import as_object, as_str, list_of_strings
+from src.type_definitions.common import JSONObject
+from src.type_definitions.json_utils import (
+    as_object,
+    as_str,
+    list_of_strings,
+    to_json_value,
+)
 
 from ..rules.base_rules import ValidationIssue, ValidationResult, ValidationSeverity
 
@@ -37,7 +41,7 @@ class SemanticValidator:
             issues.append(
                 ValidationIssue(
                     field="gene_references",
-                    value=cast("JSONValue", variant_gene_refs),
+                    value=to_json_value(list(variant_gene_refs)),
                     rule="gene_variant_relationship",
                     message=f"Variant not associated with gene {gene_id}",
                     severity=ValidationSeverity.ERROR,
@@ -88,7 +92,7 @@ class SemanticValidator:
             issues.append(
                 ValidationIssue(
                     field="associated_phenotypes",
-                    value=cast("JSONValue", associated_phenotypes),
+                    value=to_json_value(associated_phenotypes),
                     rule="phenotype_association_required",
                     message="Gene must have at least one associated phenotype",
                     severity=ValidationSeverity.WARNING,

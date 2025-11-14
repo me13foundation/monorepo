@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Protocol
 
 JSONPrimitive = str | int | float | bool | None
 JSONValue = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
@@ -57,7 +57,7 @@ class SourcePlugin(ABC):
         """
 
         _ = configuration  # Preserve signature for subclasses while avoiding unused warnings
-        return cast("JSONObject", {})
+        return {}
 
 
 __all__ = ["SourcePlugin"]

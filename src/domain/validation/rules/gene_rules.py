@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from typing import cast
 
 from src.type_definitions.common import JSONObject, JSONValue
 
@@ -116,16 +115,20 @@ class GeneValidationRules:
                 )
 
             for key, items in value.items():
-                if not isinstance(items, list) or not all(
-                    isinstance(item, str) for item in items
-                ):
+                if not isinstance(items, list):
+                    return (
+                        False,
+                        f"Cross reference '{key}' must be a list",
+                        "Provide a list of string identifiers",
+                    )
+                string_items = [item for item in items if isinstance(item, str)]
+                if len(string_items) != len(items):
                     return (
                         False,
                         f"Cross reference '{key}' must be a list of strings",
                         "Ensure each cross reference list contains strings",
                     )
 
-                string_items = cast("list[str]", items)
                 unique_items = {
                     entry.strip().upper() for entry in string_items if entry.strip()
                 }

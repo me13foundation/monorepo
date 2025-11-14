@@ -10,7 +10,7 @@ from abc import abstractmethod
 from src.domain.entities.gene import Gene
 from src.domain.repositories.base import Repository
 from src.domain.value_objects.identifiers import GeneIdentifier
-from src.type_definitions.common import GeneUpdate
+from src.type_definitions.common import GeneUpdate, JSONObject
 
 
 class GeneRepository(Repository[Gene, int, GeneUpdate]):
@@ -65,7 +65,7 @@ class GeneRepository(Repository[Gene, int, GeneUpdate]):
         """Find a gene by gene_id, raising NotFoundError if not found."""
 
     @abstractmethod
-    def get_gene_statistics(self) -> dict[str, int | float | bool | str | None]:
+    def get_gene_statistics(self) -> JSONObject:
         """Get statistics about genes in the repository."""
 
     @abstractmethod

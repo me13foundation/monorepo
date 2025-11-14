@@ -4,7 +4,8 @@ Unified Search API routes for MED13 Resource Library.
 Provides cross-entity search capabilities with relevance scoring.
 """
 
-from typing import TypedDict, cast
+from collections.abc import Mapping, Sequence
+from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -115,35 +116,24 @@ async def unified_search(
             limit=limit,
         )
 
-        payload = cast("UnifiedSearchPayload", raw)
-        raw_results = payload.get("results")
-        results_payload: list[RawSearchResult] = (
-            raw_results if isinstance(raw_results, list) else []
+        payload = raw if isinstance(raw, Mapping) else {}
+        result_items = _build_search_results(payload.get("results"))
+        query_field = payload.get("query")
+        query_value = query_field if isinstance(query_field, str) else query
+
+        total_results_value_obj = payload.get("total_results")
+        total_results_value = (
+            int(total_results_value_obj)
+            if isinstance(total_results_value_obj, (int, float))
+            else len(result_items)
         )
 
-        result_items = [
-            SearchResultItem(
-                entity_type=SearchResultType(item["entity_type"]),
-                entity_id=str(item["entity_id"]),
-                title=item["title"],
-                description=item["description"],
-                relevance_score=float(item["relevance_score"]),
-                metadata=item["metadata"],
-            )
-            for item in results_payload
-        ]
-
-        query_value = payload.get("query")
-        if not isinstance(query_value, str):
-            query_value = query
-
-        total_results_value = payload.get("total_results")
-        if not isinstance(total_results_value, int):
-            total_results_value = len(result_items)
-
-        breakdown_value = payload.get("entity_breakdown")
-        if not isinstance(breakdown_value, dict):
-            breakdown_value = {}
+        breakdown_value_obj = payload.get("entity_breakdown")
+        breakdown_value = (
+            _ensure_breakdown(breakdown_value_obj)
+            if isinstance(breakdown_value_obj, Mapping)
+            else {}
+        )
 
         return UnifiedSearchResponse(
             query=query_value,
@@ -229,13 +219,89 @@ async def search_statistics(
             "last_updated": None,  # Would track when data was last indexed
         }
 
-        return SearchStatisticsResponse(
-            total_entities=cast("dict[str, int]", stats["total_entities"]),
-            searchable_fields=cast("dict[str, list[str]]", stats["searchable_fields"]),
-            last_updated=cast("str | None", stats["last_updated"]),
-        )
+        return _build_statistics_response(stats)
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Failed to get search statistics: {e!s}",
         )
+
+
+def _build_search_results(raw_results: object) -> list[SearchResultItem]:
+    if not isinstance(raw_results, Sequence):
+        return []
+    items: list[SearchResultItem] = []
+    for entry in raw_results:
+        if not isinstance(entry, Mapping):
+            continue
+        entity_type_value = entry.get("entity_type")
+        try:
+            entity_type = SearchResultType(str(entity_type_value))
+        except ValueError:
+            continue
+        entity_id_value = entry.get("entity_id")
+        title_value = entry.get("title")
+        description_value = entry.get("description")
+        relevance_value = entry.get("relevance_score")
+        metadata_value = entry.get("metadata")
+
+        if not isinstance(title_value, str) or not isinstance(description_value, str):
+            continue
+        if isinstance(relevance_value, (int, float, str)):
+            try:
+                relevance_score = float(relevance_value)
+            except (TypeError, ValueError):
+                relevance_score = 0.0
+        else:
+            relevance_score = 0.0
+
+        metadata_payload = metadata_value if isinstance(metadata_value, dict) else {}
+        items.append(
+            SearchResultItem(
+                entity_type=entity_type,
+                entity_id=str(entity_id_value),
+                title=title_value,
+                description=description_value,
+                relevance_score=relevance_score,
+                metadata=metadata_payload,
+            ),
+        )
+    return items
+
+
+def _ensure_breakdown(raw_breakdown: Mapping[str, object]) -> dict[str, int]:
+    breakdown: dict[str, int] = {}
+    for key, value in raw_breakdown.items():
+        if isinstance(key, str) and isinstance(value, (int, float)):
+            breakdown[key] = int(value)
+    return breakdown
+
+
+def _build_statistics_response(stats: Mapping[str, object]) -> SearchStatisticsResponse:
+    total_entities_raw = stats.get("total_entities")
+    searchable_fields_raw = stats.get("searchable_fields")
+    last_updated = stats.get("last_updated")
+
+    total_entities = (
+        {
+            key: int(val)
+            for key, val in total_entities_raw.items()
+            if isinstance(key, str) and isinstance(val, (int, float))
+        }
+        if isinstance(total_entities_raw, Mapping)
+        else {}
+    )
+    searchable_fields = (
+        {
+            key: [str(item) for item in value if isinstance(item, str)]
+            for key, value in searchable_fields_raw.items()
+            if isinstance(key, str) and isinstance(value, Sequence)
+        }
+        if isinstance(searchable_fields_raw, Mapping)
+        else {}
+    )
+    return SearchStatisticsResponse(
+        total_entities=total_entities,
+        searchable_fields=searchable_fields,
+        last_updated=last_updated if isinstance(last_updated, str) else None,
+    )

@@ -6,14 +6,12 @@ Provides secure JWT token creation, validation, and management.
 
 import secrets
 import string
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Literal, TypedDict, cast
+from typing import Literal, TypedDict
 from uuid import UUID
 
 import jwt
-
-if TYPE_CHECKING:
-    from src.type_definitions.common import JSONObject
 
 
 class TokenPayload(TypedDict, total=False):
@@ -149,15 +147,14 @@ class JWTProvider:
             ValueError: If token is invalid, expired, or malformed
         """
         try:
-            payload = jwt.decode(
+            payload_obj = jwt.decode(
                 token,
                 self.secret_key,
                 algorithms=[self.algorithm],
                 issuer="med13-resource-library",
             )
 
-            # Additional validation
-            decoded_payload = cast("DecodedTokenPayload", payload)
+            decoded_payload = self._coerce_decoded_payload(payload_obj)
             self._validate_payload(decoded_payload)
 
         except jwt.ExpiredSignatureError as exc:
@@ -172,8 +169,7 @@ class JWTProvider:
         except Exception as exc:
             message = f"Token validation failed: {exc!s}"
             raise ValueError(message) from exc
-        else:
-            return decoded_payload
+        return decoded_payload
 
     def get_token_expiration(self, token: str) -> datetime:
         """
@@ -189,10 +185,7 @@ class JWTProvider:
             ValueError: If token is malformed
         """
         try:
-            payload = cast(
-                "JSONObject",
-                jwt.decode(token, options={"verify_signature": False}),
-            )
+            payload = self._decode_unverified_payload(token)
         except Exception as exc:
             message = f"Cannot parse token expiration: {exc!s}"
             raise ValueError(message) from exc
@@ -329,3 +322,52 @@ class JWTProvider:
         """
         alphabet = string.ascii_letters + string.digits + string.punctuation
         return "".join(secrets.choice(alphabet) for _ in range(length))
+
+    def _decode_unverified_payload(self, token: str) -> dict[str, object]:
+        """Decode a token without verifying the signature."""
+        payload = jwt.decode(token, options={"verify_signature": False})
+        if not isinstance(payload, dict):
+            message = "Decoded token payload must be a JSON object"
+            raise TypeError(message)
+        return payload
+
+    def _coerce_decoded_payload(
+        self,
+        payload: Mapping[str, object],
+    ) -> DecodedTokenPayload:
+        """Convert a decoded JWT payload into a typed structure."""
+        result: DecodedTokenPayload = {}
+
+        subject = payload.get("sub")
+        if isinstance(subject, str) and subject:
+            result["sub"] = subject
+        token_type = payload.get("type")
+        type_map: dict[str, Literal["access", "refresh"]] = {
+            "access": "access",
+            "refresh": "refresh",
+        }
+        literal_type = type_map.get(token_type) if isinstance(token_type, str) else None
+        if literal_type is not None:
+            result["type"] = literal_type
+        role = payload.get("role")
+        if isinstance(role, str):
+            result["role"] = role
+        issuer = payload.get("iss")
+        if isinstance(issuer, str):
+            result["iss"] = issuer
+
+        issued_at = payload.get("iat")
+        if isinstance(issued_at, (int, float)):
+            result["iat"] = int(issued_at)
+        else:
+            message = "Token missing issued-at timestamp"
+            raise TypeError(message)
+
+        expires = payload.get("exp")
+        if isinstance(expires, (int, float)):
+            result["exp"] = int(expires)
+        else:
+            message = "Token missing expiration timestamp"
+            raise TypeError(message)
+
+        return result
