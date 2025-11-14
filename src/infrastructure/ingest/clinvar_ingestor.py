@@ -108,21 +108,21 @@ class ClinVarIngestor(BaseIngestor):
             query_terms = [f"({gene_symbol}[gene] OR MED13[gene] OR mediator[gene])"]
 
         # Add additional filters if provided
-        if kwargs.get("variant_type"):
-            query_terms.append(f"{kwargs['variant_type']}[variant_type]")
-        if kwargs.get("clinical_significance"):
-            query_terms.append(
-                f"{kwargs['clinical_significance']}[clinical_significance]",
-            )
+        variant_type_filter = kwargs.get("variant_type")
+        if isinstance(variant_type_filter, str):
+            query_terms.append(f"{variant_type_filter}[variant_type]")
+        clinical_sig_filter = kwargs.get("clinical_significance")
+        if isinstance(clinical_sig_filter, str):
+            query_terms.append(f"{clinical_sig_filter}[clinical_significance]")
 
         query = " AND ".join(query_terms)
 
         # Use ESearch to find relevant records
-        params = {
+        params: dict[str, str | int | float | bool | None] = {
             "db": "clinvar",
             "term": query,
             "retmode": "json",
-            "retmax": kwargs.get("max_results", 1000),  # Limit results
+            "retmax": self._coerce_int(kwargs.get("max_results"), 1000),
             "sort": "relevance",
         }
 
@@ -353,3 +353,14 @@ class ClinVarIngestor(BaseIngestor):
             all_records.extend(records)
 
         return all_records
+
+    @staticmethod
+    def _coerce_int(value: JSONValue | None, default: int) -> int:
+        """Convert JSON value to int with fallback."""
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return default

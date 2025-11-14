@@ -8,12 +8,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import httpx
 from defusedxml import ElementTree
 
-from .base_ingestor import BaseIngestor, IngestionError
+from .base_ingestor import BaseIngestor, HeaderMap, IngestionError, QueryParams
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from xml.etree.ElementTree import Element  # nosec B405
@@ -49,7 +49,9 @@ class UniProtIngestor(BaseIngestor):
         self,
         method: str,
         endpoint: str,
-        **kwargs: Any,
+        *,
+        params: QueryParams | None = None,
+        headers: HeaderMap | None = None,
     ) -> httpx.Response:
         """
         Override base _make_request to handle UniProt's redirect issues.
@@ -69,7 +71,12 @@ class UniProtIngestor(BaseIngestor):
                         "User-Agent": "MED13-Resource-Library/1.0 (research@med13.org)",
                     },
                 ) as temp_client:
-                    response = await temp_client.request(method, url, **kwargs)
+                    response = await temp_client.request(
+                        method,
+                        url,
+                        params=params,
+                        headers=headers,
+                    )
 
                     # Check for rate limiting
                     if response.status_code == STATUS_TOO_MANY_REQUESTS:
@@ -157,7 +164,7 @@ class UniProtIngestor(BaseIngestor):
             size = int(raw_size)
         if size <= 0:
             size = 50
-        params = {
+        params: dict[str, str | int | float | bool | None] = {
             "protein": full_query,  # EBI uses 'protein' parameter
             "size": size,
         }

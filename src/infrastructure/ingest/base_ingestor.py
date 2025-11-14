@@ -7,17 +7,17 @@ import asyncio
 import json
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 from types import TracebackType
-from typing import Any
 
 import httpx
 
 from src.models.value_objects import DataSource, Provenance
-from src.type_definitions.common import JSONObject, JSONValue, RawRecord
+from src.type_definitions.common import JSONObject, JSONPrimitive, JSONValue, RawRecord
 
 
 class IngestionStatus(Enum):
@@ -90,6 +90,10 @@ class RateLimiter:
         """Wait until a token is available."""
         while not self.acquire():
             await asyncio.sleep(1.0)
+
+
+QueryParams = Mapping[str, JSONPrimitive]
+HeaderMap = Mapping[str, str]
 
 
 class BaseIngestor(ABC):
@@ -248,7 +252,9 @@ class BaseIngestor(ABC):
         self,
         method: str,
         endpoint: str,
-        **kwargs: Any,
+        *,
+        params: QueryParams | None = None,
+        headers: HeaderMap | None = None,
     ) -> httpx.Response:
         """
         Make HTTP request with rate limiting and retry logic.
@@ -273,7 +279,12 @@ class BaseIngestor(ABC):
                 # Wait for rate limit token
                 await self.rate_limiter.wait_for_token()
 
-                response = await self.client.request(method, url, **kwargs)
+                response = await self.client.request(
+                    method,
+                    url,
+                    params=params,
+                    headers=headers,
+                )
 
                 # Check for rate limiting
                 if response.status_code == rate_limit_status:

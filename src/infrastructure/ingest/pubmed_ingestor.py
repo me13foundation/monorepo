@@ -105,15 +105,18 @@ class PubMedIngestor(BaseIngestor):
         full_query = " AND ".join(f"({term})" for term in query_terms)
 
         # Use ESearch to find relevant records
-        params = {
+        mindate_value = kwargs.get("mindate")
+        maxdate_value = kwargs.get("maxdate")
+
+        params: dict[str, str | int | float | bool | None] = {
             "db": "pubmed",
             "term": full_query,
             "retmode": "json",
-            "retmax": kwargs.get("max_results", 500),  # Limit results
+            "retmax": self._coerce_int(kwargs.get("max_results"), 500),
             "sort": "relevance",
             "datetype": "pdat",
-            "mindate": kwargs.get("mindate"),  # Publication date from
-            "maxdate": kwargs.get("maxdate"),  # Publication date to
+            "mindate": mindate_value if isinstance(mindate_value, str) else None,
+            "maxdate": maxdate_value if isinstance(maxdate_value, str) else None,
         }
 
         response = await self._make_request("GET", "esearch.fcgi", params=params)
@@ -434,3 +437,14 @@ class PubMedIngestor(BaseIngestor):
         kwargs["maxdate"] = end_date.strftime("%Y/%m/%d")
 
         return await self.fetch_med13_publications(**kwargs)
+
+    @staticmethod
+    def _coerce_int(value: JSONValue | None, default: int) -> int:
+        """Convert JSON value to integer range."""
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value)
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return default
