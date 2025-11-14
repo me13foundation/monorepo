@@ -320,8 +320,19 @@ class NormalizationStageRunner:
                     citation_record,
                     source="uniprot",
                 )
-                if normalized_publication:
-                    normalized.publications.append(normalized_publication)
+                reference_identifier = (
+                    reference.pubmed_id or reference.title or "unknown reference"
+                )
+                error_message = (
+                    "Failed to normalize UniProt publication "
+                    f"(protein={protein.primary_accession}, reference={reference_identifier})"
+                )
+                self._append_entity_or_error(
+                    normalized.publications,
+                    normalized_publication,
+                    normalized.errors,
+                    error_message,
+                )
 
     def _append_entity_or_error(
         self,
