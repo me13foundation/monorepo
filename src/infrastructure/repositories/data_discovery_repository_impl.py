@@ -5,9 +5,9 @@ These implementations provide concrete SQLAlchemy-based data access
 for data discovery sessions, source catalogs, and query test results.
 """
 
-from typing import Any
 from uuid import UUID
 
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from src.database.sqlite_utils import retry_on_sqlite_lock
@@ -86,9 +86,13 @@ def _owner_identifier_candidates(
 
 
 def _dialect_name_for_session(session: Session) -> str:
-    bind: Any = getattr(session, "bind", None)
-    dialect = getattr(bind, "dialect", None) if bind else None
-    return getattr(dialect, "name", "") if dialect else ""
+    try:
+        bind = session.get_bind()
+    except RuntimeError:
+        return ""
+    if not isinstance(bind, Engine):
+        return ""
+    return bind.dialect.name
 
 
 class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):

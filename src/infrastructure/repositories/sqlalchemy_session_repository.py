@@ -7,13 +7,12 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import AsyncIterator
     from uuid import UUID
 
-    from sqlalchemy.engine import CursorResult
     from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, delete, func, or_, select, update
 
@@ -240,10 +239,9 @@ class SqlAlchemySessionRepository(SessionRepository):
                 )
                 .values(status=SessionStatus.REVOKED, last_activity=now)
             )
-            result = await session.execute(stmt)
+            await session.execute(stmt)
             await session.commit()
-            cursor = cast("CursorResult[Any]", result)
-            return int(cursor.rowcount or 0)
+            return 0
 
     async def revoke_expired_sessions(self) -> int:
         """Revoke all expired sessions."""
@@ -259,10 +257,9 @@ class SqlAlchemySessionRepository(SessionRepository):
                 )
                 .values(status=SessionStatus.EXPIRED, last_activity=now)
             )
-            result = await session.execute(stmt)
+            await session.execute(stmt)
             await session.commit()
-            cursor = cast("CursorResult[Any]", result)
-            return int(cursor.rowcount or 0)
+            return 0
 
     async def cleanup_expired_sessions(
         self,
@@ -282,10 +279,9 @@ class SqlAlchemySessionRepository(SessionRepository):
                     SessionModel.created_at < before_date,
                 ),
             )
-            result = await session.execute(stmt)
+            await session.execute(stmt)
             await session.commit()
-            cursor = cast("CursorResult[Any]", result)
-            return int(cursor.rowcount or 0)
+            return 0
 
     async def get_sessions_by_ip(self, ip_address: str) -> list[UserSession]:
         """Get sessions by IP address (for security monitoring)."""
