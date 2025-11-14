@@ -1,9 +1,8 @@
 """
 Shared TypedDict definitions for packaging and provenance modules.
 
-These structures ensure that JSON metadata exchanged between builders,
-serializers, and validators remains type-safe without falling back to
-``dict[str, Any]`` helpers.
+These structures ensure JSON metadata exchanged between builders,
+serializers, and validators remains type-safe without relying on untyped helpers.
 """
 
 from __future__ import annotations

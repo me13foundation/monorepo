@@ -17,7 +17,7 @@ RawRecord = dict[str, JSONValue]
 """Raw data record from external sources (typed JSON)."""
 
 
-# Update operation types (replace Dict[str, Any])
+# Update operation types (replace previous loosely typed maps)
 class GeneUpdate(TypedDict, total=False):
     """Type-safe gene update parameters."""
 

@@ -138,8 +138,8 @@ class PasswordHasher:
                 password_to_verify.encode("utf-8"),
                 hashed_password.encode("utf-8"),
             )
-        except Exception:  # noqa: BLE001 - any error implies invalid password
-            # Any exception during verification means invalid
+        except Exception:  # noqa: BLE001 - every error implies invalid password
+            # Any exception during verification means the password is invalid
             return False
 
     def is_password_strong(self, password: str) -> bool:

@@ -2,7 +2,7 @@
 Helpers for working with JSON-like payloads in a type-safe way.
 
 These utilities narrow `JSONValue` unions to concrete Python types so that
-parsers and normalizers can operate without falling back to `Any`.
+parsers and normalizers can operate without resorting to untyped fallbacks.
 """
 
 from __future__ import annotations
