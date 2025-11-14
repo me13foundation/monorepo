@@ -101,7 +101,7 @@ def to_json_value(value: object) -> JSONValue:
     Convert arbitrary Python objects into a JSONValue structure.
 
     Dataclasses, enums, datetime objects, and nested containers are serialised
-    into JSON-compatible primitives so downstream code can avoid `Any`.
+    into JSON-compatible primitives so downstream code stays fully typed.
     """
 
     result: JSONValue
