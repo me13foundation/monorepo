@@ -1,5 +1,4 @@
 from collections.abc import Generator
-from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -10,7 +9,7 @@ from src.database.url_resolver import resolve_sync_database_url
 
 DATABASE_URL = resolve_sync_database_url()
 
-ENGINE_KWARGS: dict[str, Any] = {
+ENGINE_KWARGS: dict[str, object] = {
     "future": True,
     "pool_pre_ping": True,
 }

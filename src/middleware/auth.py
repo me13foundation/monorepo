@@ -7,12 +7,12 @@ Implements API key-based authentication with role-based access control.
 import logging
 import os
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from fastapi import HTTPException, Request, status
 from fastapi.security import APIKeyHeader
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 _ENVIRONMENT = os.getenv("MED13_ENV", "development").lower()
 _ALLOW_MISSING_KEYS = (
@@ -112,7 +112,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app: Callable[..., Any],
+        app: ASGIApp,
         exclude_paths: list[str] | None = None,
     ) -> None:
         super().__init__(app)

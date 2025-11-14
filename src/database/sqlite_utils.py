@@ -11,17 +11,13 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 from sqlalchemy import event
 from sqlalchemy.exc import OperationalError
 
-if TYPE_CHECKING:  # pragma: no cover - import only for typings
-    from collections.abc import Callable
-
+if TYPE_CHECKING:
     from sqlalchemy.engine import Engine
-else:  # pragma: no cover - runtime fallback type
-    Engine = Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +26,38 @@ MAX_RETRIES = 3
 INITIAL_RETRY_DELAY = 0.1  # 100ms
 
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
+
+
+class SQLiteCursor(Protocol):
+    """Minimal cursor protocol for SQLite operations."""
+
+    def execute(self, statement: str) -> object:
+        ...
+
+    def fetchone(self) -> object:
+        ...
+
+    def close(self) -> None:
+        ...
+
+
+class SQLiteConnection(Protocol):
+    """Protocol capturing methods used on SQLite connections."""
+
+    def cursor(self) -> SQLiteCursor:
+        ...
+
+
+class RetryableOperation(Protocol[T_co]):
+    """Callable protocol for retryable database operations."""
+
+    def __call__(self) -> T_co:
+        ...
 
 
 def configure_sqlite_engine(
-    engine: Engine,
+    engine: "Engine",  # noqa: UP037
     *,
     busy_timeout_ms: int = DEFAULT_BUSY_TIMEOUT_MS,
     synchronous_level: str = "NORMAL",
@@ -49,8 +73,8 @@ def configure_sqlite_engine(
 
     @event.listens_for(engine, "connect")
     def _set_sqlite_pragmas(
-        dbapi_connection: Any,
-        _: Any,  # pragma: no cover - signature required by SQLAlchemy
+        dbapi_connection: SQLiteConnection,
+        _: object,  # pragma: no cover - signature required by SQLAlchemy
     ) -> None:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON;")
@@ -66,7 +90,7 @@ def build_sqlite_connect_args(
     timeout_seconds: int = 5,
     *,
     include_thread_check: bool = True,
-) -> dict[str, Any]:
+) -> dict[str, int | bool]:
     """
     Build default connection arguments for SQLite engines.
 
@@ -74,14 +98,14 @@ def build_sqlite_connect_args(
         timeout_seconds: Number of seconds SQLite waits before raising a lock error.
         include_thread_check: Whether to set ``check_same_thread`` (sync driver only).
     """
-    connect_args: dict[str, Any] = {"timeout": timeout_seconds}
+    connect_args: dict[str, int | bool] = {"timeout": timeout_seconds}
     if include_thread_check:
         connect_args["check_same_thread"] = False
     return connect_args
 
 
 def retry_on_sqlite_lock(  # noqa: UP047 - Python 3.9 compatible generics
-    operation: Callable[[], T],
+    operation: RetryableOperation[T],
     max_retries: int = MAX_RETRIES,
     initial_delay: float = INITIAL_RETRY_DELAY,
 ) -> T:

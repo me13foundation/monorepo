@@ -1,7 +1,6 @@
 import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,6 +34,7 @@ from src.routes.resources import router as resources_router
 from src.routes.search import router as search_router
 from src.routes.users import users_router
 from src.routes.variants import router as variants_router
+from src.type_definitions.common import JSONObject
 
 
 def _skip_startup_tasks() -> bool:
@@ -108,7 +108,7 @@ def create_app() -> FastAPI:
 
     # Root endpoint
     @app.get("/", summary="Welcome to MED13 Resource Library", tags=["info"])
-    async def root() -> dict[str, Any]:
+    async def root() -> JSONObject:
         """Welcome endpoint with API information."""
         return {
             "message": "Welcome to the MED13 Resource Library API",

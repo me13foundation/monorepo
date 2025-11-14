@@ -4,11 +4,11 @@ import logging
 import time
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
-from typing import Any
 
 from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from src.middleware.distributed_rate_limit import build_distributed_limiter
 
@@ -55,7 +55,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app: Callable[..., Any],
+        app: ASGIApp,
         exclude_paths: list[str] | None = None,
     ) -> None:
         super().__init__(app)
@@ -127,7 +127,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 class EndpointRateLimitMiddleware(BaseHTTPMiddleware):
     """More granular rate limiting based on endpoint and HTTP method."""
 
-    def __init__(self, app: Callable[..., Any]) -> None:
+    def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
         # Different limits for different endpoints

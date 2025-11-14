@@ -6,13 +6,11 @@ import logging
 import os
 from datetime import UTC, datetime
 from secrets import token_urlsafe
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
 from uuid import UUID
 
-if TYPE_CHECKING:  # pragma: no cover - type-checking only
+if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-else:
-    Session = Any  # type: ignore[assignment]
 
 from src.domain.entities.user import UserRole, UserStatus
 from src.infrastructure.security.password_hasher import PasswordHasher
@@ -24,6 +22,22 @@ from src.models.database.research_space import (
     SpaceStatusEnum,
 )
 from src.models.database.user import UserModel
+
+
+class SourceCatalogEntrySeed(TypedDict, total=False):
+    """Typed seed data for source catalog entries."""
+
+    id: str
+    name: str
+    description: str
+    category: str
+    param_type: str
+    url_template: str
+    api_endpoint: str
+    tags: list[str]
+    is_active: bool
+    requires_auth: bool
+
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +162,7 @@ def ensure_default_research_space_seeded(session: Session) -> None:
         )
 
 
-SOURCE_CATALOG_ENTRIES: list[dict[str, Any]] = [
+SOURCE_CATALOG_ENTRIES: list[SourceCatalogEntrySeed] = [
     {
         "id": "clinvar",
         "name": "ClinVar",

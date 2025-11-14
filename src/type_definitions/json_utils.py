@@ -10,12 +10,20 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from datetime import date, datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, cast
+from typing import Iterable, Protocol, TypeGuard  # noqa: UP035
 
 from .common import JSONObject, JSONValue  # noqa: TC001
 
-if TYPE_CHECKING:
-    from collections.abc import Iterable
+
+class DataclassInstance(Protocol):
+    """Protocol describing dataclass instances for type narrowing."""
+
+    __dataclass_fields__: dict[str, object]
+
+
+def _is_dataclass_instance(value: object) -> TypeGuard[DataclassInstance]:
+    """Type guard ensuring value is a dataclass instance."""
+    return is_dataclass(value)
 
 
 def as_object(value: JSONValue | None) -> JSONObject:
@@ -107,8 +115,8 @@ def to_json_value(value: object) -> JSONValue:
             result = enum_value
         else:
             result = str(enum_value)
-    elif is_dataclass(value):
-        dataclass_dict = asdict(cast("Any", value))
+    elif _is_dataclass_instance(value):
+        dataclass_dict = asdict(value)  # type: ignore[call-overload]
         result = {key: to_json_value(item) for key, item in dataclass_dict.items()}
     elif isinstance(value, dict):
         result = {str(key): to_json_value(item) for key, item in value.items()}
