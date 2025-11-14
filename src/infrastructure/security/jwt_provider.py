@@ -7,10 +7,38 @@ Provides secure JWT token creation, validation, and management.
 import secrets
 import string
 from datetime import UTC, datetime, timedelta
-from typing import Any, cast
+from typing import TYPE_CHECKING, Literal, TypedDict, cast
 from uuid import UUID
 
 import jwt
+
+if TYPE_CHECKING:
+    from src.type_definitions.common import JSONObject
+
+
+class TokenPayload(TypedDict, total=False):
+    sub: str
+    role: str
+    type: Literal["access", "refresh"]
+    exp: datetime
+    iat: datetime
+    iss: str
+
+
+class DecodedTokenPayload(TypedDict, total=False):
+    sub: str
+    role: str
+    type: Literal["access", "refresh"]
+    exp: int
+    iat: int
+    iss: str
+
+
+class RefreshResult(TypedDict):
+    access_token: str
+    expires_at: datetime
+    user_id: str
+    role: str
 
 
 class JWTProvider:
@@ -66,7 +94,7 @@ class JWTProvider:
 
         expire = datetime.now(UTC) + expires_delta
 
-        to_encode = {
+        to_encode: TokenPayload = {
             "sub": str(user_id),
             "role": role,
             "type": "access",
@@ -97,7 +125,7 @@ class JWTProvider:
 
         expire = datetime.now(UTC) + expires_delta
 
-        to_encode = {
+        to_encode: TokenPayload = {
             "sub": str(user_id),
             "type": "refresh",
             "exp": expire,
@@ -107,7 +135,7 @@ class JWTProvider:
 
         return self._encode_token(to_encode)
 
-    def decode_token(self, token: str) -> dict[str, Any]:
+    def decode_token(self, token: str) -> DecodedTokenPayload:
         """
         Decode and validate a JWT token.
 
@@ -129,9 +157,8 @@ class JWTProvider:
             )
 
             # Additional validation
-            self._validate_payload(payload)
-
-            return cast("dict[str, Any]", payload)
+            decoded_payload = cast("DecodedTokenPayload", payload)
+            self._validate_payload(decoded_payload)
 
         except jwt.ExpiredSignatureError as exc:
             message = "Token has expired"
@@ -145,6 +172,8 @@ class JWTProvider:
         except Exception as exc:
             message = f"Token validation failed: {exc!s}"
             raise ValueError(message) from exc
+        else:
+            return decoded_payload
 
     def get_token_expiration(self, token: str) -> datetime:
         """
@@ -160,18 +189,20 @@ class JWTProvider:
             ValueError: If token is malformed
         """
         try:
-            # Decode without verification to get expiration
-            payload = jwt.decode(token, options={"verify_signature": False})
+            payload = cast(
+                "JSONObject",
+                jwt.decode(token, options={"verify_signature": False}),
+            )
         except Exception as exc:
             message = f"Cannot parse token expiration: {exc!s}"
             raise ValueError(message) from exc
 
         exp_timestamp = payload.get("exp")
-        if not exp_timestamp:
+        if not isinstance(exp_timestamp, (int, float)):
             message = "Token has no expiration"
-            raise ValueError(message)
+            raise TypeError(message)
 
-        return datetime.fromtimestamp(exp_timestamp, tz=UTC)
+        return datetime.fromtimestamp(int(exp_timestamp), tz=UTC)
 
     def is_token_expired(self, token: str) -> bool:
         """
@@ -189,7 +220,7 @@ class JWTProvider:
         except ValueError:
             return True  # Treat unparseable tokens as expired
 
-    def refresh_access_token(self, refresh_token: str) -> dict[str, Any]:
+    def refresh_access_token(self, refresh_token: str) -> RefreshResult:
         """
         Create new access token from valid refresh token.
 
@@ -225,7 +256,7 @@ class JWTProvider:
             "role": role,
         }
 
-    def _encode_token(self, payload: dict[str, Any]) -> str:
+    def _encode_token(self, payload: TokenPayload) -> str:
         """
         Encode payload into JWT token.
 
@@ -236,12 +267,17 @@ class JWTProvider:
             JWT token string
         """
         try:
-            return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
+            serializable_payload = dict(payload)
+            return jwt.encode(
+                serializable_payload,
+                self.secret_key,
+                algorithm=self.algorithm,
+            )
         except Exception as exc:
             message = f"Token encoding failed: {exc!s}"
             raise ValueError(message) from exc
 
-    def _validate_payload(self, payload: dict[str, Any]) -> None:
+    def _validate_payload(self, payload: DecodedTokenPayload) -> None:
         """
         Validate decoded token payload.
 

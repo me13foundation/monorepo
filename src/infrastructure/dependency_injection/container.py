@@ -11,7 +11,6 @@ import os
 import secrets
 from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
-from typing import Any, cast
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -119,7 +118,7 @@ class DependencyContainer:
         self.jwt_algorithm = jwt_algorithm
 
         # Initialize ASYNC database engine (for Clean Architecture - auth)
-        engine_kwargs: dict[str, Any] = {
+        engine_kwargs: dict[str, object] = {
             "echo": False,  # Set to True for debugging
             "pool_pre_ping": True,
         }
@@ -299,7 +298,7 @@ class DependencyContainer:
 
     async def health_check(self) -> HealthCheckResponse:
         """Perform health check on all dependencies."""
-        health_status = {
+        health_status: HealthCheckResponse = {
             "database": False,
             "jwt_provider": False,
             "password_hasher": False,
@@ -339,7 +338,7 @@ class DependencyContainer:
         except (SQLAlchemyError, ValueError, RuntimeError) as exc:
             logger.warning("Service initialization health check failed: %s", exc)
 
-        return cast("HealthCheckResponse", health_status)
+        return health_status
 
     def create_gene_application_service(
         self,

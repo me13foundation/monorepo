@@ -12,25 +12,21 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from src.domain.services.file_upload_service import (
     DataRecord,
     FileUploadGateway,
     FileUploadResult,
+    JSONObject,
+    JSONValue,
 )
-from src.type_definitions.json_utils import to_json_value
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
+    from xml.etree.ElementTree import Element
 
     from src.domain.entities.user_data_source import SourceConfiguration
-    from src.type_definitions.common import JSONObject, JSONValue
-else:  # pragma: no cover - runtime compatibility fallback
-    SourceConfiguration = Any
-    JSONObject = dict[str, Any]
-    JSONValue = Any
-    Callable = Any
 
 # Prefer defusedxml if available
 try:  # pragma: no cover - import guard
@@ -110,13 +106,11 @@ class LocalFileUploadGateway(FileUploadGateway):
 
         metadata: JSONObject = cast(
             "JSONObject",
-            to_json_value(
-                {
-                    "columns": self._extract_columns(records),
-                    "inferred_types": self._infer_data_types(records),
-                    "validation_errors": validation_errors,
-                },
-            ),
+            {
+                "columns": self._extract_columns(records),
+                "inferred_types": self._infer_data_types(records),
+                "validation_errors": validation_errors,
+            },
         )
 
         return FileUploadResult(
@@ -143,7 +137,7 @@ class LocalFileUploadGateway(FileUploadGateway):
             raise ValueError(error)
 
         content_text = file_bytes.decode("utf-8", errors="replace")
-        parser_map = {
+        parser_map: dict[str, Callable[[str, int], list[DataRecord]]] = {
             "csv": self._parse_csv,
             "json": self._parse_json,
             "xml": self._parse_xml,
@@ -200,7 +194,7 @@ class LocalFileUploadGateway(FileUploadGateway):
         for i, row in enumerate(reader):
             if i >= max_records:
                 break
-            data = {key: to_json_value(value) for key, value in row.items()}
+            data = self._row_to_json_object(row)
             records.append(DataRecord(data=data, line_number=i + 1))
         return records
 
@@ -210,7 +204,7 @@ class LocalFileUploadGateway(FileUploadGateway):
         for i, row in enumerate(reader):
             if i >= max_records:
                 break
-            data = {key: to_json_value(value) for key, value in row.items()}
+            data = self._row_to_json_object(row)
             records.append(DataRecord(data=data, line_number=i + 1))
         return records
 
@@ -219,14 +213,24 @@ class LocalFileUploadGateway(FileUploadGateway):
         records: list[DataRecord] = []
         if isinstance(parsed, list):
             for i, item in enumerate(parsed[:max_records]):
-                data = cast("JSONObject", to_json_value(item))
+                if isinstance(item, dict):
+                    data = cast("JSONObject", item)
+                else:
+                    data = cast("JSONObject", {"value": item})
                 records.append(DataRecord(data=data, line_number=i + 1))
         elif isinstance(parsed, dict):
-            data = cast("JSONObject", to_json_value(parsed))
+            data = cast("JSONObject", parsed)
             records.append(DataRecord(data=data))
         elif isinstance(parsed, str):
+            value_payload = cast(
+                "JSONObject",
+                {"value": parsed},
+            )
             records.append(
-                DataRecord(data={"value": to_json_value(parsed)}, line_number=1),
+                DataRecord(
+                    data=value_payload,
+                    line_number=1,
+                ),
             )
         return records
 
@@ -243,12 +247,17 @@ class LocalFileUploadGateway(FileUploadGateway):
             records.append(DataRecord(data=record_data, line_number=i + 1))
         return records
 
-    def _xml_element_to_dict(self, element: Any) -> JSONObject:
+    def _xml_element_to_dict(self, element: Element) -> JSONObject:
         data: JSONObject = {}
-        data[element.tag] = {
-            child.tag: to_json_value(child.text or "") for child in element
-        }
+        data[element.tag] = {child.tag: child.text or "" for child in element}
         return data
+
+    def _row_to_json_object(self, row: Mapping[str, object]) -> JSONObject:
+        """Convert CSV/TSV rows to typed JSON objects."""
+        normalized = {
+            str(key): (value if value is not None else "") for key, value in row.items()
+        }
+        return cast("JSONObject", normalized)
 
     def _validate_records(
         self,

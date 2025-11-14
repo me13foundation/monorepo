@@ -8,7 +8,7 @@ import hashlib
 import re
 import secrets
 import string
-from typing import Any, TypedDict, cast
+from typing import TypedDict
 
 import bcrypt
 
@@ -24,6 +24,15 @@ class PasswordAnalysis(TypedDict):
     is_strong: bool
     score: int
     issues: list[str]
+
+
+class HashInfo(TypedDict, total=False):
+    """Metadata returned from hash inspection."""
+
+    scheme: str | None
+    needs_update: bool
+    is_valid: bool
+    error: str
 
 
 class PasswordHasher:
@@ -170,7 +179,7 @@ class PasswordHasher:
         chars = string.ascii_letters + string.digits + string.punctuation
         return "".join(secrets.choice(chars) for _ in range(length))
 
-    def get_hash_info(self, hashed_password: str) -> dict[str, Any]:
+    def get_hash_info(self, hashed_password: str) -> HashInfo:
         """
         Get information about a password hash.
 
@@ -183,7 +192,7 @@ class PasswordHasher:
         try:
             # Check if it's a valid bcrypt hash
             if hashed_password.startswith(("$2b$", "$2a$")):
-                result: dict[str, Any] = {
+                result: HashInfo = {
                     "scheme": "bcrypt",
                     "needs_update": False,  # Could implement version checking
                     "is_valid": True,
@@ -245,7 +254,7 @@ class PasswordHasher:
     def check_password_complexity(  # noqa: C901, PLR0912
         self,
         password: str,
-    ) -> dict[str, Any]:
+    ) -> PasswordAnalysis:
         """
         Detailed password complexity analysis.
 
@@ -317,4 +326,4 @@ class PasswordHasher:
             analysis["score"] >= self.score_strong and len(analysis["issues"]) == 0
         )
 
-        return cast("dict[str, Any]", analysis)
+        return analysis

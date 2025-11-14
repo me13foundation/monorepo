@@ -3,11 +3,24 @@ DOI minting service for Zenodo deposits.
 """
 
 import logging
-from typing import Any, cast
+from typing import TypedDict
+
+from src.type_definitions.external_apis import (
+    ZenodoDepositResponse,
+    ZenodoMetadata,
+    ZenodoPublishResponse,
+)
 
 from .client import ZenodoClient
 
 logger = logging.getLogger(__name__)
+
+
+class DOIMintResult(TypedDict):
+    deposit_id: int
+    doi: str
+    url: str
+    deposit: ZenodoPublishResponse
 
 
 class DOIService:
@@ -25,8 +38,8 @@ class DOIService:
     async def mint_doi(
         self,
         deposit_id: int,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        metadata: ZenodoMetadata | None = None,
+    ) -> DOIMintResult:
         """
         Mint DOI for a deposit by publishing it.
 
@@ -44,22 +57,18 @@ class DOIService:
         # Publish deposit (this mints the DOI)
         published_deposit = await self.client.publish_deposit(deposit_id)
 
-        # Extract DOI (cast to dict for compatibility)
-        doi = self.client.extract_doi(cast("dict[str, Any]", published_deposit))
-
-        if not doi:
-            message = "DOI not found in published deposit response"
-            raise ValueError(message)
+        doi = published_deposit["doi"]
 
         logger.info("DOI minted successfully: %s", doi)
 
-        published_dict = cast("dict[str, Any]", published_deposit)
-        return {
+        record_url = published_deposit.get("record_url", "")
+        result: DOIMintResult = {
             "deposit_id": deposit_id,
             "doi": doi,
-            "url": published_dict.get("links", {}).get("html", ""),
+            "url": record_url or f"https://doi.org/{doi}",
             "deposit": published_deposit,
         }
+        return result
 
     async def get_doi(self, deposit_id: int) -> str | None:
         """
@@ -71,7 +80,7 @@ class DOIService:
         Returns:
             DOI string or None
         """
-        deposit = await self.client.get_deposit(deposit_id)
+        deposit: ZenodoDepositResponse = await self.client.get_deposit(deposit_id)
         return self.client.extract_doi(deposit)
 
     def format_doi_url(self, doi: str) -> str:

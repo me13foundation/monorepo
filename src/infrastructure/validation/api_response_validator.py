@@ -6,7 +6,6 @@ helping prevent runtime errors from malformed external data.
 """
 
 import time
-from typing import Any
 
 from src.type_definitions.common import JSONObject, JSONValue
 from src.type_definitions.external_apis import (
@@ -14,7 +13,9 @@ from src.type_definitions.external_apis import (
     ClinVarESearchResult,
     ClinVarSearchResponse,
     ClinVarSearchValidationResult,
+    ClinVarVariantRecord,
     ClinVarVariantResponse,
+    ClinVarVariantResultMap,
     ClinVarVariantValidationResult,
     ValidationIssue,
 )
@@ -228,7 +229,7 @@ class APIResponseValidator:
 
     @staticmethod
     def validate_pubmed_search_response(
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> APIResponseValidationResult:
         """Validate PubMed search API response."""
         start_time = time.time()
@@ -288,7 +289,7 @@ class APIResponseValidator:
 
     @staticmethod
     def validate_pubmed_article_response(
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> APIResponseValidationResult:
         """Validate PubMed article details API response."""
         start_time = time.time()
@@ -357,7 +358,7 @@ class APIResponseValidator:
 
     @staticmethod
     def validate_generic_api_response(
-        data: Any,
+        data: JSONValue,
         required_fields: list[str],
         field_types: dict[str, type] | None = None,
     ) -> APIResponseValidationResult:
@@ -376,8 +377,9 @@ class APIResponseValidator:
 
         issues: list[ValidationIssue] = []
 
-        # Check data is a dict
-        if not isinstance(data, dict):
+        payload: JSONObject | None = data if isinstance(data, dict) else None
+
+        if payload is None:
             issues.append(
                 ValidationIssue(
                     field="root",
@@ -404,7 +406,7 @@ class APIResponseValidator:
                     severity="error",
                 )
                 for field in required_fields
-                if field not in data
+                if field not in payload
             ],
         )
 
@@ -421,7 +423,10 @@ class APIResponseValidator:
                         severity="error",
                     )
                     for field, expected_type in field_types.items()
-                    if (field in data and not isinstance(data[field], expected_type))
+                    if (
+                        field in payload
+                        and not isinstance(payload[field], expected_type)
+                    )
                 ],
             )
 
@@ -437,7 +442,7 @@ class APIResponseValidator:
             issues=issues,
             data_quality_score=data_quality_score,
             sanitized_data=(
-                data
+                payload
                 if data_quality_score > APIResponseValidator.QUALITY_MEDIUM
                 else None
             ),
@@ -452,8 +457,8 @@ class APIResponseValidator:
 
     @staticmethod
     def _validate_header_section(
-        header_obj: Any,
-    ) -> tuple[list[ValidationIssue], dict[str, Any] | None]:
+        header_obj: JSONValue,
+    ) -> tuple[list[ValidationIssue], JSONObject | None]:
         issues: list[ValidationIssue] = []
         if header_obj is None:
             issues.append(
@@ -477,11 +482,14 @@ class APIResponseValidator:
             )
             return issues, None
 
-        return issues, header_obj
+        header_payload: JSONObject = header_obj
+        return issues, header_payload
 
     @staticmethod
-    def _sanitize_variant_record(record_value: dict[str, Any]) -> dict[str, Any]:
-        record: dict[str, Any] = {}
+    def _sanitize_variant_record(
+        record_value: JSONObject,
+    ) -> ClinVarVariantRecord:
+        record: ClinVarVariantRecord = {}
         for field_name in (
             "variation_id",
             "variation_name",
@@ -512,8 +520,8 @@ class APIResponseValidator:
 
     @staticmethod
     def _sanitize_variant_result(
-        result_section: Any,
-    ) -> tuple[list[ValidationIssue], dict[str, Any] | None]:
+        result_section: JSONValue,
+    ) -> tuple[list[ValidationIssue], ClinVarVariantResultMap | None]:
         issues: list[ValidationIssue] = []
         if result_section is None:
             issues.append(
@@ -547,7 +555,7 @@ class APIResponseValidator:
                 ),
             )
 
-        sanitized_records: dict[str, Any] = {}
+        sanitized_records: ClinVarVariantResultMap = {}
         for key, value in result_section.items():
             if key == "uids":
                 if isinstance(value, list):

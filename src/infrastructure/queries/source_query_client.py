@@ -8,7 +8,7 @@ for programmatic sources, following Clean Architecture principles.
 import asyncio
 import logging
 from collections.abc import MutableMapping
-from typing import TYPE_CHECKING, Any, Protocol, assert_never, cast
+from typing import TYPE_CHECKING, Protocol, assert_never, cast
 from urllib.parse import quote
 
 import aiohttp
@@ -22,6 +22,7 @@ from src.domain.entities.data_discovery_session import (
     SourceCatalogEntry,
 )
 from src.domain.repositories.data_discovery_repository import SourceQueryClient
+from src.type_definitions.common import JSONObject, JSONValue
 
 if TYPE_CHECKING:
     from aiohttp import ClientResponse
@@ -34,7 +35,7 @@ class SessionLike(Protocol):
 
     headers: MutableMapping[str, str]
 
-    def mount(self, prefix: str, adapter: Any) -> None:
+    def mount(self, prefix: str, adapter: object) -> None:
         """Attach an adapter for the specified prefix."""
 
     def close(self) -> None:
@@ -110,7 +111,7 @@ class HTTPQueryClient(SourceQueryClient):
         catalog_entry: SourceCatalogEntry,
         parameters: QueryParameters,
         timeout_seconds: int = 30,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Execute a query against an external data source.
 
@@ -212,7 +213,7 @@ class HTTPQueryClient(SourceQueryClient):
         catalog_entry: SourceCatalogEntry,
         parameters: QueryParameters,
         timeout_seconds: int,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Execute an API query using aiohttp for async HTTP requests.
 
@@ -263,9 +264,9 @@ class HTTPQueryClient(SourceQueryClient):
         self,
         catalog_entry: SourceCatalogEntry,
         parameters: QueryParameters,
-    ) -> dict[str, Any]:
+    ) -> dict[str, str]:
         """Construct request parameters for API queries."""
-        request_params: dict[str, Any] = {}
+        request_params: dict[str, str] = {}
 
         if parameters.gene_symbol:
             request_params["gene"] = parameters.gene_symbol
@@ -282,17 +283,21 @@ class HTTPQueryClient(SourceQueryClient):
             else:
                 config_dict = None
             if isinstance(config_dict, dict):
-                request_params.update(config_dict.get("api_params", {}))
+                api_params = config_dict.get("api_params", {})
+                if isinstance(api_params, dict):
+                    request_params.update(
+                        {str(key): str(value) for key, value in api_params.items()},
+                    )
 
         return request_params
 
     async def _parse_response_payload(
         self,
         response: "ClientResponse",
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """Parse API response payload with JSON/text fallback."""
         try:
-            data = await response.json()
+            data = cast("JSONValue", await response.json())
         except aiohttp.ContentTypeError:
             text = await response.text()
             data = {"response": text, "content_type": response.content_type}

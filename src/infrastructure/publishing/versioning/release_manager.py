@@ -5,7 +5,6 @@ Release management and orchestration.
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
 
 from src.application.packaging import PackageStorage
 from src.infrastructure.publishing.versioning.semantic_versioner import (
@@ -15,6 +14,7 @@ from src.infrastructure.publishing.versioning.semantic_versioner import (
 from src.infrastructure.publishing.zenodo.client import ZenodoClient
 from src.infrastructure.publishing.zenodo.doi_service import DOIService
 from src.infrastructure.publishing.zenodo.uploader import ZenodoUploader
+from src.type_definitions.common import JSONObject
 from src.type_definitions.external_apis import ZenodoMetadata
 
 logger = logging.getLogger(__name__)
@@ -50,8 +50,8 @@ class ReleaseManager:
         version: str | None,
         release_notes: str | None = None,
         version_type: VersionType | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        metadata: ZenodoMetadata | None = None,
+    ) -> JSONObject:
         """
         Create and publish a new release.
 
@@ -115,7 +115,7 @@ class ReleaseManager:
         doi_result = await self.doi_service.mint_doi(deposit["id"])
 
         # Create release record
-        release_info = {
+        release_info: JSONObject = {
             "version": version,
             "doi": doi_result["doi"],
             "doi_url": self.doi_service.format_doi_url(doi_result["doi"]),
@@ -139,7 +139,7 @@ class ReleaseManager:
         self,
         version: str,
         release_notes: str | None,
-        additional_metadata: dict[str, Any] | None,
+        additional_metadata: ZenodoMetadata | None,
     ) -> ZenodoMetadata:
         """
         Prepare metadata for Zenodo deposit.
@@ -152,37 +152,33 @@ class ReleaseManager:
         Returns:
             Zenodo metadata dictionary
         """
-        metadata = {
-            "metadata": {
-                "title": f"{self.package_name} v{version}",
-                "description": release_notes
-                or f"{self.package_name} release {version}",
-                "version": version,
-                "creators": [
-                    {
-                        "name": "MED13 Foundation",
-                        "affiliation": "MED13 Foundation",
-                    },
-                ],
-                "license": {"id": "cc-by-4.0"},
-                "keywords": [
-                    "MED13",
-                    "genetics",
-                    "variants",
-                    "phenotypes",
-                    "biomedical data",
-                    "FAIR data",
-                ],
-                "upload_type": "dataset",
-                "publication_date": datetime.now(UTC).date().isoformat(),
-            },
+        metadata: ZenodoMetadata = {
+            "title": f"{self.package_name} v{version}",
+            "description": release_notes or f"{self.package_name} release {version}",
+            "version": version,
+            "creators": [
+                {
+                    "name": "MED13 Foundation",
+                    "affiliation": "MED13 Foundation",
+                },
+            ],
+            "license": "cc-by-4.0",
+            "keywords": [
+                "MED13",
+                "genetics",
+                "variants",
+                "phenotypes",
+                "biomedical data",
+                "FAIR data",
+            ],
+            "publication_date": datetime.now(UTC).date().isoformat(),
         }
 
         # Merge additional metadata
         if additional_metadata:
-            metadata["metadata"].update(additional_metadata)
+            metadata.update(additional_metadata)
 
-        return cast("ZenodoMetadata", metadata)
+        return metadata
 
     def list_releases(self) -> list[str]:
         """

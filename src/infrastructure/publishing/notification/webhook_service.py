@@ -3,9 +3,10 @@ Webhook notification service for releases.
 """
 
 import logging
-from typing import Any
 
 import httpx
+
+from src.type_definitions.common import JSONObject
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class WebhookService:
     async def send_webhook(
         self,
         url: str,
-        payload: dict[str, Any],
+        payload: JSONObject,
         headers: dict[str, str] | None = None,
     ) -> bool:
         """
@@ -65,7 +66,7 @@ class WebhookService:
         version: str,
         doi: str,
         release_notes: str | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: JSONObject | None = None,
     ) -> dict[str, bool]:
         """
         Send release notification webhooks.
@@ -80,7 +81,7 @@ class WebhookService:
         Returns:
             Dictionary mapping webhook URLs to success status
         """
-        payload = {
+        payload: JSONObject = {
             "event": "release.published",
             "package": "MED13 Resource Library",
             "version": version,
@@ -90,7 +91,7 @@ class WebhookService:
             "metadata": metadata or {},
         }
 
-        results = {}
+        results: dict[str, bool] = {}
         for url in webhook_urls:
             success = await self.send_webhook(url, payload)
             results[url] = success

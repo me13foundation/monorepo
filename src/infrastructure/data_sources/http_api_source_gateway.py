@@ -10,8 +10,10 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import json
+from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import httpx
 
@@ -20,20 +22,24 @@ from src.domain.services.api_source_service import (
     APIRequestResult,
     APISourceGateway,
 )
+from src.domain.services.api_source_service import (
+    JSONObject as GatewayJSONObject,
+)
+from src.domain.services.api_source_service import (
+    JSONValue as GatewayJSONValue,
+)
 from src.type_definitions.json_utils import to_json_value
 
 AuthHeaders = dict[str, str]
+QueryParamValue = str | int | float | bool | None
+QueryParamsDict = dict[str, QueryParamValue]
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from src.domain.entities.user_data_source import SourceConfiguration
-    from src.type_definitions.common import JSONObject, SourceMetadata
-else:  # pragma: no cover - runtime compatibility fallback
-    SourceConfiguration = Any
-    JSONObject = dict[str, Any]
-    SourceMetadata = dict[str, Any]
-    Callable = Any
+    from src.type_definitions.common import SourceMetadata
+
+AuthConfig = Mapping[str, object]
+AuthMethod = Callable[[AuthConfig], AuthHeaders | None]
 
 
 class HttpxAPISourceGateway(APISourceGateway):
@@ -42,7 +48,7 @@ class HttpxAPISourceGateway(APISourceGateway):
     def __init__(self, timeout_seconds: int = 30, max_retries: int = 3):
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
-        self.auth_methods: dict[str, Callable[[dict[str, Any]], AuthHeaders | None]] = {
+        self.auth_methods: dict[str, AuthMethod] = {
             "none": self._auth_none,
             "bearer": self._auth_bearer,
             "basic": self._auth_basic,
@@ -66,7 +72,7 @@ class HttpxAPISourceGateway(APISourceGateway):
                 if auth_headers:
                     headers.update(auth_headers)
 
-                params: dict[str, Any] = {}
+                params: QueryParamsDict = {}
                 metadata = self._metadata(configuration)
                 params["limit"] = self._coerce_limit(metadata.get("limit"), default=1)
 
@@ -99,7 +105,8 @@ class HttpxAPISourceGateway(APISourceGateway):
                     "application/json",
                 ):
                     with contextlib.suppress(Exception):
-                        sample_data = response.json()
+                        sample_payload = response.json()
+                        sample_data = self._ensure_json_object(sample_payload)
 
                 return APIConnectionTest(
                     success=success,
@@ -125,13 +132,16 @@ class HttpxAPISourceGateway(APISourceGateway):
     async def fetch_data(
         self,
         configuration: SourceConfiguration,
-        request_parameters: JSONObject | None = None,
+        request_parameters: Mapping[str, GatewayJSONValue] | None = None,
     ) -> APIRequestResult:
         if not configuration.url:
             return APIRequestResult(success=False, errors=["No URL provided"])
 
         start_time = datetime.now(UTC)
-        params = dict(request_parameters or {})
+        base_params: Mapping[str, object] = (
+            request_parameters if request_parameters is not None else {}
+        )
+        params: QueryParamsDict = self._normalize_params(base_params)
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
@@ -143,7 +153,9 @@ class HttpxAPISourceGateway(APISourceGateway):
                 metadata = self._metadata(configuration)
                 url = configuration.url
                 method = metadata.get("method", "GET").upper()
-                params.update(dict(metadata.get("query_params", {})))
+                query_params = metadata.get("query_params", {})
+                if isinstance(query_params, dict):
+                    params.update(self._normalize_params(query_params))
 
                 await self._apply_rate_limiting(configuration)
 
@@ -163,11 +175,12 @@ class HttpxAPISourceGateway(APISourceGateway):
 
                 response_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
 
-                data = None
+                data: GatewayJSONObject | None = None
                 if response.headers.get("content-type", "").startswith(
                     "application/json",
                 ):
-                    data = response.json()
+                    payload = response.json()
+                    data = self._ensure_json_object(payload)
 
                 errors: list[str] = []
                 success = response.is_success and data is not None
@@ -176,12 +189,15 @@ class HttpxAPISourceGateway(APISourceGateway):
                         f"HTTP {response.status_code}: {response.text[:200]}",
                     )
 
-                metadata_payload = {
-                    "request_url": url,
-                    "params": params,
-                    "method": method,
-                    "headers": headers,
-                }
+                metadata_payload: GatewayJSONObject = cast(
+                    "GatewayJSONObject",
+                    {
+                        "request_url": url,
+                        "params": dict(params),
+                        "method": method,
+                        "headers": dict(headers),
+                    },
+                )
 
                 return APIRequestResult(
                     success=success,
@@ -190,7 +206,7 @@ class HttpxAPISourceGateway(APISourceGateway):
                     response_time_ms=response_time,
                     status_code=response.status_code,
                     errors=errors,
-                    metadata=cast("JSONObject", to_json_value(metadata_payload)),
+                    metadata=cast("GatewayJSONObject", to_json_value(metadata_payload)),
                 )
 
         except Exception as exc:  # noqa: BLE001
@@ -222,22 +238,27 @@ class HttpxAPISourceGateway(APISourceGateway):
         auth_type = configuration.auth_type or "none"
         auth_method = self.auth_methods.get(auth_type)
         if auth_method and configuration.auth_credentials:
-            credentials = cast("dict[str, Any]", configuration.auth_credentials)
-            return auth_method(credentials)
+            credentials = configuration.auth_credentials
+            if isinstance(credentials, dict):
+                return auth_method(credentials)
         if auth_type == "none":
             return None
-        return auth_method({}) if auth_method else None
+        if auth_method is None:
+            return None
+        empty_config: AuthConfig = {}
+        return auth_method(empty_config)
 
     def _metadata(self, configuration: SourceConfiguration) -> SourceMetadata:
         return configuration.metadata
 
-    def _coerce_limit(self, value: Any, default: int) -> int:
-        try:
-            parsed = int(value)
-        except (TypeError, ValueError):
-            return default
-        else:
+    def _coerce_limit(self, value: object | None, default: int) -> int:
+        if isinstance(value, (int, float, str)):
+            try:
+                parsed = int(value)
+            except (TypeError, ValueError):
+                return default
             return parsed if parsed > 0 else default
+        return default
 
     async def _apply_rate_limiting(
         self,
@@ -254,7 +275,7 @@ class HttpxAPISourceGateway(APISourceGateway):
         method: str,
         url: str,
         headers: dict[str, str],
-        params: dict[str, Any],
+        params: QueryParamsDict,
     ) -> httpx.Response | None:
         for attempt in range(self.max_retries):
             try:
@@ -270,26 +291,47 @@ class HttpxAPISourceGateway(APISourceGateway):
                 await asyncio.sleep(2**attempt)
         return None
 
-    def _count_records(self, data: Any) -> int:
-        if isinstance(data, list):
-            return len(data)
-        if isinstance(data, dict):
-            for key in ["data", "results", "records", "items"]:
-                if key in data and isinstance(data[key], list):
-                    return len(data[key])
-            return 1
-        return 0
+    def _count_records(self, data: GatewayJSONObject | None) -> int:
+        if data is None:
+            return 0
+        for key in ["data", "results", "records", "items"]:
+            value = data.get(key)
+            if isinstance(value, list):
+                return len(value)
+        return 1
 
-    def _auth_none(self, _config: dict[str, Any]) -> None:
+    def _normalize_params(
+        self,
+        raw_params: Mapping[str, object],
+    ) -> QueryParamsDict:
+        normalized: QueryParamsDict = {}
+        for key, value in raw_params.items():
+            normalized[str(key)] = self._format_param_value(value)
+        return normalized
+
+    def _format_param_value(self, value: object) -> QueryParamValue:
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return json.dumps(value)
+
+    def _ensure_json_object(
+        self,
+        payload: object,
+    ) -> GatewayJSONObject:
+        if isinstance(payload, dict):
+            return cast("GatewayJSONObject", payload)
+        return cast("GatewayJSONObject", {"value": payload})
+
+    def _auth_none(self, _config: AuthConfig) -> None:
         return None
 
-    def _auth_bearer(self, config: dict[str, Any]) -> AuthHeaders | None:
+    def _auth_bearer(self, config: AuthConfig) -> AuthHeaders | None:
         token = config.get("token", "")
         if token:
             return {"Authorization": f"Bearer {token}"}
         return None
 
-    def _auth_basic(self, config: dict[str, Any]) -> AuthHeaders | None:
+    def _auth_basic(self, config: AuthConfig) -> AuthHeaders | None:
         username = config.get("username", "")
         password = config.get("password", "")
         if username and password:
@@ -297,10 +339,10 @@ class HttpxAPISourceGateway(APISourceGateway):
             return {"Authorization": f"Basic {auth_string}"}
         return None
 
-    def _auth_api_key(self, _config: dict[str, Any]) -> None:
+    def _auth_api_key(self, _config: AuthConfig) -> None:
         return None
 
-    def _auth_oauth2(self, config: dict[str, Any]) -> AuthHeaders | None:
+    def _auth_oauth2(self, config: AuthConfig) -> AuthHeaders | None:
         token = config.get("access_token", "")
         if token:
             return {"Authorization": f"Bearer {token}"}

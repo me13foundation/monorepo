@@ -7,7 +7,7 @@ and minting DOIs.
 
 import logging
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import httpx
 
@@ -73,10 +73,10 @@ class ZenodoClient:
             response = await client.post(
                 create_url,
                 headers=self.headers,
-                json=metadata,
+                json={"metadata": metadata},
             )
             response.raise_for_status()
-            deposit = cast("dict[str, Any]", response.json())
+            deposit = cast("ZenodoDepositResponse", response.json())
 
             bucket_url = deposit["links"]["bucket"]
 
@@ -84,7 +84,7 @@ class ZenodoClient:
             if files:
                 await self._upload_files(client, bucket_url, files)
 
-            return cast("ZenodoDepositResponse", deposit)
+            return deposit
 
     async def _upload_files(
         self,
@@ -135,7 +135,7 @@ class ZenodoClient:
             response.raise_for_status()
             return cast("ZenodoPublishResponse", response.json())
 
-    async def get_deposit(self, deposit_id: int) -> dict[str, Any]:
+    async def get_deposit(self, deposit_id: int) -> ZenodoDepositResponse:
         """
         Get deposit information.
 
@@ -149,13 +149,13 @@ class ZenodoClient:
             url = f"{self.base_url}/deposit/depositions/{deposit_id}"
             response = await client.get(url, headers=self.headers)
             response.raise_for_status()
-            return cast("dict[str, Any]", response.json())
+            return cast("ZenodoDepositResponse", response.json())
 
     async def update_deposit(
         self,
         deposit_id: int,
-        metadata: dict[str, Any],
-    ) -> dict[str, Any]:
+        metadata: ZenodoMetadata,
+    ) -> ZenodoDepositResponse:
         """
         Update deposit metadata.
 
@@ -168,11 +168,18 @@ class ZenodoClient:
         """
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             url = f"{self.base_url}/deposit/depositions/{deposit_id}"
-            response = await client.put(url, headers=self.headers, json=metadata)
+            response = await client.put(
+                url,
+                headers=self.headers,
+                json={"metadata": metadata},
+            )
             response.raise_for_status()
-            return cast("dict[str, Any]", response.json())
+            return cast("ZenodoDepositResponse", response.json())
 
-    def extract_doi(self, deposit: dict[str, Any]) -> str | None:
+    def extract_doi(
+        self,
+        deposit: ZenodoDepositResponse | ZenodoPublishResponse,
+    ) -> str | None:
         """
         Extract DOI from deposit response.
 
