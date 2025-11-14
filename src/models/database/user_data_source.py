@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-# SQLAlchemy model for user-managed data sources.
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -9,14 +8,16 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.type_definitions.common import JSONObject  # noqa: TC001
+
 from .base import Base
 
 if TYPE_CHECKING:
-    from src.type_definitions.common import JSONObject
-
     from .ingestion_job import IngestionJobModel
     from .research_space import ResearchSpaceModel
     from .source_template import SourceTemplateModel
+
+# SQLAlchemy model for user-managed data sources.
 
 
 class SourceTypeEnum(str, Enum):

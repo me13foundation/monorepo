@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-# SQLAlchemy models for research spaces and memberships.
 from datetime import UTC, datetime
 from enum import Enum
-from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import JSON, ForeignKey, Index, String, Text
@@ -11,10 +9,9 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from .base import Base
+from src.type_definitions.common import JSONObject  # noqa: TC001
 
-if TYPE_CHECKING:
-    from src.type_definitions.common import JSONObject
+from .base import Base
 
 
 class SpaceStatusEnum(str, Enum):

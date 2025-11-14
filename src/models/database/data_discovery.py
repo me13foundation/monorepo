@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-# SQLAlchemy models for Data Discovery (sessions, catalog, query tests).
-from typing import TYPE_CHECKING
+from datetime import datetime  # noqa: TC003
+from uuid import UUID  # noqa: TC003
 
 from sqlalchemy import (
     JSON,
@@ -17,13 +17,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.type_definitions.common import JSONObject  # noqa: TC001
+
 from .base import Base
-
-if TYPE_CHECKING:
-    from datetime import datetime
-    from uuid import UUID
-
-    from src.type_definitions.common import JSONObject
 
 
 class DataDiscoverySessionModel(Base):

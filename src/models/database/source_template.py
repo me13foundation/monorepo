@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-# SQLAlchemy model for reusable data source templates.
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -9,12 +8,14 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.type_definitions.common import JSONObject  # noqa: TC001
+
 from .base import Base
 
 if TYPE_CHECKING:
-    from src.type_definitions.common import JSONObject
-
     from .user_data_source import UserDataSourceModel
+
+# SQLAlchemy model for reusable data source templates.
 
 
 class TemplateCategoryEnum(str, Enum):
