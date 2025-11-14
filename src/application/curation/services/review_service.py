@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from src.application.curation.repositories.review_repository import (
     ReviewFilter,
+    ReviewRecordLike,
     ReviewRepository,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
-
     from sqlalchemy.orm import Session
+
+    from src.type_definitions.common import JSONObject
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ class ReviewQueueItem:
     last_updated: datetime | None
 
     @classmethod
-    def from_record(cls, record: Mapping[str, Any]) -> ReviewQueueItem:
+    def from_record(cls, record: ReviewRecordLike) -> ReviewQueueItem:
         raw_id = record.get("id")
         if raw_id is None:
             msg = "Review record missing required id"
@@ -50,12 +51,12 @@ class ReviewQueueItem:
         quality_score_raw = record.get("quality_score")
         quality_score = (
             float(quality_score_raw)
-            if isinstance(quality_score_raw, (float, int))
+            if isinstance(quality_score_raw, float | int)
             else None
         )
 
         issues_raw = record.get("issues", 0)
-        issues = int(issues_raw) if isinstance(issues_raw, (int, float)) else 0
+        issues = int(issues_raw) if isinstance(issues_raw, int | float) else 0
 
         last_updated_raw = record.get("last_updated")
         last_updated: datetime | None
@@ -80,7 +81,7 @@ class ReviewQueueItem:
             last_updated=last_updated,
         )
 
-    def to_serializable(self) -> dict[str, Any]:
+    def to_serializable(self) -> JSONObject:
         return {
             "id": self.id,
             "entity_type": self.entity_type,
