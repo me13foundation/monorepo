@@ -4,21 +4,26 @@ SQLAlchemy implementation of SessionRepository for MED13 Resource Library.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from collections.abc import AsyncIterator
-    from uuid import UUID
-
-    from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import and_, delete, func, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.session import SessionStatus, UserSession
 from src.domain.repositories.session_repository import SessionRepository
 from src.models.database.session import SessionModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from uuid import UUID
+
+    from sqlalchemy.engine import CursorResult
+
+
+SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 
 class SqlAlchemySessionRepository(SessionRepository):
@@ -36,7 +41,7 @@ class SqlAlchemySessionRepository(SessionRepository):
             return None
         return sha256(token.encode()).hexdigest()
 
-    def __init__(self, session_factory: Any) -> None:
+    def __init__(self, session_factory: SessionFactory) -> None:
         """
         Initialize repository with session factory.
 
@@ -239,9 +244,10 @@ class SqlAlchemySessionRepository(SessionRepository):
                 )
                 .values(status=SessionStatus.REVOKED, last_activity=now)
             )
-            await session.execute(stmt)
+            result = await session.execute(stmt)
             await session.commit()
-            return 0
+            cursor = cast("CursorResult[tuple[()]]", result)
+            return int(cursor.rowcount or 0)
 
     async def revoke_expired_sessions(self) -> int:
         """Revoke all expired sessions."""
@@ -257,9 +263,10 @@ class SqlAlchemySessionRepository(SessionRepository):
                 )
                 .values(status=SessionStatus.EXPIRED, last_activity=now)
             )
-            await session.execute(stmt)
+            result = await session.execute(stmt)
             await session.commit()
-            return 0
+            cursor = cast("CursorResult[tuple[()]]", result)
+            return int(cursor.rowcount or 0)
 
     async def cleanup_expired_sessions(
         self,
@@ -279,9 +286,10 @@ class SqlAlchemySessionRepository(SessionRepository):
                     SessionModel.created_at < before_date,
                 ),
             )
-            await session.execute(stmt)
+            result = await session.execute(stmt)
             await session.commit()
-            return 0
+            cursor = cast("CursorResult[tuple[()]]", result)
+            return int(cursor.rowcount or 0)
 
     async def get_sessions_by_ip(self, ip_address: str) -> list[UserSession]:
         """Get sessions by IP address (for security monitoring)."""

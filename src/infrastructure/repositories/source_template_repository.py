@@ -7,7 +7,7 @@ Provides persistence and query operations for reusable data source templates.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from sqlalchemy import desc, func, or_, select
 
@@ -30,14 +30,14 @@ if TYPE_CHECKING:
     from src.domain.entities.source_template import SourceTemplate, TemplateCategory
     from src.domain.entities.user_data_source import SourceType
     from src.type_definitions.common import JSONObject
-else:  # pragma: no cover - runtime compatibility fallback
-    Session = Any
-    ColumnElement = Any
-    SourceTemplate = Any
-    TemplateCategory = Any
-    SourceType = Any
-    JSONObject = dict[str, Any]
-    UUID = Any
+
+
+class SourceTemplateStatistics(TypedDict):
+    total_templates: int
+    public_templates: int
+    approved_templates: int
+    total_usage: int
+    average_success_rate: float
 
 
 class SqlAlchemySourceTemplateRepository(SourceTemplateRepository):
@@ -302,17 +302,15 @@ class SqlAlchemySourceTemplateRepository(SourceTemplateRepository):
             func.coalesce(func.avg(SourceTemplateModel.success_rate), 0.0),
         )
 
-        return cast(
-            "JSONObject",
-            {
-                "total_templates": int(self.session.execute(total_stmt).scalar_one()),
-                "public_templates": int(self.session.execute(public_stmt).scalar_one()),
-                "approved_templates": int(
-                    self.session.execute(approved_stmt).scalar_one(),
-                ),
-                "total_usage": int(self.session.execute(usage_sum_stmt).scalar_one()),
-                "average_success_rate": float(
-                    self.session.execute(success_avg_stmt).scalar_one(),
-                ),
-            },
+        stats = SourceTemplateStatistics(
+            total_templates=int(self.session.execute(total_stmt).scalar_one()),
+            public_templates=int(self.session.execute(public_stmt).scalar_one()),
+            approved_templates=int(
+                self.session.execute(approved_stmt).scalar_one(),
+            ),
+            total_usage=int(self.session.execute(usage_sum_stmt).scalar_one()),
+            average_success_rate=float(
+                self.session.execute(success_avg_stmt).scalar_one(),
+            ),
         )
+        return cast("JSONObject", stats)

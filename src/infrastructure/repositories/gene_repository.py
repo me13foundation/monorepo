@@ -5,7 +5,7 @@ Data access layer for gene entities with specialized queries.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from sqlalchemy import asc, delete, desc, func, or_, select, update
 
@@ -16,14 +16,18 @@ from src.infrastructure.mappers.gene_mapper import GeneMapper
 from src.models.database import GeneModel
 
 if TYPE_CHECKING:
-    from src.type_definitions.common import GeneUpdate
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
 
     from src.domain.entities.gene import Gene
     from src.domain.repositories.base import QuerySpecification
     from src.domain.value_objects.identifiers import GeneIdentifier
+    from src.type_definitions.common import GeneUpdate
+
+
+class GeneStatistics(TypedDict):
+    total_genes: int
+    genes_with_variants: int
+    genes_with_phenotypes: int
 
 
 class SqlAlchemyGeneRepository(GeneRepositoryInterface):
@@ -244,14 +248,15 @@ class SqlAlchemyGeneRepository(GeneRepositoryInterface):
         count = self.session.execute(stmt).scalar_one()
         return count > 0
 
-    def get_gene_statistics(self) -> dict[str, Any]:
+    def get_gene_statistics(self) -> dict[str, int | float | bool | str | None]:
         """Get statistics about genes in the database."""
         total_genes = self.count()
-        return {
-            "total_genes": total_genes,
-            "genes_with_variants": 0,  # Would need a join query
-            "genes_with_phenotypes": 0,  # Would need a complex join query
-        }
+        stats = GeneStatistics(
+            total_genes=total_genes,
+            genes_with_variants=0,  # TODO: implement query
+            genes_with_phenotypes=0,  # TODO: implement query
+        )
+        return cast("dict[str, int | float | bool | str | None]", stats)
 
     def search_by_name_or_symbol(self, query: str, limit: int = 10) -> list[Gene]:
         """Search genes by name or symbol containing the query string."""

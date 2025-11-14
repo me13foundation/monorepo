@@ -4,21 +4,23 @@ SQLAlchemy implementation of UserRepository for MED13 Resource Library.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, delete, desc, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.domain.repositories.user_repository import UserRepository
 from src.models.database.user import UserModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from collections.abc import AsyncIterator
     from uuid import UUID
 
-    from sqlalchemy.ext.asyncio import AsyncSession
+
+SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 
 class SqlAlchemyUserRepository(UserRepository):
@@ -29,7 +31,7 @@ class SqlAlchemyUserRepository(UserRepository):
     SQLAlchemy models mapped to domain entities.
     """
 
-    def __init__(self, session_factory: Any) -> None:
+    def __init__(self, session_factory: SessionFactory) -> None:
         """
         Initialize repository with session factory.
 

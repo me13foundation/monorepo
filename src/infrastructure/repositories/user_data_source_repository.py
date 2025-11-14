@@ -8,7 +8,7 @@ and efficient database operations.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 from sqlalchemy import and_, delete, desc, func, select, update
 
@@ -31,6 +31,16 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
     from sqlalchemy.engine import CursorResult
     from sqlalchemy.orm import Session
+
+    from src.type_definitions.common import JSONObject
+
+
+class UserDataSourceStatistics(TypedDict):
+    total_sources: int
+    status_counts: dict[str, int]
+    type_counts: dict[str, int]
+    average_quality_score: float | None
+    sources_with_quality_metrics: int
 
 
 class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
@@ -289,7 +299,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         )
         result = self.session.execute(stmt)
         self.session.commit()
-        cursor = cast("CursorResult[Any]", result)
+        cursor = cast("CursorResult[tuple[()]]", result)
         affected = int(cursor.rowcount or 0)
         return affected > 0
 
@@ -315,7 +325,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         stmt = select(func.count()).where(UserDataSourceModel.id == str(source_id))
         return self.session.execute(stmt).scalar_one() > 0
 
-    def get_statistics(self) -> dict[str, Any]:
+    def get_statistics(self) -> JSONObject:
         """Get overall statistics about data sources."""
         # Get counts by status
         status_counts: dict[str, int] = {}
@@ -347,21 +357,24 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
                 ).isnot(None),
             ),
         )
-        result = self.session.execute(stmt).first()
-        if result is None:
-            avg_quality, total_with_quality = None, 0
-        else:
-            avg_quality, total_with_quality = result
+        avg_quality = None
+        total_with_quality = 0
+        quality_row = self.session.execute(stmt).first()
+        if quality_row is not None:
+            avg_quality, total_with_quality = quality_row
 
         # Get total count
         total_count = self.session.execute(
             select(func.count()).select_from(UserDataSourceModel),
         ).scalar_one()
 
-        return {
-            "total_sources": total_count,
-            "status_counts": status_counts,
-            "type_counts": type_counts,
-            "average_quality_score": float(avg_quality) if avg_quality else None,
-            "sources_with_quality_metrics": total_with_quality,
-        }
+        stats = UserDataSourceStatistics(
+            total_sources=total_count,
+            status_counts=status_counts,
+            type_counts=type_counts,
+            average_quality_score=(
+                float(avg_quality) if avg_quality is not None else None
+            ),
+            sources_with_quality_metrics=int(total_with_quality),
+        )
+        return cast("JSONObject", stats)
