@@ -5,11 +5,11 @@ Provides bidirectional mapping between domain entities and database models
 for the Research Spaces module with strong type safety.
 """
 
-from typing import Any
 from uuid import UUID
 
 from src.domain.entities.research_space import ResearchSpace, SpaceStatus
 from src.models.database.research_space import ResearchSpaceModel
+from src.type_definitions.common import JSONObject  # noqa: TC001
 
 
 class ResearchSpaceMapper:
@@ -42,7 +42,7 @@ class ResearchSpaceMapper:
         status_value = (
             model.status.value if hasattr(model.status, "value") else str(model.status)
         )
-        settings_dict: dict[str, Any] = dict(model.settings) if model.settings else {}
+        settings_dict: JSONObject = dict(model.settings) if model.settings else {}
         tags_list = model.tags if model.tags else []
 
         return ResearchSpace(

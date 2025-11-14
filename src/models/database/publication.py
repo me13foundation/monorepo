@@ -3,6 +3,7 @@ Publication SQLAlchemy model for MED13 Resource Library.
 Database representation of scientific publications and citations.
 """
 
+from datetime import date
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, Float, Integer, String, Text
@@ -59,7 +60,7 @@ class PublicationModel(Base):
     volume: Mapped[str | None] = mapped_column(String(20), nullable=True)
     issue: Mapped[str | None] = mapped_column(String(20), nullable=True)
     pages: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    publication_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    publication_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     # Publication metadata
     publication_type: Mapped[str] = mapped_column(

@@ -6,7 +6,6 @@ following the Clean Architecture pattern of separating domain logic
 from infrastructure concerns.
 """
 
-from typing import Any
 from uuid import UUID
 
 from src.domain.entities.data_discovery_session import (
@@ -23,30 +22,27 @@ from src.models.database.data_discovery import (
     SourceCatalogEntryModel,
 )
 
+UUIDInput = str | int | UUID
 
-def _coerce_uuid(value: Any) -> UUID:
-    """
-    Convert a value that may come from legacy rows into a proper UUID.
-    """
+
+def _coerce_uuid(value: UUIDInput) -> UUID:
+    """Convert legacy string/int identifiers into UUIDs."""
     if isinstance(value, UUID):
         return value
     if isinstance(value, int):
         return UUID(f"{value:032x}")
-    if isinstance(value, str):
-        normalized = value.strip()
-        try:
-            return UUID(normalized)
-        except ValueError:
-            if normalized.isdigit():
-                return UUID(f"{int(normalized):032x}")
-            raise
-    return UUID(str(value))
+    normalized = value.strip()
+    try:
+        return UUID(normalized)
+    except ValueError as exc:
+        if normalized.isdigit():
+            return UUID(f"{int(normalized):032x}")
+        msg = f"Invalid UUID value: {value}"
+        raise ValueError(msg) from exc
 
 
-def _coerce_uuid_or_none(value: Any | None) -> UUID | None:
-    if value is None:
-        return None
-    return _coerce_uuid(value)
+def _coerce_uuid_or_none(value: UUIDInput | None) -> UUID | None:
+    return None if value is None else _coerce_uuid(value)
 
 
 def session_to_model(entity: DataDiscoverySession) -> DataDiscoverySessionModel:
@@ -228,31 +224,8 @@ def query_result_to_entity(model: QueryTestResultModel) -> QueryTestResult:
     """
     # Convert string UUIDs from database to UUID objects for domain entities
     # Handle various input types (string, UUID, int for legacy data)
-    model_result_id: Any = model.id
-    if isinstance(model_result_id, str):
-        result_id = UUID(model_result_id)
-    elif isinstance(model_result_id, UUID):
-        result_id = model_result_id
-    else:
-        # Legacy integer IDs - convert to UUID (zero-padded)
-        result_id = (
-            UUID(f"{model_result_id:032x}")
-            if isinstance(model_result_id, int)
-            else UUID(str(model_result_id))
-        )
-
-    model_session_id: Any = model.session_id
-    if isinstance(model_session_id, str):
-        session_id = UUID(model_session_id)
-    elif isinstance(model_session_id, UUID):
-        session_id = model_session_id
-    else:
-        # Legacy integer IDs - convert to UUID (zero-padded)
-        session_id = (
-            UUID(f"{model_session_id:032x}")
-            if isinstance(model_session_id, int)
-            else UUID(str(model_session_id))
-        )
+    result_id = _coerce_uuid(model.id)
+    session_id = _coerce_uuid(model.session_id)
 
     parameters = QueryParameters(
         gene_symbol=model.gene_symbol,

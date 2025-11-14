@@ -3,6 +3,7 @@ Evidence SQLAlchemy model for MED13 Resource Library.
 Database representation of supporting evidence for variant-phenotype relationships.
 """
 
+from datetime import date
 from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Date, Float, ForeignKey, Integer, String, Text
@@ -102,7 +103,7 @@ class EvidenceModel(Base):
 
     # Review status
     reviewed: Mapped[bool] = mapped_column(default=False, nullable=False)
-    review_date: Mapped[Date | None] = mapped_column(Date, nullable=True)
+    review_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     reviewer_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Relationships

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from src.domain.entities.publication import Publication, PublicationType
 from src.domain.value_objects.identifiers import PublicationIdentifier
@@ -9,7 +9,6 @@ from src.models.database.publication import PublicationModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Sequence
-    from datetime import date
 
 
 class PublicationMapper:
@@ -35,7 +34,7 @@ class PublicationMapper:
             volume=model.volume,
             issue=model.issue,
             pages=model.pages,
-            publication_date=cast("date | None", model.publication_date),
+            publication_date=model.publication_date,
             abstract=model.abstract,
             keywords=keywords,
             citation_count=model.citation_count or 0,
@@ -66,7 +65,7 @@ class PublicationMapper:
         target.volume = entity.volume
         target.issue = entity.issue
         target.pages = entity.pages
-        target.publication_date = cast("Any", entity.publication_date)
+        target.publication_date = entity.publication_date
         target.abstract = entity.abstract
         target.keywords = PublicationMapper._serialize_keywords(entity.keywords)
         target.citation_count = entity.citation_count

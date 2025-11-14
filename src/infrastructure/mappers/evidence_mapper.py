@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 
 from src.domain.entities.evidence import Evidence, EvidenceType
 from src.domain.entities.variant import VariantSummary
@@ -17,7 +17,6 @@ from src.models.database.variant import VariantModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Sequence
-    from datetime import date
 
 
 class EvidenceMapper:
@@ -48,7 +47,7 @@ class EvidenceMapper:
             study_type=model.study_type,
             statistical_significance=model.statistical_significance,
             reviewed=model.reviewed,
-            review_date=cast("date | None", model.review_date),
+            review_date=model.review_date,
             reviewer_notes=model.reviewer_notes,
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -104,7 +103,7 @@ class EvidenceMapper:
         target.study_type = entity.study_type
         target.statistical_significance = entity.statistical_significance
         target.reviewed = entity.reviewed
-        target.review_date = cast("Any", entity.review_date)
+        target.review_date = entity.review_date
         target.reviewer_notes = entity.reviewer_notes
         if entity.created_at:
             target.created_at = entity.created_at
