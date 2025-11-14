@@ -8,10 +8,16 @@ for FAIR data packaging and distribution.
 import json
 import shutil
 import uuid
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
+from src.application.packaging.types import (
+    ProvenanceMetadata,
+    ProvenanceSourceEntry,
+    ROCrateFileEntry,
+)
 from src.type_definitions.common import JSONObject, JSONValue
 from src.type_definitions.json_utils import list_of_objects
 
@@ -132,7 +138,7 @@ class ROCrateBuilder:
 
         return f"data/{target_name}"
 
-    def _coerce_path(self, file_info: JSONObject) -> str:
+    def _coerce_path(self, file_info: ROCrateFileEntry) -> str:
         """Extract and validate the required path field from file info."""
         path_value = file_info.get("path")
         if not isinstance(path_value, str) or not path_value:
@@ -140,15 +146,19 @@ class ROCrateBuilder:
             raise ValueError(msg)
         return path_value
 
-    def _string_or_none(self, payload: JSONObject, field: str) -> str | None:
+    def _string_or_none(
+        self,
+        payload: Mapping[str, object],
+        field: str,
+    ) -> str | None:
         """Safely read string fields from JSON metadata objects."""
         value = payload.get(field)
         return value if isinstance(value, str) else None
 
     def generate_metadata(
         self,
-        data_files: list[JSONObject],
-        provenance_info: JSONObject | None = None,
+        data_files: Sequence[ROCrateFileEntry],
+        provenance_info: ProvenanceMetadata | None = None,
     ) -> JSONMetadata:
         """
         Generate RO-Crate metadata.json.
@@ -202,13 +212,20 @@ class ROCrateBuilder:
 
         # Add provenance if available
         if provenance_info:
-            sources = list_of_objects(provenance_info.get("sources"))
-            for source in sources:
+            sources_raw = list_of_objects(
+                cast("JSONValue", provenance_info.get("sources")),
+            )
+            for source in sources_raw:
+                typed_source = cast("ProvenanceSourceEntry", source)
                 download_entry: JSONMetadata = {
-                    "@type": "DataDownload",
-                    "name": self._string_or_none(source, "name"),
-                    "contentUrl": self._string_or_none(source, "url"),
-                    "datePublished": self._string_or_none(source, "date"),
+                    "@type": typed_source.get("@type", "DataDownload"),
+                    "name": self._string_or_none(typed_source, "name"),
+                    "contentUrl": self._string_or_none(typed_source, "url"),
+                    "datePublished": self._string_or_none(
+                        typed_source,
+                        "datePublished",
+                    ),
+                    "version": self._string_or_none(typed_source, "version"),
                 }
                 has_part.append(download_entry)
 
@@ -250,8 +267,8 @@ class ROCrateBuilder:
 
     def build(
         self,
-        data_files: list[JSONObject],
-        provenance_info: JSONObject | None = None,
+        data_files: Sequence[ROCrateFileEntry],
+        provenance_info: ProvenanceMetadata | None = None,
     ) -> Path:
         """
         Build complete RO-Crate package.

@@ -10,6 +10,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from src.application.packaging.types import (
+        ProvenanceMetadata,
+        ProvenanceSourceEntry,
+    )
     from src.models.value_objects.provenance import Provenance
     from src.type_definitions.common import JSONObject
 
@@ -20,7 +24,7 @@ class ProvenanceTracker:
     @staticmethod
     def serialize_provenance(
         provenance_records: list[Provenance],
-    ) -> JSONObject:
+    ) -> ProvenanceMetadata:
         """
         Serialize provenance records to JSON-LD format.
 
@@ -30,10 +34,10 @@ class ProvenanceTracker:
         Returns:
             Serialized provenance dictionary
         """
-        sources: list[JSONObject] = []
+        sources: list[ProvenanceSourceEntry] = []
 
         for prov in provenance_records:
-            source_info: JSONObject = {
+            source_info: ProvenanceSourceEntry = {
                 "@type": "DataDownload",
                 "name": prov.source.value,
                 "datePublished": (
@@ -50,7 +54,7 @@ class ProvenanceTracker:
                 source_info["version"] = prov.source_version
 
             if prov.processing_steps:
-                source_info["processingSteps"] = prov.processing_steps
+                source_info["processingSteps"] = list(prov.processing_steps)
 
             if prov.quality_score is not None:
                 source_info["qualityScore"] = prov.quality_score

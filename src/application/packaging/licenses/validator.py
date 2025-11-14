@@ -11,8 +11,13 @@ import yaml  # type: ignore[import-untyped]
 from .manager import LicenseCompatibility, LicenseManager
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
+    from src.application.packaging.types import (
+        LicenseManifest,
+        LicenseSourceEntry,
+    )
     from src.type_definitions.common import JSONObject
 
 
@@ -28,7 +33,10 @@ class LicenseValidator:
         """
         self.package_license = package_license
 
-    def validate_sources(self, source_licenses: list[JSONObject]) -> JSONObject:
+    def validate_sources(
+        self,
+        source_licenses: Sequence[LicenseSourceEntry],
+    ) -> JSONObject:
         """
         Validate source licenses against package license.
 
@@ -42,16 +50,10 @@ class LicenseValidator:
         warnings: list[str] = []
 
         for source_info in source_licenses:
-            source_license_value = source_info.get("license", "unknown")
-            source_name_value = source_info.get("source", "unknown")
-            source_license = (
-                str(source_license_value)
-                if source_license_value is not None
-                else "unknown"
-            )
-            source_name = (
-                str(source_name_value) if source_name_value is not None else "unknown"
-            )
+            source_license_value = source_info.get("license") or "unknown"
+            source_name_value = source_info.get("source") or "unknown"
+            source_license = str(source_license_value)
+            source_name = str(source_name_value)
 
             compatibility = LicenseManager.check_compatibility(
                 source_license,
@@ -100,18 +102,20 @@ class LicenseValidator:
 
             issues: list[str] = []
 
-            package_license_value = manifest_raw.get("package_license")
+            manifest_dict = cast("LicenseManifest", manifest_raw)
+
+            package_license_value = manifest_dict.get("package_license")
             if not isinstance(package_license_value, str):
                 issues.append("Missing package_license in manifest")
 
-            sources_value = manifest_raw.get("sources")
-            sources: list[JSONObject] | None = None
+            sources_value = manifest_dict.get("sources")
+            sources: list[LicenseSourceEntry] | None = None
             if not isinstance(sources_value, list):
                 issues.append("Missing sources in manifest")
             elif not all(isinstance(source, dict) for source in sources_value):
                 issues.append("All sources must be JSON objects")
             else:
-                sources = cast("list[JSONObject]", sources_value)
+                sources = list(sources_value)
 
             if issues:
                 return self._format_result(is_valid=False, issues=issues)
