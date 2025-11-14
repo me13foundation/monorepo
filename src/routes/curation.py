@@ -32,7 +32,7 @@ from src.infrastructure.dependency_injection.container import (
     get_legacy_dependency_container,
 )
 from src.routes.auth import get_current_active_user
-from src.type_definitions.common import JSONObject
+from src.type_definitions.common import JSONObject, JSONValue
 
 router = APIRouter(prefix="/curation", tags=["curation"])
 
@@ -192,6 +192,7 @@ async def bulk(
     )
     service = _approval_service()
     ids_list = list(req.ids)
+    ids_payload: list[JSONValue] = [int(_id) for _id in ids_list]
     if req.action == "approve":
         count = service.approve(db, ids_list)
     elif req.action == "reject":
@@ -205,7 +206,7 @@ async def bulk(
         action=f"curation.bulk.{req.action}",
         target=("curation_queue", ",".join(str(_id) for _id in ids_list)),
         actor_id=current_user.id,
-        details={"ids": ids_list, "updated": count},
+        details={"ids": ids_payload, "updated": count},
     )
     return {"updated": count}
 

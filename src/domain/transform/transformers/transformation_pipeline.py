@@ -16,7 +16,7 @@ from src.type_definitions.common import RawRecord
 
 from .etl_transformer import ETLTransformer
 
-type RawSourceData = dict[str, list[RawRecord]]
+RawSourceData = dict[str, list[RawRecord]]
 
 
 class PipelineMode(Enum):

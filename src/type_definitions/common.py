@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import Literal, TypedDict
 
-type JSONPrimitive = str | int | float | bool | None
+JSONPrimitive = str | int | float | bool | None
 type JSONValue = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
-type JSONObject = dict[str, JSONValue]
-type RawRecord = dict[str, JSONValue]
+JSONObject = dict[str, JSONValue]
+RawRecord = dict[str, JSONValue]
 """Raw data record from external sources (typed JSON)."""
 
 
@@ -240,24 +240,8 @@ class ResearchSpaceSettings(TypedDict, total=False):
 
 
 # Query specification types
-class QueryFilters(TypedDict, total=False):
-    """Type-safe query filters."""
-
-    # Common filters
-    status: str
-    created_after: str
-    created_before: str
-    updated_after: str
-    updated_before: str
-    owner_id: str
-    space_id: str
-
-    # Search
-    search: str
-    tags: list[str]
-
-    # Custom filters
-    custom: dict[str, str | int | float | bool | None]
+FilterValue = str | int | float | bool | None
+QueryFilters = dict[str, FilterValue]
 
 
 # Statistics and health check types

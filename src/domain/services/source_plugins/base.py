@@ -1,13 +1,36 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Protocol, cast
+
+JSONPrimitive = str | int | float | bool | None
+JSONValue = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
+JSONObject = dict[str, JSONValue]
+
+
+class _SourceConfigurationProtocol(Protocol):
+    """Structural typing placeholder for plugin configuration."""
+
+
+class _SourceTypeProtocol(Protocol):
+    """Structural typing placeholder for plugin source type."""
+
+    value: str
+
 
 if TYPE_CHECKING:
     from src.domain.entities.user_data_source import (
-        SourceConfiguration,
-        SourceType,
+        SourceConfiguration as _SourceConfiguration,
     )
+    from src.domain.entities.user_data_source import (
+        SourceType as _RealSourceType,
+    )
+
+    SourceConfiguration = _SourceConfiguration
+    SourceType = _RealSourceType
+else:
+    SourceConfiguration = _SourceConfigurationProtocol
+    SourceType = _SourceTypeProtocol
 
 
 class SourcePlugin(ABC):
@@ -26,7 +49,7 @@ class SourcePlugin(ABC):
     ) -> SourceConfiguration:
         """Validate and sanitize a configuration before persistence."""
 
-    def activation_metadata(self, configuration: SourceConfiguration) -> dict[str, Any]:
+    def activation_metadata(self, configuration: SourceConfiguration) -> JSONObject:
         """
         Optional metadata emitted when a plugin is activated.
 
@@ -34,7 +57,7 @@ class SourcePlugin(ABC):
         """
 
         _ = configuration  # Preserve signature for subclasses while avoiding unused warnings
-        return {}
+        return cast("JSONObject", {})
 
 
 __all__ = ["SourcePlugin"]

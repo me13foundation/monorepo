@@ -1,6 +1,6 @@
 """Application-level orchestration for gene use cases."""
 
-from typing import Any, cast
+from typing import cast
 
 from src.domain.entities.gene import Gene
 from src.domain.entities.variant import VariantSummary
@@ -359,7 +359,10 @@ class GeneApplicationService:
                 "has_location": gene.chromosome is not None,
             }
 
-        stats_raw: dict[str, Any] = self._gene_repository.get_gene_statistics()
+        stats_raw: dict[
+            str,
+            int | float | bool | str | None,
+        ] = self._gene_repository.get_gene_statistics()
         stats: dict[str, int | float | bool | str | None] = {
             key: value
             for key, value in stats_raw.items()
@@ -429,10 +432,8 @@ class GeneApplicationService:
         return gene.id
 
     @staticmethod
-    def _coerce_int(value: Any, default: int = 0) -> int:
-        if isinstance(value, int):
-            return value
-        if isinstance(value, float):
+    def _coerce_int(value: float | str | None, default: int = 0) -> int:
+        if isinstance(value, (int, float)):
             return int(value)
         if isinstance(value, str):
             try:

@@ -21,12 +21,8 @@ from src.models.api import (
     VariantUpdate,
 )
 from src.routes.serializers import serialize_variant
-from src.type_definitions.common import (
-    JSONObject,
-)
-from src.type_definitions.common import (
-    VariantUpdate as VariantUpdatePayload,
-)
+from src.type_definitions.common import JSONObject, QueryFilters
+from src.type_definitions.common import VariantUpdate as VariantUpdatePayload
 
 if TYPE_CHECKING:
     from src.application.services.variant_service import VariantApplicationService
@@ -67,7 +63,7 @@ class VariantSearchResponse(BaseModel):
     query: str
     results: list[VariantResponse]
     count: int
-    filters: dict[str, str]
+    filters: QueryFilters | None
 
 
 @router.get(
@@ -98,20 +94,22 @@ async def get_variants(
 
     try:
         # Build filters dictionary
-        filters = {}
+        filters_payload: QueryFilters = {}
         if gene_id:
-            filters["gene_id"] = gene_id
+            filters_payload["gene_id"] = gene_id
         if clinical_significance:
-            filters["clinical_significance"] = clinical_significance
+            filters_payload["clinical_significance"] = clinical_significance
         if variant_type:
-            filters["variant_type"] = variant_type
+            filters_payload["variant_type"] = variant_type
+
+        filters_arg = filters_payload or None
 
         variants, total = service.list_variants(
             page=page,
             per_page=per_page,
             sort_by=sort_by,
             sort_order=sort_order,
-            filters=filters,
+            filters=filters_arg,
         )
 
         variant_responses = [serialize_variant(variant) for variant in variants]
@@ -426,20 +424,22 @@ async def search_variants(
 
     try:
         # Build filters
-        filters = {}
+        filters_payload: QueryFilters = {}
         if gene_id:
-            filters["gene_id"] = gene_id
+            filters_payload["gene_id"] = gene_id
         if clinical_significance:
-            filters["clinical_significance"] = clinical_significance
+            filters_payload["clinical_significance"] = clinical_significance
 
-        variants = service.search_variants(q, limit, filters)
+        filters_arg = filters_payload or None
+
+        variants = service.search_variants(q, limit, filters_arg)
         serialized_variants = [serialize_variant(variant) for variant in variants]
 
         return VariantSearchResponse(
             query=q,
             results=serialized_variants,
             count=len(serialized_variants),
-            filters=filters,
+            filters=filters_arg,
         )
     except Exception as e:
         raise HTTPException(

@@ -6,13 +6,13 @@ use cases while preserving domain purity and strong typing.
 """
 
 from datetime import date
-from typing import Any, cast
+from typing import cast
 
 from src.domain.entities.evidence import Evidence, EvidenceType
 from src.domain.repositories.evidence_repository import EvidenceRepository
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.value_objects.confidence import Confidence, EvidenceLevel
-from src.type_definitions.common import EvidenceUpdate, QueryFilters
+from src.type_definitions.common import EvidenceUpdate, JSONObject, QueryFilters
 
 
 class EvidenceApplicationService:
@@ -186,7 +186,7 @@ class EvidenceApplicationService:
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Evidence]:
         """Search evidence with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -202,7 +202,7 @@ class EvidenceApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Evidence], int]:
         """Retrieve paginated evidence with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -226,7 +226,7 @@ class EvidenceApplicationService:
             "update",
         )
 
-    def detect_evidence_conflicts(self, variant_id: int) -> list[dict[str, Any]]:
+    def detect_evidence_conflicts(self, variant_id: int) -> list[JSONObject]:
         """
         Detect conflicts between evidence records for a variant.
 
@@ -237,9 +237,12 @@ class EvidenceApplicationService:
             List of conflict descriptions with details
         """
         evidence_list = self._evidence_repository.find_by_variant(variant_id)
-        return self._evidence_domain_service.detect_evidence_conflicts(evidence_list)
+        conflicts = self._evidence_domain_service.detect_evidence_conflicts(
+            evidence_list,
+        )
+        return [cast("JSONObject", conflict) for conflict in conflicts]
 
-    def calculate_evidence_consensus(self, variant_id: int) -> dict[str, Any]:
+    def calculate_evidence_consensus(self, variant_id: int) -> JSONObject:
         """
         Calculate consensus from multiple evidence records for a variant.
 
@@ -250,7 +253,10 @@ class EvidenceApplicationService:
             Consensus information
         """
         evidence_list = self._evidence_repository.find_by_variant(variant_id)
-        return self._evidence_domain_service.calculate_evidence_consensus(evidence_list)
+        consensus = self._evidence_domain_service.calculate_evidence_consensus(
+            evidence_list,
+        )
+        return cast("JSONObject", consensus)
 
     def score_evidence_quality(self, evidence_id: int) -> float:
         """
@@ -290,7 +296,7 @@ class EvidenceApplicationService:
 
     @staticmethod
     def _normalize_filters(
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
     ) -> QueryFilters | None:
         if filters is None:
             return None

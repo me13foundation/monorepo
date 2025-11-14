@@ -17,6 +17,8 @@ This will be your “Paper Extraction SOP” for your world model.
 
 ---
 
+- ✅ Application services (data discovery, audit trail, evidence, publication, authorization, gene, variant) now avoid `Any` in favor of the TypedDict/Protocol patterns described in `docs/type_examples.md`, advancing the "never Any" initiative.
+
   3. ✅ Remaining `Any` usages in routes/tests now rely on the TypedDict/Protocol patterns outlined in `docs/type_examples.md`, preserving the “never Any” requirement.
 # 📘 **UNIVERSAL BIOMEDICAL PAPER EXTRACTION TEMPLATE**
 

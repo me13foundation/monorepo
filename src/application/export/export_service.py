@@ -16,6 +16,7 @@ from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.variant_service import VariantApplicationService
+from src.type_definitions.common import QueryFilters
 
 
 class ExportFormat(str, Enum):
@@ -67,7 +68,7 @@ class BulkExportService:
         entity_type: str,
         export_format: ExportFormat,
         compression: CompressionFormat = CompressionFormat.NONE,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
         chunk_size: int = 1000,
     ) -> Generator[str | bytes, None, None]:
         """
@@ -119,11 +120,13 @@ class BulkExportService:
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
         chunk_size: int,
     ) -> Generator[str | bytes, None, None]:
         """Export genes data."""
-        search_term = (filters or {}).get("search")
+        filters_payload = self._copy_filters(filters)
+        search_value = filters_payload.get("search")
+        search_term = search_value if isinstance(search_value, str) else None
         genes = self._collect_paginated(
             lambda page, size: self._gene_service.list_genes(
                 page=page,
@@ -151,7 +154,7 @@ class BulkExportService:
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
         chunk_size: int,
     ) -> Generator[str | bytes, None, None]:
         """Export variants data."""
@@ -182,7 +185,7 @@ class BulkExportService:
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
         chunk_size: int,
     ) -> Generator[str | bytes, None, None]:
         """Export phenotypes data."""
@@ -213,7 +216,7 @@ class BulkExportService:
         self,
         export_format: ExportFormat,
         compression: CompressionFormat,
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
         chunk_size: int,
     ) -> Generator[str | bytes, None, None]:
         """Export evidence data."""
@@ -485,6 +488,12 @@ class BulkExportService:
             "created_at",
             "updated_at",
         ]
+
+    @staticmethod
+    def _copy_filters(filters: QueryFilters | None) -> QueryFilters:
+        if filters is None:
+            return {}
+        return cast("QueryFilters", dict(filters))
 
     def get_export_info(self, entity_type: str) -> dict[str, Any]:
         """

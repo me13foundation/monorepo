@@ -6,7 +6,8 @@ templates into concrete configurations, and quality assurance checks.
 """
 
 import re
-from typing import Any
+from collections.abc import Mapping
+from typing import cast
 
 import jsonschema
 from pydantic import BaseModel
@@ -20,6 +21,16 @@ from src.domain.entities.user_data_source import (
     SourceConfiguration,
     SourceType,
 )
+from src.type_definitions.common import (
+    AuthCredentials,
+    JSONObject,
+    JSONValue,
+    SourceMetadata,
+)
+
+TemplateParameters = Mapping[str, JSONValue]
+JSONSchema = JSONObject
+PrimitiveAuthValue = str | int | float | bool | None
 
 
 class TemplateValidationResult(BaseModel):
@@ -51,9 +62,9 @@ class TemplateValidationService:
     def __init__(self) -> None:
         """Initialize the template validation service."""
         # Common JSON schemas for different data types
-        self.schemas = self._load_common_schemas()
+        self.schemas: dict[str, JSONSchema] = self._load_common_schemas()
 
-    def _load_common_schemas(self) -> dict[str, dict[str, Any]]:
+    def _load_common_schemas(self) -> dict[str, JSONSchema]:
         """Load common JSON schemas for validation."""
         return {
             "gene_variant": {
@@ -170,7 +181,7 @@ class TemplateValidationService:
     def instantiate_template(
         self,
         template: SourceTemplate,
-        user_parameters: dict[str, Any],
+        user_parameters: TemplateParameters,
     ) -> TemplateInstantiationResult:
         """
         Instantiate a template with user-provided parameters.
@@ -188,10 +199,9 @@ class TemplateValidationService:
         # Check for required parameters
         required_params = self._extract_required_parameters(template)
 
+        normalized_parameters = dict(user_parameters)
         missing_parameters = [
-            p
-            for p in required_params
-            if p not in user_parameters or user_parameters[p] is None
+            p for p in required_params if normalized_parameters.get(p) is None
         ]
 
         if missing_parameters:
@@ -201,7 +211,7 @@ class TemplateValidationService:
             )
 
         # Validate parameter values
-        param_errors = self._validate_parameters(user_parameters, template)
+        param_errors = self._validate_parameters(normalized_parameters, template)
         if param_errors:
             errors.extend(param_errors)
 
@@ -210,7 +220,10 @@ class TemplateValidationService:
 
         # Build configuration
         try:
-            configuration = self._build_configuration(template, user_parameters)
+            configuration = self._build_configuration(
+                template,
+                normalized_parameters,
+            )
             return TemplateInstantiationResult(
                 success=True,
                 configuration=configuration,
@@ -221,7 +234,7 @@ class TemplateValidationService:
                 errors=[f"Configuration build error: {e!s}"],
             )
 
-    def _validate_json_schema(self, schema: dict[str, Any]) -> list[str]:
+    def _validate_json_schema(self, schema: JSONSchema) -> list[str]:
         """Validate a JSON schema for correctness."""
         errors = []
 
@@ -293,7 +306,7 @@ class TemplateValidationService:
             ],
         )
 
-        # Validate field configurations (structure is dict[str, Any] by contract)
+        # Validate field configurations (structure is JSON objects by contract)
         for _field_name, _field_config in ui_config.fields.items():
             # Additional deep validation can be added here as needed
             continue
@@ -321,29 +334,31 @@ class TemplateValidationService:
 
     def _validate_parameters(
         self,
-        parameters: dict[str, Any],
+        parameters: TemplateParameters,
         template: SourceTemplate,
     ) -> list[str]:
         """Validate parameter values against template constraints."""
         errors = []
+        normalized_parameters = dict(parameters)
 
         # Validate against schema
         try:
-            jsonschema.validate(parameters, template.schema_definition)
+            jsonschema.validate(normalized_parameters, template.schema_definition)
         except jsonschema.ValidationError as e:
             errors.append(f"Parameter validation error: {e!s}")
 
         # Apply custom validation rules
         for rule in template.validation_rules:
-            if rule.field in parameters:
-                rule_errors = self._apply_validation_rule(parameters[rule.field], rule)
+            if rule.field in normalized_parameters:
+                rule_value = normalized_parameters[rule.field]
+                rule_errors = self._apply_validation_rule(rule_value, rule)
                 errors.extend(rule_errors)
 
         return errors
 
     def _apply_validation_rule(  # noqa: C901, PLR0912
         self,
-        value: Any,
+        value: JSONValue,
         rule: ValidationRule,
     ) -> list[str]:
         """Apply a validation rule to a parameter value."""
@@ -357,7 +372,8 @@ class TemplateValidationService:
                     )
 
             elif rule.rule_type == "pattern":
-                pattern = rule.parameters.get("pattern", "")
+                pattern_value = rule.parameters.get("pattern")
+                pattern = pattern_value if isinstance(pattern_value, str) else ""
                 if pattern and not re.match(pattern, str(value)):
                     errors.append(
                         rule.error_message
@@ -365,11 +381,15 @@ class TemplateValidationService:
                     )
 
             elif rule.rule_type == "range":
-                min_val = rule.parameters.get("min")
-                max_val = rule.parameters.get("max")
+                min_val = self._coerce_float_value(rule.parameters.get("min"))
+                max_val = self._coerce_float_value(rule.parameters.get("max"))
+                num_value = self._coerce_float_value(value)
 
-                try:
-                    num_value = float(value)
+                if num_value is None:
+                    errors.append(
+                        f"Field '{rule.field}' must be numeric for range validation",
+                    )
+                else:
                     if min_val is not None and num_value < min_val:
                         errors.append(
                             rule.error_message
@@ -380,13 +400,14 @@ class TemplateValidationService:
                             rule.error_message
                             or f"Field '{rule.field}' above maximum {max_val}",
                         )
-                except (ValueError, TypeError):
-                    errors.append(
-                        f"Field '{rule.field}' must be numeric for range validation",
-                    )
 
             elif rule.rule_type == "enum":
-                allowed_values = rule.parameters.get("values", [])
+                allowed_values_value = rule.parameters.get("values")
+                allowed_values: list[JSONValue]
+                if isinstance(allowed_values_value, list):
+                    allowed_values = list(allowed_values_value)
+                else:
+                    allowed_values = []
                 if value not in allowed_values:
                     errors.append(
                         rule.error_message
@@ -394,7 +415,12 @@ class TemplateValidationService:
                     )
 
             elif rule.rule_type == "type":
-                expected_type = rule.parameters.get("type", "string")
+                expected_type_value = rule.parameters.get("type")
+                expected_type = (
+                    expected_type_value
+                    if isinstance(expected_type_value, str)
+                    else "string"
+                )
                 if not self._check_type(value, expected_type):
                     errors.append(
                         rule.error_message
@@ -406,7 +432,7 @@ class TemplateValidationService:
 
         return errors
 
-    def _check_type(self, value: Any, expected_type: str) -> bool:
+    def _check_type(self, value: JSONValue, expected_type: str) -> bool:
         """Check if a value matches an expected type."""
         valid = True
         if expected_type == "string":
@@ -428,30 +454,97 @@ class TemplateValidationService:
     def _build_configuration(
         self,
         template: SourceTemplate,
-        parameters: dict[str, Any],
+        parameters: TemplateParameters,
     ) -> SourceConfiguration:
         """Build a SourceConfiguration from template and parameters."""
-        # Start with template defaults
-        config_dict = {
-            "url": parameters.get("url", ""),
-            "file_path": parameters.get("file_path", ""),
-            "format": parameters.get("format", ""),
-            "requests_per_minute": parameters.get("requests_per_minute"),
-            "field_mapping": parameters.get("field_mapping", {}),
-            "auth_type": parameters.get("auth_type"),
-            "auth_credentials": parameters.get("auth_credentials", {}),
-            "metadata": parameters.get("metadata", {}),
-        }
-
-        # Add template-specific metadata
-        config_dict["metadata"].update(
+        normalized_parameters = dict(parameters)
+        metadata_payload = self._ensure_json_object(
+            normalized_parameters.get("metadata"),
+        )
+        metadata_payload.update(
             {
                 "template_id": str(template.id),
                 "template_name": template.name,
                 "validation_rules": [
-                    rule.model_dump() for rule in template.validation_rules
+                    cast("JSONObject", rule.model_dump())
+                    for rule in template.validation_rules
                 ],
             },
         )
+        metadata = cast("SourceMetadata", metadata_payload)
 
-        return SourceConfiguration(**config_dict)
+        field_mapping = self._coerce_field_mapping(
+            normalized_parameters.get("field_mapping"),
+        )
+        auth_credentials = self._coerce_auth_credentials(
+            normalized_parameters.get("auth_credentials"),
+        )
+
+        return SourceConfiguration(
+            url=self._coerce_str_value(normalized_parameters.get("url")) or "",
+            file_path=self._coerce_str_value(normalized_parameters.get("file_path"))
+            or "",
+            format=self._coerce_str_value(normalized_parameters.get("format")) or "",
+            requests_per_minute=self._coerce_int_value(
+                normalized_parameters.get("requests_per_minute"),
+            ),
+            field_mapping=field_mapping or None,
+            auth_type=self._coerce_str_value(normalized_parameters.get("auth_type")),
+            auth_credentials=auth_credentials,
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _coerce_str_value(value: JSONValue | None) -> str | None:
+        if isinstance(value, str):
+            return value
+        return None
+
+    @staticmethod
+    def _coerce_float_value(value: JSONValue | None) -> float | None:
+        if isinstance(value, bool):
+            return float(value)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            try:
+                return float(value)
+            except ValueError:
+                return None
+        return None
+
+    @classmethod
+    def _coerce_int_value(cls, value: JSONValue | None) -> int | None:
+        float_value = cls._coerce_float_value(value)
+        if float_value is None:
+            return None
+        return int(float_value)
+
+    @staticmethod
+    def _ensure_json_object(value: JSONValue | None) -> dict[str, JSONValue]:
+        if isinstance(value, dict):
+            return dict(value)
+        return {}
+
+    @staticmethod
+    def _coerce_field_mapping(value: JSONValue | None) -> dict[str, str]:
+        if not isinstance(value, dict):
+            return {}
+        return {
+            key: val
+            for key, val in value.items()
+            if isinstance(key, str) and isinstance(val, str)
+        }
+
+    @staticmethod
+    def _coerce_auth_credentials(
+        value: JSONValue | None,
+    ) -> AuthCredentials | None:
+        if not isinstance(value, dict):
+            return None
+        normalized = {
+            key: val
+            for key, val in value.items()
+            if isinstance(val, (str, int, float, bool)) or val is None
+        }
+        return normalized or None

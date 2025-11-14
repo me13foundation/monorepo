@@ -20,7 +20,11 @@ import {
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { Loader2, SlidersHorizontal, ShieldOff, Search } from 'lucide-react'
 import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
+import type { DataSourceAvailability } from '@/lib/api/data-source-activation'
 import { toast } from 'sonner'
+
+const EMPTY_CATALOG_ENTRIES: SourceCatalogEntry[] = []
+const EMPTY_AVAILABILITY_SUMMARIES: DataSourceAvailability[] = []
 
 export function DataSourceAvailabilitySection() {
   const [selectedSource, setSelectedSource] = useState<SourceCatalogEntry | null>(null)
@@ -28,13 +32,11 @@ export function DataSourceAvailabilitySection() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const catalogQuery = useAdminCatalogEntries()
-  const catalogEntries = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data])
+  const catalogEntries = catalogQuery.data ?? EMPTY_CATALOG_ENTRIES
 
   const availabilitySummariesQuery = useCatalogAvailabilitySummaries()
-  const availabilitySummaries = useMemo(
-    () => availabilitySummariesQuery.data ?? [],
-    [availabilitySummariesQuery.data],
-  )
+  const availabilitySummaries =
+    availabilitySummariesQuery.data ?? EMPTY_AVAILABILITY_SUMMARIES
 
   const availabilityQuery = useCatalogAvailability(dialogOpen ? selectedSource?.id ?? null : null)
   const spacesQuery = useResearchSpaces({ limit: 100 })

@@ -5,7 +5,7 @@ Coordinates domain services and repositories to implement publication management
 use cases while preserving strong typing.
 """
 
-from typing import Any, cast
+from typing import cast
 
 from src.domain.entities.publication import Publication, PublicationType
 from src.domain.repositories.evidence_repository import EvidenceRepository
@@ -137,7 +137,7 @@ class PublicationApplicationService:
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Publication]:
         """Search publications with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -153,7 +153,7 @@ class PublicationApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Publication], int]:
         """Retrieve paginated publications with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -217,7 +217,7 @@ class PublicationApplicationService:
 
     @staticmethod
     def _normalize_filters(
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
     ) -> QueryFilters | None:
         if filters is None:
             return None

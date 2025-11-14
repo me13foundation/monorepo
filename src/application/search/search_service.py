@@ -6,12 +6,13 @@ Provides cross-entity search capabilities with relevance scoring and filtering.
 
 import logging
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.variant_service import VariantApplicationService
+from src.type_definitions.common import QueryFilters
 
 
 class SearchEntity(str, Enum):
@@ -100,7 +101,7 @@ class UnifiedSearchService:
         query: str,
         entity_types: list[SearchEntity] | None = None,
         limit: int = 20,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> dict[str, Any]:
         """
         Perform unified search across specified entities.
@@ -205,12 +206,12 @@ class UnifiedSearchService:
         self,
         query: str,
         limit: int,
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
     ) -> list[SearchResult]:
         """Search variants and convert to search results."""
         try:
             # Use the paginate method with filters
-            filters_dict = filters or {}
+            filters_dict = self._clone_filters(filters)
             # Add search query to filters if provided
             if query:
                 filters_dict["search"] = query
@@ -220,7 +221,7 @@ class UnifiedSearchService:
                 per_page=limit,
                 sort_by="variant_id",
                 sort_order="asc",
-                filters=filters_dict,
+                filters=filters_dict or None,
             )
         except Exception as exc:  # noqa: BLE001 - defensive fallback
             logger.warning("Variant search failed: %s", exc)
@@ -254,7 +255,7 @@ class UnifiedSearchService:
         self,
         query: str,
         limit: int,
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
     ) -> list[SearchResult]:
         """Search phenotypes and convert to search results."""
         try:
@@ -295,7 +296,7 @@ class UnifiedSearchService:
         self,
         query: str,
         limit: int,
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
     ) -> list[SearchResult]:
         """Search evidence and convert to search results."""
         try:
@@ -452,6 +453,12 @@ class UnifiedSearchService:
             entity_type = result.entity_type.value
             breakdown[entity_type] = breakdown.get(entity_type, 0) + 1
         return breakdown
+
+    @staticmethod
+    def _clone_filters(filters: QueryFilters | None) -> QueryFilters:
+        if filters is None:
+            return {}
+        return cast("QueryFilters", dict(filters))
 
 
 __all__ = ["SearchEntity", "SearchResult", "SearchResultType", "UnifiedSearchService"]

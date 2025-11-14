@@ -9,16 +9,32 @@ while HTTP concerns are delegated to infrastructure adapters.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
+JSONPrimitive = str | int | float | bool | None
+JSONValue = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
+JSONObject = dict[str, JSONValue]
+
+
+class _SourceConfigurationProtocol(Protocol):
+    """Structural typing for API source configuration usage."""
+
+    url: str | None
+    auth_type: str | None
+    auth_credentials: dict[str, JSONPrimitive] | None
+    requests_per_minute: int | None
+
+
 if TYPE_CHECKING:
-    from src.domain.entities.user_data_source import SourceConfiguration
-    from src.type_definitions.common import JSONObject
-else:  # pragma: no cover - runtime compatibility fallback
-    SourceConfiguration = Any
-    JSONObject = dict[str, Any]
+    from src.domain.entities.user_data_source import (
+        SourceConfiguration as _SourceConfiguration,
+    )
+
+    SourceConfiguration = _SourceConfiguration
+else:
+    SourceConfiguration = _SourceConfigurationProtocol
 
 
 class APIRequestResult(BaseModel):

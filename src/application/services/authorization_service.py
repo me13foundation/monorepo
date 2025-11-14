@@ -4,7 +4,7 @@ Authorization service for MED13 Resource Library.
 Handles permission checking, role-based access control, and resource authorization.
 """
 
-from typing import Any
+from typing import TypedDict
 from uuid import UUID
 
 from src.domain.entities.user import User, UserRole
@@ -26,6 +26,46 @@ class InsufficientPermissionsError(AuthorizationError):
 
 class ResourceNotFoundError(AuthorizationError):
     """Raised when requested resource doesn't exist."""
+
+
+class AccessCheckResponse(TypedDict, total=False):
+    """Structured response for resource access checks."""
+
+    has_access: bool
+    user_permissions: list[str]
+    resource_type: str
+    action: str
+    role_based_access: bool
+    reason: str
+
+
+class RoleCapabilitiesResponse(TypedDict):
+    """Structured response describing a role's capabilities."""
+
+    role: str
+    hierarchy_level: int
+    permissions: list[str]
+    permission_count: int
+    user_count: int
+    can_manage_higher_roles: bool
+    can_manage_equal_roles: bool
+
+
+class RolePermissionsSummary(TypedDict):
+    """Summary of permissions associated with a role."""
+
+    permission_count: int
+    permissions: list[str]
+
+
+class SystemPermissionsSummary(TypedDict):
+    """System-wide permission summary payload."""
+
+    total_permissions: int
+    total_roles: int
+    roles: dict[str, RolePermissionsSummary]
+    permissions_list: list[str]
+    role_hierarchy: dict[str, int]
 
 
 class AuthorizationService:
@@ -274,7 +314,7 @@ class AuthorizationService:
         user_id: UUID,
         resource_type: str,
         action: str,
-    ) -> dict[str, Any]:
+    ) -> AccessCheckResponse:
         """
         Get information about what resources user can access.
 
@@ -329,7 +369,7 @@ class AuthorizationService:
 
     # Administrative methods
 
-    async def get_role_capabilities(self, role: UserRole) -> dict[str, Any]:
+    async def get_role_capabilities(self, role: UserRole) -> RoleCapabilitiesResponse:
         """
         Get detailed information about a role's capabilities.
 
@@ -355,7 +395,7 @@ class AuthorizationService:
             "can_manage_equal_roles": False,  # Current policy
         }
 
-    async def get_system_permissions_summary(self) -> dict[str, Any]:
+    async def get_system_permissions_summary(self) -> SystemPermissionsSummary:
         """
         Get summary of all permissions in the system.
 
@@ -365,7 +405,7 @@ class AuthorizationService:
         all_permissions = Permission.__members__.values()
         roles = [r.value for r in UserRole]
 
-        role_summaries: dict[str, dict[str, Any]] = {}
+        role_summaries: dict[str, RolePermissionsSummary] = {}
         for role in UserRole:
             permissions = RolePermissions.get_permissions_for_role(role)
             role_summaries[role.value] = {

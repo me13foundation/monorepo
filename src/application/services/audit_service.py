@@ -8,7 +8,7 @@ emit append-only audit events without duplicating serialization code.
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from src.models.database.audit import AuditLog
 
@@ -19,6 +19,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing helpers only
     from sqlalchemy.orm import Session
 
     from src.application.curation.repositories.audit_repository import AuditRepository
+    from src.type_definitions.common import JSONValue
 
 
 class AuditTrailService:
@@ -34,7 +35,7 @@ class AuditTrailService:
         action: str,
         target: tuple[str, str],
         actor_id: UUID | str | None,
-        details: Mapping[str, Any] | None = None,
+        details: Mapping[str, JSONValue] | None = None,
     ) -> AuditLog:
         """
         Persist an audit record describing the action that was taken.

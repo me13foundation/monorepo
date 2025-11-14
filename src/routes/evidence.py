@@ -27,6 +27,7 @@ from src.type_definitions.common import (
 )
 from src.type_definitions.common import (
     JSONObject,
+    QueryFilters,
 )
 
 if TYPE_CHECKING:
@@ -111,14 +112,19 @@ async def get_evidence(
     """
     Retrieve a paginated list of evidence records with optional search and filters.
     """
-    filters = {
-        "variant_id": variant_id,
-        "phenotype_id": phenotype_id,
-        "evidence_level": evidence_level,
-        "evidence_type": evidence_type,
-        "reviewed": reviewed,
-    }
-    filters = {k: v for k, v in filters.items() if v is not None}
+    filters_payload: QueryFilters = {}
+    if variant_id is not None:
+        filters_payload["variant_id"] = variant_id
+    if phenotype_id is not None:
+        filters_payload["phenotype_id"] = phenotype_id
+    if evidence_level is not None:
+        filters_payload["evidence_level"] = evidence_level
+    if evidence_type is not None:
+        filters_payload["evidence_type"] = evidence_type
+    if reviewed is not None:
+        filters_payload["reviewed"] = reviewed
+
+    filter_arg = filters_payload or None
 
     try:
         evidence_list, total = service.list_evidence(
@@ -126,7 +132,7 @@ async def get_evidence(
             per_page=per_page,
             sort_by=sort_by,
             sort_order=sort_order,
-            filters=filters,
+            filters=filter_arg,
         )
 
         evidence_responses = [
@@ -388,13 +394,15 @@ async def search_evidence(
     Search evidence records by description, summary, or other text fields.
     """
     try:
-        filters = {
-            "variant_id": variant_id,
-            "phenotype_id": phenotype_id,
-        }
-        filters = {k: v for k, v in filters.items() if v is not None}
+        filters_payload: QueryFilters = {}
+        if variant_id is not None:
+            filters_payload["variant_id"] = variant_id
+        if phenotype_id is not None:
+            filters_payload["phenotype_id"] = phenotype_id
 
-        evidence_list = service.search_evidence(query, limit, filters)
+        filter_arg = filters_payload or None
+
+        evidence_list = service.search_evidence(query, limit, filter_arg)
 
         evidence_payload = [serialize_evidence(ev) for ev in evidence_list]
 
@@ -423,10 +431,7 @@ async def get_evidence_conflicts(
     Detect and list any conflicting evidence records for a given variant.
     """
     try:
-        conflicts = [
-            cast("JSONObject", conflict)
-            for conflict in service.detect_evidence_conflicts(variant_id)
-        ]
+        conflicts = service.detect_evidence_conflicts(variant_id)
         return EvidenceConflictsResponse(
             variant_id=variant_id,
             conflicts=conflicts,
@@ -452,10 +457,7 @@ async def get_evidence_consensus(
     Calculate consensus from multiple evidence records for a variant.
     """
     try:
-        consensus = cast(
-            "JSONObject",
-            service.calculate_evidence_consensus(variant_id),
-        )
+        consensus = service.calculate_evidence_consensus(variant_id)
         return EvidenceConsensusResponse(
             variant_id=variant_id,
             consensus=consensus,

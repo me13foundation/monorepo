@@ -45,7 +45,7 @@ class ClinVarVariantRecord(TypedDict, total=False):
     last_updated: str | None
 
 
-type ClinVarVariantResultMap = dict[str, ClinVarVariantRecord | list[str]]
+ClinVarVariantResultMap = dict[str, ClinVarVariantRecord | list[str]]
 
 
 class ClinVarVariantResponse(TypedDict):

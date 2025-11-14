@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from src.application.services.variant_service import VariantApplicationService
     from src.domain.entities.evidence import Evidence
     from src.domain.entities.variant import Variant
+    from src.type_definitions.common import QueryFilters
 
 logger = logging.getLogger(__name__)
 
@@ -129,12 +130,13 @@ class CurationService:
             Dictionary with comprehensive clinical information
         """
         # Get variant details
+        variant_filters: QueryFilters = {"id": variant_id}
         variants, _ = self._variant_service.list_variants(
             page=1,
             per_page=1,
             sort_by="id",
             sort_order="asc",
-            filters={"id": variant_id},
+            filters=variant_filters,
         )
 
         if not variants:
@@ -143,10 +145,11 @@ class CurationService:
         variant = variants[0]
 
         # Get evidence records
+        evidence_filters: QueryFilters = {"variant_id": variant_id}
         evidence_records = self._evidence_service.search_evidence(
             query="",
             limit=100,
-            filters={"variant_id": variant_id},
+            filters=evidence_filters,
         )
 
         # Get phenotypes associated with evidence
@@ -155,12 +158,18 @@ class CurationService:
         )
         phenotypes: list[dict[str, Any]] = []
         for phenotype_id in phenotype_ids[:10]:  # Limit to 10 phenotypes
+            phenotype_filters: QueryFilters | None = self._build_filter(
+                "id",
+                phenotype_id,
+            )
+            if phenotype_filters is None:
+                continue
             phenotype_list, _ = self._phenotype_service.list_phenotypes(
                 page=1,
                 per_page=1,
                 sort_by="id",
                 sort_order="asc",
-                filters={"id": phenotype_id},
+                filters=phenotype_filters,
             )
             if not phenotype_list:
                 continue
@@ -242,12 +251,20 @@ class CurationService:
     ) -> dict[str, Any] | None:
         """Enrich a variant review record with clinical data."""
         # Get variant details
+        raw_entity_id = review_record.get("entity_id")
+        entity_identifier: str | int | None
+        if isinstance(raw_entity_id, (str, int)):
+            entity_identifier = raw_entity_id
+        else:
+            entity_identifier = None
+
+        variant_filters = self._build_filter("id", entity_identifier)
         variants, _ = self._variant_service.list_variants(
             page=1,
             per_page=1,
             sort_by="id",
             sort_order="asc",
-            filters={"id": review_record.get("entity_id")},
+            filters=variant_filters,
         )
 
         if not variants:
@@ -256,10 +273,11 @@ class CurationService:
         variant = variants[0]
 
         # Get evidence summary
+        evidence_filters = self._build_filter("variant_id", entity_identifier)
         evidence_records = self._evidence_service.search_evidence(
             query="",
             limit=50,
-            filters={"variant_id": review_record.get("entity_id")},
+            filters=evidence_filters,
         )
 
         # Extract evidence levels
@@ -269,12 +287,15 @@ class CurationService:
         phenotype_ids = list({ev.phenotype_id for ev in evidence_records})
         phenotypes = []
         for phenotype_id in phenotype_ids[:3]:  # Limit for card display
+            phenotype_filters = self._build_filter("id", phenotype_id)
+            if phenotype_filters is None:
+                continue
             phenotype_list, _ = self._phenotype_service.list_phenotypes(
                 page=1,
                 per_page=1,
                 sort_by="id",
                 sort_order="asc",
-                filters={"id": phenotype_id},
+                filters=phenotype_filters,
             )
             if phenotype_list:
                 phenotype_data = phenotype_list[0]
@@ -371,6 +392,17 @@ class CurationService:
             "priority": review_record.get("priority", ""),
             "last_updated": last_updated_value,
         }
+
+    @staticmethod
+    def _build_filter(
+        key: str,
+        value: object,
+    ) -> QueryFilters | None:
+        if value is None:
+            return None
+        if isinstance(value, (str, int, float, bool)):
+            return {key: value}
+        return None
 
     def _calculate_confidence_score(self, evidence_records: list[Evidence]) -> float:
         """Calculate overall confidence score from evidence."""

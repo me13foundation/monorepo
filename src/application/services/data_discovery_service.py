@@ -7,7 +7,6 @@ following Clean Architecture principles with dependency injection.
 
 import logging
 from collections.abc import Sequence
-from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -35,6 +34,7 @@ from src.domain.repositories.data_discovery_repository import (
     SourceQueryClient,
 )
 from src.domain.repositories.source_template_repository import SourceTemplateRepository
+from src.type_definitions.common import JSONObject
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,7 @@ class AddSourceToSpaceRequest(BaseModel):
     session_id: UUID
     catalog_entry_id: str
     research_space_id: UUID
-    source_config: dict[str, Any] = Field(default_factory=dict)
+    source_config: JSONObject = Field(default_factory=dict)
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -467,7 +467,7 @@ class DataDiscoveryService:
             return self._query_repo.save(failed_result)
 
         error_message: str | None = None
-        response_data: dict[str, Any] | None = None
+        response_data: JSONObject | None = None
         response_url: str | None = None
 
         try:

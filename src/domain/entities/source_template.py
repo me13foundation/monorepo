@@ -7,12 +7,11 @@ enabling users to quickly set up sources with proven configurations.
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from src.type_definitions.common import JSONObject
+from src.type_definitions.common import JSONObject, JSONValue
 
 from .user_data_source import SourceType
 
@@ -34,7 +33,7 @@ class ValidationRule(BaseModel):
 
     field: str = Field(..., description="Field name to validate")
     rule_type: str = Field(..., description="Type of validation rule")
-    parameters: dict[str, Any] = Field(
+    parameters: dict[str, JSONValue] = Field(
         default_factory=dict,
         description="Rule parameters",
     )

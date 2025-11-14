@@ -1,7 +1,7 @@
 """Application-level orchestration for variant workflows."""
 
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import cast
 
 from src.domain.entities.evidence import Evidence
 from src.domain.entities.variant import EvidenceSummary, Variant
@@ -161,7 +161,7 @@ class VariantApplicationService:
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> list[Variant]:
         """Search variants with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -184,7 +184,7 @@ class VariantApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Variant], int]:
         """Retrieve paginated variants with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -341,7 +341,7 @@ class VariantApplicationService:
 
     @staticmethod
     def _normalize_filters(
-        filters: dict[str, Any] | None,
+        filters: QueryFilters | None,
     ) -> QueryFilters | None:
         if filters is None:
             return None

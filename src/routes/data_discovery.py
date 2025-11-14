@@ -41,7 +41,7 @@ from src.infrastructure.repositories.research_space_repository import (
     SqlAlchemyResearchSpaceRepository,
 )
 from src.routes.auth import get_current_active_user
-from src.type_definitions.common import JSONObject
+from src.type_definitions.common import JSONObject, JSONValue
 
 logger = logging.getLogger(__name__)
 
@@ -413,6 +413,7 @@ async def toggle_source_selection(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Data discovery session not found",
             )
+        selected_sources_payload: list[JSONValue] = list(session.selected_sources)
         audit_service.record_action(
             db,
             action="data_discovery.session.toggle_source",
@@ -420,7 +421,7 @@ async def toggle_source_selection(
             actor_id=current_user.id,
             details={
                 "catalog_entry_id": catalog_entry_id,
-                "selected_sources": session.selected_sources,
+                "selected_sources": selected_sources_payload,
             },
         )
         return _session_to_response(session)
@@ -464,12 +465,13 @@ async def update_source_selection(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Data discovery session not found",
             )
+        selected_sources_payload: list[JSONValue] = list(session.selected_sources)
         audit_service.record_action(
             db,
             action="data_discovery.session.set_sources",
             target=("data_discovery_session", str(session.id)),
             actor_id=current_user.id,
-            details={"selected_sources": session.selected_sources},
+            details={"selected_sources": selected_sources_payload},
         )
         return _session_to_response(session)
 
