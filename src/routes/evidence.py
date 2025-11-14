@@ -4,7 +4,7 @@ Evidence API routes for MED13 Resource Library.
 RESTful endpoints for evidence management linking variants and phenotypes.
 """
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -58,6 +58,62 @@ class EvidenceSearchResponse(BaseModel):
     query: str
     total_results: int
     results: list[EvidenceResponse]
+
+
+def _enum_text(value: object) -> str:
+    return value.value if hasattr(value, "value") else str(value)
+
+
+def _to_evidence_update_payload(data: EvidenceUpdate) -> EvidenceUpdatePayload:
+    updates: EvidenceUpdatePayload = {}
+    _apply_evidence_content_updates(data, updates)
+    _apply_evidence_scoring_updates(data, updates)
+    _apply_review_updates(data, updates)
+    return updates
+
+
+def _apply_evidence_content_updates(
+    data: EvidenceUpdate,
+    updates: EvidenceUpdatePayload,
+) -> None:
+    if data.description is not None:
+        updates["description"] = data.description
+    if data.summary is not None:
+        updates["summary"] = data.summary
+    if data.evidence_level is not None:
+        updates["evidence_level"] = _enum_text(data.evidence_level)
+    if data.evidence_type is not None:
+        updates["evidence_type"] = _enum_text(data.evidence_type)
+    if data.publication_id is not None:
+        updates["publication_id"] = data.publication_id
+    if data.sample_size is not None:
+        updates["sample_size"] = data.sample_size
+    if data.study_type is not None:
+        updates["study_type"] = data.study_type
+    if data.statistical_significance is not None:
+        updates["statistical_significance"] = data.statistical_significance
+
+
+def _apply_evidence_scoring_updates(
+    data: EvidenceUpdate,
+    updates: EvidenceUpdatePayload,
+) -> None:
+    if data.confidence_score is not None:
+        updates["confidence_score"] = data.confidence_score
+    if data.quality_score is not None:
+        updates["quality_score"] = data.quality_score
+
+
+def _apply_review_updates(
+    data: EvidenceUpdate,
+    updates: EvidenceUpdatePayload,
+) -> None:
+    if data.reviewed is not None:
+        updates["reviewed"] = data.reviewed
+    if data.review_date is not None:
+        updates["review_date"] = data.review_date
+    if data.reviewer_notes is not None:
+        updates["reviewer_notes"] = data.reviewer_notes
 
 
 class EvidenceConflictsResponse(BaseModel):
@@ -252,10 +308,7 @@ async def update_evidence(
                 detail=f"Evidence {evidence_id} not found",
             )
 
-        updates = cast(
-            "EvidenceUpdatePayload",
-            evidence_data.model_dump(exclude_unset=True),
-        )
+        updates = _to_evidence_update_payload(evidence_data)
 
         evidence = service.update_evidence(evidence_id, updates)
         return serialize_evidence(evidence)

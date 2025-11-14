@@ -4,7 +4,8 @@ Variant API routes for MED13 Resource Library.
 RESTful endpoints for variant management with CRUD operations.
 """
 
-from typing import TYPE_CHECKING, cast
+from enum import Enum
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -265,10 +266,7 @@ async def update_variant(
                 detail=f"Variant {variant_id} not found",
             )
 
-        updates = cast(
-            "VariantUpdatePayload",
-            variant_data.model_dump(exclude_unset=True),
-        )
+        updates = _to_variant_update_payload(variant_data)
 
         variant = service.update_variant(variant_id, updates)
         return serialize_variant(variant)
@@ -482,4 +480,38 @@ async def get_variant_statistics(
     """
     Retrieve statistical information about variants in the database.
     """
-    return cast("JSONObject", service.get_variant_statistics())
+    return service.get_variant_statistics()
+
+
+def _enum_value(value: Enum | str) -> str:
+    return value.value if isinstance(value, Enum) else str(value)
+
+
+def _to_variant_update_payload(variant_data: VariantUpdate) -> VariantUpdatePayload:
+    """Convert the Pydantic variant update into a typed payload."""
+    updates: VariantUpdatePayload = {}
+
+    if variant_data.clinvar_id is not None:
+        updates["clinvar_id"] = variant_data.clinvar_id
+    if variant_data.hgvs_genomic is not None:
+        updates["hgvs_genomic"] = variant_data.hgvs_genomic
+    if variant_data.hgvs_protein is not None:
+        updates["hgvs_protein"] = variant_data.hgvs_protein
+    if variant_data.hgvs_cdna is not None:
+        updates["hgvs_cdna"] = variant_data.hgvs_cdna
+    if variant_data.variant_type is not None:
+        updates["variant_type"] = _enum_value(variant_data.variant_type)
+    if variant_data.clinical_significance is not None:
+        updates["clinical_significance"] = _enum_value(
+            variant_data.clinical_significance,
+        )
+    if variant_data.condition is not None:
+        updates["condition"] = variant_data.condition
+    if variant_data.review_status is not None:
+        updates["review_status"] = variant_data.review_status
+    if variant_data.allele_frequency is not None:
+        updates["allele_frequency"] = variant_data.allele_frequency
+    if variant_data.gnomad_af is not None:
+        updates["gnomad_af"] = variant_data.gnomad_af
+
+    return updates

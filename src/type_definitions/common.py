@@ -8,7 +8,10 @@ and other common patterns throughout the application.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Literal, TypedDict
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from datetime import date
 
 JSONPrimitive = str | int | float | bool | None
 type JSONValue = JSONPrimitive | Mapping[str, "JSONValue"] | Sequence["JSONValue"]
@@ -37,14 +40,26 @@ class VariantUpdate(TypedDict, total=False):
     """Type-safe variant update parameters."""
 
     gene_id: str
-    hgvs_notation: str
-    variant_type: str
-    clinical_significance: str
-    population_frequency: dict[str, float]
+    variant_id: str
+    clinvar_id: str
     chromosome: str | None
     position: int | None
     reference_allele: str | None
     alternate_allele: str | None
+
+    hgvs_notation: str
+    hgvs_genomic: str | None
+    hgvs_protein: str | None
+    hgvs_cdna: str | None
+
+    variant_type: str
+    clinical_significance: str
+    condition: str | None
+    review_status: str | None
+
+    population_frequency: dict[str, float]
+    allele_frequency: float | None
+    gnomad_af: float | None
 
 
 class PhenotypeUpdate(TypedDict, total=False):
@@ -54,8 +69,11 @@ class PhenotypeUpdate(TypedDict, total=False):
     name: str
     definition: str | None
     synonyms: list[str]
-    parents: list[str]
-    children: list[str]
+    category: str
+    parent_hpo_id: str | None
+    is_root_term: bool | None
+    frequency_in_med13: str | None
+    severity_score: int | None
 
 
 class EvidenceUpdate(TypedDict, total=False):
@@ -64,11 +82,18 @@ class EvidenceUpdate(TypedDict, total=False):
     variant_id: str
     phenotype_id: str | None
     publication_id: str | None
-    evidence_level: str
-    confidence_score: float
-    source: str
-    evidence_type: str
     description: str | None
+    summary: str | None
+    evidence_level: str
+    evidence_type: str
+    confidence_score: float
+    quality_score: int | None
+    sample_size: int | None
+    study_type: str | None
+    statistical_significance: str | None
+    reviewed: bool | None
+    review_date: date | None
+    reviewer_notes: str | None
 
 
 class PublicationUpdate(TypedDict, total=False):

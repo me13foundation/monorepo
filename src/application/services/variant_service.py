@@ -8,7 +8,7 @@ from src.domain.entities.variant import EvidenceSummary, Variant
 from src.domain.repositories.evidence_repository import EvidenceRepository
 from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.variant_domain_service import VariantDomainService
-from src.type_definitions.common import QueryFilters, VariantUpdate
+from src.type_definitions.common import JSONObject, QueryFilters, VariantUpdate
 
 
 class VariantApplicationService:
@@ -323,7 +323,7 @@ class VariantApplicationService:
             evidence_summaries,
         )
 
-    def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
+    def get_variant_statistics(self) -> JSONObject:
         """Get statistics about variants in the repository."""
         return self._variant_repository.get_variant_statistics()
 

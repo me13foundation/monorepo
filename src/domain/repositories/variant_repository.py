@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from src.domain.entities.variant import Variant, VariantSummary
 from src.domain.repositories.base import Repository
-from src.type_definitions.common import QueryFilters, VariantUpdate
+from src.type_definitions.common import JSONObject, QueryFilters, VariantUpdate
 
 
 class VariantRepository(Repository[Variant, int, VariantUpdate]):
@@ -73,7 +73,7 @@ class VariantRepository(Repository[Variant, int, VariantUpdate]):
         """Get variant summaries for a gene."""
 
     @abstractmethod
-    def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
+    def get_variant_statistics(self) -> JSONObject:
         """Get statistics about variants in the repository."""
 
     @abstractmethod

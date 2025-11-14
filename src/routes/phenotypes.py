@@ -5,7 +5,8 @@ RESTful endpoints for phenotype management with HPO ontology integration.
 """
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, cast
+from enum import Enum
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -46,6 +47,33 @@ def _stat_count(stats: Mapping[str, object], key: str) -> int:
         except ValueError:
             return 0
     return 0
+
+
+def _enum_str(value: Enum | str) -> str:
+    return value.value if isinstance(value, Enum) else str(value)
+
+
+def _to_phenotype_update_payload(
+    payload: PhenotypeUpdate,
+) -> PhenotypeUpdatePayload:
+    updates: PhenotypeUpdatePayload = {}
+    if payload.name is not None:
+        updates["name"] = payload.name
+    if payload.definition is not None:
+        updates["definition"] = payload.definition
+    if payload.synonyms is not None:
+        updates["synonyms"] = payload.synonyms
+    if payload.category is not None:
+        updates["category"] = _enum_str(payload.category)
+    if payload.parent_hpo_id is not None:
+        updates["parent_hpo_id"] = payload.parent_hpo_id
+    if payload.is_root_term is not None:
+        updates["is_root_term"] = payload.is_root_term
+    if payload.frequency_in_med13 is not None:
+        updates["frequency_in_med13"] = payload.frequency_in_med13
+    if payload.severity_score is not None:
+        updates["severity_score"] = payload.severity_score
+    return updates
 
 
 def get_phenotype_service(
@@ -230,10 +258,7 @@ async def update_phenotype(
                 detail=f"Phenotype {phenotype_id} not found",
             )
 
-        updates = cast(
-            "PhenotypeUpdatePayload",
-            phenotype_data.model_dump(exclude_unset=True),
-        )
+        updates = _to_phenotype_update_payload(phenotype_data)
 
         phenotype = service.update_phenotype(phenotype_id, updates)
         return serialize_phenotype(phenotype)

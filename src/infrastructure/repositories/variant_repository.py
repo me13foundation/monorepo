@@ -18,7 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
     from src.domain.entities.variant import Variant
     from src.domain.repositories.base import QuerySpecification
-    from src.type_definitions.common import QueryFilters, VariantUpdate
+    from src.type_definitions.common import JSONObject, QueryFilters, VariantUpdate
 
 
 class SqlAlchemyVariantRepository(VariantRepositoryInterface):
@@ -142,7 +142,7 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         self.session.commit()
         return True
 
-    def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
+    def get_variant_statistics(self) -> JSONObject:
         total_variants = self.count()
         pathogenic = len(self.find_pathogenic_variants())
         return {
