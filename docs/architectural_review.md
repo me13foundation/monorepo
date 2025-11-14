@@ -48,7 +48,7 @@ The MED13 Resource Library demonstrates **mixed architectural compliance** with 
 
 **Status**: Properly implemented with container pattern
 
-**Evidence**: `src/application/container.py`
+**Evidence**: `src/infrastructure/dependency_injection/container.py`
 - ✅ Centralized `DependencyContainer` class
 - ✅ Lazy loading of services
 - ✅ Proper lifecycle management

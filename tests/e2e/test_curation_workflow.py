@@ -3,9 +3,9 @@ import os
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.application import container as container_module
 from src.database.session import SessionLocal, engine
 from src.domain.entities.user import UserRole, UserStatus
+from src.infrastructure.dependency_injection import container as container_module
 from src.infrastructure.security.password_hasher import PasswordHasher
 from src.main import create_app
 from src.middleware import jwt_auth as jwt_auth_module

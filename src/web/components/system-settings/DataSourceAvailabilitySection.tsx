@@ -28,10 +28,13 @@ export function DataSourceAvailabilitySection() {
   const [searchTerm, setSearchTerm] = useState('')
 
   const catalogQuery = useAdminCatalogEntries()
-  const catalogEntries = catalogQuery.data ?? []
+  const catalogEntries = useMemo(() => catalogQuery.data ?? [], [catalogQuery.data])
 
   const availabilitySummariesQuery = useCatalogAvailabilitySummaries()
-  const availabilitySummaries = availabilitySummariesQuery.data ?? []
+  const availabilitySummaries = useMemo(
+    () => availabilitySummariesQuery.data ?? [],
+    [availabilitySummariesQuery.data],
+  )
 
   const availabilityQuery = useCatalogAvailability(dialogOpen ? selectedSource?.id ?? null : null)
   const spacesQuery = useResearchSpaces({ limit: 100 })

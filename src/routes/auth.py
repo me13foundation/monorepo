@@ -11,10 +11,6 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from src.application.container import (
-    container,
-    get_authentication_service_dependency,
-)
 from src.application.dto.auth_requests import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
@@ -51,6 +47,10 @@ from src.application.services.user_management_service import (
 )
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.domain.value_objects.permission import Permission
+from src.infrastructure.dependency_injection.container import (
+    container,
+    get_authentication_service_dependency,
+)
 from src.infrastructure.security.password_hasher import PasswordHasher
 from src.models.database.user import UserModel
 

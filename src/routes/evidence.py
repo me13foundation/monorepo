@@ -10,9 +10,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from src.application.container import get_legacy_dependency_container
 from src.database.session import get_session
 from src.domain.value_objects.confidence import EvidenceLevel
+from src.infrastructure.dependency_injection.container import (
+    get_legacy_dependency_container,
+)
 from src.models.api import (
     EvidenceCreate,
     EvidenceResponse,

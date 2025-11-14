@@ -13,11 +13,11 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-from src.application.container import container
 from src.application.services.authentication_service import (
     AuthenticationError,
     AuthenticationService,
 )
+from src.infrastructure.dependency_injection.container import container
 
 SKIP_JWT_VALIDATION = os.getenv("MED13_BYPASS_JWT_FOR_TESTS") == "1"
 

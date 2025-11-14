@@ -10,13 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.application.container import get_legacy_dependency_container
 from src.application.search.search_service import (
     SearchEntity,
     SearchResultType,
     UnifiedSearchService,
 )
 from src.database.session import get_session
+from src.infrastructure.dependency_injection.container import (
+    get_legacy_dependency_container,
+)
 from src.type_definitions.common import JSONObject
 
 router = APIRouter(prefix="/search", tags=["search"])

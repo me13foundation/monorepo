@@ -14,7 +14,6 @@ from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from src.application.container import get_data_discovery_service_dependency
 from src.application.curation.repositories.audit_repository import (
     SqlAlchemyAuditRepository,
 )
@@ -36,6 +35,9 @@ from src.domain.entities.data_discovery_session import (
     TestResultStatus,
 )
 from src.domain.entities.user import User, UserRole
+from src.infrastructure.dependency_injection.container import (
+    get_data_discovery_service_dependency,
+)
 from src.infrastructure.repositories.research_space_repository import (
     SqlAlchemyResearchSpaceRepository,
 )

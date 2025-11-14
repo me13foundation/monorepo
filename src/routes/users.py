@@ -9,7 +9,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.application.container import container
 from src.application.dto.auth_requests import AdminUpdateUserRequest, CreateUserRequest
 from src.application.dto.auth_responses import (
     ErrorResponse,
@@ -33,6 +32,7 @@ from src.application.services.user_management_service import (
 )
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.domain.value_objects.permission import Permission
+from src.infrastructure.dependency_injection.container import container
 from src.routes.auth import get_current_active_user
 
 # HTTP status codes

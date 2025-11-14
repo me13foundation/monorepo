@@ -6,12 +6,15 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.application.container import container, initialize_legacy_session
 from src.database.seed import (
     ensure_default_research_space_seeded,
     ensure_source_catalog_seeded,
 )
 from src.database.session import get_session
+from src.infrastructure.dependency_injection.container import (
+    container,
+    initialize_legacy_session,
+)
 from src.middleware.auth import AuthMiddleware
 from src.middleware.jwt_auth import JWTAuthMiddleware
 from src.middleware.rate_limit import EndpointRateLimitMiddleware

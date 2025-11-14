@@ -211,8 +211,8 @@ Benefits:
 #### **Dependency Injection Container**
 ```python
 # src/infrastructure/dependency_injection/container.py
-# Enables easy addition of new services and repositories
-# Supports different implementations per environment
+# Unified container wiring services/repositories
+# Supports async auth stack + legacy services during migration
 ```
 
 #### **Plugin Architecture for Data Sources**

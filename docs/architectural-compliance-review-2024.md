@@ -115,7 +115,7 @@ $ make all
 - ✅ Domain services depend only on repository interfaces
 - ✅ Application services receive repositories via dependency injection
 - ✅ Infrastructure implements domain interfaces
-- ✅ Dependency container properly configured (`src/application/container.py`)
+- ✅ Dependency container properly configured (`src/infrastructure/dependency_injection/container.py`)
 
 **Example - Gene Service Pattern**:
 ```python
@@ -152,7 +152,7 @@ class GeneApplicationService:
 
 **Status**: Properly implemented with container pattern
 
-**Evidence**: `src/application/container.py`
+**Evidence**: `src/infrastructure/dependency_injection/container.py`
 - ✅ Centralized `DependencyContainer` class
 - ✅ Lazy loading of services
 - ✅ Proper lifecycle management

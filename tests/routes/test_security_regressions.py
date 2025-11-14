@@ -5,15 +5,18 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
-from src.application import container as container_module
 from src.application.services.authorization_service import AuthorizationError
 from src.database.session import SessionLocal, engine
 from src.domain.entities.user import User, UserRole, UserStatus
+from src.infrastructure.dependency_injection import container as container_module
 from src.infrastructure.security.password_hasher import PasswordHasher
 from src.main import create_app
 from src.middleware import jwt_auth as jwt_auth_module
 from src.models.database import Base
-from src.models.database.data_discovery import DataDiscoverySessionModel
+from src.models.database.data_discovery import (
+    DataDiscoverySessionModel,
+    QueryTestResultModel,
+)
 from src.routes.auth import get_current_active_user
 
 
@@ -42,6 +45,7 @@ def test_data_discovery_rejects_foreign_session_access() -> None:
     """
     Base.metadata.create_all(bind=engine)
     session = SessionLocal()
+    session.query(QueryTestResultModel).delete()
     session.query(DataDiscoverySessionModel).delete()
     session.commit()
 

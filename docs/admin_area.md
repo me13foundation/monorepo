@@ -928,7 +928,7 @@ All API endpoints implement authorization checks:
 - [x] Create `SpaceAuthorizationService` for permission checks
 - [x] Create Request DTOs (`CreateSpaceRequest`, `UpdateSpaceRequest`, etc.) following existing patterns
 - [x] Create Response DTOs for API contracts
-- [x] Add dependency injection configuration in `application/container.py`
+- [x] Add dependency injection configuration in `infrastructure/dependency_injection/container.py`
 - [x] Implement proper error handling with domain exceptions
 - [x] Follow existing service patterns (see `SourceManagementService` for reference)
 
