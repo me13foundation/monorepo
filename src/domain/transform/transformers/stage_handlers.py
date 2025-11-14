@@ -27,12 +27,13 @@ from .stage_models import (
 if TYPE_CHECKING:
     from src.type_definitions.common import RawRecord
 
-    from ..normalizers.gene_normalizer import GeneNormalizer
+    from ..normalizers.gene_normalizer import GeneNormalizer, NormalizedGene
     from ..normalizers.phenotype_normalizer import PhenotypeNormalizer
     from ..normalizers.publication_normalizer import PublicationNormalizer
     from ..normalizers.variant_normalizer import VariantNormalizer
 
 ParsedRecord = TypeVar("ParsedRecord")
+NormalizedEntityT = TypeVar("NormalizedEntityT")
 
 
 class BatchParser(Protocol[ParsedRecord]):
@@ -110,9 +111,38 @@ class NormalizationStageRunner:
     ) -> tuple[NormalizedDataBundle, TransformationResult]:
         start_time = time.time()
         normalized = NormalizedDataBundle()
-
-        # Normalize gene records
         seen_genes: set[str] = set()
+
+        self._normalize_uniprot_genes(parsed_data, normalized, seen_genes)
+        self._normalize_clinvar_genes(parsed_data, normalized, seen_genes)
+        self._normalize_clinvar_variants(parsed_data, normalized)
+        self._normalize_clinvar_phenotypes(parsed_data, normalized)
+        self._normalize_hpo_terms(parsed_data, normalized)
+        self._normalize_pubmed_publications(parsed_data, normalized)
+        self._normalize_uniprot_publications(parsed_data, normalized)
+
+        result = TransformationResult(
+            stage=TransformationStage.NORMALIZATION,
+            status=(
+                TransformationStatus.COMPLETED
+                if not normalized.errors
+                else TransformationStatus.PARTIAL
+            ),
+            records_processed=normalized.total_records(),
+            records_failed=len(normalized.errors),
+            data=normalized.as_dict(),
+            errors=normalized.errors,
+            duration_seconds=time.time() - start_time,
+            timestamp=time.time(),
+        )
+        return normalized, result
+
+    def _normalize_uniprot_genes(
+        self,
+        parsed_data: ParsedDataBundle,
+        normalized: NormalizedDataBundle,
+        seen_genes: set[str],
+    ) -> None:
         for protein in parsed_data.uniprot:
             for gene in protein.genes:
                 record: RawRecord = cast(
@@ -128,15 +158,19 @@ class NormalizationStageRunner:
                     record,
                     source="uniprot",
                 )
-                if normalized_gene:
-                    if normalized_gene.primary_id not in seen_genes:
-                        normalized.genes.append(normalized_gene)
-                        seen_genes.add(normalized_gene.primary_id)
-                else:
-                    normalized.errors.append(
-                        f"Failed to normalize UniProt gene: {gene.name}",
-                    )
+                self._add_gene_if_unique(
+                    normalized,
+                    seen_genes,
+                    normalized_gene,
+                    f"Failed to normalize UniProt gene: {gene.name}",
+                )
 
+    def _normalize_clinvar_genes(
+        self,
+        parsed_data: ParsedDataBundle,
+        normalized: NormalizedDataBundle,
+        seen_genes: set[str],
+    ) -> None:
         for variant in parsed_data.clinvar:
             gene_record: RawRecord = cast(
                 "RawRecord",
@@ -150,16 +184,23 @@ class NormalizationStageRunner:
                 gene_record,
                 source="clinvar",
             )
-            if normalized_gene:
-                if normalized_gene.primary_id not in seen_genes:
-                    normalized.genes.append(normalized_gene)
-                    seen_genes.add(normalized_gene.primary_id)
-            elif variant.gene_symbol:
-                normalized.errors.append(
-                    f"Failed to normalize ClinVar gene: {variant.gene_symbol}",
-                )
+            error_message = (
+                f"Failed to normalize ClinVar gene: {variant.gene_symbol}"
+                if variant.gene_symbol
+                else None
+            )
+            self._add_gene_if_unique(
+                normalized,
+                seen_genes,
+                normalized_gene,
+                error_message,
+            )
 
-        # Normalize variants
+    def _normalize_clinvar_variants(
+        self,
+        parsed_data: ParsedDataBundle,
+        normalized: NormalizedDataBundle,
+    ) -> None:
         for variant in parsed_data.clinvar:
             variant_record: RawRecord = cast(
                 "RawRecord",
@@ -179,14 +220,18 @@ class NormalizationStageRunner:
                 variant_record,
                 source="clinvar",
             )
-            if normalized_variant:
-                normalized.variants.append(normalized_variant)
-            else:
-                normalized.errors.append(
-                    f"Failed to normalize ClinVar variant: {variant.clinvar_id}",
-                )
+            self._append_entity_or_error(
+                normalized.variants,
+                normalized_variant,
+                normalized.errors,
+                f"Failed to normalize ClinVar variant: {variant.clinvar_id}",
+            )
 
-        # Normalize phenotypes
+    def _normalize_clinvar_phenotypes(
+        self,
+        parsed_data: ParsedDataBundle,
+        normalized: NormalizedDataBundle,
+    ) -> None:
         for variant in parsed_data.clinvar:
             for phenotype_name in variant.phenotypes:
                 phenotype_record: RawRecord = cast(
@@ -197,13 +242,18 @@ class NormalizationStageRunner:
                     phenotype_record,
                     source="clinvar",
                 )
-                if normalized_phenotype:
-                    normalized.phenotypes.append(normalized_phenotype)
-                else:
-                    normalized.errors.append(
-                        f"Failed to normalize ClinVar phenotype: {phenotype_name}",
-                    )
+                self._append_entity_or_error(
+                    normalized.phenotypes,
+                    normalized_phenotype,
+                    normalized.errors,
+                    f"Failed to normalize ClinVar phenotype: {phenotype_name}",
+                )
 
+    def _normalize_hpo_terms(
+        self,
+        parsed_data: ParsedDataBundle,
+        normalized: NormalizedDataBundle,
+    ) -> None:
         for term in parsed_data.hpo:
             hpo_record: RawRecord = {
                 "hpo_id": term.hpo_id,
@@ -215,12 +265,18 @@ class NormalizationStageRunner:
                 hpo_record,
                 source="hpo",
             )
-            if normalized_phenotype:
-                normalized.phenotypes.append(normalized_phenotype)
-            else:
-                normalized.errors.append(f"Failed to normalize HPO term: {term.hpo_id}")
+            self._append_entity_or_error(
+                normalized.phenotypes,
+                normalized_phenotype,
+                normalized.errors,
+                f"Failed to normalize HPO term: {term.hpo_id}",
+            )
 
-        # Normalize publications
+    def _normalize_pubmed_publications(
+        self,
+        parsed_data: ParsedDataBundle,
+        normalized: NormalizedDataBundle,
+    ) -> None:
         for publication in parsed_data.pubmed:
             authors = [
                 f"{author.last_name}, {author.first_name}".strip(", ")
@@ -245,13 +301,18 @@ class NormalizationStageRunner:
                 pub_record,
                 source="pubmed",
             )
-            if normalized_publication:
-                normalized.publications.append(normalized_publication)
-            else:
-                normalized.errors.append(
-                    f"Failed to normalize PubMed publication: {publication.pubmed_id}",
-                )
+            self._append_entity_or_error(
+                normalized.publications,
+                normalized_publication,
+                normalized.errors,
+                f"Failed to normalize PubMed publication: {publication.pubmed_id}",
+            )
 
+    def _normalize_uniprot_publications(
+        self,
+        parsed_data: ParsedDataBundle,
+        normalized: NormalizedDataBundle,
+    ) -> None:
         for protein in parsed_data.uniprot:
             for reference in protein.references:
                 normalized_publication = self.publication_normalizer.normalize(
@@ -261,21 +322,32 @@ class NormalizationStageRunner:
                 if normalized_publication:
                     normalized.publications.append(normalized_publication)
 
-        result = TransformationResult(
-            stage=TransformationStage.NORMALIZATION,
-            status=(
-                TransformationStatus.COMPLETED
-                if not normalized.errors
-                else TransformationStatus.PARTIAL
-            ),
-            records_processed=normalized.total_records(),
-            records_failed=len(normalized.errors),
-            data=normalized.as_dict(),
-            errors=normalized.errors,
-            duration_seconds=time.time() - start_time,
-            timestamp=time.time(),
-        )
-        return normalized, result
+    def _append_entity_or_error(
+        self,
+        collection: list[NormalizedEntityT],
+        entity: NormalizedEntityT | None,
+        errors: list[str],
+        error_message: str,
+    ) -> None:
+        if entity is not None:
+            collection.append(entity)
+        else:
+            errors.append(error_message)
+
+    def _add_gene_if_unique(
+        self,
+        normalized: NormalizedDataBundle,
+        seen_genes: set[str],
+        normalized_gene: NormalizedGene | None,
+        error_message: str | None,
+    ) -> None:
+        if normalized_gene:
+            primary_id = getattr(normalized_gene, "primary_id", None)
+            if primary_id and primary_id not in seen_genes:
+                normalized.genes.append(normalized_gene)
+                seen_genes.add(primary_id)
+        elif error_message:
+            normalized.errors.append(error_message)
 
 
 @dataclass
