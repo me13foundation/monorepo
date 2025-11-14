@@ -4,9 +4,10 @@ Variant API routes for MED13 Resource Library.
 RESTful endpoints for variant management with CRUD operations.
 """
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
@@ -20,7 +21,12 @@ from src.models.api import (
     VariantUpdate,
 )
 from src.routes.serializers import serialize_variant
-from src.type_definitions.common import VariantUpdate as VariantUpdatePayload
+from src.type_definitions.common import (
+    JSONObject,
+)
+from src.type_definitions.common import (
+    VariantUpdate as VariantUpdatePayload,
+)
 
 if TYPE_CHECKING:
     from src.application.services.variant_service import VariantApplicationService
@@ -36,6 +42,32 @@ def get_variant_service(
 
     container = get_legacy_dependency_container()
     return container.create_variant_application_service(db)
+
+
+class VariantEvidenceSummaryResponse(BaseModel):
+    """Response summarizing evidence associated with a variant."""
+
+    variant_id: int
+    evidence_conflicts: list[str]
+    clinical_significance_confidence: float
+    conflict_count: int
+
+
+class VariantsByGeneResponse(BaseModel):
+    """Response for variants associated with a gene."""
+
+    gene_id: int
+    variants: list[VariantResponse]
+    count: int
+
+
+class VariantSearchResponse(BaseModel):
+    """Response payload for variant search operations."""
+
+    query: str
+    results: list[VariantResponse]
+    count: int
+    filters: dict[str, str]
 
 
 @router.get(
@@ -297,11 +329,15 @@ async def update_variant_classification(
         )
 
 
-@router.get("/{variant_id}/evidence", summary="Get variant evidence")
+@router.get(
+    "/{variant_id}/evidence",
+    summary="Get variant evidence",
+    response_model=VariantEvidenceSummaryResponse,
+)
 async def get_variant_evidence(
     variant_id: int,
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> dict[str, Any]:
+) -> VariantEvidenceSummaryResponse:
     """
     Get evidence associated with a variant.
     """
@@ -317,12 +353,12 @@ async def get_variant_evidence(
         conflicts = service.detect_evidence_conflicts(variant_id)
         confidence = service.assess_clinical_significance_confidence(variant_id)
 
-        return {
-            "variant_id": variant_id,
-            "evidence_conflicts": conflicts,
-            "clinical_significance_confidence": confidence,
-            "conflict_count": len(conflicts),
-        }
+        return VariantEvidenceSummaryResponse(
+            variant_id=variant_id,
+            evidence_conflicts=conflicts,
+            clinical_significance_confidence=confidence,
+            conflict_count=len(conflicts),
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -332,7 +368,11 @@ async def get_variant_evidence(
         )
 
 
-@router.get("/gene/{gene_id}", summary="Get variants by gene")
+@router.get(
+    "/gene/{gene_id}",
+    summary="Get variants by gene",
+    response_model=VariantsByGeneResponse,
+)
 async def get_variants_by_gene(
     gene_id: int,
     limit: int
@@ -343,7 +383,7 @@ async def get_variants_by_gene(
         description="Maximum number of results",
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> dict[str, Any]:
+) -> VariantsByGeneResponse:
     """
     Retrieve variants associated with a specific gene.
     """
@@ -352,11 +392,11 @@ async def get_variants_by_gene(
         variants = service.get_variants_by_gene(gene_id, limit)
         serialized_variants = [serialize_variant(variant) for variant in variants]
 
-        return {
-            "gene_id": gene_id,
-            "variants": serialized_variants,
-            "count": len(serialized_variants),
-        }
+        return VariantsByGeneResponse(
+            gene_id=gene_id,
+            variants=serialized_variants,
+            count=len(serialized_variants),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -364,7 +404,11 @@ async def get_variants_by_gene(
         )
 
 
-@router.get("/search", summary="Search variants")
+@router.get(
+    "/search",
+    summary="Search variants",
+    response_model=VariantSearchResponse,
+)
 async def search_variants(
     q: str = Query(..., description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
@@ -375,7 +419,7 @@ async def search_variants(
         description="Filter by clinical significance",
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> dict[str, Any]:
+) -> VariantSearchResponse:
     """
     Search variants by query with optional filters.
     """
@@ -391,12 +435,12 @@ async def search_variants(
         variants = service.search_variants(q, limit, filters)
         serialized_variants = [serialize_variant(variant) for variant in variants]
 
-        return {
-            "query": q,
-            "results": serialized_variants,
-            "count": len(serialized_variants),
-            "filters": filters,
-        }
+        return VariantSearchResponse(
+            query=q,
+            results=serialized_variants,
+            count=len(serialized_variants),
+            filters=filters,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -427,11 +471,15 @@ async def delete_variant(
     )
 
 
-@router.get("/stats", summary="Get variant statistics")
+@router.get(
+    "/stats",
+    summary="Get variant statistics",
+    response_model=dict[str, int | float | bool | str | None],
+)
 async def get_variant_statistics(
     service: "VariantApplicationService" = Depends(get_variant_service),
-) -> dict[str, Any]:
+) -> JSONObject:
     """
     Retrieve statistical information about variants in the database.
     """
-    return service.get_variant_statistics()
+    return cast("JSONObject", service.get_variant_statistics())

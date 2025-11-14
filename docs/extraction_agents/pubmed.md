@@ -17,6 +17,7 @@ This will be your “Paper Extraction SOP” for your world model.
 
 ---
 
+  3. ✅ Remaining `Any` usages in routes/tests now rely on the TypedDict/Protocol patterns outlined in `docs/type_examples.md`, preserving the “never Any” requirement.
 # 📘 **UNIVERSAL BIOMEDICAL PAPER EXTRACTION TEMPLATE**
 
 *(works for MED13, MED13L, TBCK, TBP, RASopathies, epilepsy genes, etc.)*
@@ -390,5 +391,3 @@ This is the definitive list of what to extract from ANY paper:
 9. Agent who extracted (LLM vs human)
 
 ---
-
-  3. Replace remaining Any usages in routes/tests with the TypedDicts and Protocols showcased in docs/type_examples.md to realize the “never Any” requirement.

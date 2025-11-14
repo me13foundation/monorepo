@@ -6,7 +6,6 @@ Provides streaming data export capabilities in multiple formats.
 
 import gzip
 from collections.abc import Generator
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -21,6 +20,7 @@ from src.database.session import get_session
 from src.infrastructure.dependency_injection.container import (
     get_legacy_dependency_container,
 )
+from src.type_definitions.common import JSONObject
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -120,7 +120,7 @@ async def export_entity_data(
 async def get_export_info(
     entity_type: str,
     service: "BulkExportService" = Depends(get_export_service),
-) -> dict[str, Any]:
+) -> JSONObject:
     """
     Get information about export options and data statistics for an entity type.
     """
@@ -147,7 +147,7 @@ async def get_export_info(
 
 
 @router.get("/")
-async def list_exportable_entities() -> dict[str, Any]:
+async def list_exportable_entities() -> JSONObject:
     """
     List all entity types that can be exported.
     """

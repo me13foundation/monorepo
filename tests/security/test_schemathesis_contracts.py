@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import os
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from schemathesis import openapi
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from schemathesis.schemas import APIOperation
 
 from src.main import create_app
 
 
 @contextmanager
-def _temporary_skip_startup_tasks() -> Any:
+def _temporary_skip_startup_tasks() -> Iterator[None]:
     original = os.environ.get("MED13_SKIP_STARTUP_TASKS")
     os.environ["MED13_SKIP_STARTUP_TASKS"] = "1"
     try:

@@ -6,10 +6,10 @@ and user registration.
 """
 
 import secrets
-from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from pydantic import BaseModel
 
 from src.application.dto.auth_requests import (
     ChangePasswordRequest,
@@ -70,24 +70,38 @@ auth_router = APIRouter(
 security = HTTPBearer(auto_error=False)
 
 
+class RouteInfo(BaseModel):
+    """Lightweight representation of an auth route."""
+
+    path: str
+    methods: set[str] | None
+    name: str | None
+
+
+class RouteListResponse(BaseModel):
+    """Response payload for listing auth routes."""
+
+    routes: list[RouteInfo]
+
+
 @auth_router.get("/test")
 async def test_endpoint() -> dict[str, str]:
     """Simple test endpoint to check if auth routes are working."""
     return {"message": "Auth routes are working!"}
 
 
-@auth_router.get("/routes")
-async def list_routes() -> dict[str, list[dict[str, Any]]]:
+@auth_router.get("/routes", response_model=RouteListResponse)
+async def list_routes() -> RouteListResponse:
     """List all auth routes."""
     routes = [
-        {
-            "path": getattr(route, "path", str(route)),
-            "methods": getattr(route, "methods", None),
-            "name": getattr(route, "name", None),
-        }
+        RouteInfo(
+            path=getattr(route, "path", str(route)),
+            methods=getattr(route, "methods", None),
+            name=getattr(route, "name", None),
+        )
         for route in auth_router.routes
     ]
-    return {"routes": routes}
+    return RouteListResponse(routes=routes)
 
 
 async def get_current_user(

@@ -4,7 +4,7 @@ Evidence API routes for MED13 Resource Library.
 RESTful endpoints for evidence management linking variants and phenotypes.
 """
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -22,7 +22,12 @@ from src.models.api import (
     PaginatedResponse,
 )
 from src.routes.serializers import serialize_evidence
-from src.type_definitions.common import EvidenceUpdate as EvidenceUpdatePayload
+from src.type_definitions.common import (
+    EvidenceUpdate as EvidenceUpdatePayload,
+)
+from src.type_definitions.common import (
+    JSONObject,
+)
 
 if TYPE_CHECKING:
     from src.application.services.evidence_service import EvidenceApplicationService
@@ -52,6 +57,27 @@ class EvidenceSearchResponse(BaseModel):
     query: str
     total_results: int
     results: list[EvidenceResponse]
+
+
+class EvidenceConflictsResponse(BaseModel):
+    """Response model for evidence conflict detection."""
+
+    variant_id: int
+    conflicts: list[JSONObject]
+    total_conflicts: int
+
+
+class EvidenceConsensusResponse(BaseModel):
+    """Response model for evidence consensus calculations."""
+
+    variant_id: int
+    consensus: JSONObject
+
+
+class EvidenceStatisticsResponse(BaseModel):
+    """Response model for evidence statistics."""
+
+    statistics: dict[str, int | float | bool | str | None]
 
 
 def get_evidence_service(
@@ -384,21 +410,28 @@ async def search_evidence(
         )
 
 
-@router.get("/variant/{variant_id}/conflicts", summary="Detect conflicts for a variant")
+@router.get(
+    "/variant/{variant_id}/conflicts",
+    summary="Detect conflicts for a variant",
+    response_model=EvidenceConflictsResponse,
+)
 async def get_evidence_conflicts(
     variant_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> dict[str, Any]:
+) -> EvidenceConflictsResponse:
     """
     Detect and list any conflicting evidence records for a given variant.
     """
     try:
-        conflicts = service.detect_evidence_conflicts(variant_id)
-        return {
-            "variant_id": variant_id,
-            "conflicts": conflicts,
-            "total_conflicts": len(conflicts),
-        }
+        conflicts = [
+            cast("JSONObject", conflict)
+            for conflict in service.detect_evidence_conflicts(variant_id)
+        ]
+        return EvidenceConflictsResponse(
+            variant_id=variant_id,
+            conflicts=conflicts,
+            total_conflicts=len(conflicts),
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -409,20 +442,24 @@ async def get_evidence_conflicts(
 @router.get(
     "/variant/{variant_id}/consensus",
     summary="Get evidence consensus for a variant",
+    response_model=EvidenceConsensusResponse,
 )
 async def get_evidence_consensus(
     variant_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> dict[str, Any]:
+) -> EvidenceConsensusResponse:
     """
     Calculate consensus from multiple evidence records for a variant.
     """
     try:
-        consensus = service.calculate_evidence_consensus(variant_id)
-        return {
-            "variant_id": variant_id,
-            "consensus": consensus,
-        }
+        consensus = cast(
+            "JSONObject",
+            service.calculate_evidence_consensus(variant_id),
+        )
+        return EvidenceConsensusResponse(
+            variant_id=variant_id,
+            consensus=consensus,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -433,17 +470,17 @@ async def get_evidence_consensus(
 @router.get(
     "/statistics/",
     summary="Get evidence statistics",
-    response_model=dict[str, Any],
+    response_model=EvidenceStatisticsResponse,
 )
 async def get_evidence_statistics(
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
-) -> dict[str, Any]:
+) -> EvidenceStatisticsResponse:
     """
     Retrieve statistics about evidence in the repository.
     """
     try:
         stats = service.get_evidence_statistics()
-        return stats
+        return EvidenceStatisticsResponse(statistics=stats)
     except Exception as e:
         raise HTTPException(
             status_code=500,

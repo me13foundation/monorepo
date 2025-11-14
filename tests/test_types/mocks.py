@@ -4,7 +4,7 @@ Typed mock implementations for MED13 Resource Library testing.
 Provides type-safe mock repositories and services for comprehensive unit testing.
 """
 
-from typing import Any
+from typing import TypedDict
 from unittest.mock import MagicMock
 
 from src.application.services.evidence_service import EvidenceApplicationService
@@ -23,6 +23,14 @@ from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.services.variant_domain_service import VariantDomainService
+from src.type_definitions.common import (
+    EvidenceUpdate,
+    GeneUpdate,
+    JSONObject,
+    PhenotypeUpdate,
+    PublicationUpdate,
+    VariantUpdate,
+)
 
 from .fixtures import (
     TestEvidence,
@@ -126,7 +134,7 @@ class MockGeneRepository(GeneRepository):
             for test_gene in self._genes.values()
         ]
 
-    def update(self, gene_id: int, updates: dict[str, Any]) -> Gene:
+    def update(self, gene_id: int, updates: GeneUpdate) -> Gene:
         """Mock update method."""
         self.update_gene(gene_id, updates)
         # Simplified: just return a mock updated gene
@@ -236,7 +244,7 @@ class MockVariantRepository(VariantRepository):
             for test_variant in self._variants.values()
         ]
 
-    def update(self, variant_id: int, updates: dict[str, Any]) -> Variant:
+    def update(self, variant_id: int, updates: VariantUpdate) -> Variant:
         """Mock update method."""
         self.update_variant(variant_id, updates)
         if variant_id in self._variants:
@@ -390,7 +398,7 @@ class MockPhenotypeRepository(PhenotypeRepository):
             for test_phenotype in self._phenotypes.values()
         ]
 
-    def update(self, phenotype_id: int, updates: dict[str, Any]) -> Phenotype:
+    def update(self, phenotype_id: int, updates: PhenotypeUpdate) -> Phenotype:
         """Mock update method."""
         self.update_phenotype(phenotype_id, updates)
         if phenotype_id in self._phenotypes:
@@ -472,7 +480,7 @@ class MockEvidenceRepository(EvidenceRepository):
             for test_evidence in self._evidence.values()
         ]
 
-    def update(self, evidence_id: int, updates: dict[str, Any]) -> Evidence:
+    def update(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
         """Mock update method."""
         self.update_evidence(evidence_id, updates)
         if evidence_id in self._evidence:
@@ -596,7 +604,7 @@ class MockPublicationRepository(PublicationRepository):
             for test_publication in self._publications.values()
         ]
 
-    def update(self, publication_id: int, updates: dict[str, Any]) -> Publication:
+    def update(self, publication_id: int, updates: PublicationUpdate) -> Publication:
         """Mock update method."""
         self.update_publication(publication_id, updates)
         if publication_id in self._publications:
@@ -765,7 +773,7 @@ class MockSourceQueryClient:
         self.generate_url = MagicMock()
         self.validate_parameters = MagicMock(return_value=True)
 
-    def setup_success_behavior(self, response_data: dict[str, Any] | None = None):
+    def setup_success_behavior(self, response_data: JSONObject | None = None):
         """Set up successful query behavior."""
         self.execute_query.return_value = response_data or {"result": "success"}
         self.generate_url.return_value = "https://example.com/test"
@@ -782,7 +790,15 @@ class MockSourceQueryClient:
         self.validate_parameters.return_value = False
 
 
-def create_mock_data_discovery_repositories() -> dict[str, Any]:
+class DataDiscoveryRepositoryMocks(TypedDict):
+    """Typed mapping for mock data discovery repositories."""
+
+    session_repo: MockDataDiscoverySessionRepository
+    catalog_repo: MockSourceCatalogRepository
+    query_repo: MockQueryTestResultRepository
+
+
+def create_mock_data_discovery_repositories() -> DataDiscoveryRepositoryMocks:
     """
     Create a set of mock data discovery repositories for testing.
 

@@ -4,7 +4,7 @@ Gene API routes for MED13 Resource Library.
 RESTful endpoints for gene management with CRUD operations.
 """
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -15,7 +15,12 @@ from src.infrastructure.dependency_injection.container import (
 )
 from src.models.api import GeneCreate, GeneResponse, GeneUpdate, PaginatedResponse
 from src.routes.serializers import serialize_gene
-from src.type_definitions.common import GeneUpdate as GeneUpdatePayload
+from src.type_definitions.common import (
+    GeneUpdate as GeneUpdatePayload,
+)
+from src.type_definitions.common import (
+    JSONObject,
+)
 
 if TYPE_CHECKING:
     from src.application.services.gene_service import GeneApplicationService
@@ -237,11 +242,15 @@ async def delete_gene(
         raise HTTPException(status_code=500, detail=f"Failed to delete gene: {e!s}")
 
 
-@router.get("/{gene_id}/statistics", summary="Get gene statistics")
+@router.get(
+    "/{gene_id}/statistics",
+    summary="Get gene statistics",
+    response_model=dict[str, int | float | bool | str | None],
+)
 async def get_gene_statistics(
     gene_id: str,
     service: "GeneApplicationService" = Depends(get_gene_service),
-) -> dict[str, Any]:
+) -> JSONObject:
     """
     Retrieve statistics for a specific gene.
 
@@ -255,7 +264,7 @@ async def get_gene_statistics(
             raise HTTPException(status_code=404, detail=f"Gene {gene_id} not found")
 
         stats = service.get_gene_statistics(gene_id)
-        return stats
+        return cast("JSONObject", stats)
 
     except HTTPException:
         raise

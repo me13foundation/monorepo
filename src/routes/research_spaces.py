@@ -4,7 +4,6 @@ Research Spaces API routes for MED13 Resource Library.
 Provides REST API endpoints for research space management and membership operations.
 """
 
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -624,23 +623,20 @@ class DataSourceResponse(BaseModel):
     updated_at: str
 
     @classmethod
-    def from_entity(cls, source: Any) -> "DataSourceResponse":
+    def from_entity(cls, source: UserDataSource) -> "DataSourceResponse":
         """Create response from domain entity."""
 
-        if isinstance(source, UserDataSource):
-            return cls(
-                id=source.id,
-                owner_id=source.owner_id,
-                research_space_id=source.research_space_id,
-                name=source.name,
-                description=source.description,
-                source_type=source.source_type.value,
-                status=source.status.value,
-                created_at=source.created_at.isoformat(),
-                updated_at=source.updated_at.isoformat(),
-            )
-        invalid_entity_msg = "Invalid source entity"
-        raise ValueError(invalid_entity_msg)
+        return cls(
+            id=source.id,
+            owner_id=source.owner_id,
+            research_space_id=source.research_space_id,
+            name=source.name,
+            description=source.description,
+            source_type=source.source_type.value,
+            status=source.status.value,
+            created_at=source.created_at.isoformat(),
+            updated_at=source.updated_at.isoformat(),
+        )
 
 
 class DataSourceListResponse(BaseModel):

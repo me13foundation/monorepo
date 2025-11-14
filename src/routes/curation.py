@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
+from datetime import datetime
+from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -31,6 +32,7 @@ from src.infrastructure.dependency_injection.container import (
     get_legacy_dependency_container,
 )
 from src.routes.auth import get_current_active_user
+from src.type_definitions.common import JSONObject
 
 router = APIRouter(prefix="/curation", tags=["curation"])
 
@@ -59,6 +61,17 @@ class CommentRequest(BaseModel):
     entity_id: str
     comment: str
     user: str | None = None
+
+
+class ReviewQueueItemResponse(BaseModel):
+    id: int
+    entity_type: str
+    entity_id: str
+    status: str
+    priority: str
+    quality_score: float | None
+    issues: int
+    last_updated: datetime | None
 
 
 def _review_service() -> ReviewService:
@@ -97,7 +110,7 @@ async def _require_permission(
     await authz_service.require_permission(current_user.id, permission)
 
 
-@router.get("/queue", response_model=list[dict[str, Any]])
+@router.get("/queue", response_model=list[ReviewQueueItemResponse])
 async def list_queue(
     entity_type: str | None = None,
     status: str | None = None,
@@ -107,7 +120,7 @@ async def list_queue(
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_active_user),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
-) -> list[dict[str, Any]]:
+) -> list[ReviewQueueItemResponse]:
     await _require_permission(
         current_user,
         Permission.CURATION_REVIEW,
@@ -124,8 +137,19 @@ async def list_queue(
             offset=offset,
         ),
     )
-    # Minimal JSON response until dedicated API models are defined
-    return [item.to_serializable() for item in results]
+    return [
+        ReviewQueueItemResponse(
+            id=item.id,
+            entity_type=item.entity_type,
+            entity_id=item.entity_id,
+            status=item.status,
+            priority=item.priority,
+            quality_score=item.quality_score,
+            issues=item.issues,
+            last_updated=item.last_updated,
+        )
+        for item in results
+    ]
 
 
 @router.post("/submit", status_code=status.HTTP_201_CREATED)
@@ -217,14 +241,17 @@ async def comment(
     return {"id": comment_id}
 
 
-@router.get("/{entity_type}/{entity_id}", response_model=dict[str, Any])
+@router.get(
+    "/{entity_type}/{entity_id}",
+    response_model=JSONObject,
+)
 async def get_curated_detail(
     entity_type: str,
     entity_id: str,
     service: CurationDetailService = Depends(_curation_detail_service),
     current_user: User = Depends(get_current_active_user),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
-) -> dict[str, Any]:
+) -> JSONObject:
     """
     Retrieve enriched detail payload for a queued entity.
 
@@ -238,7 +265,7 @@ async def get_curated_detail(
     )
     try:
         detail = service.get_detail(entity_type, entity_id)
-        return dict(detail.to_serializable())
+        return cast("JSONObject", detail.to_serializable())
     except ValueError as exc:
         message = str(exc)
         status_code = (

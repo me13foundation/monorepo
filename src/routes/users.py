@@ -4,10 +4,10 @@ User management routes for MED13 Resource Library.
 Provides REST API endpoints for administrative user management operations.
 """
 
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 
 from src.application.dto.auth_requests import AdminUpdateUserRequest, CreateUserRequest
 from src.application.dto.auth_responses import (
@@ -30,6 +30,7 @@ from src.application.services.user_management_service import (
     UserManagementService,
     UserNotFoundError,
 )
+from src.domain.entities.session import UserSession
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.domain.value_objects.permission import Permission
 from src.infrastructure.dependency_injection.container import container
@@ -56,6 +57,13 @@ users_router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
+
+
+class UserSessionsResponse(BaseModel):
+    """Response model for user session listings."""
+
+    sessions: list[UserSession]
+    count: int
 
 
 async def _ensure_permission(
@@ -395,13 +403,15 @@ async def get_user_statistics(
 async def get_user_sessions(
     current_user: User = Depends(get_current_active_user),
     auth_service: AuthenticationService = Depends(container.get_authentication_service),
-) -> dict[str, Any]:
+) -> UserSessionsResponse:
     """
     Get all active sessions for the current user.
     """
     try:
-        sessions = await auth_service.get_user_sessions(current_user.id)
-        return {"sessions": sessions, "count": len(sessions)}
+        sessions: list[UserSession] = await auth_service.get_user_sessions(
+            current_user.id,
+        )
+        return UserSessionsResponse(sessions=sessions, count=len(sessions))
     except Exception as e:
         raise HTTPException(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,

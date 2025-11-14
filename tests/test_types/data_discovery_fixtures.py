@@ -22,7 +22,7 @@ def create_test_source_catalog_entry(
     name: str = "Test Source",
     category: str = "Genomic Variant Databases",
     param_type: str = "gene",
-    **overrides,
+    **overrides: object,
 ) -> SourceCatalogEntry:
     """
     Create a test SourceCatalogEntry with sensible defaults.
@@ -32,7 +32,7 @@ def create_test_source_catalog_entry(
         name: Display name
         category: Category classification
         param_type: Parameter type (gene, term, etc.)
-        **overrides: Any additional field overrides
+        **overrides: Additional field overrides
 
     Returns:
         A properly typed SourceCatalogEntry instance
@@ -72,7 +72,7 @@ def create_test_data_discovery_session(
     owner_id: str | None = None,
     research_space_id: str | None = None,
     name: str = "Test Session",
-    **overrides,
+    **overrides: object,
 ) -> DataDiscoverySession:
     """
     Create a test DataDiscoverySession with sensible defaults.
@@ -82,7 +82,7 @@ def create_test_data_discovery_session(
         owner_id: Owner ID (generated if not provided)
         research_space_id: Research space ID
         name: Session name
-        **overrides: Any additional field overrides
+        **overrides: Additional field overrides
 
     Returns:
         A properly typed DataDiscoverySession instance
@@ -117,7 +117,7 @@ def create_test_query_test_result(
     session_id: str | None = None,
     catalog_entry_id: str = "test-source",
     status: TestResultStatus = TestResultStatus.SUCCESS,
-    **overrides,
+    **overrides: object,
 ) -> QueryTestResult:
     """
     Create a test QueryTestResult with sensible defaults.
@@ -127,7 +127,7 @@ def create_test_query_test_result(
         session_id: Session ID (generated if not provided)
         catalog_entry_id: Catalog entry ID
         status: Test status
-        **overrides: Any additional field overrides
+        **overrides: Additional field overrides
 
     Returns:
         A properly typed QueryTestResult instance

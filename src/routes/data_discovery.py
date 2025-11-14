@@ -6,7 +6,6 @@ query testing, and integration with data sources.
 """
 
 import logging
-from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -42,6 +41,7 @@ from src.infrastructure.repositories.research_space_repository import (
     SqlAlchemyResearchSpaceRepository,
 )
 from src.routes.auth import get_current_active_user
+from src.type_definitions.common import JSONObject
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class AddToSpaceRequest(BaseModel):
 
     catalog_entry_id: str = Field(..., description="Catalog entry ID")
     research_space_id: UUID = Field(..., description="Target research space ID")
-    source_config: dict[str, Any] = Field(
+    source_config: JSONObject = Field(
         default_factory=dict,
         description="Source configuration",
     )
@@ -144,7 +144,7 @@ class QueryTestResultResponse(BaseModel):
     session_id: UUID
     parameters: QueryParametersModel
     status: TestResultStatus
-    response_data: dict[str, Any] | None
+    response_data: JSONObject | None
     response_url: str | None
     error_message: str | None
     execution_time_ms: int | None
