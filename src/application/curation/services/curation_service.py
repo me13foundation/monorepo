@@ -7,9 +7,10 @@ Provides clinical data enrichment for curation workflows.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 
 from src.application.curation.repositories.review_repository import (
     ReviewFilter,
@@ -25,7 +26,10 @@ if TYPE_CHECKING:
     from src.application.services.variant_service import VariantApplicationService
     from src.domain.entities.evidence import Evidence
     from src.domain.entities.variant import Variant
-    from src.type_definitions.common import QueryFilters
+from src.type_definitions.common import FilterValue, JSONObject, QueryFilters
+
+ClinicalFilterValue = FilterValue | list[FilterValue]
+ClinicalFilters = Mapping[str, ClinicalFilterValue]
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +68,7 @@ class CurationService:
         entity_type: str = "variants"
         status: str = "pending"
         priority: str | None = None
-        clinical_filters: dict[str, Any] | None = None
+        clinical_filters: ClinicalFilters | None = None
         limit: int = 50
         offset: int = 0
 
@@ -72,7 +76,7 @@ class CurationService:
         self,
         db: Session,
         query: ReviewQueueQuery | None = None,
-    ) -> tuple[list[dict[str, Any]], int]:
+    ) -> tuple[list[JSONObject], int]:
         """
         Get enriched review queue with clinical data for curation.
 
@@ -118,7 +122,7 @@ class CurationService:
 
         return enriched_items, len(enriched_items)
 
-    def get_variant_clinical_details(self, variant_id: int) -> dict[str, Any] | None:
+    def get_variant_clinical_details(self, variant_id: int) -> JSONObject | None:
         """
         Get comprehensive clinical details for a specific variant.
 
@@ -156,7 +160,7 @@ class CurationService:
         phenotype_ids = list(
             {ev.phenotype_id for ev in evidence_records if ev.phenotype_id is not None},
         )
-        phenotypes: list[dict[str, Any]] = []
+        phenotypes: list[JSONObject] = []
         for phenotype_id in phenotype_ids[:10]:  # Limit to 10 phenotypes
             phenotype_filters: QueryFilters | None = self._build_filter(
                 "id",
@@ -204,56 +208,63 @@ class CurationService:
             if evidence.publication_id
         ]
 
-        return {
-            "id": variant.id,
-            "variant_id": variant.identifier.variant_id,
-            "gene_symbol": (
-                variant.gene_identifier.symbol if variant.gene_identifier else "Unknown"
-            ),
-            "chromosome": variant.chromosome,
-            "position": variant.position,
-            "reference_allele": variant.reference_allele,
-            "alternate_allele": variant.alternate_allele,
-            "clinical_significance": variant.clinical_significance,
-            "hgvs_genomic": variant.hgvs_genomic,
-            "hgvs_cdna": variant.hgvs_cdna,
-            "hgvs_protein": variant.hgvs_protein,
-            "confidence_score": self._calculate_confidence_score(evidence_records),
-            "evidence_count": len(evidence_records),
-            "evidence_levels": list(
-                {ev.evidence_level.value for ev in evidence_records},
-            ),
-            "evidence_records": [
-                {
-                    "id": ev.id,
-                    "evidence_level": ev.evidence_level.value,
-                    "evidence_type": ev.evidence_type,
-                    "description": ev.description,
-                    "confidence": ev.confidence.score if ev.confidence else 0.5,
-                    "variant_id": ev.variant_id,
-                    "phenotype_id": ev.phenotype_id,
-                }
-                for ev in evidence_records
-            ],
-            "phenotypes": phenotypes,
-            "publications": publications,
-            "gnomad_af": variant.gnomad_af,
-            "allele_frequency": variant.allele_frequency,
-            "quality_score": 0.85,  # Placeholder - calculated in validation
-            "issues": 0,  # Placeholder - from validation results
-            "review_status": variant.review_status,
-        }
+        evidence_summaries: list[JSONObject] = [
+            {
+                "id": ev.id,
+                "evidence_level": ev.evidence_level.value,
+                "evidence_type": ev.evidence_type,
+                "description": ev.description,
+                "confidence": ev.confidence.score if ev.confidence else 0.5,
+                "variant_id": ev.variant_id,
+                "phenotype_id": ev.phenotype_id,
+            }
+            for ev in evidence_records
+        ]
+
+        return cast(
+            "JSONObject",
+            {
+                "id": variant.id,
+                "variant_id": variant.identifier.variant_id,
+                "gene_symbol": (
+                    variant.gene_identifier.symbol
+                    if variant.gene_identifier
+                    else "Unknown"
+                ),
+                "chromosome": variant.chromosome,
+                "position": variant.position,
+                "reference_allele": variant.reference_allele,
+                "alternate_allele": variant.alternate_allele,
+                "clinical_significance": variant.clinical_significance,
+                "hgvs_genomic": variant.hgvs_genomic,
+                "hgvs_cdna": variant.hgvs_cdna,
+                "hgvs_protein": variant.hgvs_protein,
+                "confidence_score": self._calculate_confidence_score(evidence_records),
+                "evidence_count": len(evidence_records),
+                "evidence_levels": list(
+                    {ev.evidence_level.value for ev in evidence_records},
+                ),
+                "evidence_records": evidence_summaries,
+                "phenotypes": phenotypes,
+                "publications": publications,
+                "gnomad_af": variant.gnomad_af,
+                "allele_frequency": variant.allele_frequency,
+                "quality_score": 0.85,  # Placeholder - calculated in validation
+                "issues": 0,  # Placeholder - from validation results
+                "review_status": variant.review_status,
+            },
+        )
 
     def _enrich_variant_review(
         self,
         review_record: ReviewRecordLike,
-        clinical_filters: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
+        clinical_filters: ClinicalFilters | None = None,
+    ) -> JSONObject | None:
         """Enrich a variant review record with clinical data."""
         # Get variant details
         raw_entity_id = review_record.get("entity_id")
         entity_identifier: str | int | None
-        if isinstance(raw_entity_id, (str, int)):
+        if isinstance(raw_entity_id, str | int):
             entity_identifier = raw_entity_id
         else:
             entity_identifier = None
@@ -285,7 +296,7 @@ class CurationService:
 
         # Get phenotype summary (simplified)
         phenotype_ids = list({ev.phenotype_id for ev in evidence_records})
-        phenotypes = []
+        phenotypes: list[JSONObject] = []
         for phenotype_id in phenotype_ids[:3]:  # Limit for card display
             phenotype_filters = self._build_filter("id", phenotype_id)
             if phenotype_filters is None:
@@ -308,7 +319,7 @@ class CurationService:
                 )
 
         # Apply clinical filters if provided
-        if clinical_filters and not self._passes_clinical_filters(
+        if clinical_filters is not None and not self._passes_clinical_filters(
             variant,
             evidence_records,
             clinical_filters,
@@ -322,34 +333,39 @@ class CurationService:
             else (str(lu) if lu is not None else None)
         )
 
-        return {
-            "id": review_record.get("id"),
-            "entity_id": review_record.get("entity_id"),
-            "variant_id": variant.identifier.variant_id,
-            "gene_symbol": (
-                variant.gene_identifier.symbol if variant.gene_identifier else "Unknown"
-            ),
-            "chromosome": variant.chromosome,
-            "position": variant.position,
-            "clinical_significance": variant.clinical_significance,
-            "confidence_score": self._calculate_confidence_score(evidence_records),
-            "evidence_count": len(evidence_records),
-            "evidence_levels": evidence_levels,
-            "phenotypes": phenotypes,
-            "gnomad_af": variant.gnomad_af,
-            "allele_frequency": variant.allele_frequency,
-            "quality_score": review_record.get("quality_score") or 0.85,
-            "issues": review_record.get("issues", 0),
-            "status": review_record.get("status", ""),
-            "priority": review_record.get("priority", ""),
-            "last_updated": last_updated_value,
-        }
+        return cast(
+            "JSONObject",
+            {
+                "id": review_record.get("id"),
+                "entity_id": review_record.get("entity_id"),
+                "variant_id": variant.identifier.variant_id,
+                "gene_symbol": (
+                    variant.gene_identifier.symbol
+                    if variant.gene_identifier
+                    else "Unknown"
+                ),
+                "chromosome": variant.chromosome,
+                "position": variant.position,
+                "clinical_significance": variant.clinical_significance,
+                "confidence_score": self._calculate_confidence_score(evidence_records),
+                "evidence_count": len(evidence_records),
+                "evidence_levels": evidence_levels,
+                "phenotypes": phenotypes,
+                "gnomad_af": variant.gnomad_af,
+                "allele_frequency": variant.allele_frequency,
+                "quality_score": review_record.get("quality_score") or 0.85,
+                "issues": review_record.get("issues", 0),
+                "status": review_record.get("status", ""),
+                "priority": review_record.get("priority", ""),
+                "last_updated": last_updated_value,
+            },
+        )
 
     def _enrich_gene_review(
         self,
         review_record: ReviewRecordLike,
-        _clinical_filters: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
+        _clinical_filters: ClinicalFilters | None = None,
+    ) -> JSONObject | None:
         """Enrich a gene review record with clinical data."""
         # Placeholder for gene enrichment - would need gene service
         lu = review_record.get("last_updated")
@@ -359,21 +375,24 @@ class CurationService:
             else (str(lu) if lu is not None else None)
         )
 
-        return {
-            "id": review_record.get("id"),
-            "entity_id": review_record.get("entity_id"),
-            "gene_symbol": f"Gene_{review_record.get('entity_id')}",
-            "quality_score": review_record.get("quality_score") or 0.8,
-            "issues": review_record.get("issues", 0),
-            "status": review_record.get("status", ""),
-            "priority": review_record.get("priority", ""),
-            "last_updated": last_updated_value,
-        }
+        return cast(
+            "JSONObject",
+            {
+                "id": review_record.get("id"),
+                "entity_id": review_record.get("entity_id"),
+                "gene_symbol": f"Gene_{review_record.get('entity_id')}",
+                "quality_score": review_record.get("quality_score") or 0.8,
+                "issues": review_record.get("issues", 0),
+                "status": review_record.get("status", ""),
+                "priority": review_record.get("priority", ""),
+                "last_updated": last_updated_value,
+            },
+        )
 
     def _create_basic_enrichment(
         self,
         review_record: ReviewRecordLike,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """Create basic enrichment for unsupported entity types."""
         lu = review_record.get("last_updated")
         last_updated_value = (
@@ -382,16 +401,19 @@ class CurationService:
             else (str(lu) if lu is not None else None)
         )
 
-        return {
-            "id": review_record.get("id"),
-            "entity_id": review_record.get("entity_id"),
-            "entity_type": review_record.get("entity_type", ""),
-            "quality_score": review_record.get("quality_score") or 0.5,
-            "issues": review_record.get("issues", 0),
-            "status": review_record.get("status", ""),
-            "priority": review_record.get("priority", ""),
-            "last_updated": last_updated_value,
-        }
+        return cast(
+            "JSONObject",
+            {
+                "id": review_record.get("id"),
+                "entity_id": review_record.get("entity_id"),
+                "entity_type": review_record.get("entity_type", ""),
+                "quality_score": review_record.get("quality_score") or 0.5,
+                "issues": review_record.get("issues", 0),
+                "status": review_record.get("status", ""),
+                "priority": review_record.get("priority", ""),
+                "last_updated": last_updated_value,
+            },
+        )
 
     @staticmethod
     def _build_filter(
@@ -400,7 +422,7 @@ class CurationService:
     ) -> QueryFilters | None:
         if value is None:
             return None
-        if isinstance(value, (str, int, float, bool)):
+        if isinstance(value, str | int | float | bool):
             return {key: value}
         return None
 
@@ -433,28 +455,26 @@ class CurationService:
         self,
         variant: Variant,
         evidence_records: list[Evidence],
-        filters: dict[str, Any],
+        filters: ClinicalFilters,
     ) -> bool:
         """Check if variant passes clinical filters."""
         # Clinical significance filter
-        if "clinical_significance" in filters:
-            sig_filter = filters["clinical_significance"]
-            if (
-                isinstance(sig_filter, list)
-                and variant.clinical_significance not in sig_filter
-            ):
+        sig_filter = filters.get("clinical_significance")
+        if isinstance(sig_filter, list):
+            allowed = {str(value) for value in sig_filter}
+            if variant.clinical_significance not in allowed:
                 return False
 
         # Evidence level filter
-        if "evidence_level" in filters:
-            min_level = filters["evidence_level"]
+        min_level_filter = filters.get("evidence_level")
+        if isinstance(min_level_filter, str):
             level_hierarchy = {
                 "limited": 0,
                 "supporting": 1,
                 "strong": 2,
                 "definitive": 3,
             }
-            min_level_value = level_hierarchy.get(min_level, 0)
+            min_level_value = level_hierarchy.get(min_level_filter, 0)
 
             has_required_level = any(
                 level_hierarchy.get(ev.evidence_level.value, 0) >= min_level_value
@@ -464,9 +484,10 @@ class CurationService:
                 return False
 
         # Confidence filter
-        if "confidence" in filters:
+        confidence_filter = filters.get("confidence")
+        if isinstance(confidence_filter, int | float):
             confidence = self._calculate_confidence_score(evidence_records)
-            if confidence < filters["confidence"]:
+            if confidence < float(confidence_filter):
                 return False
 
         return True

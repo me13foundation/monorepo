@@ -1,12 +1,12 @@
 """Application-level orchestration for phenotype use cases."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, cast
 
 from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
 from src.domain.repositories.phenotype_repository import PhenotypeRepository
 from src.domain.value_objects.identifiers import PhenotypeIdentifier
-from src.type_definitions.common import PhenotypeUpdate, QueryFilters
+from src.type_definitions.common import FilterValue, PhenotypeUpdate, QueryFilters
 
 
 @dataclass
@@ -101,7 +101,7 @@ class PhenotypeApplicationService:
         self,
         query: str,
         limit: int = 10,
-        filters: dict[str, Any] | None = None,
+        filters: Mapping[str, FilterValue] | QueryFilters | None = None,
     ) -> list[Phenotype]:
         """Search phenotypes with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -117,7 +117,7 @@ class PhenotypeApplicationService:
         per_page: int,
         sort_by: str,
         sort_order: str,
-        filters: dict[str, Any] | None = None,
+        filters: Mapping[str, FilterValue] | QueryFilters | None = None,
     ) -> tuple[list[Phenotype], int]:
         """Retrieve paginated phenotypes with optional filters."""
         normalized_filters = self._normalize_filters(filters)
@@ -158,11 +158,11 @@ class PhenotypeApplicationService:
 
     @staticmethod
     def _normalize_filters(
-        filters: dict[str, Any] | None,
+        filters: Mapping[str, FilterValue] | QueryFilters | None,
     ) -> QueryFilters | None:
         if filters is None:
             return None
-        return cast("QueryFilters", dict(filters))
+        return dict(filters)
 
 
 __all__ = ["PhenotypeApplicationService", "PhenotypeHierarchy"]
