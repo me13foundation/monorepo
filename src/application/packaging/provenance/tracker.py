@@ -7,10 +7,11 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.models.value_objects.provenance import Provenance
+    from src.type_definitions.common import JSONObject
 
 
 class ProvenanceTracker:
@@ -19,7 +20,7 @@ class ProvenanceTracker:
     @staticmethod
     def serialize_provenance(
         provenance_records: list[Provenance],
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Serialize provenance records to JSON-LD format.
 
@@ -29,10 +30,10 @@ class ProvenanceTracker:
         Returns:
             Serialized provenance dictionary
         """
-        sources: list[dict[str, Any]] = []
+        sources: list[JSONObject] = []
 
         for prov in provenance_records:
-            source_info: dict[str, Any] = {
+            source_info: JSONObject = {
                 "@type": "DataDownload",
                 "name": prov.source.value,
                 "datePublished": (
@@ -83,9 +84,9 @@ class ProvenanceTracker:
 
     @staticmethod
     def enrich_with_provenance(
-        metadata: dict[str, Any],
+        metadata: JSONObject,
         provenance_records: list[Provenance],
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Enrich metadata dictionary with provenance information.
 
@@ -101,16 +102,22 @@ class ProvenanceTracker:
         if "@graph" in metadata:
             graph_entities = metadata.get("@graph")
             if isinstance(graph_entities, list):
+                sources_value = provenance_info.get("sources")
+                if not isinstance(sources_value, list):
+                    return metadata
+
                 for entity in graph_entities:
                     if not isinstance(entity, dict):
                         continue
                     if entity.get("@id") != "./":
                         continue
-                    has_part = entity.setdefault("hasPart", [])
-                    if isinstance(has_part, list):
-                        has_part.extend(provenance_info["sources"])
+                    has_part_value = entity.get("hasPart")
+                    if isinstance(has_part_value, list):
+                        has_part_list = has_part_value
                     else:
-                        entity["hasPart"] = list(provenance_info["sources"])
+                        has_part_list = []
+                        entity["hasPart"] = has_part_list
+                    has_part_list.extend(sources_value)
                     break
 
         return metadata

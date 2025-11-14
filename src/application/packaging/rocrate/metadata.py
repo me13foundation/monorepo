@@ -5,12 +5,13 @@ Metadata generation utilities for RO-Crate packages.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from src.models.value_objects.provenance import Provenance
+    from src.type_definitions.common import JSONObject
 
 
 class MetadataGenerator:
@@ -19,7 +20,7 @@ class MetadataGenerator:
     @staticmethod
     def generate_provenance_metadata(
         provenance_records: list[Provenance],
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Generate provenance metadata from provenance records.
 
@@ -29,9 +30,9 @@ class MetadataGenerator:
         Returns:
             Provenance metadata dictionary
         """
-        sources: list[dict[str, Any]] = []
+        sources: list[JSONObject] = []
         for prov in provenance_records:
-            source_info: dict[str, Any] = {
+            source_info: JSONObject = {
                 "@type": "DataDownload",
                 "name": prov.source.value,
                 "url": prov.source_url or "",
@@ -53,7 +54,7 @@ class MetadataGenerator:
         return {"sources": sources}
 
     @staticmethod
-    def generate_license_metadata(license_id: str) -> dict[str, Any]:
+    def generate_license_metadata(license_id: str) -> JSONObject:
         """
         Generate license metadata.
 
@@ -84,7 +85,7 @@ class MetadataGenerator:
         file_path: Path,
         description: str | None = None,
         mime_type: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Generate metadata for a file.
 
@@ -96,7 +97,7 @@ class MetadataGenerator:
         Returns:
             File metadata dictionary
         """
-        metadata = {
+        metadata: JSONObject = {
             "@id": str(file_path),
             "@type": "File",
             "name": file_path.name,
@@ -131,7 +132,7 @@ class MetadataGenerator:
         license_id: str,
         author: str,
         keywords: list[str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Generate root dataset metadata.
 

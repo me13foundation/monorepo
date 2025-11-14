@@ -6,13 +6,17 @@ Provides cross-entity search capabilities with relevance scoring and filtering.
 
 import logging
 from enum import Enum
-from typing import Any, cast
+from typing import cast
 
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.variant_service import VariantApplicationService
-from src.type_definitions.common import QueryFilters
+from src.domain.entities.evidence import Evidence
+from src.domain.entities.gene import Gene
+from src.domain.entities.phenotype import Phenotype
+from src.domain.entities.variant import Variant
+from src.type_definitions.common import JSONObject, QueryFilters
 
 
 class SearchEntity(str, Enum):
@@ -47,16 +51,20 @@ class SearchResult:
         title: str,
         description: str,
         relevance_score: float,
-        metadata: dict[str, Any] | None = None,
+        metadata: JSONObject | None = None,
     ):
         self.entity_type = entity_type
         self.entity_id = entity_id
         self.title = title
         self.description = description
         self.relevance_score = relevance_score
-        self.metadata = metadata or {}
+        if metadata is not None:
+            metadata_payload: JSONObject = dict(metadata)
+        else:
+            metadata_payload = cast("JSONObject", {})
+        self.metadata = metadata_payload
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> JSONObject:
         """Convert to dictionary for API response."""
         return {
             "entity_type": self.entity_type.value,
@@ -102,7 +110,7 @@ class UnifiedSearchService:
         entity_types: list[SearchEntity] | None = None,
         limit: int = 20,
         filters: QueryFilters | None = None,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Perform unified search across specified entities.
 
@@ -172,7 +180,7 @@ class UnifiedSearchService:
         self,
         query: str,
         limit: int,
-        _filters: dict[str, Any] | None,
+        _filters: QueryFilters | None,
     ) -> list[SearchResult]:
         """Search genes and convert to search results."""
         try:
@@ -338,7 +346,7 @@ class UnifiedSearchService:
 
         return results
 
-    def _calculate_gene_relevance(self, query: str, gene: Any) -> float:
+    def _calculate_gene_relevance(self, query: str, gene: Gene) -> float:
         """Calculate relevance score for gene search result."""
         query_lower = query.lower()
         score = 0.0
@@ -365,7 +373,7 @@ class UnifiedSearchService:
 
         return min(score, 1.0)  # Cap at 1.0
 
-    def _calculate_variant_relevance(self, query: str, variant: Any) -> float:
+    def _calculate_variant_relevance(self, query: str, variant: Variant) -> float:
         """Calculate relevance score for variant search result."""
         query_lower = query.lower()
         score = 0.0
@@ -390,7 +398,7 @@ class UnifiedSearchService:
 
         return min(score, 1.0)
 
-    def _calculate_phenotype_relevance(self, query: str, phenotype: Any) -> float:
+    def _calculate_phenotype_relevance(self, query: str, phenotype: Phenotype) -> float:
         """Calculate relevance score for phenotype search result."""
         query_lower = query.lower()
         score = 0.0
@@ -423,7 +431,7 @@ class UnifiedSearchService:
 
         return min(score, 1.0)
 
-    def _calculate_evidence_relevance(self, query: str, evidence: Any) -> float:
+    def _calculate_evidence_relevance(self, query: str, evidence: Evidence) -> float:
         """Calculate relevance score for evidence search result."""
         query_lower = query.lower()
         score = 0.0

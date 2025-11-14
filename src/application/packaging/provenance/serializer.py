@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from src.models.value_objects.provenance import Provenance
+    from src.type_definitions.common import JSONObject, JSONValue
 
 
 @dataclass
@@ -20,7 +21,7 @@ class ProvenanceSerializer:
     """Serializer for converting provenance data to JSON-LD."""
 
     @staticmethod
-    def get_jsonld_context() -> dict[str, Any]:
+    def get_jsonld_context() -> JSONObject:
         """Get the JSON-LD context for provenance metadata."""
         return {
             "@context": {
@@ -52,13 +53,13 @@ class ProvenanceSerializer:
             },
         }
 
-    def serialize_provenance(self, provenance: Provenance) -> dict[str, Any]:
+    def serialize_provenance(self, provenance: Provenance) -> JSONObject:
         """Serialize a single provenance record to JSON-LD."""
         context = self.get_jsonld_context()
         source_name = provenance.source.value
 
         entity_id = f"urn:med13:dataset:{source_name}"
-        dataset_node: dict[str, Any] = {
+        dataset_node: JSONObject = {
             "@id": entity_id,
             "@type": "prov:Entity",
             "title": f"MED13 Dataset from {source_name}",
@@ -74,28 +75,29 @@ class ProvenanceSerializer:
         if provenance.metadata:
             dataset_node["prov:qualifiedAttribution"] = provenance.metadata
 
-        jsonld_data: dict[str, Any] = {**context, "@graph": [dataset_node]}
+        jsonld_data: JSONObject = {**context, "@graph": [dataset_node]}
+        graph_nodes = cast("list[JSONObject]", jsonld_data["@graph"])
 
         # Add acquisition activity node
         activity_id = f"urn:med13:activity:acquisition:{source_name}"
-        acquisition_activity: dict[str, Any] = {
+        acquisition_activity: JSONObject = {
             "@id": activity_id,
             "@type": "prov:Activity",
             "prov:label": f"Data acquisition from {source_name}",
             "startedAtTime": provenance.acquired_at.isoformat(),
             "endedAtTime": provenance.acquired_at.isoformat(),
         }
-        jsonld_data["@graph"].append(acquisition_activity)
+        graph_nodes.append(acquisition_activity)
         dataset_node["wasGeneratedBy"] = {"@id": activity_id}
 
         # Add agent (acquired_by)
         agent_id = f"urn:med13:agent:{provenance.acquired_by}"
-        agent_node = {
+        agent_node: JSONObject = {
             "@id": agent_id,
             "@type": "prov:Agent",
             "foaf:name": provenance.acquired_by,
         }
-        jsonld_data["@graph"].append(agent_node)
+        graph_nodes.append(agent_node)
         acquisition_activity["wasAttributedTo"] = {"@id": agent_id}
 
         # Add processing steps as chained activities
@@ -103,7 +105,7 @@ class ProvenanceSerializer:
             step_activity_id = (
                 f"urn:med13:activity:processing:{source_name}:{step_index}"
             )
-            step_activity: dict[str, Any] = {
+            step_activity: JSONObject = {
                 "@id": step_activity_id,
                 "@type": "prov:Activity",
                 "prov:label": f"Processing step: {step}",
@@ -118,17 +120,17 @@ class ProvenanceSerializer:
                 )
                 step_activity["prov:used"] = {"@id": prev_step_entity_id}
 
-            jsonld_data["@graph"].append(step_activity)
+            graph_nodes.append(step_activity)
 
             output_entity_id = f"urn:med13:entity:processed:{source_name}:{step_index}"
-            output_entity: dict[str, Any] = {
+            output_entity: JSONObject = {
                 "@id": output_entity_id,
                 "@type": "prov:Entity",
                 "prov:label": f"Dataset after {step}",
                 "wasDerivedFrom": {"@id": entity_id},
                 "wasGeneratedBy": {"@id": step_activity_id},
             }
-            jsonld_data["@graph"].append(output_entity)
+            graph_nodes.append(output_entity)
 
         if provenance.quality_score is not None:
             dataset_node["qualityScore"] = provenance.quality_score
@@ -139,25 +141,27 @@ class ProvenanceSerializer:
     def serialize_provenance_chain(
         self,
         provenance_records: list[Provenance],
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """Serialize multiple provenance records as a chain."""
         context = self.get_jsonld_context()
 
-        graph = []
+        graph: list[JSONObject] = []
         for provenance in provenance_records:
             serialized = self.serialize_provenance(provenance)
             # Merge graphs, avoiding duplicates
-            for node in serialized["@graph"]:
-                if node not in graph:
-                    graph.append(node)
+            serialized_graph = serialized.get("@graph", [])
+            if isinstance(serialized_graph, list):
+                for node in serialized_graph:
+                    if node not in graph:
+                        graph.append(node)
 
         return {**context, "@graph": graph}
 
-    def to_json(self, data: dict[str, Any], indent: int | None = 2) -> str:
+    def to_json(self, data: JSONObject, indent: int | None = 2) -> str:
         """Convert JSON-LD data to JSON string."""
         return json.dumps(data, indent=indent, ensure_ascii=False)
 
-    def validate_jsonld(self, jsonld_data: dict[str, Any]) -> list[str]:
+    def validate_jsonld(self, jsonld_data: JSONObject) -> list[str]:
         """Validate JSON-LD structure and content."""
         issues = []
 
@@ -198,37 +202,46 @@ class FAIRMetadataSerializer:
 
     def create_fair_metadata_bundle(
         self,
-        dataset_metadata: dict[str, Any],
+        dataset_metadata: JSONObject,
         provenance: Provenance,
-        license_info: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        license_info: JSONObject | None = None,
+    ) -> JSONObject:
         """Create a complete FAIR metadata bundle."""
-        context = {
-            "@context": {
-                **self.provenance_serializer.get_jsonld_context()["@context"],
+        base_context = self.provenance_serializer.get_jsonld_context().get("@context")
+        combined_context: dict[str, JSONValue]
+        if isinstance(base_context, dict):
+            combined_context = cast("dict[str, JSONValue]", dict(base_context))
+        else:
+            combined_context = {}
+        combined_context.update(
+            {
                 "fair": "https://www.go-fair.org/fair-principles/",
                 "license": "dct:license",
                 "accessRights": "dct:accessRights",
                 "conformsTo": "dct:conformsTo",
             },
-        }
+        )
+        context: JSONObject = {"@context": combined_context}
 
         # Combine all metadata
-        graph_nodes: list[dict[str, Any]] = [
-            {
-                "@id": "urn:med13:dataset:main",
-                "@type": ["prov:Entity", "dct:Dataset"],
-                **dataset_metadata,
-                "conformsTo": [
-                    {"@id": "fair:findable"},
-                    {"@id": "fair:accessible"},
-                    {"@id": "fair:interoperable"},
-                    {"@id": "fair:reusable"},
-                ],
-            },
-        ]
+        dataset_node: JSONObject = {
+            "@id": "urn:med13:dataset:main",
+            "@type": ["prov:Entity", "dct:Dataset"],
+            "conformsTo": [
+                {"@id": "fair:findable"},
+                {"@id": "fair:accessible"},
+                {"@id": "fair:interoperable"},
+                {"@id": "fair:reusable"},
+            ],
+        }
+        dataset_node.update(dataset_metadata)
 
-        bundle = {**context, "@graph": graph_nodes}
+        graph_nodes: list[JSONObject] = [dataset_node]
+
+        bundle: JSONObject = {
+            "@context": context["@context"],
+            "@graph": graph_nodes,
+        }
 
         # Add license information
         if license_info:

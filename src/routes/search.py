@@ -4,7 +4,7 @@ Unified Search API routes for MED13 Resource Library.
 Provides cross-entity search capabilities with relevance scoring.
 """
 
-from typing import cast
+from typing import TypedDict, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -22,6 +22,26 @@ from src.infrastructure.dependency_injection.container import (
 from src.type_definitions.common import JSONObject
 
 router = APIRouter(prefix="/search", tags=["search"])
+
+
+class RawSearchResult(TypedDict):
+    """Raw search result payload from the service."""
+
+    entity_type: str
+    entity_id: int | str
+    title: str
+    description: str
+    relevance_score: float
+    metadata: JSONObject
+
+
+class UnifiedSearchPayload(TypedDict, total=False):
+    """Typed representation of the unified search payload."""
+
+    query: str
+    total_results: int
+    entity_breakdown: dict[str, int]
+    results: list[RawSearchResult]
 
 
 class SearchResultItem(BaseModel):
@@ -95,6 +115,12 @@ async def unified_search(
             limit=limit,
         )
 
+        payload = cast("UnifiedSearchPayload", raw)
+        raw_results = payload.get("results")
+        results_payload: list[RawSearchResult] = (
+            raw_results if isinstance(raw_results, list) else []
+        )
+
         result_items = [
             SearchResultItem(
                 entity_type=SearchResultType(item["entity_type"]),
@@ -102,15 +128,27 @@ async def unified_search(
                 title=item["title"],
                 description=item["description"],
                 relevance_score=float(item["relevance_score"]),
-                metadata=cast("JSONObject", item.get("metadata", {})),
+                metadata=item["metadata"],
             )
-            for item in raw.get("results", [])
+            for item in results_payload
         ]
 
+        query_value = payload.get("query")
+        if not isinstance(query_value, str):
+            query_value = query
+
+        total_results_value = payload.get("total_results")
+        if not isinstance(total_results_value, int):
+            total_results_value = len(result_items)
+
+        breakdown_value = payload.get("entity_breakdown")
+        if not isinstance(breakdown_value, dict):
+            breakdown_value = {}
+
         return UnifiedSearchResponse(
-            query=raw.get("query", query),
-            total_results=raw.get("total_results", len(result_items)),
-            entity_breakdown=raw.get("entity_breakdown", {}),
+            query=query_value,
+            total_results=total_results_value,
+            entity_breakdown=breakdown_value,
             results=result_items,
         )
     except Exception as e:

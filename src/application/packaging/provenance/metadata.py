@@ -9,16 +9,31 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
-
-if TYPE_CHECKING:
-    from src.type_definitions.common import JSONObject, JSONValue
-else:  # pragma: no cover - runtime fallback for type checking only import
-    JSONObject = dict[str, Any]
-    JSONValue = object
+from typing import TYPE_CHECKING, TypedDict, Unpack, cast
 
 if TYPE_CHECKING:
     from src.models.value_objects.provenance import Provenance
+    from src.type_definitions.common import JSONObject, JSONValue
+
+
+class DatasetMetadataOptions(TypedDict, total=False):
+    """Optional keyword arguments accepted by DatasetMetadata."""
+
+    contributors: list[JSONObject]
+    keywords: list[str]
+    date_created: datetime | None
+    date_modified: datetime | None
+    date_published: datetime | None
+    temporal_coverage: JSONObject | None
+    spatial_coverage: JSONObject | None
+    license_url: str | None
+    rights_statement: str | None
+    access_rights: str
+    conforms_to: list[str]
+    encoding_format: str | None
+    compression_format: str | None
+    byte_size: int | None
+    provenance: Provenance | None
 
 
 @dataclass
@@ -158,8 +173,8 @@ class MetadataEnricher:
         self,
         title: str,
         description: str,
-        creators: list[dict[str, Any]],
-        **kwargs: Any,
+        creators: list[JSONObject],
+        **kwargs: Unpack[DatasetMetadataOptions],
     ) -> DatasetMetadata:
         """Create base metadata with standard FAIR fields."""
         metadata = DatasetMetadata(
@@ -211,4 +226,4 @@ class MetadataEnricher:
         return issues
 
 
-__all__ = ["DatasetMetadata", "MetadataEnricher"]
+__all__ = ["DatasetMetadata", "DatasetMetadataOptions", "MetadataEnricher"]

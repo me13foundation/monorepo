@@ -8,15 +8,16 @@ import csv
 import gzip
 import json
 from collections.abc import Callable, Generator, Sequence
+from datetime import datetime
 from enum import Enum
 from io import StringIO
-from typing import Any, cast
+from typing import TypeVar, cast
 
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.variant_service import VariantApplicationService
-from src.type_definitions.common import QueryFilters
+from src.type_definitions.common import JSONObject, JSONValue, QueryFilters
 
 
 class ExportFormat(str, Enum):
@@ -33,6 +34,9 @@ class CompressionFormat(str, Enum):
 
     NONE = "none"
     GZIP = "gzip"
+
+
+EntityItem = TypeVar("EntityItem")
 
 
 class BulkExportService:
@@ -245,12 +249,15 @@ class BulkExportService:
 
     def _export_as_json(
         self,
-        items: list[Any],
+        items: list[EntityItem],
         compression: CompressionFormat,
         entity_type: str,
     ) -> Generator[str | bytes, None, None]:
         """Export data as JSON format."""
-        data = {entity_type: [self._serialize_item(item) for item in items]}
+        serialized_items = [self._serialize_item(item) for item in items]
+        data: JSONObject = {
+            entity_type: cast("JSONValue", serialized_items),
+        }
 
         json_str = json.dumps(data, indent=2, default=str)
 
@@ -261,7 +268,7 @@ class BulkExportService:
 
     def _export_as_jsonl(
         self,
-        items: list[Any],
+        items: list[EntityItem],
         compression: CompressionFormat,
     ) -> Generator[str | bytes, None, None]:
         """Export data as JSON Lines format (one JSON object per line)."""
@@ -277,7 +284,7 @@ class BulkExportService:
 
     def _export_as_csv(
         self,
-        items: list[Any],
+        items: list[EntityItem],
         export_format: ExportFormat,
         compression: CompressionFormat,
         field_names: list[str],
@@ -305,12 +312,12 @@ class BulkExportService:
 
     def _collect_paginated(
         self,
-        fetch_page: Callable[[int, int], tuple[list[Any], int]],
+        fetch_page: Callable[[int, int], tuple[list[EntityItem], int]],
         chunk_size: int,
-    ) -> list[Any]:
+    ) -> list[EntityItem]:
         """Collect paginated records using the provided fetch callable."""
         page = 1
-        results: list[Any] = []
+        results: list[EntityItem] = []
         batch_size = max(chunk_size, 1)
 
         while True:
@@ -324,8 +331,11 @@ class BulkExportService:
 
         return results
 
-    def _serialize_item(self, item: Any) -> Any:
+    def _serialize_item(self, item: object) -> JSONValue:
         """Serialize an entity item to a dictionary."""
+        if isinstance(item, datetime):
+            return item.isoformat()
+
         if self._is_namedtuple(item):
             return self._serialize_namedtuple(item)
 
@@ -338,42 +348,41 @@ class BulkExportService:
         if isinstance(item, (list, tuple)):
             return self._serialize_sequence(item)
 
-        return item
+        return cast("JSONValue", item)
 
     @staticmethod
-    def _is_namedtuple(candidate: Any) -> bool:
+    def _is_namedtuple(candidate: object) -> bool:
         """Determine if a value behaves like a NamedTuple."""
         return hasattr(candidate, "_fields") and all(
             isinstance(field, str) for field in getattr(candidate, "_fields", [])
         )
 
-    def _serialize_namedtuple(self, item: Any) -> dict[str, Any]:
+    def _serialize_namedtuple(self, item: object) -> JSONObject:
         """Serialize a NamedTuple into a dictionary."""
         fields = cast("Sequence[str]", getattr(item, "_fields", ()))
         return {field: self._serialize_item(getattr(item, field)) for field in fields}
 
-    def _serialize_object(self, item: Any) -> dict[str, Any]:
+    def _serialize_object(self, item: object) -> JSONObject:
         """Serialize a regular object, excluding private attributes."""
-        result: dict[str, Any] = {}
+        result: JSONObject = {}
         for key, value in vars(item).items():
             if key.startswith("_"):
                 continue
             result[key] = self._serialize_item(value)
         return result
 
-    def _serialize_sequence(self, items: Sequence[Any]) -> list[Any]:
+    def _serialize_sequence(self, items: Sequence[object]) -> list[JSONValue]:
         """Serialize a list or tuple of items."""
         return [self._serialize_item(value) for value in items]
 
-    def _item_to_csv_row(self, item: Any, field_names: list[str]) -> dict[str, Any]:
+    def _item_to_csv_row(self, item: object, field_names: list[str]) -> dict[str, str]:
         """Convert an item to a CSV row dictionary."""
         serialized_raw = self._serialize_item(item)
-        serialized = (
-            serialized_raw
-            if isinstance(serialized_raw, dict)
-            else {"value": serialized_raw}
-        )
-        row = {}
+        if isinstance(serialized_raw, dict):
+            serialized: JSONObject = serialized_raw
+        else:
+            serialized = {"value": serialized_raw}
+        row: dict[str, str] = {}
 
         for field in field_names:
             value = serialized.get(field, "")
@@ -396,13 +405,13 @@ class BulkExportService:
         return row
 
     @staticmethod
-    def _resolve_nested_value(source: Any, path: Sequence[str]) -> Any:
-        current: Any = source
+    def _resolve_nested_value(source: JSONValue, path: Sequence[str]) -> JSONValue:
+        current: JSONValue = source
         for part in path:
             if isinstance(current, dict):
                 current = current.get(part, "")
             elif hasattr(current, part):
-                current = getattr(current, part, "")
+                current = cast("JSONValue", getattr(current, part, ""))
             else:
                 return ""
         return current
@@ -495,7 +504,7 @@ class BulkExportService:
             return {}
         return cast("QueryFilters", dict(filters))
 
-    def get_export_info(self, entity_type: str) -> dict[str, Any]:
+    def get_export_info(self, entity_type: str) -> JSONObject:
         """
         Get information about available export formats and entity counts.
 

@@ -2,18 +2,24 @@
 License validation utilities.
 """
 
-from pathlib import Path
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
 
 import yaml  # type: ignore[import-untyped]
 
 from .manager import LicenseCompatibility, LicenseManager
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from src.type_definitions.common import JSONObject
+
 
 class LicenseValidator:
     """Validate license compliance for packages."""
 
-    def __init__(self, package_license: str = "CC-BY-4.0"):
+    def __init__(self, package_license: str = "CC-BY-4.0") -> None:
         """
         Initialize validator.
 
@@ -22,7 +28,7 @@ class LicenseValidator:
         """
         self.package_license = package_license
 
-    def validate_sources(self, source_licenses: list[dict[str, Any]]) -> dict[str, Any]:
+    def validate_sources(self, source_licenses: list[JSONObject]) -> JSONObject:
         """
         Validate source licenses against package license.
 
@@ -32,12 +38,20 @@ class LicenseValidator:
         Returns:
             Validation result dictionary
         """
-        issues = []
-        warnings = []
+        issues: list[str] = []
+        warnings: list[str] = []
 
         for source_info in source_licenses:
-            source_license = source_info.get("license", "unknown")
-            source_name = source_info.get("source", "unknown")
+            source_license_value = source_info.get("license", "unknown")
+            source_name_value = source_info.get("source", "unknown")
+            source_license = (
+                str(source_license_value)
+                if source_license_value is not None
+                else "unknown"
+            )
+            source_name = (
+                str(source_name_value) if source_name_value is not None else "unknown"
+            )
 
             compatibility = LicenseManager.check_compatibility(
                 source_license,
@@ -46,20 +60,19 @@ class LicenseValidator:
 
             if compatibility == LicenseCompatibility.MISSING:
                 warnings.append(f"Missing license for source: {source_name}")
-
             elif compatibility == LicenseCompatibility.INCOMPATIBLE:
                 issues.append(
                     f"Incompatible license '{source_license}' "
                     f"from source '{source_name}'",
                 )
 
-        return {
-            "valid": len(issues) == 0,
-            "issues": issues,
-            "warnings": warnings,
-        }
+        return self._format_result(
+            is_valid=len(issues) == 0,
+            issues=issues,
+            warnings=warnings,
+        )
 
-    def validate_manifest(self, manifest_path: Path) -> dict[str, Any]:
+    def validate_manifest(self, manifest_path: Path) -> JSONObject:
         """
         Validate license manifest file.
 
@@ -70,36 +83,63 @@ class LicenseValidator:
             Validation result dictionary
         """
         if not manifest_path.exists():
-            return {
-                "valid": False,
-                "issues": ["License manifest file not found"],
-                "warnings": [],
-            }
+            return self._format_result(
+                is_valid=False,
+                issues=["License manifest file not found"],
+            )
 
         try:
             with manifest_path.open(encoding="utf-8") as f:
-                manifest = yaml.safe_load(f)
+                manifest_raw = yaml.safe_load(f)
 
-            if "package_license" not in manifest:
-                return {
-                    "valid": False,
-                    "issues": ["Missing package_license in manifest"],
-                    "warnings": [],
-                }
+            if not isinstance(manifest_raw, dict):
+                return self._format_result(
+                    is_valid=False,
+                    issues=["Manifest must be a mapping"],
+                )
 
-            if "sources" not in manifest:
-                return {
-                    "valid": False,
-                    "issues": ["Missing sources in manifest"],
-                    "warnings": [],
-                }
+            issues: list[str] = []
 
-            # Validate sources
-            return self.validate_sources(manifest["sources"])
+            package_license_value = manifest_raw.get("package_license")
+            if not isinstance(package_license_value, str):
+                issues.append("Missing package_license in manifest")
+
+            sources_value = manifest_raw.get("sources")
+            sources: list[JSONObject] | None = None
+            if not isinstance(sources_value, list):
+                issues.append("Missing sources in manifest")
+            elif not all(isinstance(source, dict) for source in sources_value):
+                issues.append("All sources must be JSON objects")
+            else:
+                sources = cast("list[JSONObject]", sources_value)
+
+            if issues:
+                return self._format_result(is_valid=False, issues=issues)
+
+            if sources is None:
+                return self._format_result(
+                    is_valid=False,
+                    issues=["Sources could not be parsed"],
+                )
+
+            return self.validate_sources(sources)
 
         except (OSError, ValueError, yaml.YAMLError) as exc:
-            return {
-                "valid": False,
-                "issues": [f"Error reading manifest: {exc}"],
-                "warnings": [],
-            }
+            return self._format_result(
+                is_valid=False,
+                issues=[f"Error reading manifest: {exc}"],
+            )
+
+    @staticmethod
+    def _format_result(
+        *,
+        is_valid: bool,
+        issues: list[str],
+        warnings: list[str] | None = None,
+    ) -> JSONObject:
+        """Create a standardized validation result."""
+        return {
+            "valid": is_valid,
+            "issues": issues,
+            "warnings": warnings or [],
+        }

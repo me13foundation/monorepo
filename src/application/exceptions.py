@@ -4,9 +4,9 @@ Custom exceptions for MED13 Resource Library authentication system.
 Provides structured error handling with appropriate HTTP status codes.
 """
 
-from typing import Any
-
 from fastapi import HTTPException, status
+
+from src.type_definitions.common import JSONObject
 
 
 class AuthenticationException(HTTPException):
@@ -167,7 +167,7 @@ class EmailVerificationException(ValidationException):
 def create_error_response(
     exc: Exception,
     _status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
-) -> dict[str, Any]:
+) -> JSONObject:
     """
     Create standardized error response.
 
@@ -178,7 +178,7 @@ def create_error_response(
     Returns:
         Standardized error response dictionary
     """
-    error_response = {
+    error_response: JSONObject = {
         "error": "Internal server error",
         "detail": "An unexpected error occurred",
         "code": "INTERNAL_ERROR",

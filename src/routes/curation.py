@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import cast
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -266,7 +265,7 @@ async def get_curated_detail(
     )
     try:
         detail = service.get_detail(entity_type, entity_id)
-        return cast("JSONObject", detail.to_serializable())
+        return detail.to_serializable()
     except ValueError as exc:
         message = str(exc)
         status_code = (

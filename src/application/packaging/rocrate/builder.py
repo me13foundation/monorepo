@@ -10,7 +10,7 @@ import shutil
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 from src.type_definitions.common import JSONObject, JSONValue
 from src.type_definitions.json_utils import list_of_objects
@@ -34,7 +34,7 @@ class ROCrateBuilder:
         version: str = "1.0.0",
         license_id: str | None = None,
         author: str | None = None,
-        **legacy_kwargs: Any,
+        **legacy_kwargs: str | None,
     ):
         """
         Initialize RO-Crate builder.
@@ -276,7 +276,7 @@ class ROCrateBuilder:
 
         return self.base_path
 
-    def validate(self) -> dict[str, Any]:
+    def validate(self) -> JSONObject:
         """
         Validate RO-Crate structure and metadata.
 
