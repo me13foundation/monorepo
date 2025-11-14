@@ -282,7 +282,7 @@ class TransformationPipeline:
 
         metrics = {
             "pipeline_config": self.get_pipeline_status()["config"],
-            "transformer_metrics": self.transformer._get_metrics_summary(),
+            "transformer_metrics": self.transformer.metrics_tracker.summary(),
             "execution_history": [
                 {
                     "stage": result.stage.value,
