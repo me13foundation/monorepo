@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from .catalog import catalog_router
+from .catalog import router as catalog_router
 from .data_sources import router as data_sources_router
 from .stats import stats_router
 from .templates import router as templates_router
