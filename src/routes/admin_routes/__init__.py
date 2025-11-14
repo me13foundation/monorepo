@@ -1,0 +1,29 @@
+"""
+Admin API router aggregation.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+
+from .catalog import catalog_router
+from .data_sources import data_sources_router
+from .stats import stats_router
+from .templates import templates_router
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    responses={
+        401: {"description": "Unauthorized - Invalid or missing authentication"},
+        403: {"description": "Forbidden - Insufficient permissions"},
+        500: {"description": "Internal Server Error"},
+    },
+)
+
+router.include_router(templates_router)
+router.include_router(data_sources_router)
+router.include_router(catalog_router)
+router.include_router(stats_router)
+
+__all__ = ["router"]
