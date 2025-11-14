@@ -6,7 +6,7 @@ Contains types for domain entities, value objects, and domain operations.
 
 import abc
 from datetime import datetime
-from typing import Any, Protocol, TypedDict, TypeVar
+from typing import Protocol, TypedDict, TypeVar
 
 from .common import EntityStatus, JSONObject, JSONValue, PriorityLevel, ValidationResult
 
@@ -17,6 +17,16 @@ T_contra = TypeVar(
     contravariant=True,
 )  # Generic entity type (contravariant for protocols)
 ID = TypeVar("ID")  # Generic ID type
+
+
+class DomainEntity(Protocol):
+    """Protocol for domain entities with an identifier."""
+
+    id: str | int | None
+
+    def model_dump(self) -> JSONObject:  # pragma: no cover - structure only
+        """Return a JSON-serializable representation of the entity."""
+        ...
 
 
 # Domain entity identifiers
@@ -32,7 +42,7 @@ class DomainOperationResult(TypedDict, total=False):
     """Result of a domain operation."""
 
     success: bool
-    entity: Any | None  # Keep Any for now - would need Protocol for proper typing
+    entity: DomainEntity | None
     errors: list[str]
     warnings: list[str]
     validation_result: ValidationResult

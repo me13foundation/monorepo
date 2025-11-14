@@ -5,9 +5,9 @@ Contains types for API endpoints, request/response schemas,
 and external API integrations.
 """
 
-from typing import Any, TypedDict
+from typing import TypedDict
 
-from .common import PaginatedResponse
+from .common import JSONObject, PaginatedResponse
 
 
 # Request types
@@ -177,7 +177,7 @@ class APIError(TypedDict):
 
     error: str
     message: str
-    details: dict[str, Any] | None
+    details: JSONObject | None
     code: str
 
 
@@ -193,7 +193,7 @@ class BulkUpdateRequest(TypedDict):
     """Bulk update request."""
 
     ids: list[str]
-    updates: dict[str, Any]  # Will be replaced with specific types per entity
+    updates: JSONObject  # Will be replaced with specific types per entity
 
 
 class BulkOperationResponse(TypedDict):
@@ -211,7 +211,7 @@ class SearchRequest(TypedDict, total=False):
 
     q: str
     entity_type: str
-    filters: dict[str, Any]
+    filters: JSONObject
     sort_by: str
     sort_order: str
     page: int
