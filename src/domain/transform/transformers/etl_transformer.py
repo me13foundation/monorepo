@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Protocol, TypeVar, cast
+from typing import Protocol, TypeVar, cast
 
 from src.type_definitions.common import RawRecord  # noqa: TC001
 
@@ -37,6 +37,8 @@ from ..parsers.clinvar_parser import ClinVarParser, ClinVarVariant
 from ..parsers.hpo_parser import HPOParser, HPOTerm
 from ..parsers.pubmed_parser import PubMedParser, PubMedPublication
 from ..parsers.uniprot_parser import UniProtParser, UniProtProtein
+
+StageData = dict[str, object]
 
 ParsedRecord = TypeVar("ParsedRecord")
 NormalizedRecord = TypeVar("NormalizedRecord", covariant=True)
@@ -71,9 +73,9 @@ class ParsedDataBundle:
     pubmed: list[PubMedPublication] = field(default_factory=list)
     hpo: list[HPOTerm] = field(default_factory=list)
     uniprot: list[UniProtProtein] = field(default_factory=list)
-    extras: dict[str, list[Any]] = field(default_factory=dict)
+    extras: dict[str, list[object]] = field(default_factory=dict)
 
-    def add(self, source: str, records: list[Any]) -> None:
+    def add(self, source: str, records: list[object]) -> None:
         """Persist parsed records under the appropriate collection."""
         if source == "clinvar":
             self.clinvar = cast("list[ClinVarVariant]", records)
@@ -96,9 +98,9 @@ class ParsedDataBundle:
             + sum(len(values) for values in self.extras.values())
         )
 
-    def as_dict(self) -> dict[str, list[Any]]:
+    def as_dict(self) -> StageData:
         """Expose parsed data as plain dictionaries for reporting."""
-        payload: dict[str, list[Any]] = {
+        payload: StageData = {
             "clinvar": list(self.clinvar),
             "pubmed": list(self.pubmed),
             "hpo": list(self.hpo),
@@ -126,7 +128,7 @@ class NormalizedDataBundle:
             + len(self.publications)
         )
 
-    def as_dict(self) -> dict[str, list[Any]]:
+    def as_dict(self) -> StageData:
         return {
             "genes": list(self.genes),
             "variants": list(self.variants),
@@ -145,7 +147,7 @@ class MappedDataBundle:
     gene_variant_mapper: GeneVariantMapper | None = None
     variant_phenotype_mapper: VariantPhenotypeMapper | None = None
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> StageData:
         return {
             "gene_variant_links": [asdict(link) for link in self.gene_variant_links],
             "variant_phenotype_links": [
@@ -173,7 +175,7 @@ class ValidationSummary:
         self.failed += 1
         self.errors.extend(messages)
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> StageData:
         return {
             "passed": self.passed,
             "failed": self.failed,
@@ -188,7 +190,7 @@ class ExportReport:
     files_created: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> StageData:
         return {
             "files_created": list(self.files_created),
             "errors": list(self.errors),
@@ -223,7 +225,7 @@ class TransformationResult:
     status: TransformationStatus
     records_processed: int
     records_failed: int
-    data: dict[str, Any]
+    data: StageData
     errors: list[str]
     duration_seconds: float
     timestamp: float
@@ -239,7 +241,7 @@ class ETLTransformationMetrics:
     mapped_relationships: int
     validation_errors: int
     processing_time_seconds: float
-    stage_metrics: dict[str, dict[str, Any]]
+    stage_metrics: dict[str, StageData]
 
 
 class ETLTransformer:
@@ -254,11 +256,11 @@ class ETLTransformer:
         self.output_dir = output_dir or Path("data/transformed")
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        self.parsers: dict[str, BatchParser[Any]] = {
-            "clinvar": cast("BatchParser[Any]", ClinVarParser()),
-            "pubmed": cast("BatchParser[Any]", PubMedParser()),
-            "hpo": cast("BatchParser[Any]", HPOParser()),
-            "uniprot": cast("BatchParser[Any]", UniProtParser()),
+        self.parsers: dict[str, BatchParser[object]] = {
+            "clinvar": cast("BatchParser[object]", ClinVarParser()),
+            "pubmed": cast("BatchParser[object]", PubMedParser()),
+            "hpo": cast("BatchParser[object]", HPOParser()),
+            "uniprot": cast("BatchParser[object]", UniProtParser()),
         }
 
         self.gene_normalizer = GeneNormalizer()
@@ -281,7 +283,7 @@ class ETLTransformer:
         self,
         raw_data: dict[str, list[RawRecord]],
         validate: bool = True,
-    ) -> dict[str, Any]:
+    ) -> StageData:
         """
         Transform data from all sources through the complete ETL pipeline.
 
@@ -293,7 +295,7 @@ class ETLTransformer:
             Dictionary with transformed data, metadata, and metrics.
         """
         start_time = time.time()
-        results: dict[str, Any] = {}
+        results: dict[str, object] = {}
         all_errors: list[str] = []
 
         parsed_data = await self._parse_all_sources(raw_data)
@@ -385,17 +387,19 @@ class ETLTransformer:
         return parsed_data
 
     @staticmethod
-    def _stage_to_dict(stage_result: Any) -> dict[str, Any]:
+    def _stage_to_dict(stage_result: object) -> StageData:
         if hasattr(stage_result, "as_dict"):
-            return cast("dict[str, Any]", stage_result.as_dict())
+            dictionary = stage_result.as_dict()
+            if isinstance(dictionary, dict):
+                return dict(dictionary)
         if isinstance(stage_result, dict):
-            return stage_result
+            return dict(stage_result)
         if hasattr(stage_result, "__dict__"):
-            return dict(cast("dict[str, Any]", stage_result.__dict__))
+            return dict(stage_result.__dict__)
         return {}
 
     @staticmethod
-    def _stage_errors(stage_result: Any) -> list[str]:
+    def _stage_errors(stage_result: object) -> list[str]:
         if hasattr(stage_result, "errors"):
             errors = stage_result.errors
             if isinstance(errors, list):
@@ -407,29 +411,37 @@ class ETLTransformer:
         return []
 
     @staticmethod
-    def _safe_total_records(stage: Any) -> int:
+    def _safe_total_records(stage: object) -> int:
         if hasattr(stage, "total_records"):
             try:
                 return int(stage.total_records())
             except Exception:
                 return 0
         if isinstance(stage, dict):
-            return sum(len(v) for v in stage.values() if isinstance(v, list))
+            total = 0
+            for value in stage.values():
+                if isinstance(value, list):
+                    total += len(value)
+            return total
         return 0
 
     @staticmethod
-    def _safe_relationship_count(stage: Any) -> int:
+    def _safe_relationship_count(stage: object) -> int:
         if hasattr(stage, "relationship_count"):
             try:
                 return int(stage.relationship_count())
             except Exception:
                 return 0
         if isinstance(stage, dict):
-            return sum(len(v) for v in stage.values() if isinstance(v, list))
+            total = 0
+            for value in stage.values():
+                if isinstance(value, list):
+                    total += len(value)
+            return total
         return 0
 
     @staticmethod
-    def _safe_validation_failures(validation: Any | None) -> int:
+    def _safe_validation_failures(validation: object | None) -> int:
         if validation is None:
             return 0
         if hasattr(validation, "failed"):
@@ -441,11 +453,11 @@ class ETLTransformer:
             failed = validation.get("failed", 0)
             try:
                 return int(failed)
-            except Exception:
+            except (TypeError, ValueError):
                 return 0
         return 0
 
-    def _normalize_all_entities(
+    def _normalize_all_entities(  # noqa: PLR0915
         self,
         parsed_data: ParsedDataBundle,
     ) -> NormalizedDataBundle:
@@ -547,7 +559,7 @@ class ETLTransformer:
                     )
 
         for term in parsed_data.hpo:
-            hpo_record: dict[str, Any] = {
+            hpo_record: RawRecord = {
                 "hpo_id": term.hpo_id,
                 "name": term.name,
                 "definition": term.definition,
@@ -569,12 +581,17 @@ class ETLTransformer:
                 for author in publication.authors
                 if author.last_name
             ]
-            pub_record: dict[str, Any] = {
+            publication_date = (
+                publication.publication_date.isoformat()
+                if publication.publication_date
+                else None
+            )
+            pub_record: RawRecord = {
                 "pubmed_id": publication.pubmed_id,
                 "title": publication.title,
                 "authors": authors,
                 "journal": (publication.journal.title if publication.journal else None),
-                "publication_date": publication.publication_date,
+                "publication_date": publication_date,
                 "doi": publication.doi,
                 "pmc_id": publication.pmc_id,
             }
@@ -592,7 +609,7 @@ class ETLTransformer:
         for protein in parsed_data.uniprot:
             for reference in protein.references:
                 normalized_publication = self.publication_normalizer.normalize(
-                    {"citation": asdict(reference)},
+                    cast("RawRecord", {"citation": asdict(reference)}),
                     source="uniprot",
                 )
                 if normalized_publication:
@@ -756,7 +773,7 @@ class ETLTransformer:
 
         try:
             for entity_type, entities in normalized_data.as_dict().items():
-                if not entities:
+                if not isinstance(entities, list) or not entities:
                     continue
                 filename = f"{entity_type}_normalized.json"
                 filepath = self.output_dir / filename
@@ -823,10 +840,17 @@ class ETLTransformer:
         self.metrics.mapped_relationships = self._safe_relationship_count(mapped)
         self.metrics.validation_errors = self._safe_validation_failures(validation)
         self.metrics.stage_metrics = {
-            stage: result.__dict__ for stage, result in self.results.items()
+            stage: {
+                "status": result.status.value,
+                "records_processed": result.records_processed,
+                "records_failed": result.records_failed,
+                "errors": list(result.errors),
+                "duration_seconds": result.duration_seconds,
+            }
+            for stage, result in self.results.items()
         }
 
-    def _get_metrics_summary(self) -> dict[str, Any]:
+    def _get_metrics_summary(self) -> StageData:
         """Get a summary of transformation metrics."""
         return {
             "total_input_records": self.metrics.total_input_records,
@@ -840,20 +864,21 @@ class ETLTransformer:
             },
         }
 
-    def get_transformation_status(self) -> dict[str, Any]:
+    def get_transformation_status(self) -> StageData:
         """
         Get the current status of the transformation pipeline.
 
         Returns:
             Dictionary with stage status and metrics summary.
         """
+        last_updated = max(
+            (result.timestamp for result in self.results.values()),
+            default=None,
+        )
         return {
             "stages": {k: v.status.value for k, v in self.results.items()},
             "metrics": self._get_metrics_summary(),
-            "last_updated": max(
-                (result.timestamp for result in self.results.values()),
-                default=None,
-            ),
+            "last_updated": last_updated,
         }
 
 

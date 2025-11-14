@@ -7,12 +7,18 @@ significance, gene associations, and phenotype information.
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict
 
 import defusedxml.ElementTree as ET
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from xml.etree.ElementTree import Element as XMLElement  # nosec B405
+else:  # pragma: no cover - runtime typing helper
+    from xml.etree.ElementTree import Element as _StdlibXMLElement  # nosec B405
+
+    XMLElement = _StdlibXMLElement
+
+from src.type_definitions.common import RawRecord
 
 
 class ClinicalSignificance(Enum):
@@ -39,6 +45,33 @@ class VariantType(Enum):
     COPY_NUMBER_VARIATION = "copy number variation"
     STRUCTURAL_VARIANT = "structural variant"
     OTHER = "other"
+
+
+class VariantInfo(TypedDict, total=False):
+    variant_id: str
+    variation_name: str
+    variant_type: VariantType
+    last_updated: str
+
+
+class GeneInfo(TypedDict, total=False):
+    gene_symbol: str | None
+    gene_id: str | None
+    gene_name: str | None
+
+
+class LocationInfo(TypedDict, total=False):
+    chromosome: str | None
+    start_position: int | None
+    end_position: int | None
+    reference_allele: str | None
+    alternate_allele: str | None
+
+
+class ClinicalInfo(TypedDict, total=False):
+    clinical_significance: ClinicalSignificance
+    phenotypes: list[str]
+    review_status: str | None
 
 
 @dataclass
@@ -83,7 +116,7 @@ class ClinVarParser:
     def __init__(self) -> None:
         self.namespaces = {"clinvar": "https://www.ncbi.nlm.nih.gov/clinvar/variation"}
 
-    def parse_raw_data(self, raw_data: dict[str, Any]) -> ClinVarVariant | None:
+    def parse_raw_data(self, raw_data: RawRecord) -> ClinVarVariant | None:
         """
         Parse raw ClinVar data into structured variant record.
 
@@ -94,14 +127,16 @@ class ClinVarParser:
             Structured ClinVarVariant object or None if parsing fails
         """
         try:
-            clinvar_id = raw_data.get("clinvar_id")
-            raw_xml = raw_data.get("raw_xml")
+            clinvar_id_value = raw_data.get("clinvar_id")
+            raw_xml_value = raw_data.get("raw_xml")
 
-            if not clinvar_id or not raw_xml:
+            if not isinstance(clinvar_id_value, str):
+                return None
+            if not isinstance(raw_xml_value, str):
                 return None
 
             # Parse XML
-            root = ET.fromstring(raw_xml)
+            root = ET.fromstring(raw_xml_value)
 
             # Extract basic variant information
             variant_info = self._extract_variant_info(root)
@@ -110,7 +145,7 @@ class ClinVarParser:
             clinical_info = self._extract_clinical_info(root)
 
             return ClinVarVariant(
-                clinvar_id=clinvar_id,
+                clinvar_id=clinvar_id_value,
                 variant_id=variant_info.get("variant_id", ""),
                 variation_name=variant_info.get("variation_name", ""),
                 variant_type=variant_info.get("variant_type", VariantType.OTHER),
@@ -129,7 +164,7 @@ class ClinVarParser:
                 phenotypes=clinical_info.get("phenotypes", []),
                 review_status=clinical_info.get("review_status"),
                 last_updated=variant_info.get("last_updated"),
-                raw_xml=raw_xml,
+                raw_xml=raw_xml_value,
             )
 
         except Exception as e:
@@ -137,7 +172,7 @@ class ClinVarParser:
             print(f"Error parsing ClinVar record {raw_data.get('clinvar_id')}: {e}")
             return None
 
-    def parse_batch(self, raw_data_list: list[dict[str, Any]]) -> list[ClinVarVariant]:
+    def parse_batch(self, raw_data_list: list[RawRecord]) -> list[ClinVarVariant]:
         """
         Parse multiple ClinVar records.
 
@@ -155,9 +190,9 @@ class ClinVarParser:
 
         return parsed_variants
 
-    def _extract_variant_info(self, root: "XMLElement") -> dict[str, Any]:
+    def _extract_variant_info(self, root: XMLElement) -> VariantInfo:
         """Extract basic variant information from XML."""
-        info: dict[str, Any] = {}
+        info: VariantInfo = {}
 
         # Find VariationArchive element
         variation_archive = root.find(".//VariationArchive")
@@ -171,9 +206,9 @@ class ClinVarParser:
 
         return info
 
-    def _extract_gene_info(self, root: "XMLElement") -> dict[str, Any]:
+    def _extract_gene_info(self, root: XMLElement) -> GeneInfo:
         """Extract gene information from XML."""
-        info: dict[str, Any] = {}
+        info: GeneInfo = {}
 
         # Find Gene element
         gene = root.find(".//Gene")
@@ -184,9 +219,9 @@ class ClinVarParser:
 
         return info
 
-    def _extract_location_info(self, root: "XMLElement") -> dict[str, Any]:
+    def _extract_location_info(self, root: XMLElement) -> LocationInfo:
         """Extract genomic location information from XML."""
-        info: dict[str, Any] = {}
+        info: LocationInfo = {}
 
         # Find SequenceLocation element (GRCh38 preferred)
         sequence_locations = root.findall(".//SequenceLocation")
@@ -195,8 +230,8 @@ class ClinVarParser:
             if assembly == "GRCh38":  # Prefer GRCh38 assembly
                 info["chromosome"] = location.get("Chr")
                 try:
-                    info["start_position"] = int(location.get("start", 0))
-                    info["end_position"] = int(location.get("stop", 0))
+                    info["start_position"] = int(location.get("start", "0"))
+                    info["end_position"] = int(location.get("stop", "0"))
                 except (ValueError, TypeError):
                     pass
                 info["reference_allele"] = location.get("referenceAlleleVCF")
@@ -205,9 +240,9 @@ class ClinVarParser:
 
         return info
 
-    def _extract_clinical_info(self, root: "XMLElement") -> dict[str, Any]:
+    def _extract_clinical_info(self, root: XMLElement) -> ClinicalInfo:
         """Extract clinical information from XML."""
-        info: dict[str, Any] = {"phenotypes": []}
+        info: ClinicalInfo = {"phenotypes": []}
 
         # Find ClinicalSignificance element
         clinical_sig = root.find(".//ClinicalSignificance")

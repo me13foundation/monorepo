@@ -7,12 +7,18 @@ metadata, abstracts, authors, and citation information.
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import defusedxml.ElementTree as ET
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from xml.etree.ElementTree import Element as XMLElement  # nosec B405
+else:  # pragma: no cover - runtime typing helper
+    from xml.etree.ElementTree import Element as _StdlibXMLElement  # nosec B405
+
+    XMLElement = _StdlibXMLElement
+
+from src.type_definitions.common import RawRecord
 
 
 @dataclass
@@ -77,7 +83,7 @@ class PubMedParser:
     def __init__(self) -> None:
         self.namespaces = {"pubmed": "http://www.ncbi.nlm.nih.gov/pubmed"}
 
-    def parse_raw_data(self, raw_data: dict[str, Any]) -> PubMedPublication | None:
+    def parse_raw_data(self, raw_data: RawRecord) -> PubMedPublication | None:
         """
         Parse raw PubMed data into structured publication record.
 
@@ -88,14 +94,16 @@ class PubMedParser:
             Structured PubMedPublication object or None if parsing fails
         """
         try:
-            pubmed_id = raw_data.get("pubmed_id")
-            raw_xml = raw_data.get("raw_xml")
+            pubmed_id_value = raw_data.get("pubmed_id")
+            raw_xml_value = raw_data.get("raw_xml")
 
-            if not pubmed_id or not raw_xml:
+            if not isinstance(pubmed_id_value, str):
+                return None
+            if not isinstance(raw_xml_value, str):
                 return None
 
             # Parse XML
-            root = ET.fromstring(raw_xml)
+            root = ET.fromstring(raw_xml_value)
 
             # Extract publication information
             title = self._extract_title(root)
@@ -111,7 +119,7 @@ class PubMedParser:
             country = self._extract_country(root)
 
             return PubMedPublication(
-                pubmed_id=pubmed_id,
+                pubmed_id=pubmed_id_value,
                 title=title,
                 abstract=abstract,
                 authors=authors,
@@ -123,7 +131,7 @@ class PubMedParser:
                 pmc_id=pmc_id,
                 language=language,
                 country=country,
-                raw_xml=raw_xml,
+                raw_xml=raw_xml_value,
             )
 
         except Exception as e:
@@ -133,7 +141,7 @@ class PubMedParser:
 
     def parse_batch(
         self,
-        raw_data_list: list[dict[str, Any]],
+        raw_data_list: list[RawRecord],
     ) -> list[PubMedPublication]:
         """
         Parse multiple PubMed records.
@@ -152,7 +160,7 @@ class PubMedParser:
 
         return parsed_publications
 
-    def _extract_title(self, root: "XMLElement") -> str:
+    def _extract_title(self, root: XMLElement) -> str:
         """Extract article title from XML."""
         # Try different title element locations
         for path in (".//ArticleTitle", ".//Title", ".//BookTitle"):
@@ -164,7 +172,7 @@ class PubMedParser:
 
         return "Unknown Title"
 
-    def _extract_abstract(self, root: "XMLElement") -> str | None:
+    def _extract_abstract(self, root: XMLElement) -> str | None:
         """Extract abstract text from XML."""
         abstract_elem = root.find(".//Abstract")
         if abstract_elem is not None:
@@ -187,7 +195,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_authors(self, root: "XMLElement") -> list[PubMedAuthor]:
+    def _extract_authors(self, root: XMLElement) -> list[PubMedAuthor]:
         """Extract author information from XML."""
         authors = []
 
@@ -204,7 +212,7 @@ class PubMedParser:
 
         return authors
 
-    def _extract_author_affiliation(self, author_elem: "XMLElement") -> str | None:
+    def _extract_author_affiliation(self, author_elem: XMLElement) -> str | None:
         """Extract author affiliation information."""
         # Try different affiliation element locations
         affiliation_elem = author_elem.find(".//Affiliation") or author_elem.find(
@@ -216,7 +224,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_journal(self, root: "XMLElement") -> PubMedJournal | None:
+    def _extract_journal(self, root: XMLElement) -> PubMedJournal | None:
         """Extract journal information from XML."""
         journal_elem = root.find(".//Journal")
         if journal_elem is not None:
@@ -234,7 +242,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_publication_date(self, root: "XMLElement") -> datetime | None:
+    def _extract_publication_date(self, root: XMLElement) -> datetime | None:
         """Extract publication date from XML."""
         # Try different date element locations
         date_elem = (
@@ -260,7 +268,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_publication_types(self, root: "XMLElement") -> list[str]:
+    def _extract_publication_types(self, root: XMLElement) -> list[str]:
         """Extract publication types from XML."""
         pub_types = []
 
@@ -272,7 +280,7 @@ class PubMedParser:
 
         return pub_types
 
-    def _extract_keywords(self, root: "XMLElement") -> list[str]:
+    def _extract_keywords(self, root: XMLElement) -> list[str]:
         """Extract keywords from XML."""
         keywords = []
 
@@ -293,7 +301,7 @@ class PubMedParser:
 
         return keywords
 
-    def _extract_doi(self, root: "XMLElement") -> str | None:
+    def _extract_doi(self, root: XMLElement) -> str | None:
         """Extract DOI from XML."""
         # Look for DOI in article ID list
         article_id_list = root.find(".//ArticleIdList")
@@ -304,7 +312,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_pmc_id(self, root: "XMLElement") -> str | None:
+    def _extract_pmc_id(self, root: XMLElement) -> str | None:
         """Extract PMC ID from XML."""
         # Look for PMC ID in article ID list
         article_id_list = root.find(".//ArticleIdList")
@@ -315,14 +323,14 @@ class PubMedParser:
 
         return None
 
-    def _extract_language(self, root: "XMLElement") -> str | None:
+    def _extract_language(self, root: XMLElement) -> str | None:
         """Extract publication language from XML."""
         lang_elem = root.find(".//Language")
         if lang_elem is not None and lang_elem.text:
             return lang_elem.text.strip()
         return None
 
-    def _extract_country(self, root: "XMLElement") -> str | None:
+    def _extract_country(self, root: XMLElement) -> str | None:
         """Extract country from XML."""
         # Try different country element locations
         country_elem = root.find(".//Country") or root.find(
@@ -334,7 +342,7 @@ class PubMedParser:
 
         return None
 
-    def _extract_text(self, element: Any | None) -> str | None:
+    def _extract_text(self, element: XMLElement | None) -> str | None:
         """Safely extract text from an XML element."""
         if element is not None and getattr(element, "text", None):
             text = element.text
