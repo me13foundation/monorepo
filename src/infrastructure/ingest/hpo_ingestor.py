@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import gzip
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 from urllib.parse import urlparse
 
 from defusedxml import ElementTree
@@ -16,6 +16,8 @@ from .base_ingestor import BaseIngestor
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from xml.etree.ElementTree import Element  # nosec B405
+
+    from src.type_definitions.common import JSONObject, JSONValue, RawRecord
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,7 @@ class HPOIngestor(BaseIngestor):
             timeout_seconds=120,  # Large file downloads
         )
 
-    async def fetch_data(self, **kwargs: Any) -> list[dict[str, Any]]:
+    async def fetch_data(self, **kwargs: JSONValue) -> list[RawRecord]:
         """
         Fetch HPO ontology data.
 
@@ -62,7 +64,7 @@ class HPOIngestor(BaseIngestor):
 
         # For now, return sample HPO terms since full parsing is complex
         # TODO: Implement full OBO parsing
-        phenotype_records = [
+        phenotype_records: list[RawRecord] = [
             {
                 "hpo_id": "HP:0000118",
                 "name": "Phenotypic abnormality",
@@ -92,7 +94,7 @@ class HPOIngestor(BaseIngestor):
 
         return phenotype_records
 
-    async def _get_latest_release(self) -> dict[str, Any] | None:
+    async def _get_latest_release(self) -> JSONObject | None:
         """
         Get information about the latest HPO release.
 
@@ -106,15 +108,19 @@ class HPOIngestor(BaseIngestor):
                 "latest",
                 headers={"Accept": "application/vnd.github.v3+json"},
             )
-            release_data = response.json()
+            release_data = cast("JSONObject", response.json())
 
             # Find ontology file in assets
             ontology_url = None
-            for asset in release_data.get("assets", []):
-                filename = asset.get("name", "")
-                if filename.endswith((".owl", ".obo")):
-                    ontology_url = asset.get("browser_download_url")
-                    break
+            assets = release_data.get("assets", [])
+            if isinstance(assets, list):
+                for asset in assets:
+                    if not isinstance(asset, dict):
+                        continue
+                    filename = str(asset.get("name", ""))
+                    if filename.endswith((".owl", ".obo")):
+                        ontology_url = asset.get("browser_download_url")
+                        break
 
             # Fallback to direct download if no assets found
             if not ontology_url:
@@ -169,7 +175,7 @@ class HPOIngestor(BaseIngestor):
         else:
             return content
 
-    def _parse_hpo_ontology(self, ontology_content: str) -> list[dict[str, Any]]:
+    def _parse_hpo_ontology(self, ontology_content: str) -> list[RawRecord]:
         """
         Parse HPO ontology content into structured records.
 
@@ -179,7 +185,7 @@ class HPOIngestor(BaseIngestor):
         Returns:
             List of parsed phenotype records
         """
-        phenotypes: list[dict[str, Any]] = []
+        phenotypes: list[RawRecord] = []
 
         try:
             # Determine file format and parse accordingly
@@ -211,7 +217,7 @@ class HPOIngestor(BaseIngestor):
 
         return phenotypes
 
-    def _parse_obo_format(self, content: str) -> list[dict[str, Any]]:
+    def _parse_obo_format(self, content: str) -> list[RawRecord]:
         """
         Parse OBO (Open Biological Ontologies) format.
 
@@ -221,7 +227,7 @@ class HPOIngestor(BaseIngestor):
         Returns:
             List of phenotype records
         """
-        phenotypes: list[dict[str, Any]] = []
+        phenotypes: list[RawRecord] = []
         current_term: dict[str, str | list[str]] = {}
         in_term = False
 
@@ -263,7 +269,7 @@ class HPOIngestor(BaseIngestor):
     def _normalize_obo_term(
         self,
         term: dict[str, str | list[str]],
-    ) -> dict[str, Any]:
+    ) -> RawRecord:
         """
         Normalize OBO term data into consistent structure.
 
@@ -303,7 +309,7 @@ class HPOIngestor(BaseIngestor):
             "format": "obo",
         }
 
-    def _parse_owl_format(self, content: str) -> list[dict[str, Any]]:
+    def _parse_owl_format(self, content: str) -> list[RawRecord]:
         """
         Parse OWL/XML format (simplified implementation).
 
@@ -316,7 +322,7 @@ class HPOIngestor(BaseIngestor):
         # Simplified OWL parsing - in production would use proper OWL library
         # This is a basic implementation that extracts basic information
 
-        phenotypes: list[dict[str, Any]] = []
+        phenotypes: list[RawRecord] = []
         try:
             # Very basic XML parsing for OWL format
             # In production, would use libraries like owlready2 or rdflib
@@ -342,7 +348,7 @@ class HPOIngestor(BaseIngestor):
 
         return phenotypes
 
-    def _parse_owl_class(self, class_elem: Element) -> dict[str, Any] | None:
+    def _parse_owl_class(self, class_elem: Element) -> RawRecord | None:
         """Parse individual OWL class element."""
         # Simplified OWL class parsing
         # In production would be much more comprehensive
@@ -375,7 +381,7 @@ class HPOIngestor(BaseIngestor):
 
         return None
 
-    def _parse_simple_format(self, content: str) -> list[dict[str, Any]]:
+    def _parse_simple_format(self, content: str) -> list[RawRecord]:
         """
         Fallback parser for unrecognized formats.
 
@@ -398,8 +404,8 @@ class HPOIngestor(BaseIngestor):
 
     def _filter_med13_relevant_terms(
         self,
-        phenotypes: list[dict[str, Any]],
-    ) -> list[dict[str, Any]]:
+        phenotypes: list[RawRecord],
+    ) -> list[RawRecord]:
         """
         Filter phenotypes for MED13 relevance.
 
@@ -423,7 +429,7 @@ class HPOIngestor(BaseIngestor):
             "kidney anomaly",
         ]
 
-        relevant_terms: list[dict[str, Any]] = []
+        relevant_terms: list[RawRecord] = []
         for phenotype in phenotypes:
             name_raw = phenotype.get("name", "")
             name = (
@@ -456,7 +462,7 @@ class HPOIngestor(BaseIngestor):
     async def fetch_phenotype_hierarchy(
         self,
         root_term: str = "HP:0000118",
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Fetch phenotype hierarchy starting from a root term.
 
@@ -473,11 +479,11 @@ class HPOIngestor(BaseIngestor):
         # Build hierarchy
         return self._build_phenotype_hierarchy(all_phenotypes, root_term)
 
-    def _build_phenotype_hierarchy(
+    def _build_phenotype_hierarchy(  # noqa: C901
         self,
-        phenotypes: list[dict[str, Any]],
+        phenotypes: list[RawRecord],
         root_id: str,
-    ) -> dict[str, Any]:
+    ) -> JSONObject:
         """
         Build hierarchical structure from flat phenotype list.
 
@@ -489,11 +495,15 @@ class HPOIngestor(BaseIngestor):
             Hierarchical structure
         """
         # Create lookup by ID
-        phenotype_dict: dict[str, dict[str, Any]] = {p["hpo_id"]: p for p in phenotypes}
+        phenotype_dict: dict[str, RawRecord] = {}
+        for phenotype in phenotypes:
+            hpo_id = phenotype.get("hpo_id")
+            if isinstance(hpo_id, str):
+                phenotype_dict[hpo_id] = phenotype
 
         # Build parent-child relationships
 
-        def build_subtree(term_id: str, visited: set[str]) -> dict[str, Any]:
+        def build_subtree(term_id: str, visited: set[str]) -> JSONObject:
             """Recursively build subtree."""
             if term_id in visited:
                 return {"error": "Circular reference", "hpo_id": term_id}
@@ -505,15 +515,22 @@ class HPOIngestor(BaseIngestor):
                 return {"error": "Term not found", "hpo_id": term_id}
 
             # Get children (terms that have this as parent)
-            children: list[dict[str, Any]] = []
+            children: list[JSONObject] = []
             for pid, pterm in phenotype_dict.items():
-                if pid != term_id:
-                    parents = pterm.get("parents", [])
-                    if isinstance(parents, str):
-                        parents = [parents]
+                if pid == term_id:
+                    continue
+                parents_raw = pterm.get("parents", [])
+                if isinstance(parents_raw, str):
+                    parents = [parents_raw]
+                elif isinstance(parents_raw, list):
+                    parents = [
+                        parent for parent in parents_raw if isinstance(parent, str)
+                    ]
+                else:
+                    parents = []
 
-                    if term_id in parents:
-                        children.append(build_subtree(pid, visited.copy()))
+                if term_id in parents:
+                    children.append(build_subtree(pid, visited.copy()))
 
             return {
                 "hpo_id": term_id,
@@ -529,8 +546,8 @@ class HPOIngestor(BaseIngestor):
     async def search_phenotypes(
         self,
         query: str,
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        **kwargs: JSONValue,
+    ) -> list[RawRecord]:
         """
         Search phenotypes by name or definition.
 
@@ -544,11 +561,21 @@ class HPOIngestor(BaseIngestor):
         all_phenotypes = await self.fetch_data(**kwargs)
 
         query_lower = query.lower()
-        matches: list[dict[str, Any]] = []
+        matches: list[RawRecord] = []
 
         for phenotype in all_phenotypes:
-            name = phenotype.get("name", "").lower()
-            definition = phenotype.get("definition", "").lower()
+            name_value = phenotype.get("name", "")
+            name = (
+                name_value.lower()
+                if isinstance(name_value, str)
+                else str(name_value).lower()
+            )
+            definition_value = phenotype.get("definition", "")
+            definition = (
+                definition_value.lower()
+                if isinstance(definition_value, str)
+                else str(definition_value).lower()
+            )
 
             if query_lower in name or query_lower in definition:
                 phenotype["search_score"] = (
@@ -561,5 +588,9 @@ class HPOIngestor(BaseIngestor):
                 matches.append(phenotype)
 
         # Sort by relevance score
-        matches.sort(key=lambda x: x.get("search_score", 0), reverse=True)
+        def _match_score(value: RawRecord) -> int:
+            score_value = value.get("search_score")
+            return int(score_value) if isinstance(score_value, (int, float)) else 0
+
+        matches.sort(key=_match_score, reverse=True)
         return matches

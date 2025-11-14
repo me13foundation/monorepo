@@ -10,9 +10,9 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
 
 from src.models.value_objects import DataSource, Provenance
+from src.type_definitions.common import JSONObject, JSONValue
 
 from .base_ingestor import (
     BaseIngestor,
@@ -42,7 +42,7 @@ class IngestionTask:
 
     source: str
     ingestor_class: Callable[[], BaseIngestor]
-    parameters: dict[str, Any]
+    parameters: dict[str, JSONValue]
     priority: int = 1  # Lower number = higher priority
 
 
@@ -92,7 +92,7 @@ class IngestionCoordinator:
     async def coordinate_ingestion(
         self,
         tasks: list[IngestionTask],
-        **global_params: Any,
+        **global_params: JSONValue,
     ) -> CoordinatorResult:
         """
         Coordinate ingestion across multiple data sources.
@@ -109,7 +109,7 @@ class IngestionCoordinator:
         # Update phase
         self._update_progress("all", IngestionPhase.INITIALIZING, 0.0)
 
-        global_params_dict: dict[str, Any] = dict(global_params)
+        global_params_dict: dict[str, JSONValue] = dict(global_params)
 
         try:
             # Sort tasks by priority
@@ -151,7 +151,7 @@ class IngestionCoordinator:
     async def _execute_parallel(
         self,
         tasks: list[IngestionTask],
-        global_params: dict[str, Any],
+        global_params: dict[str, JSONValue],
     ) -> list[IngestionResult]:
         """
         Execute ingestion tasks in parallel with concurrency control.
@@ -190,7 +190,7 @@ class IngestionCoordinator:
     async def _execute_sequential(
         self,
         tasks: list[IngestionTask],
-        global_params: dict[str, Any],
+        global_params: dict[str, JSONValue],
     ) -> list[IngestionResult]:
         """
         Execute ingestion tasks sequentially.
@@ -217,7 +217,7 @@ class IngestionCoordinator:
     async def _execute_single_task(
         self,
         task: IngestionTask,
-        global_params: dict[str, Any],
+        global_params: dict[str, JSONValue],
     ) -> IngestionResult:
         """
         Execute a single ingestion task.
@@ -233,7 +233,7 @@ class IngestionCoordinator:
             self.logger.info("Starting ingestion from %s", task.source)
 
             # Merge task parameters with global parameters
-            task_params: dict[str, Any] = {**global_params, **task.parameters}
+            task_params: dict[str, JSONValue] = {**global_params, **task.parameters}
 
             # Create and execute ingestor
             ingestor_instance: BaseIngestor = task.ingestor_class()
@@ -332,7 +332,7 @@ class IngestionCoordinator:
     async def ingest_all_sources(
         self,
         gene_symbol: str = "MED13",
-        **global_params: Any,
+        **global_params: JSONValue,
     ) -> CoordinatorResult:
         """
         Convenience method to ingest from all available sources.
@@ -376,7 +376,7 @@ class IngestionCoordinator:
     async def ingest_critical_sources_only(
         self,
         gene_symbol: str = "MED13",
-        **global_params: Any,
+        **global_params: JSONValue,
     ) -> CoordinatorResult:
         """
         Ingest only critical sources (ClinVar and UniProt) for faster execution.
@@ -405,7 +405,7 @@ class IngestionCoordinator:
 
         return await self.coordinate_ingestion(tasks, **global_params)
 
-    def get_ingestion_summary(self, result: CoordinatorResult) -> dict[str, Any]:
+    def get_ingestion_summary(self, result: CoordinatorResult) -> JSONObject:
         """
         Generate a summary of ingestion results.
 
@@ -415,7 +415,7 @@ class IngestionCoordinator:
         Returns:
             Summary dictionary
         """
-        source_details: dict[str, dict[str, Any]] = {}
+        source_details: dict[str, JSONObject] = {}
 
         for source, source_result in result.source_results.items():
             source_details[source] = {
@@ -437,7 +437,7 @@ class IngestionCoordinator:
             else 0
         )
 
-        summary: dict[str, Any] = {
+        summary: JSONObject = {
             "total_sources": result.total_sources,
             "completed_sources": result.completed_sources,
             "failed_sources": result.failed_sources,
@@ -454,7 +454,7 @@ class IngestionCoordinator:
     async def retry_failed_sources(
         self,
         previous_result: CoordinatorResult,
-        **retry_params: Any,
+        **retry_params: JSONValue,
     ) -> CoordinatorResult:
         """
         Retry ingestion for failed sources.

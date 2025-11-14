@@ -7,12 +7,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, cast
 
 from src.infrastructure.ingest.base_ingestor import BaseIngestor
 from src.infrastructure.validation.api_response_validator import (
     APIResponseValidator,
 )
+
+if TYPE_CHECKING:
+    from src.type_definitions.common import JSONValue, RawRecord
+    from src.type_definitions.external_apis import (
+        ClinVarSearchResponse,
+        ClinVarVariantResponse,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +42,7 @@ class ClinVarIngestor(BaseIngestor):
             timeout_seconds=60,  # NCBI can be slow
         )
 
-    async def fetch_data(
-        self,
-        gene_symbol: str = "MED13",
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+    async def fetch_data(self, **kwargs: JSONValue) -> list[RawRecord]:
         """
         Fetch ClinVar data for specified gene.
 
@@ -51,12 +54,20 @@ class ClinVarIngestor(BaseIngestor):
             List of ClinVar records
         """
         # Step 1: Search for ClinVar records
-        variant_ids = await self._search_variants(gene_symbol, **kwargs)
+        gene_symbol_value = kwargs.get("gene_symbol")
+        gene_symbol = (
+            gene_symbol_value if isinstance(gene_symbol_value, str) else "MED13"
+        )
+
+        search_kwargs = dict(kwargs)
+        search_kwargs.pop("gene_symbol", None)
+
+        variant_ids = await self._search_variants(gene_symbol, **search_kwargs)
         if not variant_ids:
             return []
 
         # Step 2: Fetch detailed records in batches
-        all_records: list[dict[str, Any]] = []
+        all_records: list[RawRecord] = []
         batch_size = 50  # ClinVar API limit
 
         for i in range(0, len(variant_ids), batch_size):
@@ -69,7 +80,11 @@ class ClinVarIngestor(BaseIngestor):
 
         return all_records
 
-    async def _search_variants(self, gene_symbol: str, **kwargs: Any) -> list[str]:
+    async def _search_variants(
+        self,
+        gene_symbol: str,
+        **kwargs: JSONValue,
+    ) -> list[str]:
         """
         Search ClinVar for variants related to a gene.
 
@@ -112,7 +127,7 @@ class ClinVarIngestor(BaseIngestor):
         }
 
         response = await self._make_request("GET", "esearch.fcgi", params=params)
-        data = response.json()
+        data = cast("RawRecord", response.json())
 
         # Validate response structure with runtime validation
         validation_result = APIResponseValidator.validate_clinvar_search_response(data)
@@ -123,24 +138,31 @@ class ClinVarIngestor(BaseIngestor):
                 validation_result["issues"],
             )
             # Fallback to old extraction method
-            id_list = data.get("esearchresult", {}).get("idlist", [])
-            return [str(vid) for vid in id_list]
+            id_list_raw = data.get("esearchresult", {})
+            if isinstance(id_list_raw, dict):
+                ids = id_list_raw.get("idlist", [])
+                if isinstance(ids, list):
+                    return [str(vid) for vid in ids]
+            return []
 
-        sanitized = validation_result["sanitized_data"]
+        sanitized: ClinVarSearchResponse | None = validation_result["sanitized_data"]
         if sanitized is None:
             logger.warning(
                 "ClinVar search response missing sanitized payload; falling back to raw data",
             )
-            id_list = data.get("esearchresult", {}).get("idlist", [])
-            return [str(vid) for vid in id_list]
+            esearch_fallback = data.get("esearchresult")
+            if isinstance(esearch_fallback, dict):
+                raw_ids = esearch_fallback.get("idlist", [])
+                if isinstance(raw_ids, list):
+                    return [str(vid) for vid in raw_ids]
+            return []
 
-        id_list = sanitized["esearchresult"]["idlist"]
-        return [str(vid) for vid in id_list]
+        return [str(vid) for vid in sanitized["esearchresult"]["idlist"]]
 
     async def _fetch_variant_details(
         self,
         variant_ids: list[str],
-    ) -> list[dict[str, Any]]:
+    ) -> list[RawRecord]:
         """
         Fetch detailed ClinVar records for given variant IDs.
 
@@ -168,13 +190,14 @@ class ClinVarIngestor(BaseIngestor):
             "esummary.fcgi",
             params=summary_params,
         )
-        summary_data = response.json()
+        summary_data = cast("RawRecord", response.json())
 
         # Validate response structure with runtime validation
         validation_result = APIResponseValidator.validate_clinvar_variant_response(
             summary_data,
         )
 
+        variant_response: RawRecord
         if not validation_result["is_valid"]:
             logger.warning(
                 "ClinVar variant response validation failed: %s",
@@ -183,33 +206,36 @@ class ClinVarIngestor(BaseIngestor):
             # Fallback to old processing
             variant_response = summary_data
         else:
-            sanitized_variant = validation_result["sanitized_data"]
+            sanitized_variant: ClinVarVariantResponse | None = validation_result[
+                "sanitized_data"
+            ]
             if sanitized_variant is None:
                 logger.warning(
                     "ClinVar variant validation returned no sanitized payload despite passing validation",
                 )
                 variant_response = summary_data
             else:
-                variant_response = sanitized_variant
+                variant_response = cast("RawRecord", sanitized_variant)
 
-        records: list[dict[str, Any]] = []
-        for uid in variant_response.get("result", {}):
-            if uid == "uids":
-                continue
+        records: list[RawRecord] = []
+        result_section = variant_response.get("result")
+        if isinstance(result_section, dict):
+            for uid in result_section:
+                if not isinstance(uid, str) or uid == "uids":
+                    continue
 
-            # Get full record details
-            try:
-                full_record = await self._fetch_single_variant(uid)
-                if full_record:
-                    records.append(full_record)
-            except Exception as exc:  # noqa: BLE001 - log and continue per-record
-                # Skip individual record failures
-                logger.warning("Failed to fetch full record for %s: %s", uid, exc)
-                continue
+                # Get full record details
+                try:
+                    full_record = await self._fetch_single_variant(uid)
+                    if full_record:
+                        records.append(full_record)
+                except Exception as exc:  # noqa: BLE001 - log and continue per-record
+                    logger.warning("Failed to fetch full record for %s: %s", uid, exc)
+                    continue
 
         return records
 
-    async def _fetch_single_variant(self, variant_id: str) -> dict[str, Any] | None:
+    async def _fetch_single_variant(self, variant_id: str) -> RawRecord | None:
         """
         Fetch detailed record for a single ClinVar variant.
 
@@ -241,7 +267,7 @@ class ClinVarIngestor(BaseIngestor):
             "parsed_data": self._parse_clinvar_xml(xml_content),
         }
 
-    def _parse_clinvar_xml(self, _xml_content: str) -> dict[str, Any]:
+    def _parse_clinvar_xml(self, _xml_content: str) -> RawRecord:
         """
         Parse ClinVar XML response into structured data.
 
@@ -255,7 +281,7 @@ class ClinVarIngestor(BaseIngestor):
         # This is a placeholder that would be replaced with actual XML parsing logic
         try:
             # Basic extraction (would be replaced with proper XML parsing)
-            parsed = {
+            parsed: RawRecord = {
                 "gene_symbol": "MED13",  # Extract from XML
                 "variant_type": "unknown",  # Extract from XML
                 "clinical_significance": "unknown",  # Extract from XML
@@ -268,7 +294,7 @@ class ClinVarIngestor(BaseIngestor):
         else:
             return parsed
 
-    async def fetch_med13_variants(self, **kwargs: Any) -> list[dict[str, Any]]:
+    async def fetch_med13_variants(self, **kwargs: JSONValue) -> list[RawRecord]:
         """
         Convenience method to fetch all MED13-related variants.
 
@@ -278,13 +304,13 @@ class ClinVarIngestor(BaseIngestor):
         Returns:
             List of MED13 variant records
         """
-        return await self.fetch_data("MED13", **kwargs)
+        return await self.fetch_data(gene_symbol="MED13", **kwargs)
 
     async def fetch_by_variant_type(
         self,
         variant_types: list[str],
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        **kwargs: JSONValue,
+    ) -> list[RawRecord]:
         """
         Fetch variants by specific types.
 
@@ -295,9 +321,9 @@ class ClinVarIngestor(BaseIngestor):
         Returns:
             List of variant records
         """
-        all_records: list[dict[str, Any]] = []
+        all_records: list[RawRecord] = []
         for variant_type in variant_types:
-            kwargs_copy: dict[str, Any] = kwargs.copy()
+            kwargs_copy: dict[str, JSONValue] = kwargs.copy()
             kwargs_copy["variant_type"] = variant_type
             records = await self.fetch_med13_variants(**kwargs_copy)
             all_records.extend(records)
@@ -307,8 +333,8 @@ class ClinVarIngestor(BaseIngestor):
     async def fetch_by_clinical_significance(
         self,
         significances: list[str],
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        **kwargs: JSONValue,
+    ) -> list[RawRecord]:
         """
         Fetch variants by clinical significance.
 
@@ -319,9 +345,9 @@ class ClinVarIngestor(BaseIngestor):
         Returns:
             List of variant records
         """
-        all_records: list[dict[str, Any]] = []
+        all_records: list[RawRecord] = []
         for significance in significances:
-            kwargs_copy: dict[str, Any] = kwargs.copy()
+            kwargs_copy: dict[str, JSONValue] = kwargs.copy()
             kwargs_copy["clinical_significance"] = significance
             records = await self.fetch_med13_variants(**kwargs_copy)
             all_records.extend(records)

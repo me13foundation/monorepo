@@ -7,10 +7,11 @@ and other common patterns throughout the application.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import Literal, TypedDict
 
 JSONPrimitive = str | int | float | bool | None
-type JSONValue = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
+type JSONValue = JSONPrimitive | Mapping[str, "JSONValue"] | Sequence["JSONValue"]
 JSONObject = dict[str, JSONValue]
 RawRecord = dict[str, JSONValue]
 """Raw data record from external sources (typed JSON)."""

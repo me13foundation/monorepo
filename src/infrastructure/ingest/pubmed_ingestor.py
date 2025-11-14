@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, cast
 
 from defusedxml import ElementTree
 
@@ -15,6 +15,8 @@ from .base_ingestor import BaseIngestor
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from xml.etree.ElementTree import Element  # nosec B405
+
+    from src.type_definitions.common import JSONValue, RawRecord
 
 # Relevance threshold constant
 RELEVANCE_THRESHOLD: int = 5
@@ -37,11 +39,7 @@ class PubMedIngestor(BaseIngestor):
             timeout_seconds=60,  # PubMed can be slow
         )
 
-    async def fetch_data(
-        self,
-        query: str = "MED13",
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+    async def fetch_data(self, **kwargs: JSONValue) -> list[RawRecord]:
         """
         Fetch PubMed data for specified search query.
 
@@ -53,12 +51,18 @@ class PubMedIngestor(BaseIngestor):
             List of PubMed article records
         """
         # Step 1: Search for publications
-        article_ids = await self._search_publications(query, **kwargs)
+        query_value = kwargs.get("query")
+        query = query_value if isinstance(query_value, str) else "MED13"
+
+        search_kwargs = dict(kwargs)
+        search_kwargs.pop("query", None)
+
+        article_ids = await self._search_publications(query, **search_kwargs)
         if not article_ids:
             return []
 
         # Step 2: Fetch detailed records in batches
-        all_records: list[dict[str, Any]] = []
+        all_records: list[RawRecord] = []
         batch_size = 50  # PubMed API limit
 
         for i in range(0, len(article_ids), batch_size):
@@ -71,7 +75,7 @@ class PubMedIngestor(BaseIngestor):
 
         return all_records
 
-    async def _search_publications(self, query: str, **kwargs: Any) -> list[str]:
+    async def _search_publications(self, query: str, **kwargs: JSONValue) -> list[str]:
         """
         Search PubMed for publications matching the query.
 
@@ -86,11 +90,17 @@ class PubMedIngestor(BaseIngestor):
         query_terms = [query]
 
         # Add filters if provided
-        if kwargs.get("publication_date_from"):
-            query_terms.append(f"{kwargs['publication_date_from']}[pdat]")
-        if kwargs.get("publication_types"):
-            pub_types = " OR ".join(f'"{pt}"[pt]' for pt in kwargs["publication_types"])
-            query_terms.append(f"({pub_types})")
+        publication_date_from = kwargs.get("publication_date_from")
+        if isinstance(publication_date_from, str):
+            query_terms.append(f"{publication_date_from}[pdat]")
+
+        publication_types = kwargs.get("publication_types")
+        if isinstance(publication_types, list):
+            pub_types = " OR ".join(
+                f'"{pt}"[pt]' for pt in publication_types if isinstance(pt, str)
+            )
+            if pub_types:
+                query_terms.append(f"({pub_types})")
 
         full_query = " AND ".join(f"({term})" for term in query_terms)
 
@@ -107,16 +117,21 @@ class PubMedIngestor(BaseIngestor):
         }
 
         response = await self._make_request("GET", "esearch.fcgi", params=params)
-        data = response.json()
+        data = cast("RawRecord", response.json())
 
         # Extract article IDs from search results
-        id_list = data.get("esearchresult", {}).get("idlist", [])
+        esearch_section = data.get("esearchresult")
+        if not isinstance(esearch_section, dict):
+            return []
+        id_list = esearch_section.get("idlist", [])
+        if not isinstance(id_list, list):
+            return []
         return [str(aid) for aid in id_list]
 
     async def _fetch_article_details(
         self,
         article_ids: list[str],
-    ) -> list[dict[str, Any]]:
+    ) -> list[RawRecord]:
         """
         Fetch detailed PubMed records for given article IDs.
 
@@ -157,7 +172,7 @@ class PubMedIngestor(BaseIngestor):
 
         return records
 
-    def _parse_pubmed_xml(self, xml_content: str) -> list[dict[str, Any]]:
+    def _parse_pubmed_xml(self, xml_content: str) -> list[RawRecord]:
         """
         Parse PubMed XML response into structured data.
 
@@ -169,7 +184,7 @@ class PubMedIngestor(BaseIngestor):
         """
         try:
             root = ElementTree.fromstring(xml_content)
-            records: list[dict[str, Any]] = []
+            records: list[RawRecord] = []
 
             # PubMed XML structure: MedlineCitation elements
             for citation in root.findall(".//MedlineCitation"):
@@ -188,7 +203,7 @@ class PubMedIngestor(BaseIngestor):
         else:
             return records
 
-    def _parse_single_citation(self, citation: Element) -> dict[str, Any] | None:
+    def _parse_single_citation(self, citation: Element) -> RawRecord | None:
         """
         Parse a single MedlineCitation element.
 
@@ -207,7 +222,7 @@ class PubMedIngestor(BaseIngestor):
                 return None
 
             # Extract basic metadata
-            record = {
+            record: RawRecord = {
                 "pubmed_id": pmid,
                 "title": self._extract_text(citation, ".//ArticleTitle"),
                 "abstract": self._extract_text(citation, ".//AbstractText"),
@@ -325,7 +340,7 @@ class PubMedIngestor(BaseIngestor):
                 return id_elem.text.strip()
         return None
 
-    def _assess_med13_relevance(self, record: dict[str, Any]) -> dict[str, Any]:
+    def _assess_med13_relevance(self, record: RawRecord) -> RawRecord:
         """
         Assess how relevant this publication is to MED13 research.
 
@@ -339,20 +354,32 @@ class PubMedIngestor(BaseIngestor):
         reasons = []
 
         # Check title for MED13 mentions
-        title = (record.get("title") or "").lower()
+        title_value = record.get("title") or ""
+        title = (
+            title_value.lower()
+            if isinstance(title_value, str)
+            else str(title_value).lower()
+        )
         if "med13" in title:
             relevance_score += 10
             reasons.append("MED13 in title")
 
         # Check abstract for MED13 mentions
-        abstract = (record.get("abstract") or "").lower()
+        abstract_value = record.get("abstract") or ""
+        abstract = (
+            abstract_value.lower()
+            if isinstance(abstract_value, str)
+            else str(abstract_value).lower()
+        )
         if "med13" in abstract:
             relevance_score += 5
             reasons.append("MED13 in abstract")
 
         # Check keywords
-        keywords_raw = record.get("keywords", [])
-        keywords = [kw.lower() for kw in keywords_raw if isinstance(kw, str)]
+        keywords: list[str] = []
+        keywords_raw = record.get("keywords")
+        if isinstance(keywords_raw, list):
+            keywords = [kw.lower() for kw in keywords_raw if isinstance(kw, str)]
         med13_keywords = [kw for kw in keywords if "med13" in kw]
         if med13_keywords:
             relevance_score += 3
@@ -364,7 +391,7 @@ class PubMedIngestor(BaseIngestor):
             "is_relevant": relevance_score >= RELEVANCE_THRESHOLD,
         }
 
-    async def fetch_med13_publications(self, **kwargs: Any) -> list[dict[str, Any]]:
+    async def fetch_med13_publications(self, **kwargs: JSONValue) -> list[RawRecord]:
         """
         Convenience method to fetch MED13-related publications.
 
@@ -374,20 +401,21 @@ class PubMedIngestor(BaseIngestor):
         Returns:
             List of MED13-related publication records
         """
-        records = await self.fetch_data("MED13", **kwargs)
+        records = await self.fetch_data(query="MED13", **kwargs)
 
         # Filter for highly relevant publications
-        return [
-            record
-            for record in records
-            if record.get("med13_relevance", {}).get("is_relevant", False)
-        ]
+        relevant_records: list[RawRecord] = []
+        for record in records:
+            relevance = record.get("med13_relevance")
+            if isinstance(relevance, dict) and relevance.get("is_relevant", False):
+                relevant_records.append(record)
+        return relevant_records
 
     async def fetch_recent_publications(
         self,
         days_back: int = 365,
-        **kwargs: Any,
-    ) -> list[dict[str, Any]]:
+        **kwargs: JSONValue,
+    ) -> list[RawRecord]:
         """
         Fetch recent publications related to MED13.
 

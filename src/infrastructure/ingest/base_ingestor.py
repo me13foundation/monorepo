@@ -17,6 +17,7 @@ from typing import Any
 import httpx
 
 from src.models.value_objects import DataSource, Provenance
+from src.type_definitions.common import JSONObject, JSONValue, RawRecord
 
 
 class IngestionStatus(Enum):
@@ -36,7 +37,7 @@ class IngestionError(Exception):
         self,
         message: str,
         source: str,
-        details: dict[str, Any] | None = None,
+        details: JSONObject | None = None,
     ):
         super().__init__(message)
         self.source = source
@@ -51,7 +52,7 @@ class IngestionResult:
     status: IngestionStatus
     records_processed: int
     records_failed: int
-    data: list[dict[str, Any]]
+    data: list[RawRecord]
     provenance: Provenance
     errors: list[IngestionError]
     duration_seconds: float
@@ -149,7 +150,7 @@ class BaseIngestor(ABC):
         await self.client.aclose()
 
     @abstractmethod
-    async def fetch_data(self, **kwargs: Any) -> list[dict[str, Any]]:
+    async def fetch_data(self, **kwargs: JSONValue) -> list[RawRecord]:
         """
         Abstract method to fetch data from the source.
 
@@ -160,7 +161,7 @@ class BaseIngestor(ABC):
             List of raw data records
         """
 
-    async def ingest(self, **kwargs: Any) -> IngestionResult:
+    async def ingest(self, **kwargs: JSONValue) -> IngestionResult:
         """
         Main ingestion method with error handling and provenance tracking.
 
@@ -186,7 +187,7 @@ class BaseIngestor(ABC):
         )
 
         errors: list[IngestionError] = []
-        data: list[dict[str, Any]] = []
+        data: list[RawRecord] = []
 
         # Check circuit breaker before guarded operations
         if self.circuit_open:
@@ -306,7 +307,7 @@ class BaseIngestor(ABC):
 
     async def _store_raw_data(
         self,
-        data: list[dict[str, Any]],
+        data: list[RawRecord],
         timestamp: datetime,
     ) -> Path:
         """
