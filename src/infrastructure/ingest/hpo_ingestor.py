@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import gzip
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from defusedxml import ElementTree
@@ -108,7 +108,7 @@ class HPOIngestor(BaseIngestor):
                 "latest",
                 headers={"Accept": "application/vnd.github.v3+json"},
             )
-            release_data = cast("JSONObject", response.json())
+            release_data = self._ensure_raw_record(response.json())
 
             # Find ontology file in assets
             ontology_url = None
@@ -228,30 +228,24 @@ class HPOIngestor(BaseIngestor):
             List of phenotype records
         """
         phenotypes: list[RawRecord] = []
-        current_term: dict[str, str | list[str]] = {}
-        in_term = False
+        term_blocks = content.split("[Term]")
 
-        for raw_line in content.split("\n"):
-            line = raw_line.strip()
+        def new_term_dict() -> dict[str, str | list[str]]:
+            return {}
 
-            if line == "[Term]":
-                # Save previous term if exists
-                if current_term and "id" in current_term:
-                    phenotypes.append(self._normalize_obo_term(current_term))
-                current_term = cast("dict[str, str | list[str]]", {})
-                in_term = True
-            elif line == "" and in_term:
-                # End of term
-                if current_term and "id" in current_term:
-                    phenotypes.append(self._normalize_obo_term(current_term))
-                current_term = cast("dict[str, str | list[str]]", {})
-                in_term = False
-            elif in_term and ":" in line:
-                # Parse key-value pairs
+        for block in term_blocks:
+            block_content = block.strip()
+            if not block_content:
+                continue
+
+            current_term = new_term_dict()
+            for raw_line in block_content.splitlines():
+                line = raw_line.strip()
+                if not line or ":" not in line:
+                    continue
                 key, value = line.split(":", 1)
                 key = key.strip()
                 value = value.strip()
-
                 existing = current_term.get(key)
                 if existing is None:
                     current_term[key] = value
@@ -260,9 +254,8 @@ class HPOIngestor(BaseIngestor):
                 else:
                     current_term[key] = [existing, value]
 
-        # Don't forget the last term
-        if current_term and "id" in current_term:
-            phenotypes.append(self._normalize_obo_term(current_term))
+            if current_term and "id" in current_term:
+                phenotypes.append(self._normalize_obo_term(current_term))
 
         return phenotypes
 

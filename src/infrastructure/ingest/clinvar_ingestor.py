@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from src.infrastructure.ingest.base_ingestor import BaseIngestor
 from src.infrastructure.validation.api_response_validator import (
@@ -127,7 +127,7 @@ class ClinVarIngestor(BaseIngestor):
         }
 
         response = await self._make_request("GET", "esearch.fcgi", params=params)
-        data = cast("RawRecord", response.json())
+        data = self._ensure_raw_record(response.json())
 
         # Validate response structure with runtime validation
         validation_result = APIResponseValidator.validate_clinvar_search_response(data)
@@ -190,7 +190,7 @@ class ClinVarIngestor(BaseIngestor):
             "esummary.fcgi",
             params=summary_params,
         )
-        summary_data = cast("RawRecord", response.json())
+        summary_data = self._ensure_raw_record(response.json())
 
         # Validate response structure with runtime validation
         validation_result = APIResponseValidator.validate_clinvar_variant_response(
@@ -215,7 +215,7 @@ class ClinVarIngestor(BaseIngestor):
                 )
                 variant_response = summary_data
             else:
-                variant_response = cast("RawRecord", sanitized_variant)
+                variant_response = self._ensure_raw_record(sanitized_variant)
 
         records: list[RawRecord] = []
         result_section = variant_response.get("result")

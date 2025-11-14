@@ -7,7 +7,7 @@ import asyncio
 import json
 import time
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import Enum
@@ -357,6 +357,36 @@ class BaseIngestor(ABC):
         # Open circuit after N consecutive failures
         if self.failure_count >= self.failure_threshold:
             self.circuit_open = True
+
+    @staticmethod
+    def _coerce_json_value(value: object) -> JSONValue:
+        """Ensure arbitrary values conform to JSONValue contract."""
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        if isinstance(value, Mapping):
+            json_obj: JSONObject = {}
+            for key, item in value.items():
+                json_obj[str(key)] = BaseIngestor._coerce_json_value(item)
+            return json_obj
+        if isinstance(value, Sequence) and not isinstance(
+            value,
+            (str, bytes, bytearray),
+        ):
+            return [BaseIngestor._coerce_json_value(item) for item in value]
+        message = f"Unsupported JSON value: {type(value)!r}"
+        raise ValueError(message)
+
+    @classmethod
+    def _ensure_raw_record(cls, payload: object) -> RawRecord:
+        """Convert arbitrary payloads into RawRecord dictionaries."""
+        if not isinstance(payload, Mapping):
+            message = "Expected JSON object from API response"
+            raise TypeError(message)
+        record: RawRecord = {}
+        for key, value in payload.items():
+            if isinstance(key, str):
+                record[key] = cls._coerce_json_value(value)
+        return record
 
     def reset_circuit_breaker(self) -> None:
         """Reset circuit breaker state."""

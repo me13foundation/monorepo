@@ -8,7 +8,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import httpx
 from defusedxml import ElementTree
@@ -227,7 +227,7 @@ class UniProtIngestor(BaseIngestor):
 
         # Try JSON parsing first
         try:
-            data = cast("JSONValue", response.json())
+            data = self._coerce_json_value(response.json())
         except json.JSONDecodeError:
             data = None
 

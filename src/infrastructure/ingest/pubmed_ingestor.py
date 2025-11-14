@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from defusedxml import ElementTree
 
@@ -120,7 +120,7 @@ class PubMedIngestor(BaseIngestor):
         }
 
         response = await self._make_request("GET", "esearch.fcgi", params=params)
-        data = cast("RawRecord", response.json())
+        data = self._ensure_raw_record(response.json())
 
         # Extract article IDs from search results
         esearch_section = data.get("esearchresult")
