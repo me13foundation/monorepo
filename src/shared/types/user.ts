@@ -162,7 +162,7 @@ export interface UserActivity {
   userId: string
   action: string
   resource: string
-  details?: Record<string, any>
+  details?: Record<string, unknown>
   ipAddress?: string
   userAgent?: string
   timestamp: string
@@ -174,8 +174,8 @@ export interface AuditLog {
   action: string
   resource: string
   resourceId?: string
-  oldValues?: Record<string, any>
-  newValues?: Record<string, any>
+  oldValues?: Record<string, unknown>
+  newValues?: Record<string, unknown>
   ipAddress?: string
   userAgent?: string
   timestamp: string

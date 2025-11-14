@@ -105,7 +105,7 @@ export interface QualityIssue {
   field?: string
   message: string
   count: number
-  sampleValues?: any[]
+  sampleValues?: unknown[]
 }
 
 export interface SourceTemplate {
@@ -126,7 +126,7 @@ export interface SourceTemplate {
 export interface ValidationRule {
   field: string
   rule: 'required' | 'email' | 'url' | 'regex' | 'range' | 'enum'
-  parameters?: Record<string, any>
+  parameters?: Record<string, unknown>
   errorMessage?: string
 }
 
@@ -167,7 +167,7 @@ export interface IngestionError {
   field?: string
   errorType: string
   message: string
-  rawData?: any
+  rawData?: unknown
 }
 
 export interface JobMetrics {
@@ -226,7 +226,7 @@ export const DataSourceSchema = z.object({
       field: z.string().optional(),
       message: z.string(),
       count: z.number().int(),
-      sampleValues: z.array(z.any()).optional(),
+      sampleValues: z.array(z.unknown()).optional(),
     })).optional(),
   }).optional(),
   lastIngestedAt: z.string().datetime().optional(),

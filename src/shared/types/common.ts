@@ -12,10 +12,16 @@ export interface SortParams {
   direction: 'asc' | 'desc'
 }
 
+export type DateString = string // ISO 8601 format
+export type Timestamp = number // Unix timestamp in milliseconds
+
+export type PrimitiveFilterValue = string | number | boolean | null | DateString
+export type FilterValue = PrimitiveFilterValue | PrimitiveFilterValue[]
+
 export interface FilterParams {
   field: string
   operator: 'eq' | 'ne' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'nin' | 'contains' | 'startswith' | 'endswith'
-  value: any
+  value: FilterValue
 }
 
 export interface SearchParams {
@@ -25,7 +31,7 @@ export interface SearchParams {
   pagination?: PaginationParams
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
   error?: ApiError
@@ -35,7 +41,7 @@ export interface ApiResponse<T = any> {
 export interface ApiError {
   code: string
   message: string
-  details?: Record<string, any>
+  details?: Record<string, unknown>
   field?: string
 }
 
@@ -45,7 +51,7 @@ export interface ApiMeta {
   version: string
 }
 
-export interface PaginatedResponse<T = any> extends ApiResponse<T[]> {
+export interface PaginatedResponse<T = unknown> extends ApiResponse<T[]> {
   meta: ApiMeta & {
     pagination: {
       page: number
@@ -82,10 +88,6 @@ export enum HttpStatus {
   INTERNAL_SERVER_ERROR = 500,
 }
 
-// Date/Time Utilities
-export type DateString = string // ISO 8601 format
-export type Timestamp = number // Unix timestamp in milliseconds
-
 // File Upload Types
 export interface FileUpload {
   file: File
@@ -102,7 +104,7 @@ export interface UploadProgress {
 }
 
 // WebSocket Message Types
-export interface WebSocketMessage<T = any> {
+export interface WebSocketMessage<T = unknown> {
   type: string
   payload: T
   timestamp: string
@@ -131,10 +133,13 @@ export const SortParamsSchema = z.object({
   direction: z.enum(['asc', 'desc']),
 })
 
+const PrimitiveFilterValueSchema = z.union([z.string(), z.number(), z.boolean(), z.null()])
+const FilterValueSchema = z.union([PrimitiveFilterValueSchema, z.array(PrimitiveFilterValueSchema)])
+
 export const FilterParamsSchema = z.object({
   field: z.string(),
   operator: z.enum(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'in', 'nin', 'contains', 'startswith', 'endswith']),
-  value: z.any(),
+  value: FilterValueSchema,
 })
 
 export const SearchParamsSchema = z.object({
@@ -151,7 +156,7 @@ export const ApiResponseSchema = <T extends z.ZodTypeAny>(dataSchema: T) =>
     error: z.object({
       code: z.string(),
       message: z.string(),
-      details: z.record(z.any()).optional(),
+      details: z.record(z.unknown()).optional(),
       field: z.string().optional(),
     }).optional(),
     meta: z.object({
