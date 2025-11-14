@@ -1,24 +1,24 @@
+"""SQLAlchemy-backed implementation of the domain phenotype repository."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
-from src.domain.entities.phenotype import Phenotype, PhenotypeCategory
+from sqlalchemy import asc, func, or_, select
+
+from src.domain.entities.phenotype import PhenotypeCategory
 from src.domain.repositories.phenotype_repository import (
     PhenotypeRepository as PhenotypeRepositoryInterface,
 )
 from src.infrastructure.mappers.phenotype_mapper import PhenotypeMapper
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from src.models.database import PhenotypeCategory as DbPhenotypeCategory
-from src.repositories.phenotype_repository import PhenotypeRepository
-
-if TYPE_CHECKING:
-    from src.type_definitions.common import PhenotypeUpdate, QueryFilters
+from src.models.database import EvidenceModel, PhenotypeModel, VariantModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
 
+    from src.domain.entities.phenotype import Phenotype
     from src.domain.repositories.base import QuerySpecification
+    from src.type_definitions.common import PhenotypeUpdate, QueryFilters
 
 
 class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
@@ -26,24 +26,43 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
 
     def __init__(self, session: Session | None = None) -> None:
         self._session = session
-        self._repository = PhenotypeRepository(session)
+
+    @property
+    def session(self) -> Session:
+        if self._session is None:
+            message = "Session is not configured"
+            raise ValueError(message)
+        return self._session
+
+    def _to_domain(self, model: PhenotypeModel | None) -> Phenotype | None:
+        return PhenotypeMapper.to_domain(model) if model else None
+
+    def _to_domain_sequence(self, models: list[PhenotypeModel]) -> list[Phenotype]:
+        return PhenotypeMapper.to_domain_sequence(models)
 
     def create(self, phenotype: Phenotype) -> Phenotype:
         model = PhenotypeMapper.to_model(phenotype)
-        persisted = self._repository.create(model)
-        return PhenotypeMapper.to_domain(persisted)
-
-    def find_by_hpo_id(self, hpo_id: str) -> Phenotype | None:
-        model = self._repository.find_by_hpo_id(hpo_id)
-        return PhenotypeMapper.to_domain(model) if model else None
-
-    def find_by_hpo_id_or_fail(self, hpo_id: str) -> Phenotype:
-        model = self._repository.find_by_hpo_id_or_fail(hpo_id)
+        self.session.add(model)
+        self.session.commit()
+        self.session.refresh(model)
         return PhenotypeMapper.to_domain(model)
 
+    def find_by_hpo_id(self, hpo_id: str) -> Phenotype | None:
+        stmt = select(PhenotypeModel).where(PhenotypeModel.hpo_id == hpo_id)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
+
+    def find_by_hpo_id_or_fail(self, hpo_id: str) -> Phenotype:
+        phenotype = self.find_by_hpo_id(hpo_id)
+        if phenotype is None:
+            message = f"Phenotype with HPO ID '{hpo_id}' not found"
+            raise ValueError(message)
+        return phenotype
+
     def find_by_hpo_term(self, hpo_term: str) -> list[Phenotype]:
-        models = self._repository.find_by_hpo_term(hpo_term)
-        return PhenotypeMapper.to_domain_sequence(models)
+        stmt = select(PhenotypeModel).where(
+            PhenotypeModel.hpo_term.ilike(f"%{hpo_term}%"),
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_category(
         self,
@@ -51,21 +70,24 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         limit: int | None = None,
     ) -> list[Phenotype]:
         normalized = PhenotypeCategory.validate(category)
-        db_category = cast("DbPhenotypeCategory", normalized)
-        models = self._repository.find_by_category(db_category, limit)
-        return PhenotypeMapper.to_domain_sequence(models)
+        stmt = select(PhenotypeModel).where(PhenotypeModel.category == normalized)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_root_terms(self) -> list[Phenotype]:
-        models = self._repository.find_root_terms()
-        return PhenotypeMapper.to_domain_sequence(models)
+        stmt = select(PhenotypeModel).where(PhenotypeModel.is_root_term)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_children(self, parent_hpo_id: str) -> list[Phenotype]:
-        models = self._repository.find_children(parent_hpo_id)
-        return PhenotypeMapper.to_domain_sequence(models)
+        stmt = select(PhenotypeModel).where(
+            PhenotypeModel.parent_hpo_id == parent_hpo_id,
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_with_evidence(self, phenotype_id: int) -> Phenotype | None:
-        model = self._repository.find_with_evidence(phenotype_id)
-        return PhenotypeMapper.to_domain(model) if model else None
+        stmt = select(PhenotypeModel).where(PhenotypeModel.id == phenotype_id)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
 
     def search_phenotypes(
         self,
@@ -73,65 +95,101 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         limit: int = 20,
         filters: QueryFilters | None = None,
     ) -> list[Phenotype]:
-        # filters retained for API compatibility
         if filters:
             _ = dict(filters)
-        models = self._repository.search_phenotypes(query, limit)
-        return PhenotypeMapper.to_domain_sequence(models)
+        pattern = f"%{query}%"
+        stmt = (
+            select(PhenotypeModel)
+            .where(
+                or_(
+                    PhenotypeModel.name.ilike(pattern),
+                    PhenotypeModel.definition.ilike(pattern),
+                    PhenotypeModel.synonyms.ilike(pattern),
+                ),
+            )
+            .limit(limit)
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def get_phenotype_statistics(self) -> dict[str, int | float | bool | str | None]:
-        raw_stats = self._repository.get_phenotype_statistics()
+        total = self.count()
+        root_terms = len(self.find_root_terms())
         return {
-            key: value
-            for key, value in raw_stats.items()
-            if isinstance(value, (int, float, bool, str)) or value is None
+            "total_phenotypes": total,
+            "root_terms": root_terms,
+            "phenotypes_with_evidence": 0,
         }
 
     def count(self) -> int:
-        return self._repository.count()
+        stmt = select(func.count()).select_from(PhenotypeModel)
+        return int(self.session.execute(stmt).scalar_one())
 
-    # Required interface implementations
     def delete(self, phenotype_id: int) -> bool:
-        return self._repository.delete(phenotype_id)
+        model = self.session.get(PhenotypeModel, phenotype_id)
+        if model is None:
+            return False
+        self.session.delete(model)
+        self.session.commit()
+        return True
 
     def exists(self, phenotype_id: int) -> bool:
-        return self._repository.exists(phenotype_id)
+        stmt = select(func.count()).where(PhenotypeModel.id == phenotype_id)
+        return bool(self.session.execute(stmt).scalar_one())
 
     def find_all(
         self,
         limit: int | None = None,
         offset: int | None = None,
     ) -> list[Phenotype]:
-        models = self._repository.find_all(limit=limit, offset=offset)
-        return PhenotypeMapper.to_domain_sequence(models)
+        stmt = select(PhenotypeModel)
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_criteria(self, spec: QuerySpecification) -> list[Phenotype]:
-        # Simplified implementation
-        return PhenotypeMapper.to_domain_sequence(
-            self._repository.find_all(limit=spec.limit, offset=spec.offset),
-        )
+        stmt = select(PhenotypeModel)
+        for field, value in spec.filters.items():
+            column = getattr(PhenotypeModel, field, None)
+            if column is not None and value is not None:
+                stmt = stmt.where(column == value)
+        if spec.offset:
+            stmt = stmt.offset(spec.offset)
+        if spec.limit:
+            stmt = stmt.limit(spec.limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def get_by_id(self, phenotype_id: int) -> Phenotype | None:
-        model = self._repository.get_by_id(phenotype_id)
-        return PhenotypeMapper.to_domain(model) if model else None
+        return self._to_domain(self.session.get(PhenotypeModel, phenotype_id))
 
     def find_by_gene_associations(self, gene_id: int) -> list[Phenotype]:
-        models = self._repository.find_by_gene_associations(gene_id)
-        return PhenotypeMapper.to_domain_sequence(models)
+        stmt = (
+            select(PhenotypeModel)
+            .join(EvidenceModel, EvidenceModel.phenotype_id == PhenotypeModel.id)
+            .join(VariantModel, VariantModel.id == EvidenceModel.variant_id)
+            .where(VariantModel.gene_id == gene_id)
+            .order_by(PhenotypeModel.name.asc())
+        ).distinct()
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_name(self, name: str, *, fuzzy: bool = False) -> list[Phenotype]:
-        # fuzzy currently unused by underlying repo
         if fuzzy:
-            _ = fuzzy
-        models = self._repository.search_phenotypes(name, limit=10)
-        return PhenotypeMapper.to_domain_sequence(models)
+            return self.search_phenotypes(name, limit=10)
+        stmt = select(PhenotypeModel).where(PhenotypeModel.name == name)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_ontology_term(self, term_id: str) -> Phenotype | None:
         return self.find_by_hpo_id(term_id)
 
     def find_by_variant_associations(self, variant_id: int) -> list[Phenotype]:
-        models = self._repository.find_by_variant_associations(variant_id)
-        return PhenotypeMapper.to_domain_sequence(models)
+        stmt = (
+            select(PhenotypeModel)
+            .join(EvidenceModel, EvidenceModel.phenotype_id == PhenotypeModel.id)
+            .where(EvidenceModel.variant_id == variant_id)
+            .order_by(PhenotypeModel.name.asc())
+        ).distinct()
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def paginate_phenotypes(
         self,
@@ -141,20 +199,38 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         sort_order: str,
         filters: QueryFilters | None = None,
     ) -> tuple[list[Phenotype], int]:
-        # Simplified implementation; sort params retained for compatibility
-        if sort_by:
-            _ = sort_by
-        if sort_order:
-            _ = sort_order
+        stmt = select(PhenotypeModel)
         if filters:
-            _ = dict(filters)
-        offset = (page - 1) * per_page
-        models = self._repository.find_all(limit=per_page, offset=offset)
-        total = self._repository.count()
-        return PhenotypeMapper.to_domain_sequence(models), total
+            for field, value in filters.items():
+                column = getattr(PhenotypeModel, field, None)
+                if column is not None and value is not None:
+                    stmt = stmt.where(column == value)
+        sortable = {
+            "name": PhenotypeModel.name,
+            "category": PhenotypeModel.category,
+            "hpo_id": PhenotypeModel.hpo_id,
+        }
+        sort_column = sortable.get(sort_by)
+        if sort_column is not None:
+            stmt = stmt.order_by(
+                asc(sort_column) if sort_order != "desc" else sort_column.desc(),
+            )
+        offset = max(page - 1, 0) * per_page
+        stmt = stmt.offset(offset).limit(per_page)
+        models = list(self.session.execute(stmt).scalars())
+        total = self.count()
+        return self._to_domain_sequence(models), total
 
     def update(self, phenotype_id: int, updates: PhenotypeUpdate) -> Phenotype:
-        model = self._repository.update(phenotype_id, dict(updates))
+        model = self.session.get(PhenotypeModel, phenotype_id)
+        if model is None:
+            message = f"Phenotype with id {phenotype_id} not found"
+            raise ValueError(message)
+        for field, value in updates.items():
+            if hasattr(model, field):
+                setattr(model, field, value)
+        self.session.commit()
+        self.session.refresh(model)
         return PhenotypeMapper.to_domain(model)
 
     def update_phenotype(
@@ -162,7 +238,6 @@ class SqlAlchemyPhenotypeRepository(PhenotypeRepositoryInterface):
         phenotype_id: int,
         updates: PhenotypeUpdate,
     ) -> Phenotype:
-        """Update a phenotype with type-safe update parameters."""
         return self.update(phenotype_id, updates)
 
 

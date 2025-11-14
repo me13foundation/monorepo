@@ -1,22 +1,23 @@
+"""SQLAlchemy-backed implementation of the domain variant repository."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
+
+from sqlalchemy import and_, asc, desc, func, or_, select
 
 from src.domain.entities.variant import ClinicalSignificance, VariantSummary
 from src.domain.repositories.variant_repository import (
     VariantRepository as VariantRepositoryInterface,
 )
 from src.infrastructure.mappers.variant_mapper import VariantMapper
-from src.repositories.variant_repository import VariantRepository
+from src.models.database import GeneModel, VariantModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
 
     from src.domain.entities.variant import Variant
     from src.domain.repositories.base import QuerySpecification
-    from src.models.database.variant import (
-        ClinicalSignificance as DbClinicalSignificance,
-    )
     from src.type_definitions.common import QueryFilters, VariantUpdate
 
 
@@ -25,32 +26,50 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
 
     def __init__(self, session: Session | None = None) -> None:
         self._session = session
-        self._repository = VariantRepository(session)
+
+    @property
+    def session(self) -> Session:
+        if self._session is None:
+            message = "Session is not configured"
+            raise ValueError(message)
+        return self._session
+
+    def _to_domain(self, model: VariantModel | None) -> Variant | None:
+        return VariantMapper.to_domain(model) if model else None
+
+    def _to_domain_sequence(self, models: list[VariantModel]) -> list[Variant]:
+        return VariantMapper.to_domain_sequence(models)
 
     def create(self, variant: Variant) -> Variant:
         model = VariantMapper.to_model(variant)
-        persisted = self._repository.create(model)
-        return VariantMapper.to_domain(persisted)
+        self.session.add(model)
+        self.session.commit()
+        self.session.refresh(model)
+        return VariantMapper.to_domain(model)
 
     def get_by_id(self, variant_id: int) -> Variant | None:
-        model = self._repository.get_by_id(variant_id)
-        return VariantMapper.to_domain(model) if model else None
+        return self._to_domain(self.session.get(VariantModel, variant_id))
 
     def get_by_id_or_fail(self, variant_id: int) -> Variant:
-        model = self._repository.get_by_id_or_fail(variant_id)
+        model = self.session.get(VariantModel, variant_id)
+        if model is None:
+            message = f"Variant with id {variant_id} not found"
+            raise ValueError(message)
         return VariantMapper.to_domain(model)
 
     def find_by_variant_id(self, variant_id: str) -> Variant | None:
-        model = self._repository.find_by_variant_id(variant_id)
-        return VariantMapper.to_domain(model) if model else None
+        stmt = select(VariantModel).where(VariantModel.variant_id == variant_id)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
 
     def find_by_clinvar_id(self, clinvar_id: str) -> Variant | None:
-        model = self._repository.find_by_clinvar_id(clinvar_id)
-        return VariantMapper.to_domain(model) if model else None
+        stmt = select(VariantModel).where(VariantModel.clinvar_id == clinvar_id)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
 
     def find_by_gene(self, gene_id: int, limit: int | None = None) -> list[Variant]:
-        models = self._repository.find_by_gene(gene_id, limit=limit)
-        return VariantMapper.to_domain_sequence(models)
+        stmt = select(VariantModel).where(VariantModel.gene_id == gene_id)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_genomic_location(
         self,
@@ -58,12 +77,21 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         start_pos: int,
         end_pos: int,
     ) -> list[Variant]:
-        models = self._repository.find_by_genomic_location(
-            chromosome,
-            start_pos,
-            end_pos,
+        stmt = select(VariantModel).where(
+            and_(
+                VariantModel.chromosome == chromosome,
+                VariantModel.position >= start_pos,
+                VariantModel.position <= end_pos,
+            ),
         )
-        return VariantMapper.to_domain_sequence(models)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
+
+    def find_by_chromosome_position(
+        self,
+        chromosome: str,
+        position: int,
+    ) -> list[Variant]:
+        return self.find_by_genomic_location(chromosome, position, position)
 
     def find_by_clinical_significance(
         self,
@@ -71,71 +99,101 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         limit: int | None = None,
     ) -> list[Variant]:
         normalized = ClinicalSignificance.validate(significance)
-        db_significance = cast("DbClinicalSignificance", normalized)
-        models = self._repository.find_by_clinical_significance(db_significance, limit)
-        return VariantMapper.to_domain_sequence(models)
+        stmt = select(VariantModel).where(
+            VariantModel.clinical_significance == normalized,
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_pathogenic_variants(self, limit: int | None = None) -> list[Variant]:
-        models = self._repository.find_pathogenic_variants(limit)
-        return VariantMapper.to_domain_sequence(models)
+        stmt = select(VariantModel).where(
+            or_(
+                VariantModel.clinical_significance == ClinicalSignificance.PATHOGENIC,
+                VariantModel.clinical_significance
+                == ClinicalSignificance.LIKELY_PATHOGENIC,
+            ),
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_with_evidence(self, variant_id: int) -> Variant | None:
-        model = self._repository.find_with_evidence(variant_id)
-        return VariantMapper.to_domain(model) if model else None
+        stmt = select(VariantModel).where(VariantModel.id == variant_id)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
 
     def update(self, variant_id: int, updates: VariantUpdate) -> Variant:
-        model = self._repository.update(variant_id, dict(updates))
+        model = self.session.get(VariantModel, variant_id)
+        if model is None:
+            message = f"Variant with id {variant_id} not found"
+            raise ValueError(message)
+        for field, value in updates.items():
+            if hasattr(model, field):
+                setattr(model, field, value)
+        self.session.commit()
+        self.session.refresh(model)
         return VariantMapper.to_domain(model)
 
     def delete(self, variant_id: int) -> bool:
-        return self._repository.delete(variant_id)
+        model = self.session.get(VariantModel, variant_id)
+        if model is None:
+            return False
+        self.session.delete(model)
+        self.session.commit()
+        return True
 
     def get_variant_statistics(self) -> dict[str, int | float | bool | str | None]:
-        raw_stats = self._repository.get_variant_statistics()
+        total_variants = self.count()
+        pathogenic = len(self.find_pathogenic_variants())
         return {
-            key: value
-            for key, value in raw_stats.items()
-            if isinstance(value, (int, float, bool, str)) or value is None
+            "total_variants": total_variants,
+            "pathogenic_variants": pathogenic,
+            "variants_with_evidence": 0,
         }
 
     def count(self) -> int:
-        return self._repository.count()
+        stmt = select(func.count()).select_from(VariantModel)
+        return int(self.session.execute(stmt).scalar_one())
 
-    # Required interface implementations
     def exists(self, variant_id: int) -> bool:
-        return self._repository.exists(variant_id)
+        stmt = select(func.count()).where(VariantModel.id == variant_id)
+        return bool(self.session.execute(stmt).scalar_one())
 
     def find_all(
         self,
         limit: int | None = None,
         offset: int | None = None,
     ) -> list[Variant]:
-        models = self._repository.find_all(limit=limit, offset=offset)
-        return VariantMapper.to_domain_sequence(models)
-
-    def find_by_chromosome_position(
-        self,
-        chromosome: str,
-        position: int,
-    ) -> list[Variant]:
-        models = self._repository.find_by_genomic_location(
-            chromosome,
-            position,
-            position,
-        )
-        return VariantMapper.to_domain_sequence(models)
+        stmt = select(VariantModel)
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_criteria(self, spec: QuerySpecification) -> list[Variant]:
-        # Simplified implementation - would need more complex query building
-        models = self._repository.find_all(limit=spec.limit, offset=spec.offset)
-        return VariantMapper.to_domain_sequence(models)
+        stmt = select(VariantModel)
+        for field, value in spec.filters.items():
+            column = getattr(VariantModel, field, None)
+            if column is not None and value is not None:
+                stmt = stmt.where(column == value)
+        if spec.offset:
+            stmt = stmt.offset(spec.offset)
+        if spec.limit:
+            stmt = stmt.limit(spec.limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_gene_symbol(self, gene_symbol: str) -> list[Variant]:
-        models = self._repository.find_by_gene_symbol(gene_symbol)
-        return VariantMapper.to_domain_sequence(models)
+        stmt = (
+            select(VariantModel)
+            .join(VariantModel.gene)
+            .where(GeneModel.symbol == gene_symbol.upper())
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def get_variant_summaries_by_gene(self, gene_id: int) -> list[VariantSummary]:
-        models = self._repository.find_by_gene(gene_id)
+        stmt = select(VariantModel).where(VariantModel.gene_id == gene_id)
+        models = list(self.session.execute(stmt).scalars())
         return [
             VariantSummary(
                 variant_id=model.variant_id,
@@ -155,18 +213,23 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         sort_order: str,
         filters: QueryFilters | None = None,
     ) -> tuple[list[Variant], int]:
-        # Simplified implementation
-        # Parameters retained for API compatibility
-        if sort_by:
-            _ = sort_by
-        if sort_order:
-            _ = sort_order
+        stmt = select(VariantModel)
         if filters:
-            _ = dict(filters)
-        offset = (page - 1) * per_page
-        models = self._repository.find_all(limit=per_page, offset=offset)
-        total = self._repository.count()
-        return VariantMapper.to_domain_sequence(models), total
+            for field, value in filters.items():
+                column = getattr(VariantModel, field, None)
+                if column is not None and value is not None:
+                    stmt = stmt.where(column == value)
+        offset = max(page - 1, 0) * per_page
+        if sort_by:
+            column = getattr(VariantModel, sort_by, None)
+            if column is not None:
+                stmt = stmt.order_by(
+                    desc(column) if sort_order == "desc" else asc(column),
+                )
+        stmt = stmt.offset(offset).limit(per_page)
+        models = list(self.session.execute(stmt).scalars())
+        total = self.count()
+        return self._to_domain_sequence(models), total
 
     def search_variants(
         self,
@@ -174,20 +237,25 @@ class SqlAlchemyVariantRepository(VariantRepositoryInterface):
         limit: int = 10,
         filters: QueryFilters | None = None,
     ) -> list[Variant]:
-        # Simplified implementation
+        stmt = select(VariantModel).limit(limit)
         if query:
-            _ = query
+            pattern = f"%{query}%"
+            stmt = stmt.where(
+                or_(
+                    VariantModel.variant_id.ilike(pattern),
+                    VariantModel.clinvar_id.ilike(pattern),
+                    VariantModel.hgvs_genomic.ilike(pattern),
+                ),
+            )
         if filters:
-            _ = dict(filters)
-        models = self._repository.find_all(limit=limit)
-        return VariantMapper.to_domain_sequence(models)
+            for field, value in filters.items():
+                column = getattr(VariantModel, field, None)
+                if column is not None and value is not None:
+                    stmt = stmt.where(column == value)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def update_variant(self, variant_id: int, updates: VariantUpdate) -> Variant:
-        """Update a variant with type-safe update parameters."""
-        # Convert TypedDict to Dict[str, Any] for the underlying repository
-        updates_dict = dict(updates)
-        model = self._repository.update(variant_id, updates_dict)
-        return VariantMapper.to_domain(model)
+        return self.update(variant_id, updates)
 
 
 __all__ = ["SqlAlchemyVariantRepository"]

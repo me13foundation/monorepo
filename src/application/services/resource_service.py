@@ -1,3 +1,5 @@
+"""Application service for presenting curated MED13 resources."""
+
 from collections.abc import Sequence
 
 from src.models.resource import Resource
@@ -13,3 +15,6 @@ def list_resources() -> Sequence[Resource]:
             summary="Central information hub for the MED13 Foundation.",
         ),
     ]
+
+
+__all__ = ["list_resources"]

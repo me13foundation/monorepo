@@ -2,8 +2,8 @@ from collections.abc import Sequence
 
 from fastapi import APIRouter
 
+from src.application.services.resource_service import list_resources
 from src.models.resource import Resource
-from src.services.resources import list_resources
 
 router = APIRouter(prefix="/resources", tags=["resources"])
 

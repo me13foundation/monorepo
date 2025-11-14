@@ -97,4 +97,3 @@ exclude_lines = [ "pragma: no cover", "def __repr__", "if self.debug:", "if sett
 "src/routes/**" = [ "B008", "BLE001", "B904", "TRY300", "RET504", "ARG001", "PLR0913", "FBT001", "FBT003", "TRY301", "SLF001", "C901", "S106", "TC001", "TC002", "TC003",]
 "src/domain/transform/**" = [ "TID252", "C901", "PLR0911", "PLR0912", "PLR2004", "BLE001", "T201", "ERA001", "TRY003", "EM101", "EM102", "SIM102", "PLC0415", "PERF401", "ARG002", "RET504", "SIM105", "DTZ007", "DTZ001", "N817", "PLC0105", "FBT001", "FBT002", "TRY300", "TRY400", "G004", "SLF001", "TC003", "PLC0206",]
 "src/domain/validation/**" = [ "TID", "TC001", "TC002", "TC003", "C901", "FBT001", "FBT002", "PERF401", "SIM118", "A002", "UP007", "PLR0913", "PLR2004", "TRY003", "EM102", "SLF001", "PLC0415", "PLR0912",]
-"src/repositories/**" = [ "TRY003", "EM101", "EM102", "DTZ003", "RET504", "A002", "TRY300", "B904",]

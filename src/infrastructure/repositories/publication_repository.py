@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
+
+from sqlalchemy import and_, asc, desc, func, or_, select
 
 from src.domain.repositories.publication_repository import (
     PublicationRepository as PublicationRepositoryInterface,
 )
 from src.infrastructure.mappers.publication_mapper import PublicationMapper
-from src.repositories.publication_repository import PublicationRepository
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from src.models.database import PublicationType as DbPublicationType
-    from src.type_definitions.common import PublicationUpdate, QueryFilters
+from src.models.database import PublicationModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
 
     from src.domain.entities.publication import Publication
     from src.domain.repositories.base import QuerySpecification
+    from src.type_definitions.common import PublicationUpdate, QueryFilters
 
 
 class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
@@ -24,69 +24,115 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
 
     def __init__(self, session: Session | None = None) -> None:
         self._session = session
-        self._repository = PublicationRepository(session)
+
+    @property
+    def session(self) -> Session:
+        if self._session is None:
+            message = "Session is not configured"
+            raise ValueError(message)
+        return self._session
+
+    def _to_domain(self, model: PublicationModel | None) -> Publication | None:
+        return PublicationMapper.to_domain(model) if model else None
+
+    def _to_domain_sequence(
+        self,
+        models: list[PublicationModel],
+    ) -> list[Publication]:
+        return PublicationMapper.to_domain_sequence(models)
 
     def create(self, publication: Publication) -> Publication:
         model = PublicationMapper.to_model(publication)
-        persisted = self._repository.create(model)
-        return PublicationMapper.to_domain(persisted)
+        self.session.add(model)
+        self.session.commit()
+        self.session.refresh(model)
+        return PublicationMapper.to_domain(model)
 
     def get_by_id(self, publication_id: int) -> Publication | None:
-        model = self._repository.get_by_id(publication_id)
-        return PublicationMapper.to_domain(model) if model else None
+        model = self.session.get(PublicationModel, publication_id)
+        return self._to_domain(model)
 
     def get_by_id_or_fail(self, publication_id: int) -> Publication:
-        model = self._repository.get_by_id_or_fail(publication_id)
+        model = self.session.get(PublicationModel, publication_id)
+        if model is None:
+            message = f"Publication with id {publication_id} not found"
+            raise ValueError(message)
         return PublicationMapper.to_domain(model)
 
     def find_by_pubmed_id(self, pubmed_id: str) -> Publication | None:
-        model = self._repository.find_by_pubmed_id(pubmed_id)
-        return PublicationMapper.to_domain(model) if model else None
+        stmt = select(PublicationModel).where(PublicationModel.pubmed_id == pubmed_id)
+        model = self.session.execute(stmt).scalar_one_or_none()
+        return self._to_domain(model)
+
+    def find_by_pmid(self, pmid: str) -> Publication | None:
+        """Alias for PubMed ID lookups to satisfy domain contract."""
+        return self.find_by_pubmed_id(pmid)
 
     def find_by_pmc_id(self, pmc_id: str) -> Publication | None:
-        model = self._repository.find_by_pmc_id(pmc_id)
-        return PublicationMapper.to_domain(model) if model else None
+        stmt = select(PublicationModel).where(PublicationModel.pmc_id == pmc_id)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
 
     def find_by_year(self, year: int, limit: int | None = None) -> list[Publication]:
-        models = self._repository.find_by_year(year, limit)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = select(PublicationModel).where(PublicationModel.publication_year == year)
+        if limit:
+            stmt = stmt.limit(limit)
+        models = list(self.session.execute(stmt).scalars())
+        return self._to_domain_sequence(models)
 
     def find_by_author(
         self,
         author_name: str,
         limit: int | None = None,
     ) -> list[Publication]:
-        models = self._repository.find_by_author(author_name, limit)
-        return PublicationMapper.to_domain_sequence(models)
+        search_pattern = f"%{author_name}%"
+        stmt = select(PublicationModel).where(
+            PublicationModel.authors.ilike(search_pattern),
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_journal(
         self,
         journal_name: str,
         limit: int | None = None,
     ) -> list[Publication]:
-        models = self._repository.find_by_journal(journal_name, limit)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = select(PublicationModel).where(
+            PublicationModel.journal.ilike(f"%{journal_name}%"),
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_type(
         self,
         publication_type: str,
         limit: int | None = None,
     ) -> list[Publication]:
-        db_type = cast("DbPublicationType", publication_type)
-        models = self._repository.find_by_type(db_type, limit)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = select(PublicationModel).where(
+            PublicationModel.publication_type == publication_type,
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_open_access(self, limit: int | None = None) -> list[Publication]:
-        models = self._repository.find_open_access(limit)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = select(PublicationModel).where(PublicationModel.open_access.is_(True))
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_high_impact(
         self,
         min_citations: int = 50,
         limit: int | None = None,
     ) -> list[Publication]:
-        models = self._repository.find_high_impact(min_citations, limit)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = select(PublicationModel).where(
+            PublicationModel.citation_count >= min_citations,
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def search_publications(
         self,
@@ -94,82 +140,130 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         limit: int = 20,
         filters: QueryFilters | None = None,
     ) -> list[Publication]:
-        # Filters retained for API compatibility
         if filters:
             _ = dict(filters)
-        models = self._repository.search_publications(query, limit)
-        return PublicationMapper.to_domain_sequence(models)
+        search_pattern = f"%{query}%"
+        stmt = (
+            select(PublicationModel)
+            .where(
+                or_(
+                    PublicationModel.title.ilike(search_pattern),
+                    PublicationModel.authors.ilike(search_pattern),
+                    PublicationModel.abstract.ilike(search_pattern),
+                    PublicationModel.keywords.ilike(search_pattern),
+                ),
+            )
+            .limit(limit)
+        )
+        models = list(self.session.execute(stmt).scalars())
+        return self._to_domain_sequence(models)
 
     def find_med13_relevant(
         self,
         min_relevance: int = 3,
         limit: int | None = None,
     ) -> list[Publication]:
-        models = self._repository.find_med13_relevant(min_relevance, limit)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = select(PublicationModel).where(
+            and_(
+                PublicationModel.relevance_score >= min_relevance,
+                PublicationModel.relevance_score.isnot(None),
+            ),
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def get_publication_statistics(self) -> dict[str, int | float | bool | str | None]:
-        raw_stats = self._repository.get_publication_statistics()
+        total_publications = self.count()
+        open_access = len(self.find_open_access())
+        med13_relevant = len(self.find_med13_relevant())
         return {
-            key: value
-            for key, value in raw_stats.items()
-            if isinstance(value, (int, float, bool, str)) or value is None
+            "total_publications": total_publications,
+            "open_access_publications": open_access,
+            "med13_relevant_publications": med13_relevant,
         }
 
     def count(self) -> int:
-        return self._repository.count()
+        stmt = select(func.count()).select_from(PublicationModel)
+        return int(self.session.execute(stmt).scalar_one())
 
-    # Required interface implementations
     def delete(self, publication_id: int) -> bool:
-        return self._repository.delete(publication_id)
+        model = self.session.get(PublicationModel, publication_id)
+        if model is None:
+            return False
+        self.session.delete(model)
+        self.session.commit()
+        return True
 
     def exists(self, publication_id: int) -> bool:
-        return self._repository.exists(publication_id)
+        stmt = select(func.count()).where(PublicationModel.id == publication_id)
+        return bool(self.session.execute(stmt).scalar_one())
 
     def find_all(
         self,
         limit: int | None = None,
         offset: int | None = None,
     ) -> list[Publication]:
-        models = self._repository.find_all(limit=limit, offset=offset)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = select(PublicationModel)
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit:
+            stmt = stmt.limit(limit)
+        models = list(self.session.execute(stmt).scalars())
+        return self._to_domain_sequence(models)
 
     def find_by_criteria(self, spec: QuerySpecification) -> list[Publication]:
-        # Simplified implementation
-        return PublicationMapper.to_domain_sequence(
-            self._repository.find_all(limit=spec.limit, offset=spec.offset),
-        )
+        stmt = select(PublicationModel)
+        for field, value in spec.filters.items():
+            column = getattr(PublicationModel, field, None)
+            if column is not None and value is not None:
+                stmt = stmt.where(column == value)
+        if spec.sort_by:
+            column = getattr(PublicationModel, spec.sort_by, None)
+            if column is not None:
+                sort_clause = desc(column) if spec.sort_order == "desc" else asc(column)
+                stmt = stmt.order_by(sort_clause)
+        if spec.offset:
+            stmt = stmt.offset(spec.offset)
+        if spec.limit:
+            stmt = stmt.limit(spec.limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_gene_associations(self, gene_id: int) -> list[Publication]:
-        # Placeholder implementation until relationships are modeled.
         if gene_id:
             _ = gene_id
         return []
 
-    def find_by_pmid(self, pmid: str) -> Publication | None:
-        model = self._repository.find_by_pmid(pmid)
-        return PublicationMapper.to_domain(model) if model else None
-
     def find_by_doi(self, doi: str) -> Publication | None:
-        model = self._repository.find_by_doi(doi)
-        return PublicationMapper.to_domain(model) if model else None
+        stmt = select(PublicationModel).where(PublicationModel.doi == doi)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
 
     def find_by_title(
         self,
         title: str,
         fuzzy: bool = False,  # noqa: FBT001, FBT002
     ) -> list[Publication]:
+        stmt = select(PublicationModel)
         if fuzzy:
-            _ = fuzzy
-        models = self._repository.search_publications(title, limit=10)
-        return PublicationMapper.to_domain_sequence(models)
+            stmt = stmt.where(PublicationModel.title.ilike(f"%{title}%"))
+        else:
+            stmt = stmt.where(PublicationModel.title == title)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_year_range(self, start_year: int, end_year: int) -> list[Publication]:
-        models = self._repository.find_by_year_range(start_year, end_year)
-        return PublicationMapper.to_domain_sequence(models)
+        stmt = (
+            select(PublicationModel)
+            .where(
+                and_(
+                    PublicationModel.publication_year >= start_year,
+                    PublicationModel.publication_year <= end_year,
+                ),
+            )
+            .order_by(PublicationModel.publication_year.asc())
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_variant_associations(self, variant_id: int) -> list[Publication]:
-        # Placeholder implementation
         if variant_id:
             _ = variant_id
         return []
@@ -182,20 +276,40 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         sort_order: str,
         filters: QueryFilters | None = None,
     ) -> tuple[list[Publication], int]:
-        # Simplified implementation
+        stmt = select(PublicationModel)
         if filters:
-            _ = dict(filters)
-        if sort_by:
-            _ = sort_by
-        if sort_order:
-            _ = sort_order
-        offset = (page - 1) * per_page
-        models = self._repository.find_all(limit=per_page, offset=offset)
-        total = self._repository.count()
-        return PublicationMapper.to_domain_sequence(models), total
+            for field, value in filters.items():
+                column = getattr(PublicationModel, field, None)
+                if column is not None and value is not None:
+                    stmt = stmt.where(column == value)
+        sortable_fields = {
+            "title": PublicationModel.title,
+            "publication_year": PublicationModel.publication_year,
+            "citation_count": PublicationModel.citation_count,
+            "relevance_score": PublicationModel.relevance_score,
+        }
+        sort_column = sortable_fields.get(sort_by)
+        if sort_column is not None:
+            stmt = stmt.order_by(
+                desc(sort_column) if sort_order == "desc" else asc(sort_column),
+            )
+        offset = max(page - 1, 0) * per_page
+        stmt = stmt.offset(offset).limit(per_page)
+        records = list(self.session.execute(stmt).scalars())
+        total = self.count()
+        return self._to_domain_sequence(records), total
 
     def update(self, publication_id: int, updates: PublicationUpdate) -> Publication:
-        model = self._repository.update(publication_id, dict(updates))
+        model = self.session.get(PublicationModel, publication_id)
+        if model is None:
+            message = f"Publication with id {publication_id} not found"
+            raise ValueError(message)
+        for field, value in updates.items():
+            if hasattr(model, field):
+                setattr(model, field, value)
+        model.updated_at = datetime.now(UTC)
+        self.session.commit()
+        self.session.refresh(model)
         return PublicationMapper.to_domain(model)
 
     def update_publication(
@@ -203,12 +317,16 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         publication_id: int,
         updates: PublicationUpdate,
     ) -> Publication:
-        """Update a publication with type-safe update parameters."""
         return self.update(publication_id, updates)
 
     def find_recent_publications(self, days: int = 30) -> list[Publication]:
-        models = self._repository.find_recent_publications(days=days)
-        return PublicationMapper.to_domain_sequence(models)
+        cutoff = datetime.now(UTC) - timedelta(days=days)
+        stmt = (
+            select(PublicationModel)
+            .where(PublicationModel.created_at >= cutoff)
+            .order_by(PublicationModel.created_at.desc())
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
 
 __all__ = ["SqlAlchemyPublicationRepository"]

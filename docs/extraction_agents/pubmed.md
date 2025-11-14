@@ -390,6 +390,5 @@ This is the definitive list of what to extract from ANY paper:
 9. Agent who extracted (LLM vs human)
 
 ---
-1. Finish the DI/story alignment by either relocating the container into src/infrastructure or revising docs so contributors know the current home and migration status.
-  2. Retire the legacy src/repositories/src/services modules in favor of the Clean Architecture interfaces to prevent duplicate data-access patterns.
+
   3. Replace remaining Any usages in routes/tests with the TypedDicts and Protocols showcased in docs/type_examples.md to realize the “never Any” requirement.

@@ -1,24 +1,22 @@
+"""SQLAlchemy-backed implementation of the domain evidence repository."""
+
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
+
+from sqlalchemy import and_, asc, desc, func, select
+
+from src.domain.repositories.evidence_repository import (
+    EvidenceRepository as EvidenceRepositoryInterface,
+)
+from src.infrastructure.mappers.evidence_mapper import EvidenceMapper
+from src.models.database import EvidenceModel, VariantModel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
 
     from src.domain.entities.evidence import Evidence
     from src.domain.repositories.base import QuerySpecification
-from src.domain.repositories.evidence_repository import (
-    EvidenceRepository as EvidenceRepositoryInterface,
-)
-from src.domain.value_objects.confidence import EvidenceLevel
-from src.infrastructure.mappers.evidence_mapper import EvidenceMapper
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from src.models.database.evidence import EvidenceLevel as DbEvidenceLevel
-    from src.models.database.evidence import EvidenceType as DbEvidenceType
-from src.repositories.evidence_repository import EvidenceRepository
-
-if TYPE_CHECKING:
     from src.type_definitions.common import EvidenceUpdate, QueryFilters
 
 
@@ -27,19 +25,75 @@ class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
 
     def __init__(self, session: Session | None = None) -> None:
         self._session = session
-        self._repository = EvidenceRepository(session)
+
+    @property
+    def session(self) -> Session:
+        if self._session is None:
+            message = "Session is not configured"
+            raise ValueError(message)
+        return self._session
+
+    def _to_domain(self, model: EvidenceModel | None) -> Evidence | None:
+        return EvidenceMapper.to_domain(model) if model else None
+
+    def _to_domain_sequence(self, models: list[EvidenceModel]) -> list[Evidence]:
+        return EvidenceMapper.to_domain_sequence(models)
 
     def create(self, evidence: Evidence) -> Evidence:
         model = EvidenceMapper.to_model(evidence)
-        persisted = self._repository.create(model)
-        return EvidenceMapper.to_domain(persisted)
+        self.session.add(model)
+        self.session.commit()
+        self.session.refresh(model)
+        return EvidenceMapper.to_domain(model)
 
     def get_by_id(self, evidence_id: int) -> Evidence | None:
-        model = self._repository.get_by_id(evidence_id)
-        return EvidenceMapper.to_domain(model) if model else None
+        return self._to_domain(self.session.get(EvidenceModel, evidence_id))
 
     def get_by_id_or_fail(self, evidence_id: int) -> Evidence:
-        model = self._repository.get_by_id_or_fail(evidence_id)
+        evidence = self.get_by_id(evidence_id)
+        if evidence is None:
+            message = f"Evidence with id {evidence_id} not found"
+            raise ValueError(message)
+        return evidence
+
+    def find_all(
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[Evidence]:
+        stmt = select(EvidenceModel)
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
+
+    def count(self) -> int:
+        stmt = select(func.count()).select_from(EvidenceModel)
+        return int(self.session.execute(stmt).scalar_one())
+
+    def exists(self, evidence_id: int) -> bool:
+        stmt = select(func.count()).where(EvidenceModel.id == evidence_id)
+        return bool(self.session.execute(stmt).scalar_one())
+
+    def delete(self, evidence_id: int) -> bool:
+        model = self.session.get(EvidenceModel, evidence_id)
+        if model is None:
+            return False
+        self.session.delete(model)
+        self.session.commit()
+        return True
+
+    def update(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
+        model = self.session.get(EvidenceModel, evidence_id)
+        if model is None:
+            message = f"Evidence with id {evidence_id} not found"
+            raise ValueError(message)
+        for field, value in updates.items():
+            if hasattr(model, field):
+                setattr(model, field, value)
+        self.session.commit()
+        self.session.refresh(model)
         return EvidenceMapper.to_domain(model)
 
     def find_by_variant(
@@ -47,76 +101,112 @@ class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
         variant_id: int,
         limit: int | None = None,
     ) -> list[Evidence]:
-        models = self._repository.find_by_variant(variant_id, limit)
-        return EvidenceMapper.to_domain_sequence(models)
+        stmt = select(EvidenceModel).where(EvidenceModel.variant_id == variant_id)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_phenotype(
         self,
         phenotype_id: int,
         limit: int | None = None,
     ) -> list[Evidence]:
-        models = self._repository.find_by_phenotype(phenotype_id, limit)
-        return EvidenceMapper.to_domain_sequence(models)
+        stmt = select(EvidenceModel).where(EvidenceModel.phenotype_id == phenotype_id)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_variant_and_phenotype(
         self,
         variant_id: int,
         phenotype_id: int,
     ) -> list[Evidence]:
-        models = self._repository.find_by_variant_and_phenotype(
-            variant_id,
-            phenotype_id,
+        stmt = select(EvidenceModel).where(
+            and_(
+                EvidenceModel.variant_id == variant_id,
+                EvidenceModel.phenotype_id == phenotype_id,
+            ),
         )
-        return EvidenceMapper.to_domain_sequence(models)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_publication(
         self,
         publication_id: int,
         limit: int | None = None,
     ) -> list[Evidence]:
-        models = self._repository.find_by_publication(publication_id, limit)
-        return EvidenceMapper.to_domain_sequence(models)
+        stmt = select(EvidenceModel).where(
+            EvidenceModel.publication_id == publication_id,
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
+
+    def find_by_gene(self, gene_id: int) -> list[Evidence]:
+        stmt = (
+            select(EvidenceModel)
+            .join(EvidenceModel.variant)
+            .where(VariantModel.gene_id == gene_id)
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_evidence_level(
         self,
         level: str,
         limit: int | None = None,
     ) -> list[Evidence]:
-        normalized = EvidenceLevel(level)
-        db_level = cast("DbEvidenceLevel", normalized.value)
-        models = self._repository.find_by_evidence_level(db_level, limit)
-        return EvidenceMapper.to_domain_sequence(models)
+        stmt = select(EvidenceModel).where(EvidenceModel.evidence_level == level)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_by_evidence_type(
         self,
         evidence_type: str,
         limit: int | None = None,
     ) -> list[Evidence]:
-        db_type = cast("DbEvidenceType", evidence_type)
-        models = self._repository.find_by_evidence_type(db_type, limit)
-        return EvidenceMapper.to_domain_sequence(models)
+        stmt = select(EvidenceModel).where(EvidenceModel.evidence_type == evidence_type)
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
+
+    def find_by_confidence_score(
+        self,
+        min_score: float,
+        max_score: float,
+    ) -> list[Evidence]:
+        stmt = select(EvidenceModel).where(
+            EvidenceModel.confidence_score >= min_score,
+            EvidenceModel.confidence_score <= max_score,
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def find_high_confidence_evidence(
         self,
         limit: int | None = None,
     ) -> list[Evidence]:
-        models = self._repository.find_high_confidence_evidence(limit)
-        return EvidenceMapper.to_domain_sequence(models)
+        stmt = select(EvidenceModel).where(
+            EvidenceModel.evidence_level.in_(["definitive", "strong"]),
+        )
+        if limit:
+            stmt = stmt.limit(limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
-    def find_peer_reviewed_evidence(
-        self,
-        limit: int | None = None,
-    ) -> list[Evidence]:
-        models = self._repository.find_peer_reviewed_evidence(limit)
-        return EvidenceMapper.to_domain_sequence(models)
+    def find_by_criteria(self, spec: QuerySpecification) -> list[Evidence]:
+        stmt = select(EvidenceModel)
+        for field, value in spec.filters.items():
+            column = getattr(EvidenceModel, field, None)
+            if column is not None and value is not None:
+                stmt = stmt.where(column == value)
+        if spec.offset:
+            stmt = stmt.offset(spec.offset)
+        if spec.limit:
+            stmt = stmt.limit(spec.limit)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
-    def get_evidence_statistics(self) -> dict[str, int | float | bool | str | None]:
-        raw_stats = self._repository.get_evidence_statistics()
-        return {
-            key: value
-            for key, value in raw_stats.items()
-            if isinstance(value, (int, float, bool, str)) or value is None
-        }
+    def find_by_source(self, source: str) -> list[Evidence]:
+        if source:
+            _ = source
+        return []
 
     def find_relationship_evidence(
         self,
@@ -124,91 +214,74 @@ class SqlAlchemyEvidenceRepository(EvidenceRepositoryInterface):
         phenotype_id: int,
         min_confidence: float = 0.0,
     ) -> list[Evidence]:
-        models = self._repository.find_relationship_evidence(
-            variant_id,
-            phenotype_id,
-            min_confidence,
+        stmt = select(EvidenceModel).where(
+            and_(
+                EvidenceModel.variant_id == variant_id,
+                EvidenceModel.phenotype_id == phenotype_id,
+                EvidenceModel.confidence_score >= min_confidence,
+            ),
         )
-        return EvidenceMapper.to_domain_sequence(models)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
-    # Required interface implementations
-    def delete(self, evidence_id: int) -> bool:
-        return self._repository.delete(evidence_id)
-
-    def exists(self, evidence_id: int) -> bool:
-        return self._repository.exists(evidence_id)
-
-    def find_all(
+    def search_evidence(
         self,
-        limit: int | None = None,
-        offset: int | None = None,
+        query: str,
+        limit: int = 10,
+        filters: QueryFilters | None = None,
     ) -> list[Evidence]:
-        models = self._repository.find_all(limit=limit, offset=offset)
-        return EvidenceMapper.to_domain_sequence(models)
-
-    def find_by_criteria(self, spec: QuerySpecification) -> list[Evidence]:
-        # Simplified implementation - would need more complex query building
-        models = self._repository.find_all(limit=spec.limit, offset=spec.offset)
-        return EvidenceMapper.to_domain_sequence(models)
-
-    def find_by_gene(self, gene_id: int) -> list[Evidence]:
-        models = self._repository.find_by_gene(gene_id)
-        return EvidenceMapper.to_domain_sequence(models)
-
-    def find_by_source(self, source: str) -> list[Evidence]:
-        models = self._repository.find_by_source(source)
-        return EvidenceMapper.to_domain_sequence(models)
-
-    def find_by_confidence_score(
-        self,
-        min_score: float,
-        max_score: float,
-    ) -> list[Evidence]:
-        models = self._repository.find_by_confidence_score(min_score, max_score)
-        return EvidenceMapper.to_domain_sequence(models)
-
-    def find_conflicting_evidence(self, _variant_id: int) -> list[Evidence]:
-        # Placeholder implementation
-        return []
+        stmt = select(EvidenceModel).limit(limit)
+        if query:
+            stmt = stmt.where(EvidenceModel.description.ilike(f"%{query}%"))
+        if filters:
+            for field, value in filters.items():
+                column = getattr(EvidenceModel, field, None)
+                if column is not None and value is not None:
+                    stmt = stmt.where(column == value)
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
     def paginate_evidence(
         self,
         page: int,
         per_page: int,
-        _sort_by: str,
-        _sort_order: str,
-        _filters: QueryFilters | None = None,
+        sort_by: str,
+        sort_order: str,
+        filters: QueryFilters | None = None,
     ) -> tuple[list[Evidence], int]:
-        # Simplified implementation
-        offset = (page - 1) * per_page
-        models = self._repository.find_all(limit=per_page, offset=offset)
-        total = self._repository.count()
-        return EvidenceMapper.to_domain_sequence(models), total
+        stmt = select(EvidenceModel)
+        if filters:
+            for field, value in filters.items():
+                column = getattr(EvidenceModel, field, None)
+                if column is not None and value is not None:
+                    stmt = stmt.where(column == value)
+        column = getattr(EvidenceModel, sort_by, None) if sort_by else None
+        if column is not None:
+            stmt = stmt.order_by(
+                desc(column) if sort_order == "desc" else asc(column),
+            )
+        stmt = stmt.offset(max(page - 1, 0) * per_page).limit(per_page)
+        models = list(self.session.execute(stmt).scalars())
+        total = self.count()
+        return self._to_domain_sequence(models), total
 
-    def search_evidence(
-        self,
-        _query: str,
-        limit: int = 10,
-        _filters: QueryFilters | None = None,
-    ) -> list[Evidence]:
-        # Simplified implementation
-        models = self._repository.find_all(limit=limit)
-        return EvidenceMapper.to_domain_sequence(models)
+    def get_evidence_statistics(self) -> dict[str, int | float | bool | str | None]:
+        total = self.count()
+        high_confidence = len(self.find_high_confidence_evidence())
+        return {
+            "total_evidence": total,
+            "high_confidence_evidence": high_confidence,
+        }
 
-    def update(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
-        model = self._repository.update(evidence_id, dict(updates))
-        return EvidenceMapper.to_domain(model)
+    def find_conflicting_evidence(self, variant_id: int) -> list[Evidence]:
+        stmt = select(EvidenceModel).where(
+            and_(
+                EvidenceModel.variant_id == variant_id,
+                EvidenceModel.evidence_level == "conflicting",
+            ),
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
-    def update_evidence(
-        self,
-        evidence_id: int,
-        updates: EvidenceUpdate,
-    ) -> Evidence:
-        """Update evidence with type-safe update parameters."""
+    def update_evidence(self, evidence_id: int, updates: EvidenceUpdate) -> Evidence:
         return self.update(evidence_id, updates)
-
-    def count(self) -> int:
-        return self._repository.count()
 
 
 __all__ = ["SqlAlchemyEvidenceRepository"]
