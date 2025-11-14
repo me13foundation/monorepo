@@ -1,12 +1,8 @@
-"""
-Ingestion Job SQLAlchemy model for MED13 Resource Library.
+from __future__ import annotations
 
-Database representation of data ingestion job executions with
-relationships and constraints for the Data Sources module.
-"""
-
+# SQLAlchemy model for ingestion job executions (Data Sources module).
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, ForeignKey, String
 from sqlalchemy import Enum as SQLEnum
@@ -16,6 +12,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
+    from src.type_definitions.common import JSONObject
+
     from .user_data_source import UserDataSourceModel
 
 
@@ -84,34 +82,34 @@ class IngestionJobModel(Base):
     completed_at: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
     # Results and metrics
-    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
-    errors: Mapped[list[dict[str, Any]]] = mapped_column(
+    metrics: Mapped[JSONObject] = mapped_column(JSON, nullable=False, default=dict)
+    errors: Mapped[list[JSONObject]] = mapped_column(
         JSON,
         nullable=False,
         default=list,
     )
 
     # Provenance and metadata
-    provenance: Mapped[dict[str, Any]] = mapped_column(
+    provenance: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
     )
-    job_metadata: Mapped[dict[str, Any]] = mapped_column(
+    job_metadata: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
     )
 
     # Configuration snapshot
-    source_config_snapshot: Mapped[dict[str, Any]] = mapped_column(
+    source_config_snapshot: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
     )
 
     # Relationships
-    source: Mapped["UserDataSourceModel"] = relationship(
+    source: Mapped[UserDataSourceModel] = relationship(
         "UserDataSourceModel",
         back_populates="ingestion_jobs",
     )

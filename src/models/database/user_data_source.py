@@ -1,30 +1,19 @@
-"""
-User Data Source SQLAlchemy model for MED13 Resource Library.
-
-Database representation of user-managed data sources with relationships
-and constraints for the Data Sources module.
-"""
-
 from __future__ import annotations
 
+# SQLAlchemy model for user-managed data sources.
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from sqlalchemy import (
-    JSON,
-    ForeignKey,
-    String,
-    Text,
-)
-from sqlalchemy import (
-    Enum as SQLEnum,
-)
+from sqlalchemy import JSON, ForeignKey, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
 if TYPE_CHECKING:
+    from src.type_definitions.common import JSONObject
+
     from .ingestion_job import IngestionJobModel
     from .research_space import ResearchSpaceModel
     from .source_template import SourceTemplateModel
@@ -94,7 +83,7 @@ class UserDataSourceModel(Base):
         nullable=True,
         index=True,
     )
-    configuration: Mapped[dict[str, Any]] = mapped_column(
+    configuration: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
@@ -107,14 +96,14 @@ class UserDataSourceModel(Base):
         default=SourceStatusEnum.DRAFT,
         index=True,
     )
-    ingestion_schedule: Mapped[dict[str, Any]] = mapped_column(
+    ingestion_schedule: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
     )
 
     # Quality metrics
-    quality_metrics: Mapped[dict[str, Any]] = mapped_column(
+    quality_metrics: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,

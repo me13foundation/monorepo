@@ -1,12 +1,8 @@
-"""
-Source Template SQLAlchemy model for MED13 Resource Library.
+from __future__ import annotations
 
-Database representation of reusable data source templates with
-relationships and constraints for the Data Sources module.
-"""
-
+# SQLAlchemy model for reusable data source templates.
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, Boolean, Float, Integer, String, Text
 from sqlalchemy import Enum as SQLEnum
@@ -16,6 +12,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 if TYPE_CHECKING:
+    from src.type_definitions.common import JSONObject
+
     from .user_data_source import UserDataSourceModel
 
 
@@ -77,19 +75,19 @@ class SourceTemplateModel(Base):
         nullable=False,
         index=True,
     )
-    schema_definition: Mapped[dict[str, Any]] = mapped_column(
+    schema_definition: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
     )
-    validation_rules: Mapped[list[dict[str, Any]]] = mapped_column(
+    validation_rules: Mapped[list[JSONObject]] = mapped_column(
         JSON,
         nullable=False,
         default=list,
     )
 
     # UI configuration
-    ui_config: Mapped[dict[str, Any]] = mapped_column(
+    ui_config: Mapped[JSONObject] = mapped_column(
         JSON,
         nullable=False,
         default=dict,
@@ -131,7 +129,7 @@ class SourceTemplateModel(Base):
     )
 
     # Relationships
-    sources: Mapped[list["UserDataSourceModel"]] = relationship(
+    sources: Mapped[list[UserDataSourceModel]] = relationship(
         "UserDataSourceModel",
         back_populates="template",
     )

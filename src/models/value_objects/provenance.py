@@ -5,9 +5,10 @@ Immutable objects that track the origin and history of MED13 data.
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from src.type_definitions.common import JSONObject
 
 
 class DataSource(str, Enum):
@@ -62,7 +63,7 @@ class Provenance(BaseModel):
     )
 
     # Additional metadata
-    metadata: dict[str, Any] = Field(
+    metadata: JSONObject = Field(
         default_factory=dict,
         description="Additional source-specific metadata",
     )

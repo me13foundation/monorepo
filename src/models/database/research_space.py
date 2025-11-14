@@ -1,13 +1,9 @@
-"""
-Research Space SQLAlchemy models for MED13 Resource Library.
+from __future__ import annotations
 
-Database representation of research spaces and memberships with relationships
-and constraints for the Research Spaces module.
-"""
-
+# SQLAlchemy models for research spaces and memberships.
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import JSON, ForeignKey, Index, String, Text
@@ -16,6 +12,9 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from src.type_definitions.common import JSONObject
 
 
 class SpaceStatusEnum(str, Enum):
@@ -87,7 +86,7 @@ class ResearchSpaceModel(Base):
     )
 
     # Configuration
-    settings: Mapped[dict[str, Any]] = mapped_column(
+    settings: Mapped[JSONObject] = mapped_column(
         JSON,
         default=dict,
         nullable=False,

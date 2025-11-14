@@ -8,7 +8,7 @@ objects and their SQLAlchemy representations.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from src.domain.entities.source_template import (
@@ -26,8 +26,6 @@ from src.models.database.source_template import (
 
 if TYPE_CHECKING:
     from src.type_definitions.common import JSONObject
-else:
-    JSONObject = dict[str, Any]
 
 
 def _parse_datetime(value: str | None) -> datetime | None:
@@ -53,11 +51,12 @@ class SourceTemplateMapper:
     @staticmethod
     def to_domain(model: SourceTemplateModel) -> SourceTemplate:
         """Convert a SQLAlchemy model to a domain entity."""
-        schema_definition = cast("JSONObject", model.schema_definition or {})
+        schema_definition: JSONObject = model.schema_definition or {}
         validation_rules = [
-            ValidationRule(**rule) for rule in (model.validation_rules or [])
+            ValidationRule.model_validate(rule)
+            for rule in (model.validation_rules or [])
         ]
-        ui_config = TemplateUIConfig(**(model.ui_config or {}))
+        ui_config = TemplateUIConfig.model_validate(model.ui_config or {})
 
         approved_at = _parse_datetime(model.approved_at)
 
@@ -94,7 +93,7 @@ class SourceTemplateMapper:
             description=entity.description,
             category=TemplateCategoryEnum(entity.category.value),
             source_type=SourceTypeEnum(entity.source_type.value),
-            schema_definition=cast("dict[str, Any]", entity.schema_definition),
+            schema_definition=entity.schema_definition,
             validation_rules=[rule.model_dump() for rule in entity.validation_rules],
             ui_config=entity.ui_config.model_dump(),
             is_public=entity.is_public,
@@ -115,7 +114,7 @@ class SourceTemplateMapper:
         model.description = entity.description
         model.category = TemplateCategoryEnum(entity.category.value)
         model.source_type = SourceTypeEnum(entity.source_type.value)
-        model.schema_definition = cast("dict[str, Any]", entity.schema_definition)
+        model.schema_definition = entity.schema_definition
         model.validation_rules = [rule.model_dump() for rule in entity.validation_rules]
         model.ui_config = entity.ui_config.model_dump()
         model.is_public = entity.is_public

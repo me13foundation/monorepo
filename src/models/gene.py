@@ -5,9 +5,10 @@ Strongly typed Pydantic models with comprehensive validation.
 
 from datetime import UTC, datetime
 from enum import Enum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+
+from src.models.api.common import PhenotypeSummary, VariantLinkSummary
 
 
 class GeneType(str, Enum):
@@ -184,11 +185,11 @@ class GeneResponse(Gene):
     )
 
     # Optional relationships (can be included based on query parameters)
-    variants: list[dict[str, Any]] | None = Field(
+    variants: list[VariantLinkSummary] | None = Field(
         default=None,
         description="Associated variants (optional)",
     )
-    phenotypes: list[dict[str, Any]] | None = Field(
+    phenotypes: list[PhenotypeSummary] | None = Field(
         default=None,
         description="Associated phenotypes (optional)",
     )

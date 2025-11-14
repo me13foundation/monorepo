@@ -1,13 +1,7 @@
-"""
-SQLAlchemy database models for Data Discovery.
+from __future__ import annotations
 
-These models represent the database schema for data discovery sessions,
-source catalog, and query test results.
-"""
-
-from datetime import datetime
-from typing import Any
-from uuid import UUID
+# SQLAlchemy models for Data Discovery (sessions, catalog, query tests).
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     JSON,
@@ -24,6 +18,12 @@ from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from uuid import UUID
+
+    from src.type_definitions.common import JSONObject
 
 
 class DataDiscoverySessionModel(Base):
@@ -206,7 +206,7 @@ class QueryTestResultModel(Base):
     search_term: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Results
-    response_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    response_data: Mapped[JSONObject | None] = mapped_column(JSON, nullable=True)
     response_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 

@@ -4,9 +4,9 @@ Immutable objects that quantify the strength of evidence in MED13.
 """
 
 from enum import Enum
-from typing import Any
+from typing import TypedDict, Unpack, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 # Threshold constants for evidence levels
 LEVEL_DEFINITIVE: float = 0.9
@@ -75,7 +75,11 @@ class ConfidenceScore(BaseModel):
 
     @field_validator("level", mode="after")
     @classmethod
-    def validate_level_consistency(cls, v: EvidenceLevel, info: Any) -> EvidenceLevel:
+    def validate_level_consistency(
+        cls,
+        v: EvidenceLevel,
+        info: ValidationInfo,
+    ) -> EvidenceLevel:
         """Ensure evidence level is consistent with score."""
         score = info.data.get("score")
         if score is not None:
@@ -101,23 +105,31 @@ class ConfidenceScore(BaseModel):
         return v
 
     @classmethod
-    def from_score(cls, score: float, **kwargs: Any) -> "ConfidenceScore":
+    def from_score(
+        cls,
+        score: float,
+        *,
+        level_override: EvidenceLevel | None = None,
+        **options: Unpack["ConfidenceScoreOptions"],
+    ) -> "ConfidenceScore":
         """Create ConfidenceScore from numeric score with automatic level
         classification."""
+        mutable_options = cast("ConfidenceScoreOptions", dict(options))
         if score >= LEVEL_DEFINITIVE:
-            level = EvidenceLevel.DEFINITIVE
+            computed_level = EvidenceLevel.DEFINITIVE
         elif score >= LEVEL_STRONG:
-            level = EvidenceLevel.STRONG
+            computed_level = EvidenceLevel.STRONG
         elif score >= LEVEL_MODERATE:
-            level = EvidenceLevel.MODERATE
+            computed_level = EvidenceLevel.MODERATE
         elif score >= LEVEL_SUPPORTING:
-            level = EvidenceLevel.SUPPORTING
+            computed_level = EvidenceLevel.SUPPORTING
         elif score >= LEVEL_WEAK:
-            level = EvidenceLevel.WEAK
+            computed_level = EvidenceLevel.WEAK
         else:
-            level = EvidenceLevel.DISPROVEN
+            computed_level = EvidenceLevel.DISPROVEN
 
-        return cls(score=score, level=level, **kwargs)
+        level_to_use = level_override or computed_level
+        return cls(score=score, level=level_to_use, **mutable_options)
 
     def is_significant(self) -> bool:
         """Check if evidence represents a significant finding."""
@@ -145,3 +157,13 @@ class ConfidenceScore(BaseModel):
     def __str__(self) -> str:
         """String representation of confidence score."""
         return f"{self.level.value} ({self.score:.2f})"
+
+
+class ConfidenceScoreOptions(TypedDict, total=False):
+    """Optional parameters for constructing a confidence score."""
+
+    sample_size: int | None
+    p_value: float | None
+    study_count: int | None
+    peer_reviewed: bool
+    replicated: bool

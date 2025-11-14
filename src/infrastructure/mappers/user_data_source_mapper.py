@@ -46,13 +46,13 @@ class UserDataSourceMapper:
             last_ingested_at = datetime.fromisoformat(model.last_ingested_at)
 
         # Build configuration
-        configuration = SourceConfiguration(**model.configuration)
+        configuration = SourceConfiguration.model_validate(model.configuration)
 
-        # Build ingestion schedule
-        ingestion_schedule = IngestionSchedule(**model.ingestion_schedule)
+        ingestion_schedule = IngestionSchedule.model_validate(
+            model.ingestion_schedule,
+        )
 
-        # Build quality metrics
-        quality_metrics = QualityMetrics(**model.quality_metrics)
+        quality_metrics = QualityMetrics.model_validate(model.quality_metrics)
 
         return UserDataSource(
             id=UUID(model.id),

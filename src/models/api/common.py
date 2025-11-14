@@ -4,9 +4,9 @@ Common API schemas for MED13 Resource Library.
 Shared Pydantic models for pagination, errors, and health checks.
 """
 
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from src.type_definitions.common import JSONObject
 
 
 class PaginationParams(BaseModel):
@@ -70,7 +70,7 @@ class HealthComponent(BaseModel):
         description="Component health status",
     )
     message: str | None = Field(None, description="Status message")
-    details: dict[str, Any] | None = Field(None, description="Additional details")
+    details: JSONObject | None = Field(None, description="Additional details")
 
 
 class HealthResponse(BaseModel):
