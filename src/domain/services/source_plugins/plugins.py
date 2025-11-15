@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from pydantic import ValidationError
 
@@ -12,6 +12,8 @@ from src.domain.entities.user_data_source import (
 
 if TYPE_CHECKING:
     from src.type_definitions.common import SourceMetadata
+else:
+    SourceMetadata = dict[str, object]  # Runtime type stub
 
 from .base import SourcePlugin
 
@@ -91,10 +93,8 @@ class PubMedSourcePlugin(SourcePlugin):
             messages = ", ".join(error["msg"] for error in exc.errors())
             raise ValueError(messages) from exc
 
-        sanitized_metadata = cast(
-            "SourceMetadata",
-            pubmed_config.model_dump(mode="json"),
-        )
+        # Type: model_dump(mode="json") returns dict[str, object] which is SourceMetadata
+        sanitized_metadata: SourceMetadata = dict(pubmed_config.model_dump(mode="json"))
         requests_per_minute = (
             configuration.requests_per_minute or self.DEFAULT_REQUESTS_PER_MINUTE
         )

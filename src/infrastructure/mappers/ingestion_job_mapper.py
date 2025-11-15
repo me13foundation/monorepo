@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from src.domain.entities.ingestion_job import (
@@ -22,6 +22,8 @@ from src.models.value_objects.provenance import Provenance
 
 if TYPE_CHECKING:
     from src.type_definitions.common import JSONObject
+else:
+    JSONObject = dict[str, object]  # Runtime type stub
 
 
 def _from_iso(value: str | None) -> datetime | None:
@@ -42,8 +44,10 @@ class IngestionJobMapper:
         """Convert a SQLAlchemy model instance into a domain entity."""
         metrics_payload = model.metrics or {}
         errors_payload = model.errors or []
-        metadata_payload = cast("JSONObject", model.job_metadata or {})
-        snapshot_payload = cast("JSONObject", model.source_config_snapshot or {})
+        # Type: model.job_metadata is already dict[str, object] from SQLAlchemy JSON
+        metadata_payload: JSONObject = dict(model.job_metadata or {})
+        # Type: model.source_config_snapshot is already dict[str, object] from SQLAlchemy JSON
+        snapshot_payload: JSONObject = dict(model.source_config_snapshot or {})
 
         return IngestionJob(
             id=UUID(model.id),
