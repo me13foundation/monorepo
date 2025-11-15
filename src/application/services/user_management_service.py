@@ -21,7 +21,7 @@ from src.application.dto.auth_responses import (
 )
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.domain.repositories.user_repository import UserRepository
-from src.infrastructure.security.password_hasher import PasswordHasher
+from src.domain.services.security.password_hasher import PasswordHasherService
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class UserManagementService:
     def __init__(
         self,
         user_repository: UserRepository,
-        password_hasher: PasswordHasher,
+        password_hasher: PasswordHasherService,
     ):
         """
         Initialize user management service.

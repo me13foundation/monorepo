@@ -12,6 +12,8 @@ from typing import TypedDict
 
 import bcrypt
 
+from src.domain.services.security.password_hasher import PasswordHasherService
+
 
 class PasswordAnalysis(TypedDict):
     """Type definition for password complexity analysis."""
@@ -35,7 +37,7 @@ class HashInfo(TypedDict, total=False):
     error: str
 
 
-class PasswordHasher:
+class PasswordHasher(PasswordHasherService):
     """
     Secure password hashing with bcrypt and truncation prevention.
 

@@ -84,6 +84,14 @@ jobs:
           name: pip-audit-results
           path: pip-audit-results.json
 
+      - name: Validate Architecture
+        run: |
+          python scripts/validate_architecture.py
+          pytest -m architecture -v
+
+      - name: Validate Dependencies
+        run: python scripts/validate_dependencies.py
+
       - name: Run tests with coverage
         run: pytest --cov=src --cov-report=xml
 

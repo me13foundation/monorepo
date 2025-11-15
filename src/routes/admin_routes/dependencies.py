@@ -88,7 +88,7 @@ def get_ingestion_scheduling_service() -> (
     Generator[IngestionSchedulingService, None, None]
 ):
     """Yield an ingestion scheduling service tied to a scoped session."""
-    from src.application.services.ingestion_scheduler_factory import (  # noqa: PLC0415
+    from src.infrastructure.factories.ingestion_scheduler_factory import (  # noqa: PLC0415
         ingestion_scheduling_service_context,
     )
 

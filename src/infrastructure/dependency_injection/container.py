@@ -5,18 +5,19 @@ Provides centralized dependency management for all application services.
 Combines Clean Architecture (auth system) with legacy patterns during transition.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 import secrets
-from collections.abc import AsyncGenerator, Generator
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
 from src.application.curation.conflict_detector import ConflictDetector
@@ -82,7 +83,15 @@ from src.infrastructure.repositories.variant_repository import (
 )
 from src.infrastructure.security.jwt_provider import JWTProvider
 from src.infrastructure.security.password_hasher import PasswordHasher
-from src.type_definitions.common import HealthCheckResponse
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
+
+    from sqlalchemy.orm import Session
+
+    from src.domain.services.security.jwt_provider import JWTProviderService
+    from src.domain.services.security.password_hasher import PasswordHasherService
+    from src.type_definitions.common import HealthCheckResponse
 
 DEFAULT_DEV_JWT_SECRET = os.getenv("MED13_DEV_JWT_SECRET") or secrets.token_urlsafe(64)
 
@@ -144,8 +153,8 @@ class DependencyContainer:
         )
 
         # Initialize security components (Clean Architecture)
-        self.password_hasher = PasswordHasher()
-        self.jwt_provider = JWTProvider(
+        self.password_hasher: PasswordHasherService = PasswordHasher()
+        self.jwt_provider: JWTProviderService = JWTProvider(
             secret_key=resolved_secret,
             algorithm=jwt_algorithm,
         )

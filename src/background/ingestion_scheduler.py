@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from src.application.services.ingestion_scheduler_factory import (
+from src.infrastructure.factories.ingestion_scheduler_factory import (
     ingestion_scheduling_service_context,
 )
 

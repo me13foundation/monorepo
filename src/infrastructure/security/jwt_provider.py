@@ -13,6 +13,8 @@ from uuid import UUID
 
 import jwt
 
+from src.domain.services.security.jwt_provider import JWTProviderService
+
 
 class TokenPayload(TypedDict, total=False):
     sub: str
@@ -39,7 +41,7 @@ class RefreshResult(TypedDict):
     role: str
 
 
-class JWTProvider:
+class JWTProvider(JWTProviderService):
     """
     JWT token provider with secure token management.
 
@@ -133,7 +135,7 @@ class JWTProvider:
 
         return self._encode_token(to_encode)
 
-    def decode_token(self, token: str) -> DecodedTokenPayload:
+    def decode_token(self, token: str) -> dict[str, object]:
         """
         Decode and validate a JWT token.
 
@@ -169,7 +171,8 @@ class JWTProvider:
         except Exception as exc:
             message = f"Token validation failed: {exc!s}"
             raise ValueError(message) from exc
-        return decoded_payload
+        # Type: DecodedTokenPayload is compatible with dict[str, object]
+        return dict(decoded_payload)
 
     def get_token_expiration(self, token: str) -> datetime:
         """
@@ -233,8 +236,16 @@ class JWTProvider:
             message = "Invalid token type"
             raise ValueError(message)
 
-        user_id = UUID(payload["sub"])
-        role = payload.get("role", "viewer")  # Default role if not in refresh token
+        sub_value = payload.get("sub")
+        if not isinstance(sub_value, str):
+            message = "Invalid user ID in token"
+            raise TypeError(message)
+        user_id = UUID(sub_value)
+
+        role_value = payload.get("role")
+        role = (
+            role_value if isinstance(role_value, str) else "viewer"
+        )  # Default role if not in refresh token
 
         # Create new access token
         new_access_token = self.create_access_token(user_id, role)

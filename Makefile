@@ -165,6 +165,23 @@ else
 	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest)
 endif
 
+validate-architecture: ## Validate architectural compliance
+	$(call check_venv)
+	@echo "🔍 Validating architectural compliance..."
+	$(USE_PYTHON) scripts/validate_architecture.py
+	@echo "✅ Architectural validation passed"
+
+validate-dependencies: ## Validate dependency graph and layer boundaries (fails on errors)
+	$(call check_venv)
+	@echo "🔍 Validating dependencies..."
+	$(USE_PYTHON) scripts/validate_dependencies.py
+	@echo "✅ Dependency validation passed"
+
+validate-dependencies-warn: ## Validate dependencies (warnings only, doesn't fail)
+	$(call check_venv)
+	@echo "🔍 Validating dependencies (warnings only)..."
+	-$(USE_PYTHON) scripts/validate_dependencies.py || echo "⚠️  Dependency validation found issues (see docs/known-architectural-debt.md)"
+
 test-verbose: ## Run tests with verbose output
 	$(call check_venv)
 ifeq ($(POSTGRES_ACTIVE),)
@@ -672,7 +689,7 @@ REPORT_DIR := reports
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 QA_REPORT := $(REPORT_DIR)/qa_report_$(TIMESTAMP).txt
 
-all: venv-check check-env format lint-strict type-check-strict web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (fails on first error)
+all: venv-check check-env format lint-strict type-check-strict validate-architecture validate-dependencies-warn web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (fails on first error)
 	@echo ""
 	@echo "✅ All quality checks passed!"
 

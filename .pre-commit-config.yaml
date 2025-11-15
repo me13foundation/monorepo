@@ -25,6 +25,24 @@ repos:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
 
+  - repo: local
+    hooks:
+      - id: validate-architecture
+        name: Validate Architecture
+        entry: python scripts/validate_architecture.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
+      - id: validate-dependencies
+        name: Validate Dependencies
+        entry: python scripts/validate_dependencies.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [commit]
+
 # Note: Advanced type checking, security scanning, and safety checks
 # are run via Makefile commands (make type-check, make security-audit)
 # to avoid pre-commit environment conflicts

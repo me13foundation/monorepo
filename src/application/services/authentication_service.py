@@ -18,8 +18,8 @@ from src.domain.entities.session import UserSession
 from src.domain.entities.user import User, UserStatus
 from src.domain.repositories.session_repository import SessionRepository
 from src.domain.repositories.user_repository import UserRepository
-from src.infrastructure.security.jwt_provider import JWTProvider
-from src.infrastructure.security.password_hasher import PasswordHasher
+from src.domain.services.security.jwt_provider import JWTProviderService
+from src.domain.services.security.password_hasher import PasswordHasherService
 
 
 class AuthenticationError(Exception):
@@ -49,8 +49,8 @@ class AuthenticationService:
         self,
         user_repository: UserRepository,
         session_repository: SessionRepository,
-        jwt_provider: JWTProvider,
-        password_hasher: PasswordHasher,
+        jwt_provider: JWTProviderService,
+        password_hasher: PasswordHasherService,
     ):
         """
         Initialize authentication service.
@@ -245,7 +245,15 @@ class AuthenticationService:
                 raise AuthenticationError(msg)  # noqa: TRY301
 
             # Get user
-            user_id = UUID(payload["sub"])
+            sub_value = payload.get("sub")
+            if not isinstance(sub_value, str):
+                msg = "Invalid user ID in token"
+                logger.warning(
+                    "[validate_token] Invalid user ID type: %s",
+                    type(sub_value),
+                )
+                raise AuthenticationError(msg)  # noqa: TRY301
+            user_id = UUID(sub_value)
             logger.debug("[validate_token] Extracted user_id: %s", user_id)
             user = await self.user_repository.get_by_id(user_id)
 

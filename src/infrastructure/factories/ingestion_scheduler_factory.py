@@ -1,4 +1,4 @@
-"""Factory helpers for building ingestion scheduling services."""
+"""Factory helpers for building ingestion scheduling services with infrastructure adapters."""
 
 from __future__ import annotations
 
