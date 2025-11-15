@@ -1,0 +1,84 @@
+"""Mapper utilities for ingestion job entities."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import TYPE_CHECKING, cast
+from uuid import UUID
+
+from src.domain.entities.ingestion_job import (
+    IngestionError,
+    IngestionJob,
+    IngestionStatus,
+    IngestionTrigger,
+    JobMetrics,
+)
+from src.models.database.ingestion_job import (
+    IngestionJobModel,
+    IngestionStatusEnum,
+    IngestionTriggerEnum,
+)
+from src.models.value_objects.provenance import Provenance
+
+if TYPE_CHECKING:
+    from src.type_definitions.common import JSONObject
+
+
+def _from_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
+def _to_iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+class IngestionJobMapper:
+    """Bidirectional mapper between domain ingestion jobs and SQLAlchemy models."""
+
+    @staticmethod
+    def to_domain(model: IngestionJobModel) -> IngestionJob:
+        """Convert a SQLAlchemy model instance into a domain entity."""
+        metrics_payload = model.metrics or {}
+        errors_payload = model.errors or []
+        metadata_payload = cast("JSONObject", model.job_metadata or {})
+        snapshot_payload = cast("JSONObject", model.source_config_snapshot or {})
+
+        return IngestionJob(
+            id=UUID(model.id),
+            source_id=UUID(model.source_id),
+            trigger=IngestionTrigger(model.trigger.value),
+            triggered_by=(UUID(model.triggered_by) if model.triggered_by else None),
+            triggered_at=datetime.fromisoformat(model.triggered_at),
+            status=IngestionStatus(model.status.value),
+            started_at=_from_iso(model.started_at),
+            completed_at=_from_iso(model.completed_at),
+            metrics=JobMetrics.model_validate(metrics_payload),
+            errors=[
+                IngestionError.model_validate(error_payload)
+                for error_payload in errors_payload
+            ],
+            provenance=Provenance.model_validate(model.provenance),
+            metadata=metadata_payload,
+            source_config_snapshot=snapshot_payload,
+        )
+
+    @staticmethod
+    def to_model_dict(job: IngestionJob) -> dict[str, object]:
+        """Convert a domain entity into keyword arguments for SQLAlchemy models."""
+        return {
+            "id": str(job.id),
+            "source_id": str(job.source_id),
+            "trigger": IngestionTriggerEnum(job.trigger.value),
+            "triggered_by": str(job.triggered_by) if job.triggered_by else None,
+            "triggered_at": job.triggered_at.isoformat(),
+            "status": IngestionStatusEnum(job.status.value),
+            "started_at": _to_iso(job.started_at),
+            "completed_at": _to_iso(job.completed_at),
+            "metrics": job.metrics.model_dump(mode="json"),
+            "errors": [error.model_dump(mode="json") for error in job.errors],
+            "provenance": job.provenance.model_dump(mode="json"),
+            "job_metadata": dict(job.metadata),
+            "source_config_snapshot": dict(job.source_config_snapshot),
+        }

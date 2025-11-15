@@ -1,10 +1,12 @@
+import asyncio
 import os
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.background.ingestion_scheduler import run_ingestion_scheduler_loop
 from src.database.seed import (
     ensure_default_research_space_seeded,
     ensure_source_catalog_seeded,
@@ -41,10 +43,20 @@ def _skip_startup_tasks() -> bool:
     return os.getenv("MED13_SKIP_STARTUP_TASKS") == "1"
 
 
+def _scheduler_disabled() -> bool:
+    return os.getenv("MED13_DISABLE_INGESTION_SCHEDULER") == "1"
+
+
+INGESTION_SCHEDULER_INTERVAL_SECONDS = int(
+    os.getenv("MED13_INGESTION_SCHEDULER_INTERVAL_SECONDS", "300"),
+)
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
     legacy_session = None
+    scheduler_task: asyncio.Task[None] | None = None
     try:
         if not _skip_startup_tasks():
             legacy_session = next(get_session())
@@ -52,12 +64,21 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             ensure_source_catalog_seeded(legacy_session)
             ensure_default_research_space_seeded(legacy_session)
             legacy_session.commit()
+            if not _scheduler_disabled():
+                scheduler_task = asyncio.create_task(
+                    run_ingestion_scheduler_loop(INGESTION_SCHEDULER_INTERVAL_SECONDS),
+                    name="ingestion-scheduler-loop",
+                )
         yield
     except Exception:
         if legacy_session is not None:
             legacy_session.rollback()
         raise
     finally:
+        if scheduler_task is not None:
+            scheduler_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await scheduler_task
         if legacy_session is not None:
             legacy_session.close()
         await container.engine.dispose()

@@ -1,0 +1,69 @@
+"""Pydantic value object for PubMed data source configuration."""
+
+from __future__ import annotations
+
+import re
+from typing import ClassVar
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+class PubMedQueryConfig(BaseModel):
+    """PubMed-specific configuration stored in SourceConfiguration.metadata."""
+
+    DATE_PATTERN: ClassVar[re.Pattern[str]] = re.compile(r"^\d{4}/\d{2}/\d{2}$")
+
+    query: str = Field(
+        ...,
+        min_length=1,
+        description="PubMed search query string",
+    )
+    date_from: str | None = Field(
+        None,
+        description="Start date filter (YYYY/MM/DD)",
+    )
+    date_to: str | None = Field(
+        None,
+        description="End date filter (YYYY/MM/DD)",
+    )
+    publication_types: list[str] | None = Field(
+        default=None,
+        description="List of PubMed publication types to include",
+    )
+    max_results: int = Field(
+        default=1000,
+        ge=1,
+        le=10000,
+        description="Maximum number of articles to retrieve per run",
+    )
+    relevance_threshold: int = Field(
+        default=5,
+        ge=0,
+        le=10,
+        description="Relevance score threshold for filtering articles",
+    )
+
+    @field_validator("date_from", "date_to")
+    @classmethod
+    def validate_date_format(cls, value: str | None) -> str | None:
+        """Ensure PubMed dates follow the YYYY/MM/DD format."""
+        if value is None:
+            return None
+        if not cls.DATE_PATTERN.match(value):
+            msg = "Date must be in YYYY/MM/DD format"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("date_to")
+    @classmethod
+    def validate_date_range(cls, value: str | None) -> str | None:
+        """Simple passthrough; ordering enforced in model validator."""
+        return value
+
+    @model_validator(mode="after")
+    def ensure_date_order(self) -> PubMedQueryConfig:
+        """Ensure date_from is not after date_to."""
+        if self.date_from and self.date_to and self.date_from > self.date_to:
+            msg = "date_from must be before or equal to date_to"
+            raise ValueError(msg)
+        return self

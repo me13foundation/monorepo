@@ -15,4 +15,5 @@ export const dataSourceKeys = {
   availability: (id: string) => [...dataSourceKeys.all, 'availability', id] as const,
   adminCatalog: () => [...dataSourceKeys.all, 'catalog', 'admin'] as const,
   adminCatalogAvailability: () => [...dataSourceKeys.all, 'catalog', 'availability', 'admin'] as const,
+  history: (id: string) => [...dataSourceKeys.all, 'history', id] as const,
 }

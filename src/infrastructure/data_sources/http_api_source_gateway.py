@@ -22,11 +22,10 @@ from src.domain.services.api_source_service import (
     APIRequestResult,
     APISourceGateway,
 )
-from src.domain.services.api_source_service import (
-    JSONObject as GatewayJSONObject,
-)
-from src.domain.services.api_source_service import (
-    JSONValue as GatewayJSONValue,
+from src.type_definitions.common import (  # noqa: TCH001
+    JSONObject,
+    JSONValue,
+    SourceMetadata,
 )
 
 AuthHeaders = dict[str, str]
@@ -35,7 +34,6 @@ QueryParamsDict = dict[str, QueryParamValue]
 
 if TYPE_CHECKING:
     from src.domain.entities.user_data_source import SourceConfiguration
-    from src.type_definitions.common import SourceMetadata
 
 AuthConfig = Mapping[str, object]
 AuthMethod = Callable[[AuthConfig], AuthHeaders | None]
@@ -131,7 +129,7 @@ class HttpxAPISourceGateway(APISourceGateway):
     async def fetch_data(
         self,
         configuration: SourceConfiguration,
-        request_parameters: Mapping[str, GatewayJSONValue] | None = None,
+        request_parameters: Mapping[str, JSONValue] | None = None,
     ) -> APIRequestResult:
         if not configuration.url:
             return APIRequestResult(success=False, errors=["No URL provided"])
@@ -177,7 +175,7 @@ class HttpxAPISourceGateway(APISourceGateway):
 
                 response_time = (datetime.now(UTC) - start_time).total_seconds() * 1000
 
-                data: GatewayJSONObject | None = None
+                data: JSONObject | None = None
                 if response.headers.get("content-type", "").startswith(
                     "application/json",
                 ):
@@ -191,7 +189,7 @@ class HttpxAPISourceGateway(APISourceGateway):
                         f"HTTP {response.status_code}: {response.text[:200]}",
                     )
 
-                metadata_payload: GatewayJSONObject = {
+                metadata_payload: JSONObject = {
                     "request_url": url,
                     "params": {str(k): str(v) for k, v in params.items()},
                     "method": method,
@@ -290,7 +288,7 @@ class HttpxAPISourceGateway(APISourceGateway):
                 await asyncio.sleep(2**attempt)
         return None
 
-    def _count_records(self, data: GatewayJSONObject | None) -> int:
+    def _count_records(self, data: JSONObject | None) -> int:
         if data is None:
             return 0
         for key in ["data", "results", "records", "items"]:
@@ -316,7 +314,7 @@ class HttpxAPISourceGateway(APISourceGateway):
     def _ensure_json_object(
         self,
         payload: object,
-    ) -> GatewayJSONObject:
+    ) -> JSONObject:
         if isinstance(payload, dict):
             return {
                 str(key): self._coerce_json_value(value)
@@ -324,7 +322,7 @@ class HttpxAPISourceGateway(APISourceGateway):
             }
         return {"value": self._coerce_json_value(payload)}
 
-    def _coerce_json_value(self, value: object) -> GatewayJSONValue:
+    def _coerce_json_value(self, value: object) -> JSONValue:
         if isinstance(value, (str, int, float, bool)) or value is None:
             return value
         if isinstance(value, list):

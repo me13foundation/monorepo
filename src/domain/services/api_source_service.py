@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
+from src.type_definitions.common import JSONObject  # noqa: TCH001
+
 JSONPrimitive = str | int | float | bool | None
-JSONValue = JSONPrimitive | dict[str, "JSONValue"] | list["JSONValue"]
-JSONObject = dict[str, JSONValue]
 
 
 class _SourceConfigurationProtocol(Protocol):

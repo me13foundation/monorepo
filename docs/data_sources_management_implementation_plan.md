@@ -948,6 +948,7 @@ export function PubMedSourceForm() {
     - Scheduling handled by `IngestionSchedulingService` (not implemented here)
     - Quality metrics handled centrally (not managed here)
     - Ingestion job updates handled by scheduling service
+  - **Scheduler orchestration implemented**: `IngestionSchedulingService` now registers jobs, tracks `next_run_at`/`last_run_at`, and records `IngestionJob` snapshots for every run
   - **Emits events**: `IngestionCompletedEvent` for downstream processing
 
 #### Infrastructure Layer
@@ -972,13 +973,18 @@ export function PubMedSourceForm() {
 - **Indexes**: `pmid`, `research_space_id`, `next_run_at` for performance
 
 #### API & UI
+
 - **FastAPI Routes**: `/data-sources/pubmed/*`
   - Returns: `ApiResponse<DataSource>` or `PaginatedResponse<Publication>`
   - Uses: Generated TypeScript types
+- **Scheduling & History Routes**: `/admin/data-sources/{source_id}/schedule*`, `/admin/data-sources/{source_id}/ingestion-jobs`
+  - Schedule endpoints persist cadence + cron metadata (cron raising `NotImplementedError` until dedicated backend)
+  - History endpoint returns recent `IngestionJob` entries for UI detail panels
 
 - **Next.js Components**:
-  - Forms for query configuration, schedule selection
-  - Tables for run history, article results
+  - Forms for query configuration, schedule selection (Create dialog + PubMed schedule modal)
+  - Detail drawer surfaces latest manual run + ingestion job history using the new API
+  - Tables for article results (future enhancement) remain on the roadmap
   - Uses: React Query, generated types, SSR architecture
 
 #### Configuration Example

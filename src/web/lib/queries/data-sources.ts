@@ -6,8 +6,13 @@ import {
   fetchDataSourcesBySpace,
   createDataSource,
   createDataSourceInSpace,
+  configureDataSourceSchedule,
+  triggerDataSourceIngestion,
+  fetchIngestionJobHistory,
   type DataSourceListParams,
   type DataSourceListResponse,
+  type ScheduleConfigurationPayload,
+  type IngestionRunResponse,
 } from '../api/data-sources'
 import {
   fetchAdminCatalogEntries,
@@ -157,6 +162,72 @@ export function useCreateDataSourceInSpace(spaceId: string) {
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.lists() })
       toast.success('Data source created successfully')
     },
+  })
+}
+
+export function useConfigureDataSourceSchedule(spaceId?: string | null) {
+  const { data: session } = useSession()
+  const token = session?.user?.access_token
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      sourceId,
+      payload,
+    }: {
+      sourceId: string
+      payload: ScheduleConfigurationPayload
+    }) => configureDataSourceSchedule(sourceId, payload, token),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.lists() })
+      if (spaceId) {
+        queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(spaceId) })
+      }
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.detail(variables.sourceId) })
+      toast.success('Ingestion schedule updated')
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update schedule: ${error.message}`)
+    },
+  })
+}
+
+export function useTriggerDataSourceIngestion(
+  spaceId?: string | null,
+  options?: {
+    onSuccess?: (summary: IngestionRunResponse, sourceId: string) => void
+  },
+) {
+  const { data: session } = useSession()
+  const token = session?.user?.access_token
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (sourceId: string) => triggerDataSourceIngestion(sourceId, token),
+    onSuccess: (summary, sourceId) => {
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.lists() })
+      if (spaceId) {
+        queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(spaceId) })
+      }
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.detail(sourceId) })
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.history(sourceId) })
+      options?.onSuccess?.(summary, sourceId)
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to trigger ingestion: ${error.message}`)
+    },
+  })
+}
+
+export function useIngestionJobHistory(sourceId: string | null, enabled: boolean) {
+  const { data: session } = useSession()
+  const token = session?.user?.access_token
+
+  return useQuery({
+    queryKey: dataSourceKeys.history(sourceId || 'none'),
+    enabled: Boolean(token && sourceId && enabled),
+    queryFn: () => fetchIngestionJobHistory(sourceId!, token),
+    staleTime: 30 * 1000,
   })
 }
 

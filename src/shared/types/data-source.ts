@@ -5,6 +5,7 @@ export enum SourceType {
   API = 'api',
   FILE = 'file',
   DATABASE = 'database',
+  PUBMED = 'pubmed',
 }
 
 export enum SourceStatus {
@@ -80,10 +81,12 @@ export interface DataSourceConfig {
 }
 
 export interface IngestionSchedule {
-  frequency: 'manual' | 'hourly' | 'daily' | 'weekly' | 'monthly'
+  frequency: 'manual' | 'hourly' | 'daily' | 'weekly' | 'monthly' | 'cron'
   startTime?: string
   timezone?: string
   enabled: boolean
+  cronExpression?: string | null
+  backendJobId?: string | null
 }
 
 export interface QualityMetrics {
@@ -205,10 +208,12 @@ export const DataSourceSchema = z.object({
   }),
   templateId: z.string().uuid().optional(),
   ingestionSchedule: z.object({
-    frequency: z.enum(['manual', 'hourly', 'daily', 'weekly', 'monthly']),
+    frequency: z.enum(['manual', 'hourly', 'daily', 'weekly', 'monthly', 'cron']),
     startTime: z.string().optional(),
     timezone: z.string().optional(),
     enabled: z.boolean(),
+    cronExpression: z.string().optional(),
+    backendJobId: z.string().optional(),
   }).optional(),
   qualityMetrics: z.object({
     completenessScore: z.number().min(0).max(1).optional(),

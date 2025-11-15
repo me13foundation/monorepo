@@ -30,7 +30,7 @@ import { Loader2 } from 'lucide-react'
 const dataSourceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200, 'Name must be less than 200 characters'),
   description: z.string().optional(),
-  source_type: z.enum(['api', 'file_upload', 'database', 'web_scraping']),
+  source_type: z.enum(['api', 'file_upload', 'database', 'web_scraping', 'pubmed']),
   config: z.record(z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
 })
@@ -129,6 +129,7 @@ export function CreateDataSourceDialog({
                       <option value="file_upload">File Upload</option>
                       <option value="database">Database</option>
                       <option value="web_scraping">Web Scraping</option>
+                      <option value="pubmed">PubMed</option>
                     </Select>
                   </FormControl>
                   <FormDescription>

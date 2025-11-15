@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pydantic import BaseModel, Field
 
 from src.domain.entities.user_data_source import (
+    ScheduleFrequency,
     SourceConfiguration,
     UserDataSource,
 )
@@ -376,12 +377,12 @@ class QualityAssuranceService:
 
         # Freshness based on expected update frequency
         schedule = source.ingestion_schedule
-        if schedule.enabled and schedule.frequency:
-            if schedule.frequency == "hourly":
+        if schedule.enabled:
+            if schedule.frequency == ScheduleFrequency.HOURLY:
                 expected_hours = 1
-            elif schedule.frequency == "daily":
+            elif schedule.frequency == ScheduleFrequency.DAILY:
                 expected_hours = 24
-            elif schedule.frequency == "weekly":
+            elif schedule.frequency == ScheduleFrequency.WEEKLY:
                 expected_hours = 168
             else:
                 expected_hours = 24  # Default to daily

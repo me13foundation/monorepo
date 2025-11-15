@@ -4,6 +4,8 @@ Shared dependencies and constants for admin routes.
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -15,6 +17,11 @@ from src.application.services.data_source_activation_service import (
 from src.application.services.data_source_authorization_service import (
     DataSourceAuthorizationService,
 )
+
+if TYPE_CHECKING:
+    from src.application.services.ingestion_scheduling_service import (
+        IngestionSchedulingService,
+    )
 from src.application.services.source_management_service import (
     SourceManagementService,
 )
@@ -29,6 +36,11 @@ from src.infrastructure.repositories.data_discovery_repository_impl import (
 from src.infrastructure.repositories.data_source_activation_repository import (
     SqlAlchemyDataSourceActivationRepository,
 )
+
+if TYPE_CHECKING:
+    from src.infrastructure.repositories.ingestion_job_repository import (
+        SqlAlchemyIngestionJobRepository,
+    )
 from src.infrastructure.repositories.source_template_repository import (
     SqlAlchemySourceTemplateRepository,
 )
@@ -72,6 +84,28 @@ async def get_auth_service() -> DataSourceAuthorizationService:
     return DataSourceAuthorizationService()
 
 
+def get_ingestion_scheduling_service() -> (
+    Generator[IngestionSchedulingService, None, None]
+):
+    """Yield an ingestion scheduling service tied to a scoped session."""
+    from src.application.services.ingestion_scheduler_factory import (  # noqa: PLC0415
+        ingestion_scheduling_service_context,
+    )
+
+    with ingestion_scheduling_service_context() as service:
+        yield service
+
+
+def get_ingestion_job_repository() -> SqlAlchemyIngestionJobRepository:
+    """Instantiate the ingestion job repository."""
+    from src.infrastructure.repositories.ingestion_job_repository import (  # noqa: PLC0415
+        SqlAlchemyIngestionJobRepository,
+    )
+
+    session = get_db_session()
+    return SqlAlchemyIngestionJobRepository(session)
+
+
 def get_catalog_entry(session: Session, catalog_entry_id: str) -> SourceCatalogEntry:
     """
     Retrieve a catalog entry or raise HTTP 404.
@@ -94,6 +128,8 @@ __all__ = [
     "get_auth_service",
     "get_catalog_entry",
     "get_db_session",
+    "get_ingestion_scheduling_service",
+    "get_ingestion_job_repository",
     "get_source_service",
     "get_template_service",
 ]

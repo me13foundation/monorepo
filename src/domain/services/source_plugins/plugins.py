@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
+from pydantic import ValidationError
+
+from src.domain.entities.data_source_configs import PubMedQueryConfig
 from src.domain.entities.user_data_source import (
     SourceConfiguration,
     SourceType,
 )
+
+if TYPE_CHECKING:
+    from src.type_definitions.common import SourceMetadata
 
 from .base import SourcePlugin
 
@@ -17,13 +25,13 @@ class FileUploadSourcePlugin(SourcePlugin):
         self,
         configuration: SourceConfiguration,
     ) -> SourceConfiguration:
+        metadata: SourceMetadata = dict(configuration.metadata or {})
         if not configuration.file_path:
             msg = "file_path is required for file upload sources"
             raise ValueError(msg)
         if not configuration.format:
             msg = "format is required for file upload sources"
             raise ValueError(msg)
-        metadata = configuration.metadata or {}
         metadata.setdefault("ingest_mode", "batch")
         return configuration.model_copy(update={"metadata": metadata})
 
@@ -37,13 +45,13 @@ class APISourcePlugin(SourcePlugin):
         self,
         configuration: SourceConfiguration,
     ) -> SourceConfiguration:
+        metadata: SourceMetadata = dict(configuration.metadata or {})
         if not configuration.url:
             msg = "url is required for API sources"
             raise ValueError(msg)
         if configuration.requests_per_minute is None:
             msg = "requests_per_minute is required for API sources"
             raise ValueError(msg)
-        metadata = configuration.metadata or {}
         metadata.setdefault("auth_type", configuration.auth_type or "none")
         return configuration.model_copy(update={"metadata": metadata})
 
@@ -57,21 +65,51 @@ class DatabaseSourcePlugin(SourcePlugin):
         self,
         configuration: SourceConfiguration,
     ) -> SourceConfiguration:
-        connection = (
-            configuration.metadata.get("connection_string")
-            if configuration.metadata
-            else None
-        )
+        metadata: SourceMetadata = dict(configuration.metadata or {})
+        connection = metadata.get("connection_string")
         if not connection:
             msg = "metadata.connection_string is required for database sources"
             raise ValueError(msg)
-        metadata = dict(configuration.metadata or {})
         metadata.setdefault("driver", "postgresql")
         return configuration.model_copy(update={"metadata": metadata})
+
+
+class PubMedSourcePlugin(SourcePlugin):
+    """Plugin for validating PubMed data sources."""
+
+    source_type = SourceType.PUBMED
+    DEFAULT_REQUESTS_PER_MINUTE = 10
+
+    def validate_configuration(
+        self,
+        configuration: SourceConfiguration,
+    ) -> SourceConfiguration:
+        metadata: SourceMetadata = dict(configuration.metadata or {})
+        try:
+            pubmed_config = PubMedQueryConfig.model_validate(metadata)
+        except ValidationError as exc:
+            messages = ", ".join(error["msg"] for error in exc.errors())
+            raise ValueError(messages) from exc
+
+        sanitized_metadata = cast(
+            "SourceMetadata",
+            pubmed_config.model_dump(mode="json"),
+        )
+        requests_per_minute = (
+            configuration.requests_per_minute or self.DEFAULT_REQUESTS_PER_MINUTE
+        )
+
+        return configuration.model_copy(
+            update={
+                "metadata": sanitized_metadata,
+                "requests_per_minute": requests_per_minute,
+            },
+        )
 
 
 __all__ = [
     "APISourcePlugin",
     "DatabaseSourcePlugin",
+    "PubMedSourcePlugin",
     "FileUploadSourcePlugin",
 ]

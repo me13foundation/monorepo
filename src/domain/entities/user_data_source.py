@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.type_definitions.common import AuthCredentials, SourceMetadata
 
@@ -25,6 +25,18 @@ class SourceType(str, Enum):
     API = "api"
     DATABASE = "database"
     WEB_SCRAPING = "web_scraping"  # Future use
+    PUBMED = "pubmed"  # Biomedical literature ingestion
+
+
+class ScheduleFrequency(str, Enum):
+    """Available scheduling cadences for ingestion."""
+
+    MANUAL = "manual"
+    HOURLY = "hourly"
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    CRON = "cron"
 
 
 class SourceStatus(str, Enum):
@@ -101,22 +113,55 @@ class IngestionSchedule(BaseModel):
         default=False,
         description="Whether scheduled ingestion is enabled",
     )
-    frequency: str = Field(
-        default="manual",
-        description="Ingestion frequency (manual, hourly, daily, weekly)",
+    frequency: ScheduleFrequency = Field(
+        default=ScheduleFrequency.MANUAL,
+        description="Desired ingestion cadence",
     )
     start_time: datetime | None = Field(None, description="Scheduled start time")
     timezone: str = Field(default="UTC", description="Timezone for scheduling")
+    cron_expression: str | None = Field(
+        default=None,
+        description="Cron expression used when frequency is cron",
+    )
+    backend_job_id: str | None = Field(
+        default=None,
+        description="Identifier assigned by the scheduler backend",
+    )
+    next_run_at: datetime | None = Field(
+        default=None,
+        description="Next scheduled execution time",
+    )
+    last_run_at: datetime | None = Field(
+        default=None,
+        description="Most recent execution timestamp",
+    )
 
-    @field_validator("frequency")
+    @field_validator("cron_expression")
     @classmethod
-    def validate_frequency(cls, v: str) -> str:
-        """Validate frequency is supported."""
-        allowed = ["manual", "hourly", "daily", "weekly"]
-        if v not in allowed:
-            msg = f"Frequency must be one of: {allowed}"
+    def _normalize_cron(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        return value or None
+
+    @field_validator("timezone")
+    @classmethod
+    def _normalize_timezone(cls, value: str) -> str:
+        return value or "UTC"
+
+    @model_validator(mode="after")
+    def _validate_cron_expression(self) -> "IngestionSchedule":
+        if self.frequency == ScheduleFrequency.CRON and not (
+            self.cron_expression and self.cron_expression.strip()
+        ):
+            msg = "cron_expression is required when frequency is cron"
             raise ValueError(msg)
-        return v
+        return self
+
+    @property
+    def requires_scheduler(self) -> bool:
+        """Return True when this schedule should register with the scheduler backend."""
+        return self.enabled and self.frequency != ScheduleFrequency.MANUAL
 
 
 class QualityMetrics(BaseModel):
@@ -207,7 +252,7 @@ class UserDataSource(BaseModel):
     ingestion_schedule: IngestionSchedule = Field(
         default_factory=lambda: IngestionSchedule(
             enabled=False,
-            frequency="manual",
+            frequency=ScheduleFrequency.MANUAL,
             start_time=None,
             timezone="UTC",
         ),
@@ -318,6 +363,17 @@ class UserDataSource(BaseModel):
             "configuration": config,
             "updated_at": datetime.now(UTC),
             "version": self._increment_version(),
+        }
+        return self._clone_with_updates(update_payload)
+
+    def update_ingestion_schedule(
+        self,
+        schedule: IngestionSchedule,
+    ) -> "UserDataSource":
+        """Create new instance with updated ingestion schedule."""
+        update_payload: UpdatePayload = {
+            "ingestion_schedule": schedule,
+            "updated_at": datetime.now(UTC),
         }
         return self._clone_with_updates(update_payload)
 

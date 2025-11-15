@@ -18,6 +18,8 @@ from src.domain.services.file_upload_service import (
     DataRecord,
     FileUploadGateway,
     FileUploadResult,
+)
+from src.type_definitions.common import (  # noqa: TCH001
     JSONObject,
     JSONValue,
 )

@@ -14,7 +14,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Loader2 } from 'lucide-react'
 
 const templateCategories = ['clinical', 'research', 'literature', 'genomic', 'phenotypic', 'ontology', 'other'] as const satisfies TemplateCategory[]
-const templateSourceTypes = ['api', 'file_upload', 'database', 'web_scraping'] as const satisfies SourceType[]
+const templateSourceTypes = [
+  'api',
+  'file_upload',
+  'database',
+  'web_scraping',
+  'pubmed',
+] as const satisfies SourceType[]
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
