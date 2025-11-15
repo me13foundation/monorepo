@@ -25,6 +25,7 @@ from .source_management_service import (
     SourceManagementService,
     UpdateSourceRequest,
 )
+from .space_data_discovery_service import SpaceDataDiscoveryService
 from .template_management_service import (
     CreateTemplateRequest,
     TemplateManagementService,
@@ -42,6 +43,7 @@ __all__ = [
     "PhenotypeApplicationService",
     "PublicationApplicationService",
     "SourceManagementService",
+    "SpaceDataDiscoveryService",
     "TemplateManagementService",
     "UpdateSourceRequest",
     "UpdateTemplateRequest",

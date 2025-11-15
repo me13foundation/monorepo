@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.database.seed import DEFAULT_RESEARCH_SPACE_ID
 from src.infrastructure.repositories.data_discovery_repository_impl import (
     SQLAlchemyDataDiscoverySessionRepository,
     SQLAlchemyQueryTestResultRepository,
@@ -41,7 +42,7 @@ def _make_session_model(
     return DataDiscoverySessionModel(
         id=session_id,
         owner_id=owner_id,
-        research_space_id=None,
+        research_space_id=str(DEFAULT_RESEARCH_SPACE_ID),
         name="Discovery Session",
         gene_symbol=None,
         search_term=None,

@@ -8,10 +8,11 @@ This document demonstrates how to effectively use the comprehensive type safety 
 2. [Mock Repository Patterns](#mock-repository-patterns)
 3. [API Response Validation](#api-response-validation)
 4. [Domain Service Testing](#domain-service-testing)
-5. [External API Integration](#external-api-integration)
-6. [Publishing Pipeline Types](#publishing-pipeline-types)
-7. [Property-Based Testing](#property-based-testing)
-8. [JSON Packaging Helpers](#json-packaging-helpers)
+5. [Space-Scoped Discovery Patterns](#space-scoped-discovery-patterns)
+6. [External API Integration](#external-api-integration)
+7. [Publishing Pipeline Types](#publishing-pipeline-types)
+8. [Property-Based Testing](#property-based-testing)
+9. [JSON Packaging Helpers](#json-packaging-helpers)
 
 ## Typed Test Fixtures
 
@@ -110,6 +111,84 @@ def test_gene_variant_relationship() -> None:
     assert gene is not None
     assert variant is not None
     assert variant.gene_identifier == gene.symbol
+```
+
+## Space-Scoped Discovery Patterns
+
+Space-scoped discovery relies on dedicated fixtures and mocks so tests never have to hand-roll UUIDs or duplicate repository plumbing.
+
+### Fixtures for Space Sessions & Permissions
+
+```python
+from uuid import uuid4
+
+from tests.test_types.fixtures import (
+    create_test_space_discovery_session,
+    create_test_space_source_permissions,
+)
+
+def test_session_fixture_defaults() -> None:
+    space_id = uuid4()
+    session = create_test_space_discovery_session(
+        space_id,
+        owner_id=uuid4(),
+        selected_sources=["clinvar"],
+    )
+    assert session.research_space_id == space_id
+    assert "clinvar" in session.selected_sources
+
+def test_permission_fixtures() -> None:
+    permissions = create_test_space_source_permissions()
+    available = [perm for perm in permissions if perm.permission_level == "available"]
+    blocked = [perm for perm in permissions if perm.permission_level == "blocked"]
+    assert len(available) == 1
+    assert len(blocked) == 1
+```
+
+### Mocking `SpaceDataDiscoveryService`
+
+```python
+from uuid import uuid4
+
+from src.domain.entities.data_discovery_session import QueryParameters
+from tests.test_types.data_discovery_fixtures import create_test_source_catalog_entry
+from tests.test_types.mocks import create_mock_space_discovery_service
+
+def test_catalog_is_filtered_per_space() -> None:
+    space_id = uuid4()
+    catalog_entry = create_test_source_catalog_entry(entry_id="clinvar")
+    service, base_service = create_mock_space_discovery_service(
+        space_id,
+        catalog_entries=[catalog_entry],
+    )
+
+    entries = service.get_catalog()
+
+    base_service.get_source_catalog.assert_called_once_with(
+        None,
+        None,
+        research_space_id=space_id,
+    )
+    assert [entry.id for entry in entries] == ["clinvar"]
+
+def test_sessions_cannot_leak_across_spaces() -> None:
+    space_id = uuid4()
+    other_space_id = uuid4()
+    service, _ = create_mock_space_discovery_service(space_id)
+    other_service, _ = create_mock_space_discovery_service(other_space_id)
+
+    first = service.create_session(
+        owner_id=uuid4(),
+        name="Cardiac sweep",
+        parameters=QueryParameters(gene_symbol="MED13L"),
+    )
+    second = other_service.create_session(
+        owner_id=uuid4(),
+        name="Neuro sweep",
+        parameters=QueryParameters(gene_symbol="MED12"),
+    )
+
+    assert first.research_space_id != second.research_space_id
 ```
 
 ## API Response Validation

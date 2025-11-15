@@ -8,6 +8,7 @@ from uuid import UUID  # noqa: TC003
 from src.domain.entities.data_source_activation import (  # noqa: TC001
     ActivationScope,
     DataSourceActivation,
+    PermissionLevel,
 )
 
 
@@ -43,7 +44,7 @@ class DataSourceActivationRepository(ABC):
         *,
         catalog_entry_id: str,
         scope: ActivationScope,
-        is_active: bool,
+        permission_level: PermissionLevel,
         updated_by: UUID,
         research_space_id: UUID | None = None,
     ) -> DataSourceActivation:

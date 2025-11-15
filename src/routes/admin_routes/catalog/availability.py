@@ -88,7 +88,7 @@ def bulk_set_global_catalog_entry_availability(
     for catalog_entry_id in target_ids:
         activation_service.set_global_activation(
             catalog_entry_id=catalog_entry_id,
-            is_active=request.is_active,
+            permission_level=request.permission_level,
             updated_by=SYSTEM_ACTOR_ID,
         )
 
@@ -111,7 +111,7 @@ def set_global_catalog_entry_availability(
     get_catalog_entry(session, catalog_entry_id)
     activation_service.set_global_activation(
         catalog_entry_id=catalog_entry_id,
-        is_active=request.is_active,
+        permission_level=request.permission_level,
         updated_by=SYSTEM_ACTOR_ID,
     )
     summary = activation_service.get_availability_summary(catalog_entry_id)
@@ -152,7 +152,7 @@ def set_project_catalog_entry_availability(
     activation_service.set_project_activation(
         catalog_entry_id=catalog_entry_id,
         research_space_id=space_id,
-        is_active=request.is_active,
+        permission_level=request.permission_level,
         updated_by=SYSTEM_ACTOR_ID,
     )
     summary = activation_service.get_availability_summary(catalog_entry_id)

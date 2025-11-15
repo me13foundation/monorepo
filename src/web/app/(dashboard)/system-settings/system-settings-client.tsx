@@ -44,6 +44,7 @@ import type {
   UserListResponse,
 } from '@/lib/api/users'
 import { DataSourceAvailabilitySection } from '@/components/system-settings/DataSourceAvailabilitySection'
+import { SpaceSourcePermissionsManager } from '@/components/system-settings/SpaceSourcePermissionsManager'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface SystemSettingsClientProps {
@@ -234,7 +235,7 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
       <Tabs defaultValue="users" className="space-y-6">
         <TabsList>
           <TabsTrigger value="users">User Management</TabsTrigger>
-          <TabsTrigger value="catalog">Data Sources</TabsTrigger>
+          <TabsTrigger value="permissions">Source Permissions</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -458,8 +459,9 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
             isPending={mutations.deleteUser.isPending && pendingUserId === deleteTarget?.id}
           />
         </TabsContent>
-        <TabsContent value="catalog">
+        <TabsContent value="permissions" className="space-y-6">
           <DataSourceAvailabilitySection />
+          <SpaceSourcePermissionsManager />
         </TabsContent>
       </Tabs>
     </div>

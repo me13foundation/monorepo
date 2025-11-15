@@ -13,6 +13,7 @@ from src.application.services.data_source_activation_service import (
 from src.domain.entities.data_source_activation import (
     ActivationScope,
     DataSourceActivation,
+    PermissionLevel,
 )
 from src.domain.repositories.data_source_activation_repository import (
     DataSourceActivationRepository,
@@ -67,7 +68,7 @@ class InMemoryActivationRepository(DataSourceActivationRepository):
         *,
         catalog_entry_id: str,
         scope: ActivationScope,
-        is_active: bool,
+        permission_level: PermissionLevel,
         updated_by: UUID,
         research_space_id: UUID | None = None,
     ) -> DataSourceActivation:
@@ -76,7 +77,7 @@ class InMemoryActivationRepository(DataSourceActivationRepository):
         if existing:
             rule = existing.model_copy(
                 update={
-                    "is_active": is_active,
+                    "permission_level": permission_level,
                     "updated_by": updated_by,
                     "updated_at": now,
                 },
@@ -86,7 +87,7 @@ class InMemoryActivationRepository(DataSourceActivationRepository):
                 id=uuid4(),
                 catalog_entry_id=catalog_entry_id,
                 scope=scope,
-                is_active=is_active,
+                permission_level=permission_level,
                 research_space_id=research_space_id,
                 updated_by=updated_by,
                 created_at=now,
@@ -121,7 +122,7 @@ def test_global_rule_controls_default(service: DataSourceActivationService) -> N
     admin_id = uuid4()
     service.set_global_activation(
         catalog_entry_id=source_id,
-        is_active=False,
+        permission_level=PermissionLevel.BLOCKED,
         updated_by=admin_id,
     )
     assert service.is_source_active(source_id) is False
@@ -138,13 +139,13 @@ def test_project_override_takes_precedence(
     admin_id = uuid4()
     service.set_global_activation(
         catalog_entry_id=source_id,
-        is_active=False,
+        permission_level=PermissionLevel.BLOCKED,
         updated_by=admin_id,
     )
     service.set_project_activation(
         catalog_entry_id=source_id,
         research_space_id=space_id,
-        is_active=True,
+        permission_level=PermissionLevel.AVAILABLE,
         updated_by=admin_id,
     )
     assert service.is_source_active(source_id, space_id) is True
@@ -158,7 +159,7 @@ def test_clearing_rules_reverts_to_default(
     admin_id = uuid4()
     service.set_global_activation(
         catalog_entry_id=source_id,
-        is_active=False,
+        permission_level=PermissionLevel.BLOCKED,
         updated_by=admin_id,
     )
     service.clear_global_activation(source_id)
@@ -172,13 +173,13 @@ def test_bulk_summary_preserves_order(
     ids = ["catalog-5", "catalog-6"]
     service.set_global_activation(
         catalog_entry_id=ids[0],
-        is_active=False,
+        permission_level=PermissionLevel.BLOCKED,
         updated_by=admin_id,
     )
     service.set_project_activation(
         catalog_entry_id=ids[1],
         research_space_id=uuid4(),
-        is_active=False,
+        permission_level=PermissionLevel.BLOCKED,
         updated_by=admin_id,
     )
 

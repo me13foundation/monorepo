@@ -6,7 +6,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Select } from '@/components/ui/select'
 import {
   useAdminCatalogEntries,
   useCatalogAvailability,
@@ -20,11 +28,50 @@ import {
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { Loader2, SlidersHorizontal, ShieldOff, Search } from 'lucide-react'
 import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
-import type { DataSourceAvailability } from '@/lib/api/data-source-activation'
+import type {
+  DataSourceAvailability,
+  PermissionLevel,
+} from '@/lib/api/data-source-activation'
 import { toast } from 'sonner'
 
 const EMPTY_CATALOG_ENTRIES: SourceCatalogEntry[] = []
 const EMPTY_AVAILABILITY_SUMMARIES: DataSourceAvailability[] = []
+
+const PERMISSION_LABELS: Record<PermissionLevel, string> = {
+  available: 'Available',
+  visible: 'Visible',
+  blocked: 'Blocked',
+}
+
+const PERMISSION_VARIANTS: Record<PermissionLevel, 'default' | 'secondary' | 'destructive'> = {
+  available: 'default',
+  visible: 'secondary',
+  blocked: 'destructive',
+}
+
+const PERMISSION_DESCRIPTIONS: Record<PermissionLevel, string> = {
+  available: 'Catalog + testing enabled',
+  visible: 'Catalog only',
+  blocked: 'Hidden and disabled',
+}
+
+const PERMISSION_ORDER: PermissionLevel[] = ['available', 'visible', 'blocked']
+
+function getEffectivePermissionForSpace(
+  summary: DataSourceAvailability | undefined,
+  spaceId: string | null,
+): PermissionLevel {
+  if (!summary) {
+    return 'available'
+  }
+  if (spaceId) {
+    const override = summary.project_rules.find((rule) => rule.research_space_id === spaceId)
+    if (override) {
+      return override.permission_level
+    }
+  }
+  return summary.global_rule?.permission_level ?? 'available'
+}
 
 export function DataSourceAvailabilitySection() {
   const [selectedSource, setSelectedSource] = useState<SourceCatalogEntry | null>(null)
@@ -74,10 +121,10 @@ export function DataSourceAvailabilitySection() {
   const totalCount = catalogEntries.length
 
   const selectedOverrides = useMemo(() => {
-    const overrides = new Map<string, boolean>()
+    const overrides = new Map<string, PermissionLevel>()
     availabilityQuery.data?.project_rules.forEach((rule) => {
       if (rule.research_space_id) {
-        overrides.set(rule.research_space_id, rule.is_active)
+        overrides.set(rule.research_space_id, rule.permission_level)
       }
     })
     return overrides
@@ -87,60 +134,41 @@ export function DataSourceAvailabilitySection() {
     const summary = availabilitySummaryMap.get(sourceId)
     if (!summary) {
       return {
-        label: availabilitySummariesQuery.isLoading ? 'Loading policies…' : 'Active globally',
+        label: availabilitySummariesQuery.isLoading ? 'Loading policies…' : 'Defaults to Available',
         description: availabilitySummariesQuery.isLoading
           ? 'Fetching latest availability rules'
-          : 'Defaults to global active state',
+          : 'No overrides configured',
         variant: availabilitySummariesQuery.isLoading ? ('outline' as const) : ('secondary' as const),
         isLoading: availabilitySummariesQuery.isLoading,
       }
     }
 
-    const defaultState = summary.global_rule?.is_active ?? true
-    const overrideMap = new Map<string, boolean>()
-    summary.project_rules.forEach((rule) => {
-      if (rule.research_space_id) {
-        overrideMap.set(rule.research_space_id, rule.is_active)
-      }
-    })
+    const effectivePermission = summary.effective_permission_level
+    const variant = PERMISSION_VARIANTS[effectivePermission]
+    let description = `Global: ${PERMISSION_LABELS[summary.global_rule?.permission_level ?? 'available']}`
 
-    let activeCount: number | null = null
     if (totalSpaces > 0) {
-      activeCount = spaces.reduce((count, space) => {
-        const override = overrideMap.get(space.id)
-        const isActive = override ?? defaultState
-        return isActive ? count + 1 : count
-      }, 0)
+      const counts: Record<PermissionLevel, number> = {
+        available: 0,
+        visible: 0,
+        blocked: 0,
+      }
+      spaces.forEach((space) => {
+        const permission = getEffectivePermissionForSpace(summary, space.id)
+        counts[permission] += 1
+      })
+      description = `Available ${counts.available} • Visible ${counts.visible} • Blocked ${counts.blocked}`
     }
 
-    let label: string
-    let variant: 'default' | 'secondary' | 'destructive'
-    if (activeCount === null) {
-      label = defaultState ? 'Active globally' : 'Inactive globally'
-      variant = defaultState ? 'default' : 'destructive'
-    } else if (activeCount === totalSpaces) {
-      label = totalSpaces === 1 ? 'Active in 1 space' : 'Active in all spaces'
-      variant = 'default'
-    } else if (activeCount === 0) {
-      label = 'Inactive in all spaces'
-      variant = 'destructive'
-    } else {
-      label = `Active in ${activeCount}/${totalSpaces} spaces`
-      variant = 'secondary'
+    if (summary.project_rules.length > 0) {
+      description += ` • ${summary.project_rules.length} override${
+        summary.project_rules.length === 1 ? '' : 's'
+      }`
     }
-
-    const overrideCount = summary.project_rules.length
-    const descriptionParts: string[] = []
-    if (overrideCount > 0) {
-      descriptionParts.push(
-        `${overrideCount} override${overrideCount === 1 ? '' : 's'}`,
-      )
-    }
-    descriptionParts.push(`Default: ${defaultState ? 'active' : 'inactive'}`)
 
     return {
-      label,
-      description: descriptionParts.join(' • '),
+      label: PERMISSION_LABELS[effectivePermission],
+      description,
       variant,
       isLoading: false,
     }
@@ -151,13 +179,13 @@ export function DataSourceAvailabilitySection() {
     setDialogOpen(true)
   }
 
-  const handleGlobalToggle = async (isActive: boolean) => {
+  const handleGlobalPermissionChange = async (permissionLevel: PermissionLevel) => {
     if (!selectedSource) return
     try {
-      await setGlobalAvailability.mutateAsync({ catalogEntryId: selectedSource.id, isActive })
-      toast.success(`Global availability updated to ${isActive ? 'active' : 'inactive'}`)
+      await setGlobalAvailability.mutateAsync({ catalogEntryId: selectedSource.id, permissionLevel })
+      toast.success(`Global permission set to ${PERMISSION_LABELS[permissionLevel]}`)
     } catch (error) {
-      toast.error('Failed to update global availability')
+      toast.error('Failed to update global permission')
     }
   }
 
@@ -171,17 +199,17 @@ export function DataSourceAvailabilitySection() {
     }
   }
 
-  const handleProjectToggle = async (researchSpaceId: string, isActive: boolean) => {
+  const handleProjectPermissionChange = async (researchSpaceId: string, permissionLevel: PermissionLevel) => {
     if (!selectedSource) return
     try {
       await setProjectAvailability.mutateAsync({
         catalogEntryId: selectedSource.id,
         researchSpaceId,
-        isActive,
+        permissionLevel,
       })
-      toast.success(`Availability updated for project`)
+      toast.success('Permission updated for research space')
     } catch (error) {
-      toast.error('Failed to update project availability')
+      toast.error('Failed to update research space permission')
     }
   }
 
@@ -198,7 +226,7 @@ export function DataSourceAvailabilitySection() {
     }
   }
 
-  const handleBulkToggle = async (isActive: boolean) => {
+  const handleBulkPermissionChange = async (permissionLevel: PermissionLevel) => {
     if (filteredEntries.length === 0) {
       toast.info('No data sources match the current filters.')
       return
@@ -207,12 +235,12 @@ export function DataSourceAvailabilitySection() {
     const payloadIds = ids.length === totalCount ? undefined : ids
     try {
       await bulkGlobalAvailability.mutateAsync({
-        isActive,
+        permissionLevel,
         catalogEntryIds: payloadIds,
       })
       const affectedCount = payloadIds ? ids.length : totalCount
       toast.success(
-        `${isActive ? 'Enabled' : 'Disabled'} ${affectedCount} data source${
+        `Applied ${PERMISSION_LABELS[permissionLevel]} to ${affectedCount} data source${
           affectedCount === 1 ? '' : 's'
         } globally`,
       )
@@ -259,21 +287,29 @@ export function DataSourceAvailabilitySection() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  disabled={bulkGlobalAvailability.isPending || visibleCount === 0}
-                  onClick={() => handleBulkToggle(true)}
+                    disabled={bulkGlobalAvailability.isPending || visibleCount === 0}
+                    onClick={() => handleBulkPermissionChange('available')}
                 >
                   {bulkGlobalAvailability.isPending && (
                     <Loader2 className="mr-2 size-4 animate-spin" />
                   )}
-                  Enable filtered
+                    Set Available
                 </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={bulkGlobalAvailability.isPending || visibleCount === 0}
+                    onClick={() => handleBulkPermissionChange('visible')}
+                  >
+                    Set Visible
+                  </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   disabled={bulkGlobalAvailability.isPending || visibleCount === 0}
-                  onClick={() => handleBulkToggle(false)}
+                    onClick={() => handleBulkPermissionChange('blocked')}
                 >
-                  Disable filtered
+                    Set Blocked
                 </Button>
               </div>
             </div>
@@ -368,29 +404,39 @@ export function DataSourceAvailabilitySection() {
                     <p className="font-medium">Global availability</p>
                     <p className="text-sm text-muted-foreground">
                       {availabilityQuery.data?.global_rule
-                        ? `Global override set to ${availabilityQuery.data.global_rule.is_active ? 'active' : 'inactive'}`
-                        : 'No global override. Defaults to active.'}
+                        ? `Global override: ${
+                            PERMISSION_LABELS[availabilityQuery.data.global_rule.permission_level]
+                          }`
+                        : 'No global override. Defaults to Available.'}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
-                      onClick={() => handleGlobalToggle(true)}
+                      onClick={() => handleGlobalPermissionChange('available')}
                       disabled={setGlobalAvailability.isPending}
                     >
                       {setGlobalAvailability.isPending && (
                         <Loader2 className="mr-2 size-4 animate-spin" />
                       )}
-                      Enable globally
+                      Set Available
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => handleGlobalPermissionChange('visible')}
+                      disabled={setGlobalAvailability.isPending}
+                    >
+                      Set Visible
                     </Button>
                     <Button
                       size="sm"
                       variant="destructive"
-                      onClick={() => handleGlobalToggle(false)}
+                      onClick={() => handleGlobalPermissionChange('blocked')}
                       disabled={setGlobalAvailability.isPending}
                     >
                       <ShieldOff className="mr-2 size-4" />
-                      Disable globally
+                      Set Blocked
                     </Button>
                     {availabilityQuery.data?.global_rule && (
                       <Button
@@ -417,7 +463,13 @@ export function DataSourceAvailabilitySection() {
                   <div className="space-y-3">
                     {spacesQuery.data.spaces.map((space) => {
                       const override = selectedOverrides.get(space.id)
-                      const effective = override ?? availabilityQuery.data?.global_rule?.is_active ?? true
+                      const effectivePermission = getEffectivePermissionForSpace(
+                        availabilityQuery.data,
+                        space.id,
+                      )
+                      const inheritedPermission =
+                        availabilityQuery.data?.global_rule?.permission_level ?? 'available'
+                      const selectValue = override ?? 'inherit'
                       return (
                         <div key={space.id} className="rounded-lg border p-3">
                           <div className="flex flex-col gap-1">
@@ -426,37 +478,38 @@ export function DataSourceAvailabilitySection() {
                                 <p className="font-medium">{space.name}</p>
                                 <p className="text-xs text-muted-foreground">
                                   {override === undefined
-                                    ? `Inherits global (${effective ? 'active' : 'inactive'})`
-                                    : `Override: ${override ? 'active' : 'inactive'}`}
+                                    ? `Inherits global (${PERMISSION_LABELS[inheritedPermission]})`
+                                    : `Override: ${PERMISSION_LABELS[override]}`}
                                 </p>
                               </div>
-                              <div className="flex flex-wrap gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleProjectToggle(space.id, true)}
-                                  disabled={setProjectAvailability.isPending}
+                              <div className="flex flex-col gap-2">
+                                <Badge variant={PERMISSION_VARIANTS[effectivePermission]}>
+                                  {PERMISSION_LABELS[effectivePermission]}
+                                  {override ? ' • Override' : ''}
+                                </Badge>
+                                <Select
+                                  value={selectValue}
+                                  onChange={(event) => {
+                                    const value = event.target.value as PermissionLevel | 'inherit'
+                                    if (value === 'inherit') {
+                                      handleProjectReset(space.id)
+                                    } else {
+                                      handleProjectPermissionChange(space.id, value)
+                                    }
+                                  }}
+                                  disabled={
+                                    setProjectAvailability.isPending || clearProjectAvailability.isPending
+                                  }
                                 >
-                                  Activate
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleProjectToggle(space.id, false)}
-                                  disabled={setProjectAvailability.isPending}
-                                >
-                                  Deactivate
-                                </Button>
-                                {override !== undefined && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleProjectReset(space.id)}
-                                    disabled={clearProjectAvailability.isPending}
-                                  >
-                                    Clear override
-                                  </Button>
-                                )}
+                                  <option value="inherit">
+                                    Inherit ({PERMISSION_LABELS[inheritedPermission]})
+                                  </option>
+                                  {PERMISSION_ORDER.map((permission) => (
+                                    <option key={permission} value={permission}>
+                                      {PERMISSION_LABELS[permission]} — {PERMISSION_DESCRIPTIONS[permission]}
+                                    </option>
+                                  ))}
+                                </Select>
                               </div>
                             </div>
                           </div>

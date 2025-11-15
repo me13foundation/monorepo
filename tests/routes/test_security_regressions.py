@@ -4,8 +4,10 @@ import os
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from src.application.services.authorization_service import AuthorizationError
+from src.database.seed import DEFAULT_RESEARCH_SPACE_ID
 from src.database.session import SessionLocal, engine
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.infrastructure.dependency_injection import container as container_module
@@ -17,6 +19,11 @@ from src.models.database.data_discovery import (
     DataDiscoverySessionModel,
     QueryTestResultModel,
 )
+from src.models.database.research_space import (
+    ResearchSpaceModel,
+    SpaceStatusEnum,
+)
+from src.models.database.user import UserModel
 from src.routes.auth import get_current_active_user
 
 
@@ -43,6 +50,11 @@ def test_data_discovery_rejects_foreign_session_access() -> None:
     """
     Verify researchers cannot read sessions owned by another user.
     """
+    with engine.begin() as connection:
+        if connection.dialect.name == "postgresql":
+            connection.execute(
+                text("DROP TYPE IF EXISTS data_source_permission_level CASCADE"),
+            )
     Base.metadata.create_all(bind=engine)
     session = SessionLocal()
     session.query(QueryTestResultModel).delete()
@@ -53,11 +65,38 @@ def test_data_discovery_rejects_foreign_session_access() -> None:
     other_user_id = uuid4()
     session_id = uuid4()
 
+    # Seed default research space ownership to satisfy FK constraints
+    session.add(
+        UserModel(
+            id=owner_id,
+            email="owner@example.com",
+            username="owner-user",
+            full_name="Owner User",
+            hashed_password=PasswordHasher().hash_password("StrongPass!123"),
+            role=UserRole.RESEARCHER,
+            status=UserStatus.ACTIVE,
+            email_verified=True,
+        ),
+    )
+    session.add(
+        ResearchSpaceModel(
+            id=DEFAULT_RESEARCH_SPACE_ID,
+            slug="default-space",
+            name="Default Space",
+            description="Default research space for tests",
+            owner_id=owner_id,
+            status=SpaceStatusEnum.ACTIVE,
+            settings={},
+            tags=[],
+        ),
+    )
+    session.commit()
+
     session.add(
         DataDiscoverySessionModel(
             id=str(session_id),
             owner_id=str(owner_id),
-            research_space_id=None,
+            research_space_id=str(DEFAULT_RESEARCH_SPACE_ID),
             name="Secured Session",
             gene_symbol=None,
             search_term=None,

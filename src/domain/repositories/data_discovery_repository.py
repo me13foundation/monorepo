@@ -84,7 +84,12 @@ class DataDiscoverySessionRepository(ABC):
         """
 
     @abstractmethod
-    def find_by_space(self, space_id: UUID) -> list[DataDiscoverySession]:
+    def find_by_space(
+        self,
+        space_id: UUID,
+        *,
+        include_inactive: bool = False,
+    ) -> list[DataDiscoverySession]:
         """
         Find all data discovery sessions for a specific research space.
 

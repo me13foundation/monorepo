@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session  # noqa: TC002
 from src.domain.entities.data_source_activation import (
     ActivationScope,
     DataSourceActivation,
+    PermissionLevel,
 )
 from src.domain.repositories.data_source_activation_repository import (
     DataSourceActivationRepository,
@@ -17,6 +18,7 @@ from src.domain.repositories.data_source_activation_repository import (
 from src.models.database.data_source_activation import (
     ActivationScopeEnum,
     DataSourceActivationModel,
+    PermissionLevelEnum,
 )
 
 
@@ -32,10 +34,10 @@ class SqlAlchemyDataSourceActivationRepository(DataSourceActivationRepository):
             id=UUID(str(model.id)),
             catalog_entry_id=model.catalog_entry_id,
             scope=ActivationScope(model.scope.value),
+            permission_level=PermissionLevel(model.permission_level.value),
             research_space_id=(
                 UUID(str(model.research_space_id)) if model.research_space_id else None
             ),
-            is_active=model.is_active,
             updated_by=UUID(str(model.updated_by)),
             created_at=model.created_at,
             updated_at=model.updated_at,
@@ -94,7 +96,7 @@ class SqlAlchemyDataSourceActivationRepository(DataSourceActivationRepository):
         *,
         catalog_entry_id: str,
         scope: ActivationScope,
-        is_active: bool,
+        permission_level: PermissionLevel,
         updated_by: UUID,
         research_space_id: UUID | None = None,
     ) -> DataSourceActivation:
@@ -104,7 +106,8 @@ class SqlAlchemyDataSourceActivationRepository(DataSourceActivationRepository):
             if model is None:
                 msg = "Activation rule disappeared during update"
                 raise RuntimeError(msg)
-            model.is_active = is_active
+            model.permission_level = PermissionLevelEnum(permission_level.value)
+            model.is_active = permission_level != PermissionLevel.BLOCKED
             model.updated_by = str(updated_by)
         else:
             research_space_value = str(research_space_id) if research_space_id else None
@@ -112,7 +115,8 @@ class SqlAlchemyDataSourceActivationRepository(DataSourceActivationRepository):
                 catalog_entry_id=catalog_entry_id,
                 scope=ActivationScopeEnum(scope.value),
                 research_space_id=research_space_value,
-                is_active=is_active,
+                permission_level=PermissionLevelEnum(permission_level.value),
+                is_active=permission_level != PermissionLevel.BLOCKED,
                 updated_by=str(updated_by),
             )
             self._session.add(model)

@@ -23,6 +23,7 @@ import {
   updateProjectAvailability,
   clearProjectAvailability,
   bulkUpdateGlobalAvailability,
+  type PermissionLevel,
 } from '@/lib/api/data-source-activation'
 import type { DataSource } from '@/types/data-source'
 import { useEntity } from '@/hooks/use-entity'
@@ -249,8 +250,13 @@ export function useSetGlobalAvailability() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ sourceId, isActive }: { sourceId: string; isActive: boolean }) =>
-      updateGlobalAvailability(sourceId, isActive, token),
+    mutationFn: ({
+      sourceId,
+      permissionLevel,
+    }: {
+      sourceId: string
+      permissionLevel: PermissionLevel
+    }) => updateGlobalAvailability(sourceId, permissionLevel, token),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.availability(variables.sourceId) })
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.lists() })
@@ -281,12 +287,12 @@ export function useSetProjectAvailability() {
     mutationFn: ({
       sourceId,
       researchSpaceId,
-      isActive,
+      permissionLevel,
     }: {
       sourceId: string
       researchSpaceId: string
-      isActive: boolean
-    }) => updateProjectAvailability(sourceId, researchSpaceId, isActive, token),
+      permissionLevel: PermissionLevel
+    }) => updateProjectAvailability(sourceId, researchSpaceId, permissionLevel, token),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.availability(variables.sourceId) })
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(variables.researchSpaceId) })
@@ -339,8 +345,13 @@ export function useSetCatalogGlobalAvailability() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ catalogEntryId, isActive }: { catalogEntryId: string; isActive: boolean }) =>
-      updateGlobalAvailability(catalogEntryId, isActive, token),
+    mutationFn: ({
+      catalogEntryId,
+      permissionLevel,
+    }: {
+      catalogEntryId: string
+      permissionLevel: PermissionLevel
+    }) => updateGlobalAvailability(catalogEntryId, permissionLevel, token),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.availability(variables.catalogEntryId) })
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.adminCatalog() })
@@ -371,12 +382,12 @@ export function useSetCatalogProjectAvailability() {
     mutationFn: ({
       catalogEntryId,
       researchSpaceId,
-      isActive,
+      permissionLevel,
     }: {
       catalogEntryId: string
       researchSpaceId: string
-      isActive: boolean
-    }) => updateProjectAvailability(catalogEntryId, researchSpaceId, isActive, token),
+      permissionLevel: PermissionLevel
+    }) => updateProjectAvailability(catalogEntryId, researchSpaceId, permissionLevel, token),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.availability(variables.catalogEntryId) })
       queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(variables.researchSpaceId) })
@@ -402,10 +413,10 @@ export function useBulkSetCatalogGlobalAvailability() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (payload: { isActive: boolean; catalogEntryIds?: string[] }) =>
+    mutationFn: (payload: { permissionLevel: PermissionLevel; catalogEntryIds?: string[] }) =>
       bulkUpdateGlobalAvailability(
         {
-          is_active: payload.isActive,
+          permission_level: payload.permissionLevel,
           catalog_entry_ids: payload.catalogEntryIds,
         },
         token,

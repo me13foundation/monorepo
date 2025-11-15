@@ -6,10 +6,19 @@ Provides type-safe mock repositories and services for comprehensive unit testing
 
 from typing import TypedDict
 from unittest.mock import MagicMock
+from uuid import UUID
 
+from src.application.services.data_discovery_service import DataDiscoveryService
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
+from src.application.services.space_data_discovery_service import (
+    SpaceDataDiscoveryService,
+)
 from src.application.services.variant_service import VariantApplicationService
+from src.domain.entities.data_discovery_session import (
+    DataDiscoverySession,
+    SourceCatalogEntry,
+)
 from src.domain.entities.evidence import Evidence
 from src.domain.entities.gene import Gene
 from src.domain.entities.phenotype import Phenotype
@@ -38,6 +47,7 @@ from .fixtures import (
     TestPhenotype,
     TestPublication,
     TestVariant,
+    create_test_space_discovery_session,
 )
 
 
@@ -160,6 +170,63 @@ class MockGeneRepository(GeneRepository):
         self.delete_gene(gene_id)
         if gene_id in self._genes:
             del self._genes[gene_id]
+
+
+def create_mock_space_discovery_service(
+    space_id: UUID,
+    *,
+    sessions: list[DataDiscoverySession] | None = None,
+    catalog_entries: list[SourceCatalogEntry] | None = None,
+) -> tuple[SpaceDataDiscoveryService, MagicMock]:
+    """
+    Create a space discovery service backed by a mocked DataDiscoveryService.
+
+    Args:
+        space_id: Scoped research space identifier
+        sessions: Optional list of seeded sessions
+        catalog_entries: Optional list of catalog entries returned by get_catalog
+
+    Returns:
+        Tuple of (SpaceDataDiscoveryService, underlying mock DataDiscoveryService)
+    """
+    base_service = MagicMock(spec=DataDiscoveryService)
+    seeded_sessions = sessions or []
+
+    base_service.get_source_catalog.return_value = catalog_entries or []
+    base_service.get_sessions_for_space.return_value = seeded_sessions
+
+    def _find_session(session_id: UUID) -> DataDiscoverySession | None:
+        for session in seeded_sessions:
+            if session.id == session_id:
+                return session
+        return None
+
+    def _find_owned(session_id: UUID, owner_id: UUID) -> DataDiscoverySession | None:
+        for session in seeded_sessions:
+            if session.id == session_id and session.owner_id == owner_id:
+                return session
+        return None
+
+    base_service.get_session.side_effect = _find_session
+    base_service.get_session_for_owner.side_effect = _find_owned
+
+    def _create_session(request):
+        session = create_test_space_discovery_session(
+            space_id,
+            owner_id=request.owner_id,
+            name=request.name,
+        )
+        seeded_sessions.append(session)
+        return session
+
+    base_service.create_session.side_effect = _create_session
+    base_service.update_session_parameters.return_value = None
+    base_service.toggle_source_selection.return_value = None
+    base_service.set_source_selection.return_value = None
+    base_service.delete_session.return_value = True
+
+    service = SpaceDataDiscoveryService(space_id, base_service)
+    return service, base_service
 
 
 class MockVariantRepository(VariantRepository):

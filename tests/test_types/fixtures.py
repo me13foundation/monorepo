@@ -9,6 +9,11 @@ from datetime import UTC, datetime
 from typing import NamedTuple
 from uuid import UUID, uuid4
 
+from src.domain.entities.data_discovery_session import (
+    DataDiscoverySession,
+    QueryParameters,
+)
+
 
 # Test data types using NamedTuple for immutable, typed test data
 class TestGene(NamedTuple):
@@ -120,6 +125,14 @@ class TestResearchSpaceMembership(NamedTuple):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class TestSpaceSourcePermission(NamedTuple):
+    """Typed test data for space-source permission relationships."""
+
+    space_id: UUID
+    source_id: str
+    permission_level: str
 
 
 # Factory functions for creating test data with defaults
@@ -503,6 +516,70 @@ def create_test_research_space_membership(
         is_active=is_active,
         created_at=now,
         updated_at=now,
+    )
+
+
+# Space-scoped permission fixtures
+def create_test_space_source_permissions(
+    *,
+    space_id: UUID | None = None,
+    second_space_id: UUID | None = None,
+) -> list[TestSpaceSourcePermission]:
+    """
+    Create a pair of test permissions demonstrating allowed vs blocked sources.
+
+    Args:
+        space_id: Primary research space identifier
+        second_space_id: Secondary space identifier
+
+    Returns:
+        List of permission fixtures covering available/blocked cases
+    """
+    primary_space = space_id or uuid4()
+    secondary_space = second_space_id or uuid4()
+    return [
+        TestSpaceSourcePermission(
+            space_id=primary_space,
+            source_id="clinvar",
+            permission_level="available",
+        ),
+        TestSpaceSourcePermission(
+            space_id=secondary_space,
+            source_id="clinvar",
+            permission_level="blocked",
+        ),
+    ]
+
+
+def create_test_space_discovery_session(
+    space_id: UUID,
+    *,
+    owner_id: UUID | None = None,
+    name: str = "Space Discovery Session",
+    selected_sources: list[str] | None = None,
+    tested_sources: list[str] | None = None,
+) -> DataDiscoverySession:
+    """
+    Create a discovery session fixture bound to a specific research space.
+    """
+    now = datetime.now(UTC)
+    return DataDiscoverySession(
+        id=uuid4(),
+        owner_id=owner_id or uuid4(),
+        research_space_id=space_id,
+        name=name,
+        current_parameters=QueryParameters(
+            gene_symbol="MED13L",
+            search_term="atrial defect",
+        ),
+        selected_sources=selected_sources or [],
+        tested_sources=tested_sources or [],
+        total_tests_run=len(tested_sources or []),
+        successful_tests=len(tested_sources or []),
+        is_active=True,
+        created_at=now,
+        updated_at=now,
+        last_activity_at=now,
     )
 
 

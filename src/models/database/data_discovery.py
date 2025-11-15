@@ -43,10 +43,10 @@ class DataDiscoverySessionModel(Base):
         index=True,
         doc="User who owns this session",
     )
-    research_space_id: Mapped[str | None] = mapped_column(
+    research_space_id: Mapped[str] = mapped_column(
         PGUUID(as_uuid=False),
         ForeignKey("research_spaces.id"),
-        nullable=True,
+        nullable=False,
         index=True,
         doc="Research space this session belongs to",
     )

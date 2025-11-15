@@ -11,6 +11,7 @@ import {
   FileText,
   LayoutDashboard,
   Users,
+  Search,
 } from 'lucide-react'
 import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 
@@ -29,7 +30,7 @@ export function SpaceNavigation() {
     prefetchSpaceDetail,
     prefetchSpaceMembers,
     prefetchSpaceCuration,
-    prefetchDataDiscovery,
+    prefetchSpaceDiscovery,
   } = usePrefetchOnHover()
   const [isMounted, setIsMounted] = useState(false)
 
@@ -52,11 +53,18 @@ export function SpaceNavigation() {
       prefetch: prefetchSpaceDetail,
     },
     {
+      label: 'Discover Sources',
+      href: `${basePath}/discovery`,
+      icon: Search,
+      description: 'Discover and test data sources within this space',
+      prefetch: prefetchSpaceDiscovery,
+    },
+    {
       label: 'Data Sources',
-      href: '/data-discovery',
+      href: `${basePath}/data-sources`,
       icon: Database,
-      description: 'Discover and test data sources',
-      prefetch: () => prefetchDataDiscovery(),
+      description: 'Manage activated data sources',
+      prefetch: prefetchSpaceDetail,
     },
     {
       label: 'Data Curation',

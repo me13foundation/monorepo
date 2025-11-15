@@ -29,6 +29,7 @@ def availability_summary_to_response(
     """Convert availability summary into API response."""
     return DataSourceAvailabilityResponse(
         catalog_entry_id=summary.catalog_entry_id,
+        effective_permission_level=summary.effective_permission_level,
         effective_is_active=summary.effective_is_active,
         global_rule=(
             activation_rule_to_response(summary.global_rule)

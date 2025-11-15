@@ -20,6 +20,14 @@ class ActivationScopeEnum(str, Enum):
     RESEARCH_SPACE = "research_space"
 
 
+class PermissionLevelEnum(str, Enum):
+    """Permission levels controlling catalog behavior."""
+
+    BLOCKED = "blocked"
+    VISIBLE = "visible"
+    AVAILABLE = "available"
+
+
 class DataSourceActivationModel(Base):
     """SQLAlchemy persistence model for activation policies."""
 
@@ -54,6 +62,18 @@ class DataSourceActivationModel(Base):
         PGUUID(as_uuid=False),
         ForeignKey("research_spaces.id", ondelete="CASCADE"),
         nullable=True,
+        index=True,
+    )
+    permission_level: Mapped[PermissionLevelEnum] = mapped_column(
+        SQLEnum(
+            PermissionLevelEnum,
+            name="data_source_permission_level",
+            create_constraint=False,
+            values_callable=lambda enum_cls: [member.value for member in enum_cls],
+        ),
+        nullable=False,
+        default=PermissionLevelEnum.AVAILABLE,
+        server_default=PermissionLevelEnum.AVAILABLE.value,
         index=True,
     )
     is_active: Mapped[bool] = mapped_column(

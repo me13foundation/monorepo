@@ -26,6 +26,7 @@ from src.domain.entities.data_discovery_session import (
     SourceCatalogEntry,
     TestResultStatus,
 )
+from src.domain.entities.data_source_activation import PermissionLevel
 from src.domain.entities.user_data_source import SourceConfiguration, SourceType
 from src.domain.repositories.data_discovery_repository import (
     DataDiscoverySessionRepository,
@@ -121,6 +122,64 @@ class DataDiscoveryService:
         self._source_service = source_management_service
         self._template_repo = source_template_repository
         self._activation_service = activation_service
+
+    def get_sessions_for_space(
+        self,
+        space_id: UUID,
+        owner_id: UUID | None = None,
+        *,
+        include_inactive: bool = False,
+    ) -> list[DataDiscoverySession]:
+        """Retrieve sessions scoped to a specific research space."""
+        if owner_id:
+            sessions = self._session_repo.find_by_owner(
+                owner_id,
+                include_inactive=include_inactive,
+            )
+        else:
+            sessions = self._session_repo.find_by_space(
+                space_id,
+                include_inactive=include_inactive,
+            )
+
+        return [
+            session for session in sessions if session.research_space_id == space_id
+        ]
+
+    def _resolve_permission_level(
+        self,
+        catalog_entry_id: str,
+        research_space_id: UUID | None,
+    ) -> PermissionLevel:
+        """Determine the permission level for a catalog entry within a space."""
+        if not self._activation_service:
+            return PermissionLevel.AVAILABLE
+        return self._activation_service.get_effective_permission_level(
+            catalog_entry_id,
+            research_space_id,
+        )
+
+    def _can_display_source(
+        self,
+        catalog_entry_id: str,
+        research_space_id: UUID | None,
+    ) -> bool:
+        """Return True when a source should be visible within the catalog."""
+        return (
+            self._resolve_permission_level(catalog_entry_id, research_space_id)
+            != PermissionLevel.BLOCKED
+        )
+
+    def _can_execute_source(
+        self,
+        catalog_entry_id: str,
+        research_space_id: UUID | None,
+    ) -> bool:
+        """Return True when tests/ingestion may run for a source in the space."""
+        return (
+            self._resolve_permission_level(catalog_entry_id, research_space_id)
+            == PermissionLevel.AVAILABLE
+        )
 
     def create_session(
         self,
@@ -271,10 +330,7 @@ class DataDiscoveryService:
                 session_id,
             )
             return None
-        if self._activation_service and not self._activation_service.is_source_active(
-            catalog_entry_id,
-            session.research_space_id,
-        ):
+        if not self._can_execute_source(catalog_entry_id, session.research_space_id):
             logger.warning(
                 "Catalog entry %s disabled for session %s",
                 catalog_entry_id,
@@ -348,12 +404,9 @@ class DataDiscoveryService:
                     session_id,
                 )
                 continue
-            if (
-                self._activation_service
-                and not self._activation_service.is_source_active(
-                    catalog_entry_id,
-                    session.research_space_id,
-                )
+            if not self._can_execute_source(
+                catalog_entry_id,
+                session.research_space_id,
             ):
                 logger.warning(
                     "Catalog entry %s disabled for session %s",
@@ -405,13 +458,10 @@ class DataDiscoveryService:
         else:
             entries = self._catalog_repo.find_all_active()
 
-        if not self._activation_service:
-            return entries
-
         return [
             entry
             for entry in entries
-            if self._activation_service.is_source_active(entry.id, research_space_id)
+            if self._can_display_source(entry.id, research_space_id)
         ]
 
     async def execute_query_test(
@@ -441,6 +491,17 @@ class DataDiscoveryService:
                 "Session %s or catalog entry %s not found",
                 request.session_id,
                 request.catalog_entry_id,
+            )
+            return None
+
+        if not self._can_execute_source(
+            request.catalog_entry_id,
+            session.research_space_id,
+        ):
+            logger.warning(
+                "Catalog entry %s disabled for execution in session %s",
+                request.catalog_entry_id,
+                request.session_id,
             )
             return None
 
@@ -603,6 +664,17 @@ class DataDiscoveryService:
                 "Session %s or catalog entry %s not found",
                 request.session_id,
                 request.catalog_entry_id,
+            )
+            return None
+
+        if not self._can_execute_source(
+            request.catalog_entry_id,
+            session.research_space_id,
+        ):
+            logger.warning(
+                "Catalog entry %s lacks permission for space %s",
+                request.catalog_entry_id,
+                request.research_space_id,
             )
             return None
 

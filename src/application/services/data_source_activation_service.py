@@ -8,6 +8,7 @@ from uuid import UUID  # noqa: TC003
 from src.domain.entities.data_source_activation import (
     ActivationScope,
     DataSourceActivation,
+    PermissionLevel,
 )
 from src.domain.repositories.data_source_activation_repository import (  # noqa: TC001
     DataSourceActivationRepository,
@@ -19,6 +20,7 @@ class DataSourceAvailabilitySummary:
     """Aggregate view of activation policies for a catalog entry."""
 
     catalog_entry_id: str
+    effective_permission_level: PermissionLevel
     effective_is_active: bool
     global_rule: DataSourceActivation | None
     project_rules: list[DataSourceActivation]
@@ -34,7 +36,7 @@ class DataSourceActivationService:
         self,
         *,
         catalog_entry_id: str,
-        is_active: bool,
+        permission_level: PermissionLevel,
         updated_by: UUID,
     ) -> DataSourceActivation:
         """Create or update the global activation status for a data source."""
@@ -42,7 +44,7 @@ class DataSourceActivationService:
         return self._repository.set_rule(
             catalog_entry_id=catalog_entry_id,
             scope=ActivationScope.GLOBAL,
-            is_active=is_active,
+            permission_level=permission_level,
             updated_by=updated_by,
         )
 
@@ -59,7 +61,7 @@ class DataSourceActivationService:
         *,
         catalog_entry_id: str,
         research_space_id: UUID,
-        is_active: bool,
+        permission_level: PermissionLevel,
         updated_by: UUID,
     ) -> DataSourceActivation:
         """Create or update an activation override for a specific research space."""
@@ -68,7 +70,7 @@ class DataSourceActivationService:
             catalog_entry_id=catalog_entry_id,
             scope=ActivationScope.RESEARCH_SPACE,
             research_space_id=research_space_id,
-            is_active=is_active,
+            permission_level=permission_level,
             updated_by=updated_by,
         )
 
@@ -86,12 +88,12 @@ class DataSourceActivationService:
             research_space_id=research_space_id,
         )
 
-    def is_source_active(
+    def get_effective_permission_level(
         self,
         catalog_entry_id: str,
         research_space_id: UUID | None = None,
-    ) -> bool:
-        """Determine if a data source is active for the provided scope."""
+    ) -> PermissionLevel:
+        """Resolve the effective permission level for the provided context."""
 
         if research_space_id:
             project_rule = self._repository.get_rule(
@@ -100,17 +102,29 @@ class DataSourceActivationService:
                 research_space_id,
             )
             if project_rule is not None:
-                return project_rule.is_active
+                return project_rule.permission_level
 
         global_rule = self._repository.get_rule(
             catalog_entry_id,
             ActivationScope.GLOBAL,
         )
         if global_rule is not None:
-            return global_rule.is_active
+            return global_rule.permission_level
 
-        # Default: active when no rules exist.
-        return True
+        # Default: sources are available when no rule exists.
+        return PermissionLevel.AVAILABLE
+
+    def is_source_active(
+        self,
+        catalog_entry_id: str,
+        research_space_id: UUID | None = None,
+    ) -> bool:
+        """Determine if a data source is active for the provided scope."""
+
+        return (
+            self.get_effective_permission_level(catalog_entry_id, research_space_id)
+            != PermissionLevel.BLOCKED
+        )
 
     def get_availability_summary(
         self,
@@ -151,16 +165,27 @@ class DataSourceActivationService:
             else:
                 project_rules.append(rule)
 
-        effective = global_rule.is_active if global_rule is not None else True
-        return DataSourceAvailabilitySummary(
-            catalog_entry_id=catalog_entry_id,
-            effective_is_active=effective,
-            global_rule=global_rule,
-            project_rules=sorted(
+        effective_permission = (
+            global_rule.permission_level
+            if global_rule is not None
+            else PermissionLevel.AVAILABLE
+        )
+        if project_rules:
+            # Use the first project rule for deterministic ordering in summary (sorted below)
+            project_rules_sorted = sorted(
                 project_rules,
                 key=lambda r: (
                     str(r.research_space_id or ""),
                     r.updated_at,
                 ),
-            ),
+            )
+        else:
+            project_rules_sorted = []
+
+        return DataSourceAvailabilitySummary(
+            catalog_entry_id=catalog_entry_id,
+            effective_permission_level=effective_permission,
+            effective_is_active=effective_permission != PermissionLevel.BLOCKED,
+            global_rule=global_rule,
+            project_rules=project_rules_sorted,
         )

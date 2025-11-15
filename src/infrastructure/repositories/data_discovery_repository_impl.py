@@ -213,7 +213,12 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         models = query.order_by(DataDiscoverySessionModel.last_activity_at.desc()).all()
         return [session_to_entity(model) for model in models]
 
-    def find_by_space(self, space_id: UUID) -> list[DataDiscoverySession]:
+    def find_by_space(
+        self,
+        space_id: UUID,
+        *,
+        include_inactive: bool = False,
+    ) -> list[DataDiscoverySession]:
         """
         Find all data discovery sessions for a specific research space.
 
@@ -228,15 +233,15 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
             space_id,
             allow_legacy_formats=self._allow_legacy_owner_formats,
         )
-        models = (
-            self._session.query(DataDiscoverySessionModel)
-            .filter(
-                DataDiscoverySessionModel.research_space_id.in_(space_ids),
-                DataDiscoverySessionModel.is_active.is_(True),
-            )
-            .order_by(DataDiscoverySessionModel.last_activity_at.desc())
-            .all()
+        query = self._session.query(DataDiscoverySessionModel).filter(
+            DataDiscoverySessionModel.research_space_id.in_(space_ids),
         )
+        if not include_inactive:
+            query = query.filter(DataDiscoverySessionModel.is_active.is_(True))
+
+        models = query.order_by(
+            DataDiscoverySessionModel.last_activity_at.desc(),
+        ).all()
         return [session_to_entity(model) for model in models]
 
     def delete(self, session_id: UUID) -> bool:

@@ -1,3 +1,5 @@
+from sqlalchemy import text
+
 from src.application.curation.repositories.review_repository import (
     SqlAlchemyReviewRepository,
 )
@@ -8,6 +10,11 @@ from src.models.database.base import Base
 
 def setup_module(module):
     # Create tables once for this test module
+    with engine.begin() as connection:
+        if connection.dialect.name == "postgresql":
+            connection.execute(
+                text("DROP TYPE IF EXISTS data_source_permission_level CASCADE"),
+            )
     Base.metadata.create_all(engine)
 
 

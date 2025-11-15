@@ -49,6 +49,7 @@ function setupDefaults() {
   mockUseCatalogAvailability.mockReturnValue({
     data: {
       catalog_entry_id: 'catalog-1',
+      effective_permission_level: 'available',
       effective_is_active: true,
       global_rule: null,
       project_rules: [],
@@ -59,6 +60,7 @@ function setupDefaults() {
     data: [
       {
         catalog_entry_id: 'catalog-1',
+        effective_permission_level: 'available',
         effective_is_active: true,
         global_rule: null,
         project_rules: [],
@@ -123,9 +125,12 @@ describe('DataSourceAvailabilitySection', () => {
     render(<DataSourceAvailabilitySection />)
 
     await user.click(screen.getByRole('button', { name: /manage availability/i }))
-    await user.click(await screen.findByRole('button', { name: /Enable globally/i }))
+    await user.click(await screen.findByRole('button', { name: /Set Available/i }))
 
-    expect(mutateAsync).toHaveBeenCalledWith({ catalogEntryId: 'catalog-1', isActive: true })
+    expect(mutateAsync).toHaveBeenCalledWith({
+      catalogEntryId: 'catalog-1',
+      permissionLevel: 'available',
+    })
   })
 
   it('filters data sources based on search input', async () => {
@@ -165,12 +170,14 @@ describe('DataSourceAvailabilitySection', () => {
       data: [
         {
           catalog_entry_id: 'catalog-1',
+          effective_permission_level: 'available',
           effective_is_active: true,
           global_rule: null,
           project_rules: [],
         },
         {
           catalog_entry_id: 'catalog-2',
+          effective_permission_level: 'available',
           effective_is_active: true,
           global_rule: null,
           project_rules: [],
@@ -248,9 +255,9 @@ describe('DataSourceAvailabilitySection', () => {
     await user.clear(input)
     await user.type(input, 'Beta')
 
-    await user.click(screen.getByRole('button', { name: /Enable filtered/i }))
+    await user.click(screen.getByRole('button', { name: /Set Available/i }))
     expect(mutateAsync).toHaveBeenCalledWith({
-      isActive: true,
+      permissionLevel: 'available',
       catalogEntryIds: ['catalog-2'],
     })
   })

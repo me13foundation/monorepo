@@ -5,9 +5,11 @@ import { useSession } from 'next-auth/react'
 import { dashboardKeys } from '@/lib/query-keys/dashboard'
 import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
 import { dataDiscoveryKeys } from '@/lib/query-keys/data-discovery'
+import { spaceDiscoveryKeys } from '@/lib/query-keys/space-discovery'
 import { fetchDashboardStats, fetchRecentActivities } from '@/lib/api'
 import { fetchResearchSpaces, fetchResearchSpace, fetchSpaceMembers, fetchSpaceCurationStats } from '@/lib/api/research-spaces'
 import { fetchSourceCatalog, fetchDataDiscoverySessions } from '@/lib/api/data-discovery'
+import { fetchSpaceDiscoverySessions, fetchSpaceSourceCatalog } from '@/lib/api/space-discovery'
 
 const RECENT_ACTIVITY_LIMIT = 5
 
@@ -110,6 +112,24 @@ export function usePrefetchOnHover() {
     })
   }
 
+  const prefetchSpaceDiscovery = (spaceId: string) => {
+    if (!token || typeof token !== 'string' || token.length === 0 || !spaceId) {
+      return
+    }
+
+    queryClient.prefetchQuery({
+      queryKey: spaceDiscoveryKeys.catalog(spaceId, undefined),
+      queryFn: () => fetchSpaceSourceCatalog(spaceId, token),
+      staleTime: 5 * 60 * 1000,
+    })
+
+    queryClient.prefetchQuery({
+      queryKey: spaceDiscoveryKeys.sessions(spaceId),
+      queryFn: () => fetchSpaceDiscoverySessions(spaceId, token),
+      staleTime: 2 * 60 * 1000,
+    })
+  }
+
   return {
     prefetchDashboard,
     prefetchResearchSpaces,
@@ -117,5 +137,6 @@ export function usePrefetchOnHover() {
     prefetchSpaceDetail,
     prefetchSpaceMembers,
     prefetchSpaceCuration,
+    prefetchSpaceDiscovery,
   }
 }

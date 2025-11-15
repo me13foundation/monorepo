@@ -2,11 +2,12 @@ import { apiClient, authHeaders } from '@/lib/api/client'
 import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
 
 export type ActivationScope = 'global' | 'research_space'
+export type PermissionLevel = 'blocked' | 'visible' | 'available'
 
 export interface ActivationRule {
   id: string
   scope: ActivationScope
-  is_active: boolean
+  permission_level: PermissionLevel
   research_space_id: string | null
   updated_by: string
   created_at: string
@@ -15,13 +16,14 @@ export interface ActivationRule {
 
 export interface DataSourceAvailability {
   catalog_entry_id: string
+  effective_permission_level: PermissionLevel
   effective_is_active: boolean
   global_rule: ActivationRule | null
   project_rules: ActivationRule[]
 }
 
 export interface BulkActivationUpdateRequest {
-  is_active: boolean
+  permission_level: PermissionLevel
   catalog_entry_ids?: string[]
 }
 
@@ -57,14 +59,14 @@ export async function fetchDataSourceAvailability(
 
 export async function updateGlobalAvailability(
   catalogEntryId: string,
-  isActive: boolean,
+  permissionLevel: PermissionLevel,
   token?: string,
 ): Promise<DataSourceAvailability> {
   if (!token) throw new Error('Authentication token is required')
 
   const response = await apiClient.put<DataSourceAvailability>(
     `/admin/data-catalog/${catalogEntryId}/availability/global`,
-    { is_active: isActive },
+    { permission_level: permissionLevel },
     authHeaders(token),
   )
   return response.data
@@ -86,14 +88,14 @@ export async function clearGlobalAvailability(
 export async function updateProjectAvailability(
   catalogEntryId: string,
   researchSpaceId: string,
-  isActive: boolean,
+  permissionLevel: PermissionLevel,
   token?: string,
 ): Promise<DataSourceAvailability> {
   if (!token) throw new Error('Authentication token is required')
 
   const response = await apiClient.put<DataSourceAvailability>(
     `/admin/data-catalog/${catalogEntryId}/availability/research-spaces/${researchSpaceId}`,
-    { is_active: isActive },
+    { permission_level: permissionLevel },
     authHeaders(token),
   )
   return response.data

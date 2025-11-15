@@ -13,6 +13,7 @@ from src.application.services.data_discovery_service import (
     DataDiscoveryService,
     UpdateSessionParametersRequest,
 )
+from src.database.seed import DEFAULT_RESEARCH_SPACE_ID
 from src.database.session import get_session
 from src.domain.entities.data_discovery_session import QueryParameters
 from src.domain.entities.user import User, UserRole
@@ -69,10 +70,11 @@ async def create_session(
                 )
                 validated_space_id = None
 
+        enforced_space_id = validated_space_id or DEFAULT_RESEARCH_SPACE_ID
         create_request = CreateDataDiscoverySessionRequest(
             owner_id=current_user.id,
             name=request.name,
-            research_space_id=validated_space_id,
+            research_space_id=enforced_space_id,
             initial_parameters=QueryParameters(
                 gene_symbol=request.initial_parameters.gene_symbol,
                 search_term=request.initial_parameters.search_term,
@@ -97,9 +99,7 @@ async def create_session(
             target=("data_discovery_session", str(session.id)),
             actor_id=current_user.id,
             details={
-                "research_space_id": (
-                    str(validated_space_id) if validated_space_id else None
-                ),
+                "research_space_id": str(enforced_space_id),
                 "name": request.name,
             },
         )

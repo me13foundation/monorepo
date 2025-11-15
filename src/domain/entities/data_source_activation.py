@@ -16,15 +16,23 @@ class ActivationScope(str, Enum):
     RESEARCH_SPACE = "research_space"
 
 
+class PermissionLevel(str, Enum):
+    """Permission levels for catalog entries."""
+
+    BLOCKED = "blocked"
+    VISIBLE = "visible"
+    AVAILABLE = "available"
+
+
 class DataSourceActivation(BaseModel):
     """Represents a system-level activation policy for a catalog entry."""
 
     id: UUID
     catalog_entry_id: str
     scope: ActivationScope
-    is_active: bool = Field(
+    permission_level: PermissionLevel = Field(
         ...,
-        description="Whether the data source is active for this scope",
+        description="Permission level applied to this scope",
     )
     research_space_id: UUID | None = Field(
         None,
@@ -35,6 +43,24 @@ class DataSourceActivation(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(frozen=True)
+
+    @property
+    def is_active(self) -> bool:
+        """Compatibility helper indicating if entry should be surfaced."""
+        return self.permission_level != PermissionLevel.BLOCKED
+
+    @property
+    def allows_testing(self) -> bool:
+        """Return True when tests and ingestion may run for this scope."""
+        return self.permission_level == PermissionLevel.AVAILABLE
+
+    @property
+    def allows_visibility(self) -> bool:
+        """Return True when the entry may be displayed in catalogs."""
+        return self.permission_level in (
+            PermissionLevel.VISIBLE,
+            PermissionLevel.AVAILABLE,
+        )
 
     @model_validator(mode="after")
     def validate_scope(self) -> DataSourceActivation:

@@ -2,6 +2,7 @@ import os
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 
 from src.database.session import SessionLocal, engine
 from src.domain.entities.user import UserRole, UserStatus
@@ -75,6 +76,14 @@ async def test_curation_submit_list_approve_comment() -> None:
             base_url="http://testserver",
         ) as client:
             # Ensure tables exist for the test
+            with engine.begin() as connection:
+                if connection.dialect.name == "postgresql":
+                    connection.execute(
+                        text(
+                            "DROP TYPE IF EXISTS data_source_permission_level CASCADE",
+                        ),
+                    )
+            Base.metadata.drop_all(engine)
             Base.metadata.create_all(engine)
             headers = await _get_auth_headers(client)
 

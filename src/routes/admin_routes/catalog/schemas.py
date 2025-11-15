@@ -9,6 +9,7 @@ from src.domain.entities.data_discovery_session import SourceCatalogEntry
 from src.domain.entities.data_source_activation import (
     ActivationScope,
     DataSourceActivation,
+    PermissionLevel,
 )
 
 
@@ -53,7 +54,7 @@ class ActivationRuleResponse(BaseModel):
 
     id: UUID
     scope: ActivationScope
-    is_active: bool
+    permission_level: PermissionLevel
     research_space_id: UUID | None
     updated_by: UUID
     created_at: datetime
@@ -64,7 +65,7 @@ class ActivationRuleResponse(BaseModel):
         return cls(
             id=rule.id,
             scope=rule.scope,
-            is_active=rule.is_active,
+            permission_level=rule.permission_level,
             research_space_id=rule.research_space_id,
             updated_by=rule.updated_by,
             created_at=rule.created_at,
@@ -76,6 +77,7 @@ class DataSourceAvailabilityResponse(BaseModel):
     """Availability summary for a catalog entry."""
 
     catalog_entry_id: str
+    effective_permission_level: PermissionLevel
     effective_is_active: bool
     global_rule: ActivationRuleResponse | None
     project_rules: list[ActivationRuleResponse]
@@ -84,13 +86,19 @@ class DataSourceAvailabilityResponse(BaseModel):
 class ActivationUpdateRequest(BaseModel):
     """Payload for toggling activation status."""
 
-    is_active: bool = Field(..., description="Desired activation state")
+    permission_level: PermissionLevel = Field(
+        ...,
+        description="Desired permission level",
+    )
 
 
 class BulkActivationUpdateRequest(BaseModel):
     """Payload for applying a global activation to multiple catalog entries."""
 
-    is_active: bool = Field(..., description="Desired activation state")
+    permission_level: PermissionLevel = Field(
+        ...,
+        description="Desired permission level",
+    )
     catalog_entry_ids: list[str] | None = Field(
         default=None,
         description="Optional subset of catalog entries to update.",

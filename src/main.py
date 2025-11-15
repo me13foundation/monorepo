@@ -31,6 +31,9 @@ from src.routes.health import router as health_router
 from src.routes.phenotypes import router as phenotypes_router
 
 # Import models to ensure they're registered with SQLAlchemy
+from src.routes.research_space_discovery import (
+    router as research_space_discovery_router,
+)
 from src.routes.research_spaces import research_spaces_router
 from src.routes.resources import router as resources_router
 from src.routes.search import router as search_router
@@ -171,6 +174,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(curation_router)
     app.include_router(research_spaces_router)
+    app.include_router(research_space_discovery_router)
     app.include_router(data_discovery_router)
 
     # Authentication routes

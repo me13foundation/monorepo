@@ -4,6 +4,7 @@ import os
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 
 from src.database.session import SessionLocal, engine
 from src.domain.entities.user import UserRole, UserStatus
@@ -59,8 +60,19 @@ def _reset_tables(session: SessionLocal) -> None:
     session.commit()
 
 
+def _drop_permission_enum_if_supported() -> None:
+    with engine.begin() as connection:
+        if connection.dialect.name != "postgresql":
+            return
+        connection.execute(
+            text("DROP TYPE IF EXISTS data_source_permission_level CASCADE"),
+        )
+
+
 def _seed_curation_context() -> None:
     """Create the gene/variant/phenotype/evidence records needed by the test."""
+    _drop_permission_enum_if_supported()
+    Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     session = SessionLocal()
     try:
