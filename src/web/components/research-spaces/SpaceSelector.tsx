@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { Button } from '@/components/ui/button'
-import { Loader2, Folder } from 'lucide-react'
+import { Loader2, SquareMousePointer } from 'lucide-react'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { SpaceSelectorModal } from './SpaceSelectorModal'
 import type { ResearchSpaceListResponse } from '@/types/research-space'
@@ -34,8 +34,12 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
 
   if (spaces.length === 0) {
     return (
-      <Button variant="outline" onClick={() => setModalOpen(true)}>
-        <Folder className="mr-2 size-4" />
+      <Button
+        variant="outline"
+        onClick={() => setModalOpen(true)}
+        className="border-brand-primary/40 bg-brand-primary/5 text-foreground transition-colors hover:border-brand-primary/50 hover:bg-brand-primary/10 hover:!text-foreground"
+      >
+        <SquareMousePointer className="mr-2 size-4 text-brand-primary" />
         <span className="text-sm">No spaces</span>
       </Button>
     )
@@ -46,19 +50,15 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
       <Button
         variant="outline"
         onClick={() => setModalOpen(true)}
-        className="w-full justify-between sm:w-auto sm:min-w-[200px]"
+        className="w-full justify-between border-brand-primary/40 bg-brand-primary/5 text-foreground transition-colors hover:border-brand-primary/50 hover:bg-brand-primary/10 hover:!text-foreground sm:w-auto sm:min-w-[200px]"
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Folder className="size-4 shrink-0" />
+          <SquareMousePointer className="size-4 shrink-0 text-brand-primary" />
           <div className="flex min-w-0 flex-1 flex-col items-start">
             <span className="w-full truncate text-sm font-medium">
               {currentSpace?.name || 'Select a space'}
             </span>
-            {currentSpace && (
-              <span className="hidden w-full truncate font-mono text-xs text-muted-foreground sm:block">
-                {currentSpace.slug}
-              </span>
-            )}
+
           </div>
         </div>
       </Button>
