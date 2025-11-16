@@ -13,7 +13,7 @@ from src.application.services.data_discovery_service.requests import (
 )
 from src.database.session import get_session
 from src.domain.entities.user import User
-from src.infrastructure.dependency_injection.container import (
+from src.infrastructure.dependency_injection.dependencies import (
     get_data_discovery_service_dependency,
 )
 from src.routes.auth import get_current_active_user

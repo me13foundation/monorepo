@@ -41,7 +41,6 @@ from src.application.services.publication_service import PublicationApplicationS
 from src.application.services.source_management_service import SourceManagementService
 from src.application.services.user_management_service import UserManagementService
 from src.application.services.variant_service import VariantApplicationService
-from src.database.session import SessionLocal
 from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
 from src.database.url_resolver import resolve_async_database_url
 from src.domain.services.evidence_domain_service import EvidenceDomainService
@@ -85,7 +84,7 @@ from src.infrastructure.security.jwt_provider import JWTProvider
 from src.infrastructure.security.password_hasher import PasswordHasher
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator, Generator
+    from collections.abc import AsyncGenerator
 
     from sqlalchemy.orm import Session
 
@@ -449,78 +448,3 @@ class DependencyContainer:
 
 # Global container instance (will be configured in main.py)
 container = DependencyContainer()
-
-
-# LEGACY SESSION SETUP (for backward compatibility)
-def initialize_legacy_session(session: Session) -> None:
-    # This function is kept for backward compatibility but no longer does anything
-    pass
-
-
-# FastAPI dependency functions (these will be called synchronously by FastAPI)
-def get_user_repository_dependency() -> SqlAlchemyUserRepository:
-    return container.get_user_repository()
-
-
-def get_authentication_service_dependency() -> AuthenticationService:
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Create directly when event loop is running (FastAPI context)
-            return AuthenticationService(
-                user_repository=get_user_repository_dependency(),
-                session_repository=SqlAlchemySessionRepository(
-                    container.async_session_factory,
-                ),
-                jwt_provider=container.jwt_provider,
-                password_hasher=container.password_hasher,
-            )
-        # Use async container method when no event loop
-        return loop.run_until_complete(container.get_authentication_service())
-    except RuntimeError:
-        # Fallback when no event loop exists
-        return AuthenticationService(
-            user_repository=get_user_repository_dependency(),
-            session_repository=SqlAlchemySessionRepository(
-                container.async_session_factory,
-            ),
-            jwt_provider=container.jwt_provider,
-            password_hasher=container.password_hasher,
-        )
-
-
-def get_user_management_service_dependency() -> UserManagementService:
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # Create directly when event loop is running (FastAPI context)
-            return UserManagementService(
-                user_repository=get_user_repository_dependency(),
-                password_hasher=container.password_hasher,
-            )
-        # Use async container method when no event loop
-        return loop.run_until_complete(container.get_user_management_service())
-    except RuntimeError:
-        # Fallback when no event loop exists
-        return UserManagementService(
-            user_repository=get_user_repository_dependency(),
-            password_hasher=container.password_hasher,
-        )
-
-
-# LEGACY DEPENDENCY FUNCTIONS (for backward compatibility)
-def get_legacy_dependency_container() -> DependencyContainer:
-    return container
-
-
-# Data discovery service dependency
-def get_data_discovery_service_dependency() -> (
-    Generator[DataDiscoveryService, None, None]
-):
-    # Create a new session for this request
-    session = SessionLocal()
-    try:
-        service = container.create_data_discovery_service(session)
-        yield service
-    finally:
-        session.close()

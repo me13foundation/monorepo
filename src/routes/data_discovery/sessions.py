@@ -17,7 +17,7 @@ from src.database.seed import DEFAULT_RESEARCH_SPACE_ID
 from src.database.session import get_session
 from src.domain.entities.data_discovery_session import QueryParameters
 from src.domain.entities.user import User, UserRole
-from src.infrastructure.dependency_injection.container import (
+from src.infrastructure.dependency_injection.dependencies import (
     get_data_discovery_service_dependency,
 )
 from src.infrastructure.repositories.research_space_repository import (

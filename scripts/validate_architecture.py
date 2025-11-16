@@ -7,6 +7,7 @@ Validates codebase against architectural standards defined in:
 - docs/type_examples.md
 - docs/frontend/EngenieeringArchitectureNext.md
 - AGENTS.md
+- architecture_overrides.json (technical debt tracking)
 
 This script checks for:
 1. Type safety violations (Any, cast usage)
@@ -17,8 +18,19 @@ This script checks for:
 """
 
 import ast
+import json
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from src.type_definitions.common import JSONValue
 
 # Allowed exceptions for type checking
 ALLOWED_ANY_USAGE = {
@@ -75,6 +87,7 @@ WARNING_FILE_SIZE = 500  # Files approaching limit
 # Complexity thresholds
 MAX_FUNCTION_COMPLEXITY = 50  # Cyclomatic complexity
 MAX_CLASS_METHODS = 30  # Methods per class
+ARCHITECTURE_OVERRIDES_FILE = "architecture_overrides.json"
 
 
 @dataclass
@@ -111,6 +124,127 @@ class ValidationResult:
         return self.error_count == 0
 
 
+@dataclass(frozen=True)
+class FileSizeOverride:
+    """Represents a documented file size exception."""
+
+    path: str
+    max_lines: int
+    reason: str
+    expires_on: str | None = None
+
+
+@dataclass(frozen=True)
+class ClassSizeOverride:
+    """Represents a documented class size exception."""
+
+    path: str
+    class_name: str
+    max_methods: int
+    reason: str
+    expires_on: str | None = None
+
+
+@dataclass
+class ArchitectureOverrides:
+    """Overrides for transitional technical debt."""
+
+    file_size: dict[str, FileSizeOverride] = field(default_factory=dict)
+    class_size: dict[tuple[str, str], ClassSizeOverride] = field(default_factory=dict)
+
+    @classmethod
+    def load(cls, root_path: Path) -> "ArchitectureOverrides":
+        """Load overrides from configuration file if present."""
+        overrides_path = root_path / ARCHITECTURE_OVERRIDES_FILE
+        if not overrides_path.exists():
+            return cls()
+
+        try:
+            raw_data: JSONValue = json.loads(overrides_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:  # pragma: no cover - configuration error
+            error_message = f"Invalid JSON in {ARCHITECTURE_OVERRIDES_FILE}: {exc.msg}"
+            raise ValueError(error_message) from exc
+
+        if not isinstance(raw_data, dict):
+            message = f"{ARCHITECTURE_OVERRIDES_FILE} must contain a JSON object at the top level."
+            raise TypeError(message)
+
+        file_overrides = cls._parse_file_size_overrides(raw_data.get("file_size"))
+        class_overrides = cls._parse_class_size_overrides(raw_data.get("class_size"))
+
+        return cls(file_overrides, class_overrides)
+
+    @staticmethod
+    def _parse_file_size_overrides(
+        value: object | None,
+    ) -> dict[str, FileSizeOverride]:
+        overrides: dict[str, FileSizeOverride] = {}
+        if not isinstance(value, list):
+            return overrides
+
+        for entry in value:
+            if not isinstance(entry, dict):
+                continue
+
+            entry_dict: dict[str, object] = entry
+            path_value = entry_dict.get("path")
+            max_lines_value = entry_dict.get("max_lines")
+            reason_value = entry_dict.get("reason")
+            expires_value = entry_dict.get("expires_on")
+
+            if (
+                isinstance(path_value, str)
+                and isinstance(max_lines_value, int)
+                and isinstance(reason_value, str)
+            ):
+                expires = expires_value if isinstance(expires_value, str) else None
+                overrides[path_value] = FileSizeOverride(
+                    path=path_value,
+                    max_lines=max_lines_value,
+                    reason=reason_value,
+                    expires_on=expires,
+                )
+
+        return overrides
+
+    @staticmethod
+    def _parse_class_size_overrides(
+        value: object | None,
+    ) -> dict[tuple[str, str], ClassSizeOverride]:
+        overrides: dict[tuple[str, str], ClassSizeOverride] = {}
+        if not isinstance(value, list):
+            return overrides
+
+        for entry in value:
+            if not isinstance(entry, dict):
+                continue
+
+            entry_dict: dict[str, object] = entry
+            path_value = entry_dict.get("path")
+            class_name = entry_dict.get("class_name")
+            max_methods_value = entry_dict.get("max_methods")
+            reason_value = entry_dict.get("reason")
+            expires_value = entry_dict.get("expires_on")
+
+            if (
+                isinstance(path_value, str)
+                and isinstance(class_name, str)
+                and isinstance(max_methods_value, int)
+                and isinstance(reason_value, str)
+            ):
+                expires = expires_value if isinstance(expires_value, str) else None
+                key = (path_value, class_name)
+                overrides[key] = ClassSizeOverride(
+                    path=path_value,
+                    class_name=class_name,
+                    max_methods=max_methods_value,
+                    reason=reason_value,
+                    expires_on=expires,
+                )
+
+        return overrides
+
+
 class ArchitectureValidator:
     """Validates codebase against architectural standards."""
 
@@ -118,6 +252,7 @@ class ArchitectureValidator:
         """Initialize validator with root path."""
         self.root_path = root_path
         self.result = ValidationResult()
+        self.overrides = ArchitectureOverrides.load(root_path)
 
     def validate(self) -> ValidationResult:
         """Run all validation checks."""
@@ -190,6 +325,8 @@ class ArchitectureValidator:
     def _check_file_size(self, file_path: str, content: str) -> None:
         """Check if file violates size thresholds."""
         lines = len(content.splitlines())
+        if self._allows_file_size_override(file_path, lines):
+            return
 
         if lines > MAX_FILE_SIZE:
             self.result.violations.append(
@@ -361,7 +498,13 @@ class ArchitectureValidator:
                     for n in node.body
                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
                 ]
-                if len(methods) > MAX_CLASS_METHODS:
+                if len(
+                    methods,
+                ) > MAX_CLASS_METHODS and not self._allows_class_size_override(
+                    file_path,
+                    node.name,
+                    len(methods),
+                ):
                     self.result.violations.append(
                         Violation(
                             file_path=file_path,
@@ -398,6 +541,25 @@ class ArchitectureValidator:
                 complexity += len(child.values) - 1
 
         return complexity
+
+    def _allows_file_size_override(self, file_path: str, lines: int) -> bool:
+        """Return True when file size is within the documented override."""
+        override = self.overrides.file_size.get(file_path)
+        if not override:
+            return False
+        return lines <= override.max_lines
+
+    def _allows_class_size_override(
+        self,
+        file_path: str,
+        class_name: str,
+        methods: int,
+    ) -> bool:
+        """Return True when class size is within the documented override."""
+        override = self.overrides.class_size.get((file_path, class_name))
+        if not override:
+            return False
+        return methods <= override.max_methods
 
 
 def print_results(result: ValidationResult) -> None:

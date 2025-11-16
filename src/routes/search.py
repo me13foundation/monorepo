@@ -17,7 +17,7 @@ from src.application.search.search_service import (
     UnifiedSearchService,
 )
 from src.database.session import get_session
-from src.infrastructure.dependency_injection.container import (
+from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,
 )
 from src.type_definitions.common import JSONObject

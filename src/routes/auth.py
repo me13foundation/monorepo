@@ -47,8 +47,8 @@ from src.application.services.user_management_service import (
 )
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.domain.value_objects.permission import Permission
-from src.infrastructure.dependency_injection.container import (
-    container,
+from src.infrastructure.dependency_injection.container import container
+from src.infrastructure.dependency_injection.dependencies import (
     get_authentication_service_dependency,
 )
 from src.infrastructure.security.password_hasher import PasswordHasher

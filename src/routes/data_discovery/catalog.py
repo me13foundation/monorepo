@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.application.services.data_discovery_service import DataDiscoveryService
-from src.infrastructure.dependency_injection.container import (
+from src.infrastructure.dependency_injection.dependencies import (
     get_data_discovery_service_dependency,
 )
 

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
-from src.infrastructure.dependency_injection.container import (
+from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,
 )
 from src.models.api import (

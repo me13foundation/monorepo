@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     )
     from ..normalizers.gene_normalizer import NormalizedGene
     from ..normalizers.phenotype_normalizer import NormalizedPhenotype
-    from ..normalizers.publication_normalizer import NormalizedPublication
+    from ..normalizers.publication_models import NormalizedPublication
     from ..normalizers.variant_normalizer import NormalizedVariant
 
 StageData = dict[str, object]

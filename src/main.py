@@ -12,8 +12,8 @@ from src.database.seed import (
     ensure_source_catalog_seeded,
 )
 from src.database.session import get_session
-from src.infrastructure.dependency_injection.container import (
-    container,
+from src.infrastructure.dependency_injection.container import container
+from src.infrastructure.dependency_injection.dependencies import (
     initialize_legacy_session,
 )
 from src.middleware.auth import AuthMiddleware

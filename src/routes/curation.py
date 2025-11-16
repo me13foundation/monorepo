@@ -26,8 +26,8 @@ from src.application.services.authorization_service import AuthorizationService
 from src.database.session import get_session
 from src.domain.entities.user import User
 from src.domain.value_objects.permission import Permission
-from src.infrastructure.dependency_injection.container import (
-    container,
+from src.infrastructure.dependency_injection.container import container
+from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,
 )
 from src.routes.auth import get_current_active_user

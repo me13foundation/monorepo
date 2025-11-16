@@ -19,58 +19,26 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from src.type_definitions.common import PublicationUpdate, QueryFilters
 
 
-class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
-    """Domain-facing repository adapter for publications backed by SQLAlchemy."""
+class PublicationQueryMixin:
+    """Reusable mixin providing rich publication query helpers."""
 
-    def __init__(self, session: Session | None = None) -> None:
-        self._session = session
+    if TYPE_CHECKING:  # pragma: no cover - typing only
 
-    @property
-    def session(self) -> Session:
-        if self._session is None:
-            message = "Session is not configured"
-            raise ValueError(message)
-        return self._session
+        @property
+        def session(self) -> Session:
+            ...  # noqa: D401 - documentation inherited
 
-    def _to_domain(self, model: PublicationModel | None) -> Publication | None:
-        return PublicationMapper.to_domain(model) if model else None
+        def _to_domain_sequence(
+            self,
+            models: list[PublicationModel],
+        ) -> list[Publication]:
+            ...
 
-    def _to_domain_sequence(
-        self,
-        models: list[PublicationModel],
-    ) -> list[Publication]:
-        return PublicationMapper.to_domain_sequence(models)
+        def _to_domain(self, model: PublicationModel | None) -> Publication | None:
+            ...
 
-    def create(self, publication: Publication) -> Publication:
-        model = PublicationMapper.to_model(publication)
-        self.session.add(model)
-        self.session.commit()
-        self.session.refresh(model)
-        return PublicationMapper.to_domain(model)
-
-    def get_by_id(self, publication_id: int) -> Publication | None:
-        model = self.session.get(PublicationModel, publication_id)
-        return self._to_domain(model)
-
-    def get_by_id_or_fail(self, publication_id: int) -> Publication:
-        model = self.session.get(PublicationModel, publication_id)
-        if model is None:
-            message = f"Publication with id {publication_id} not found"
-            raise ValueError(message)
-        return PublicationMapper.to_domain(model)
-
-    def find_by_pubmed_id(self, pubmed_id: str) -> Publication | None:
-        stmt = select(PublicationModel).where(PublicationModel.pubmed_id == pubmed_id)
-        model = self.session.execute(stmt).scalar_one_or_none()
-        return self._to_domain(model)
-
-    def find_by_pmid(self, pmid: str) -> Publication | None:
-        """Alias for PubMed ID lookups to satisfy domain contract."""
-        return self.find_by_pubmed_id(pmid)
-
-    def find_by_pmc_id(self, pmc_id: str) -> Publication | None:
-        stmt = select(PublicationModel).where(PublicationModel.pmc_id == pmc_id)
-        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
+        def count(self) -> int:
+            ...
 
     def find_by_year(self, year: int, limit: int | None = None) -> list[Publication]:
         stmt = select(PublicationModel).where(PublicationModel.publication_year == year)
@@ -183,35 +151,6 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
             "med13_relevant_publications": med13_relevant,
         }
 
-    def count(self) -> int:
-        stmt = select(func.count()).select_from(PublicationModel)
-        return int(self.session.execute(stmt).scalar_one())
-
-    def delete(self, publication_id: int) -> bool:
-        model = self.session.get(PublicationModel, publication_id)
-        if model is None:
-            return False
-        self.session.delete(model)
-        self.session.commit()
-        return True
-
-    def exists(self, publication_id: int) -> bool:
-        stmt = select(func.count()).where(PublicationModel.id == publication_id)
-        return bool(self.session.execute(stmt).scalar_one())
-
-    def find_all(
-        self,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> list[Publication]:
-        stmt = select(PublicationModel)
-        if offset:
-            stmt = stmt.offset(offset)
-        if limit:
-            stmt = stmt.limit(limit)
-        models = list(self.session.execute(stmt).scalars())
-        return self._to_domain_sequence(models)
-
     def find_by_criteria(self, spec: QuerySpecification) -> list[Publication]:
         stmt = select(PublicationModel)
         for field, value in spec.filters.items():
@@ -268,6 +207,101 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
             _ = variant_id
         return []
 
+    def find_recent_publications(self, days: int = 30) -> list[Publication]:
+        cutoff = datetime.now(UTC) - timedelta(days=days)
+        stmt = (
+            select(PublicationModel)
+            .where(PublicationModel.created_at >= cutoff)
+            .order_by(PublicationModel.created_at.desc())
+        )
+        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
+
+
+class SqlAlchemyPublicationRepository(
+    PublicationQueryMixin,
+    PublicationRepositoryInterface,
+):
+    """Domain-facing repository adapter for publications backed by SQLAlchemy."""
+
+    def __init__(self, session: Session | None = None) -> None:
+        self._session = session
+
+    @property
+    def session(self) -> Session:
+        if self._session is None:
+            message = "Session is not configured"
+            raise ValueError(message)
+        return self._session
+
+    def _to_domain(self, model: PublicationModel | None) -> Publication | None:
+        return PublicationMapper.to_domain(model) if model else None
+
+    def _to_domain_sequence(
+        self,
+        models: list[PublicationModel],
+    ) -> list[Publication]:
+        return PublicationMapper.to_domain_sequence(models)
+
+    def create(self, publication: Publication) -> Publication:
+        model = PublicationMapper.to_model(publication)
+        self.session.add(model)
+        self.session.commit()
+        self.session.refresh(model)
+        return PublicationMapper.to_domain(model)
+
+    def get_by_id(self, publication_id: int) -> Publication | None:
+        model = self.session.get(PublicationModel, publication_id)
+        return self._to_domain(model)
+
+    def get_by_id_or_fail(self, publication_id: int) -> Publication:
+        model = self.session.get(PublicationModel, publication_id)
+        if model is None:
+            message = f"Publication with id {publication_id} not found"
+            raise ValueError(message)
+        return PublicationMapper.to_domain(model)
+
+    def find_by_pubmed_id(self, pubmed_id: str) -> Publication | None:
+        stmt = select(PublicationModel).where(PublicationModel.pubmed_id == pubmed_id)
+        model = self.session.execute(stmt).scalar_one_or_none()
+        return self._to_domain(model)
+
+    def find_by_pmid(self, pmid: str) -> Publication | None:
+        """Alias for PubMed ID lookups to satisfy domain contract."""
+        return self.find_by_pubmed_id(pmid)
+
+    def find_by_pmc_id(self, pmc_id: str) -> Publication | None:
+        stmt = select(PublicationModel).where(PublicationModel.pmc_id == pmc_id)
+        return self._to_domain(self.session.execute(stmt).scalar_one_or_none())
+
+    def count(self) -> int:
+        stmt = select(func.count()).select_from(PublicationModel)
+        return int(self.session.execute(stmt).scalar_one())
+
+    def delete(self, publication_id: int) -> bool:
+        model = self.session.get(PublicationModel, publication_id)
+        if model is None:
+            return False
+        self.session.delete(model)
+        self.session.commit()
+        return True
+
+    def exists(self, publication_id: int) -> bool:
+        stmt = select(func.count()).where(PublicationModel.id == publication_id)
+        return bool(self.session.execute(stmt).scalar_one())
+
+    def find_all(
+        self,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> list[Publication]:
+        stmt = select(PublicationModel)
+        if offset:
+            stmt = stmt.offset(offset)
+        if limit:
+            stmt = stmt.limit(limit)
+        models = list(self.session.execute(stmt).scalars())
+        return self._to_domain_sequence(models)
+
     def paginate_publications(
         self,
         page: int,
@@ -318,15 +352,6 @@ class SqlAlchemyPublicationRepository(PublicationRepositoryInterface):
         updates: PublicationUpdate,
     ) -> Publication:
         return self.update(publication_id, updates)
-
-    def find_recent_publications(self, days: int = 30) -> list[Publication]:
-        cutoff = datetime.now(UTC) - timedelta(days=days)
-        stmt = (
-            select(PublicationModel)
-            .where(PublicationModel.created_at >= cutoff)
-            .order_by(PublicationModel.created_at.desc())
-        )
-        return self._to_domain_sequence(list(self.session.execute(stmt).scalars()))
 
 
 __all__ = ["SqlAlchemyPublicationRepository"]
