@@ -14,15 +14,24 @@ interface TemplateDetailPageProps {
 
 export default async function TemplateDetailPage({ params }: TemplateDetailPageProps) {
   const session = await getServerSession(authOptions)
-  if (!session) {
+  const token = session?.user?.access_token
+
+  if (!session || !token) {
     redirect('/auth/login?error=SessionExpired')
   }
 
   const queryClient = new QueryClient()
-  await queryClient.prefetchQuery({
-    queryKey: ['template', params.templateId],
-    queryFn: () => fetchTemplate(params.templateId),
-  })
+
+  // Prefetch with error handling - failures won't block page render
+  try {
+    await queryClient.prefetchQuery({
+      queryKey: ['template', params.templateId],
+      queryFn: () => fetchTemplate(params.templateId, token),
+    })
+  } catch (error) {
+    console.error('[Server Prefetch] Failed to prefetch template:', error)
+    // Don't throw - let client retry
+  }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

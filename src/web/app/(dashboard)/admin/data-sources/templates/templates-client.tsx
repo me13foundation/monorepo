@@ -142,7 +142,7 @@ function TemplateCard({ template, onEdit, onDelete }: TemplateCardProps) {
           <div className="flex items-center gap-2">
             {template.is_public && <Badge variant="outline">Public</Badge>}
             <Button variant="ghost" size="icon" asChild>
-              <Link href={`/templates/${template.id}`}>
+              <Link href={`/admin/data-sources/templates/${template.id}`}>
                 <ExternalLink className="size-4" />
                 <span className="sr-only">View details</span>
               </Link>

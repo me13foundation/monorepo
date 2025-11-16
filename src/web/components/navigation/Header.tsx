@@ -3,13 +3,13 @@
 import { SpaceSelector } from '@/components/research-spaces/SpaceSelector'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { UserMenu } from './UserMenu'
-import { LayoutDashboard, Library, Files } from 'lucide-react'
+import { LayoutDashboard } from 'lucide-react'
 import Link from 'next/link'
 import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 
 export function Header() {
   const { currentSpaceId } = useSpaceContext()
-  const { prefetchDashboard, prefetchResearchSpaces, prefetchDataDiscovery } = usePrefetchOnHover()
+  const { prefetchDashboard, prefetchResearchSpaces } = usePrefetchOnHover()
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card shadow-sm">
@@ -25,24 +25,6 @@ export function Header() {
             >
               <LayoutDashboard className="size-5 sm:size-6" />
               <span className="text-lg font-bold sm:text-xl">MED13 Admin</span>
-            </Link>
-            <Link
-              href="/data-discovery"
-              className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
-              onMouseEnter={prefetchDataDiscovery}
-              onFocus={prefetchDataDiscovery}
-              prefetch={true}
-            >
-              <Library className="size-5 sm:size-6" />
-              <span className="text-sm font-medium sm:text-base">Data Discovery</span>
-            </Link>
-            <Link
-              href="/templates"
-              className="flex shrink-0 items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
-              prefetch={true}
-            >
-              <Files className="size-5 sm:size-6" />
-              <span className="text-sm font-medium sm:text-base">Templates</span>
             </Link>
             <div className="min-w-0 max-w-xs flex-1">
               <SpaceSelector currentSpaceId={currentSpaceId || undefined} />

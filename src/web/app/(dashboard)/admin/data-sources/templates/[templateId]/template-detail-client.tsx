@@ -11,6 +11,7 @@ import { useState } from 'react'
 import { useTemplate } from '@/lib/queries/templates'
 import { approveTemplate, deleteTemplate, publishTemplate, updateTemplate } from '@/lib/api/templates'
 import { useQueryClient } from '@tanstack/react-query'
+import { useSession } from 'next-auth/react'
 import { Loader2, ArrowLeft, Pencil, Trash2, ShieldCheck, Eye } from 'lucide-react'
 import {
   Dialog,
@@ -29,6 +30,8 @@ interface TemplateDetailClientProps {
 export default function TemplateDetailClient({ templateId }: TemplateDetailClientProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
+  const { data: session } = useSession()
+  const token = session?.user?.access_token
   const { data, isLoading, error } = useTemplate(templateId)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -44,11 +47,14 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
   }
 
   const handleDelete = async () => {
+    if (!token) {
+      throw new Error('No authentication token available')
+    }
     setDeleteLoading(true)
     try {
-      await deleteTemplate(templateId)
+      await deleteTemplate(templateId, token)
       await invalidateTemplateQueries()
-      router.push('/templates')
+      router.push('/admin/data-sources/templates')
     } finally {
       setDeleteLoading(false)
       setDeleteOpen(false)
@@ -56,15 +62,21 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
   }
 
   const handleUpdate = async (payload: TemplateUpdatePayload['data']) => {
-    await updateTemplate({ templateId, data: payload })
+    if (!token) {
+      throw new Error('No authentication token available')
+    }
+    await updateTemplate({ templateId, data: payload }, token)
     await invalidateTemplateQueries()
     setEditOpen(false)
   }
 
   const handleValidationRulesSave = async (rules: TemplateValidationRule[]) => {
+    if (!token) {
+      throw new Error('No authentication token available')
+    }
     setRulesSaving(true)
     try {
-      await updateTemplate({ templateId, data: { validation_rules: rules } })
+      await updateTemplate({ templateId, data: { validation_rules: rules } }, token)
       await invalidateTemplateQueries()
     } finally {
       setRulesSaving(false)
@@ -72,9 +84,12 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
   }
 
   const handleApprove = async () => {
+    if (!token) {
+      throw new Error('No authentication token available')
+    }
     setApprovalLoading(true)
     try {
-      await approveTemplate(templateId)
+      await approveTemplate(templateId, token)
       await invalidateTemplateQueries()
     } finally {
       setApprovalLoading(false)
@@ -82,9 +97,12 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
   }
 
   const handlePublish = async () => {
+    if (!token) {
+      throw new Error('No authentication token available')
+    }
     setPublishLoading(true)
     try {
-      await publishTemplate(templateId)
+      await publishTemplate(templateId, token)
       await invalidateTemplateQueries()
     } finally {
       setPublishLoading(false)
@@ -114,7 +132,7 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
       <div className="flex items-center justify-between">
         <div>
           <Button variant="ghost" asChild className="mb-2">
-            <Link href="/templates">
+            <Link href="/admin/data-sources/templates">
               <ArrowLeft className="mr-2 size-4" />
               Back to Templates
             </Link>

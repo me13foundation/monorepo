@@ -8,15 +8,24 @@ import TemplatesClient from './templates-client'
 
 export default async function TemplatesPage() {
   const session = await getServerSession(authOptions)
-  if (!session) {
+  const token = session?.user?.access_token
+
+  if (!session || !token) {
     redirect('/auth/login?error=SessionExpired')
   }
 
   const queryClient = new QueryClient()
-  await queryClient.prefetchQuery({
-    queryKey: ['templates', 'available'],
-    queryFn: () => fetchTemplates('available'),
-  })
+
+  // Prefetch with error handling - failures won't block page render
+  try {
+    await queryClient.prefetchQuery({
+      queryKey: ['templates', 'available'],
+      queryFn: () => fetchTemplates('available', token),
+    })
+  } catch (error) {
+    console.error('[Server Prefetch] Failed to prefetch templates:', error)
+    // Don't throw - let client retry
+  }
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>

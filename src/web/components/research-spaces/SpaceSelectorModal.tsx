@@ -131,8 +131,8 @@ export function SpaceSelectorModal({
                         key={space.id}
                         onClick={() => handleSpaceSelect(space.id)}
                         className={cn(
-                          'w-full flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-4 px-3 py-3 hover:bg-accent transition-colors text-left',
-                          isSelected && 'bg-accent/50'
+                          'w-full flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-4 px-3 py-3 hover:bg-brand-primary/5 transition-colors text-left',
+                          isSelected && 'bg-brand-primary/10'
                         )}
                       >
                         <div className="flex min-w-0 flex-col sm:contents">

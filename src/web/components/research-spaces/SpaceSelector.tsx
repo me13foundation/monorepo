@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { Button } from '@/components/ui/button'
-import { Loader2, ChevronDown, Folder } from 'lucide-react'
+import { Loader2, Folder } from 'lucide-react'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { SpaceSelectorModal } from './SpaceSelectorModal'
 import type { ResearchSpaceListResponse } from '@/types/research-space'
@@ -37,7 +37,6 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
       <Button variant="outline" onClick={() => setModalOpen(true)}>
         <Folder className="mr-2 size-4" />
         <span className="text-sm">No spaces</span>
-        <ChevronDown className="ml-2 size-4" />
       </Button>
     )
   }
@@ -62,7 +61,6 @@ export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorPr
             )}
           </div>
         </div>
-        <ChevronDown className="ml-2 size-4 shrink-0" />
       </Button>
       <SpaceSelectorModal
         open={modalOpen}
