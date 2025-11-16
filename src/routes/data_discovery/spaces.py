@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.application.services.audit_service import AuditTrailService
-from src.application.services.data_discovery_service import (
+from src.application.services.data_discovery_service import DataDiscoveryService
+from src.application.services.data_discovery_service.requests import (
     AddSourceToSpaceRequest,
-    DataDiscoveryService,
 )
 from src.database.session import get_session
 from src.domain.entities.user import User

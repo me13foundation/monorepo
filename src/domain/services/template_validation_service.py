@@ -58,12 +58,10 @@ class TemplateValidationService:
     """
 
     def __init__(self) -> None:
-        """Initialize the template validation service."""
         # Common JSON schemas for different data types
         self.schemas: dict[str, JSONSchema] = self._load_common_schemas()
 
     def _load_common_schemas(self) -> dict[str, JSONSchema]:
-        """Load common JSON schemas for validation."""
         return {
             "gene_variant": {
                 "type": "object",
@@ -113,15 +111,6 @@ class TemplateValidationService:
         }
 
     def validate_template(self, template: SourceTemplate) -> TemplateValidationResult:
-        """
-        Validate a source template for correctness and completeness.
-
-        Args:
-            template: Template to validate
-
-        Returns:
-            Validation results with errors, warnings, and suggestions
-        """
         errors = []
         warnings = []
         suggestions = []
@@ -181,16 +170,6 @@ class TemplateValidationService:
         template: SourceTemplate,
         user_parameters: TemplateParameters,
     ) -> TemplateInstantiationResult:
-        """
-        Instantiate a template with user-provided parameters.
-
-        Args:
-            template: Template to instantiate
-            user_parameters: User-provided parameter values
-
-        Returns:
-            Instantiation results with configuration or errors
-        """
         errors = []
         missing_parameters = []
 
@@ -233,7 +212,6 @@ class TemplateValidationService:
             )
 
     def _validate_json_schema(self, schema: JSONSchema) -> list[str]:
-        """Validate a JSON schema for correctness."""
         errors = []
 
         try:
@@ -249,7 +227,6 @@ class TemplateValidationService:
         return errors
 
     def _validate_validation_rule(self, rule: ValidationRule, index: int) -> list[str]:
-        """Validate a single validation rule."""
         errors = []
 
         if not rule.field.strip():
@@ -292,7 +269,6 @@ class TemplateValidationService:
         return errors
 
     def _validate_ui_config(self, ui_config: TemplateUIConfig) -> list[str]:
-        """Validate UI configuration."""
         errors = []
 
         # Validate sections have required fields
@@ -312,7 +288,6 @@ class TemplateValidationService:
         return errors
 
     def _extract_required_parameters(self, template: SourceTemplate) -> list[str]:
-        """Extract required parameters from template configuration."""
         required = []
 
         # Check UI configuration for required fields
@@ -335,7 +310,6 @@ class TemplateValidationService:
         parameters: TemplateParameters,
         template: SourceTemplate,
     ) -> list[str]:
-        """Validate parameter values against template constraints."""
         errors = []
         normalized_parameters = dict(parameters)
 
@@ -359,7 +333,6 @@ class TemplateValidationService:
         value: JSONValue,
         rule: ValidationRule,
     ) -> list[str]:
-        """Apply a validation rule to a parameter value."""
         errors = []
 
         try:
@@ -431,7 +404,6 @@ class TemplateValidationService:
         return errors
 
     def _check_type(self, value: JSONValue, expected_type: str) -> bool:
-        """Check if a value matches an expected type."""
         valid = True
         if expected_type == "string":
             valid = isinstance(value, str)
@@ -454,7 +426,6 @@ class TemplateValidationService:
         template: SourceTemplate,
         parameters: TemplateParameters,
     ) -> SourceConfiguration:
-        """Build a SourceConfiguration from template and parameters."""
         normalized_parameters = dict(parameters)
         metadata_payload = self._ensure_json_object(
             normalized_parameters.get("metadata"),

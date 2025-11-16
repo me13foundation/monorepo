@@ -1,10 +1,14 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { AxiosError } from 'axios'
 import { useSpaceContext } from '@/components/space-context-provider'
-import type { QueryParameters, QueryTestResult } from '@/lib/types/data-discovery'
+import type {
+  QueryParameters,
+  QueryTestResult,
+  SourceCatalogEntry,
+} from '@/lib/types/data-discovery'
 import {
   useAddDiscoverySourceToSpace,
   useExecuteDataDiscoveryTest,
@@ -24,6 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { ParameterBar } from '@/components/data-discovery/ParameterBar'
+import { SourceParameterConfigurator } from '@/components/data-discovery/SourceParameterConfigurator'
 import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
 
 const SourceCatalog = dynamic(
@@ -52,6 +57,7 @@ interface SpaceDiscoveryClientProps {
 export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientProps) {
   const [activeView, setActiveView] = useState<'select' | 'results'>('select')
   const [parameters, setParameters] = useState<QueryParameters>(DEFAULT_PARAMETERS)
+  const [sourceParameters, setSourceParameters] = useState<Record<string, QueryParameters>>({})
   const [selectedSources, setSelectedSources] = useState<string[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -78,9 +84,20 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     isError: isCreateSessionError,
   } = createSessionMutation
 
-  const catalog = catalogQuery.data ?? []
+  const catalog: SourceCatalogEntry[] = useMemo(
+    () => catalogQuery.data ?? [],
+    [catalogQuery.data],
+  )
   const testResults = testsQuery.data ?? []
   const catalogError = catalogQuery.error instanceof Error ? catalogQuery.error : null
+
+  const catalogById = useMemo(() => {
+    const map = new Map<string, SourceCatalogEntry>()
+    catalog.forEach((entry) => {
+      map.set(entry.id, entry)
+    })
+    return map
+  }, [catalog])
 
   useEffect(() => {
     if (!sessionsQuery.isSuccess) {
@@ -135,6 +152,29 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
       createRequestedRef.current = false
     }
   }, [isCreateSessionError])
+
+  useEffect(() => {
+    setSourceParameters((current) => {
+      const next = { ...current }
+      let changed = false
+
+      selectedSources.forEach((sourceId) => {
+        if (!next[sourceId]) {
+          next[sourceId] = parameters
+          changed = true
+        }
+      })
+
+      Object.keys(next).forEach((sourceId) => {
+        if (!selectedSources.includes(sourceId)) {
+          delete next[sourceId]
+          changed = true
+        }
+      })
+
+      return changed ? next : current
+    })
+  }, [selectedSources, parameters])
 
   const handleParametersChange = useCallback(
     (newParams: QueryParameters) => {
@@ -216,10 +256,56 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     [activeSessionId, selectedSources, applySelectionUpdate],
   )
 
+  const getParametersForSource = useCallback(
+    (sourceId: string) => sourceParameters[sourceId] ?? parameters,
+    [sourceParameters, parameters],
+  )
+
+  const handleSourceParametersChange = useCallback(
+    (sourceId: string, nextParams: QueryParameters) => {
+      setSourceParameters((prev) => ({
+        ...prev,
+        [sourceId]: nextParams,
+      }))
+    },
+    [],
+  )
+
+  const resolveExecutionContext = useCallback(
+    (sourceId: string):
+      | {
+          parameters: QueryParameters
+          catalogEntry: SourceCatalogEntry
+        }
+      | null => {
+      const catalogEntry = catalogById.get(sourceId)
+      if (!catalogEntry) {
+        toast.error('Unable to load metadata for the selected source')
+        return null
+      }
+
+      const parametersForSource = getParametersForSource(sourceId)
+      const validationResult = validateParametersForSource(catalogEntry, parametersForSource)
+
+      if (!validationResult.ok) {
+        toast.error(`${catalogEntry.name}: ${validationResult.message}`)
+        return null
+      }
+
+      return { parameters: parametersForSource, catalogEntry }
+    },
+    [catalogById, getParametersForSource],
+  )
+
   const handleRunTest = useCallback(
     async (sourceId: string) => {
       if (!activeSessionId) {
         toast.error('No discovery session available')
+        return
+      }
+
+      const executionContext = resolveExecutionContext(sourceId)
+      if (!executionContext) {
         return
       }
 
@@ -229,7 +315,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
           sessionId: activeSessionId,
           payload: {
             catalog_entry_id: sourceId,
-            parameters,
+            parameters: executionContext.parameters,
           },
         })
         toast.success('Test execution complete')
@@ -240,7 +326,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
         setIsGenerating(false)
       }
     },
-    [activeSessionId, executeTestMutation, parameters],
+    [activeSessionId, executeTestMutation, resolveExecutionContext],
   )
 
   const handleRunSingleTest = useCallback(
@@ -281,14 +367,26 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
       return
     }
 
+    const executionPayloads: Array<{ sourceId: string; parameters: QueryParameters }> = []
+    for (const sourceId of selectedSources) {
+      const executionContext = resolveExecutionContext(sourceId)
+      if (!executionContext) {
+        return
+      }
+      executionPayloads.push({
+        sourceId,
+        parameters: executionContext.parameters,
+      })
+    }
+
     setIsGenerating(true)
     try {
-      for (const sourceId of selectedSources) {
+      for (const payload of executionPayloads) {
         await executeTestMutation.mutateAsync({
           sessionId: activeSessionId,
           payload: {
-            catalog_entry_id: sourceId,
-            parameters,
+            catalog_entry_id: payload.sourceId,
+            parameters: payload.parameters,
           },
         })
       }
@@ -300,7 +398,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     } finally {
       setIsGenerating(false)
     }
-  }, [activeSessionId, selectedSources, executeTestMutation, parameters])
+  }, [activeSessionId, selectedSources, executeTestMutation, resolveExecutionContext])
 
   return (
     <div className="space-y-6">
@@ -313,9 +411,18 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
 
       <DashboardSection
         title="Query Parameters"
-        description="Tune gene and phenotype filters to personalize discovery runs."
+        description="Define default filters and tailor query requirements for every selected data source."
       >
-        <ParameterBar parameters={parameters} onParametersChange={handleParametersChange} />
+        <div className="space-y-4">
+          <ParameterBar parameters={parameters} onParametersChange={handleParametersChange} />
+          <SourceParameterConfigurator
+            catalog={catalog}
+            selectedSourceIds={selectedSources}
+            sourceParameters={sourceParameters}
+            defaultParameters={parameters}
+            onChange={handleSourceParametersChange}
+          />
+        </div>
       </DashboardSection>
 
       <DashboardSection
@@ -393,4 +500,35 @@ function areArraysEqual(a: string[], b: string[]) {
 
 function isSameParameters(a: QueryParameters, b: QueryParameters) {
   return a.gene_symbol === b.gene_symbol && a.search_term === b.search_term
+}
+
+function validateParametersForSource(
+  entry: SourceCatalogEntry,
+  params: QueryParameters,
+): { ok: boolean; message?: string } {
+  const hasGene = Boolean(params.gene_symbol && params.gene_symbol.trim().length > 0)
+  const hasTerm = Boolean(params.search_term && params.search_term.trim().length > 0)
+
+  switch (entry.param_type) {
+    case 'gene':
+      return hasGene ? { ok: true } : { ok: false, message: 'A gene symbol is required' }
+    case 'term':
+      return hasTerm ? { ok: true } : { ok: false, message: 'A phenotype or search term is required' }
+    case 'geneAndTerm':
+      if (!hasGene && !hasTerm) {
+        return { ok: false, message: 'Provide both a gene symbol and a phenotype term' }
+      }
+      if (!hasGene) {
+        return { ok: false, message: 'A gene symbol is required for this source' }
+      }
+      if (!hasTerm) {
+        return { ok: false, message: 'A phenotype or search term is required for this source' }
+      }
+      return { ok: true }
+    case 'none':
+    case 'api':
+      return { ok: true }
+    default:
+      return { ok: true }
+  }
 }

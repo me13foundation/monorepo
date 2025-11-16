@@ -1,8 +1,4 @@
-"""
-Variant API routes for MED13 Resource Library.
-
-RESTful endpoints for variant management with CRUD operations.
-"""
+"""Variant API routes for MED13 Resource Library."""
 
 from enum import Enum
 from typing import TYPE_CHECKING
@@ -87,12 +83,6 @@ async def get_variants(
     variant_type: str | None = Query(None, description="Filter by variant type"),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> PaginatedResponse[VariantResponse]:
-    """
-    Retrieve a paginated list of variants.
-
-    Supports filtering by gene, clinical significance, and variant type.
-    """
-
     try:
         # Build filters dictionary
         filters_payload: QueryFilters = {}
@@ -142,12 +132,6 @@ async def get_variant(
     include_evidence: bool = Query(False, description="Include associated evidence"),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantResponse:
-    """
-    Retrieve a specific variant by its ID.
-
-    Optionally includes associated evidence records.
-    """
-
     try:
         if include_evidence:
             variant = service.get_variant_with_evidence(int(variant_id))
@@ -179,10 +163,6 @@ async def get_variant_by_clinvar_id(
     clinvar_id: str,
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantResponse:
-    """
-    Retrieve a variant by its ClinVar accession ID.
-    """
-
     try:
         variant = service.get_variant_by_clinvar_id(clinvar_id)
         if variant is None:
@@ -211,10 +191,6 @@ async def create_variant(
     variant_data: VariantCreate,
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantResponse:
-    """
-    Create a new variant.
-    """
-
     try:
         variant = service.create_variant(
             chromosome=variant_data.chromosome,
@@ -254,10 +230,6 @@ async def update_variant(
     variant_data: VariantUpdate,
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantResponse:
-    """
-    Update an existing variant.
-    """
-
     try:
         # Validate variant exists
         if not service.validate_variant_exists(variant_id):
@@ -296,10 +268,6 @@ async def update_variant_classification(
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantResponse:
-    """
-    Update variant classification information.
-    """
-
     try:
         if variant_type is None and clinical_significance is None:
             raise HTTPException(
@@ -334,10 +302,6 @@ async def get_variant_evidence(
     variant_id: int,
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantEvidenceSummaryResponse:
-    """
-    Get evidence associated with a variant.
-    """
-
     try:
         if not service.validate_variant_exists(variant_id):
             raise HTTPException(
@@ -380,10 +344,6 @@ async def get_variants_by_gene(
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantsByGeneResponse:
-    """
-    Retrieve variants associated with a specific gene.
-    """
-
     try:
         variants = service.get_variants_by_gene(gene_id, limit)
         serialized_variants = [serialize_variant(variant) for variant in variants]
@@ -416,10 +376,6 @@ async def search_variants(
     ),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> VariantSearchResponse:
-    """
-    Search variants by query with optional filters.
-    """
-
     try:
         # Build filters
         filters_payload: QueryFilters = {}
@@ -451,11 +407,7 @@ async def delete_variant(
     variant_id: int,
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> None:
-    """
-    Delete a variant by ID.
-
-    Note: This operation may be restricted based on data integrity rules.
-    """
+    """Delete a variant placeholder (currently not implemented)."""
     if not service.validate_variant_exists(variant_id):
         raise HTTPException(
             status_code=404,
@@ -477,9 +429,6 @@ async def delete_variant(
 async def get_variant_statistics(
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> JSONObject:
-    """
-    Retrieve statistical information about variants in the database.
-    """
     return service.get_variant_statistics()
 
 

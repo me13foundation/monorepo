@@ -1,9 +1,4 @@
-"""
-Publication identifier normalization service.
-
-Standardizes publication identifiers from different sources (PubMed, DOI, PMC, etc.)
-into consistent formats for cross-referencing and deduplication.
-"""
+"""Normalize publication identifiers for consistent cross-referencing."""
 
 import re
 from dataclasses import dataclass

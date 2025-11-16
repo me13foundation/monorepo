@@ -1,0 +1,267 @@
+"""Query execution mixin for data discovery service."""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+from uuid import UUID, uuid4  # noqa: TCH003
+
+from src.application.services.source_management_service import CreateSourceRequest
+from src.domain.entities.data_discovery_session import (
+    QueryParameterType,
+    QueryTestResult,
+    TestResultStatus,
+)
+from src.domain.entities.user_data_source import SourceConfiguration, SourceType
+
+from .session_methods import SessionManagementMixin
+
+if TYPE_CHECKING:
+    from src.application.services.data_discovery_service.requests import (
+        AddSourceToSpaceRequest,
+        ExecuteQueryTestRequest,
+    )
+    from src.application.services.source_management_service import (
+        SourceManagementService,
+    )
+    from src.domain.repositories.data_discovery_repository import (
+        QueryTestResultRepository,
+        SourceQueryClient,
+    )
+    from src.domain.repositories.source_template_repository import (
+        SourceTemplateRepository,
+    )
+    from src.type_definitions.common import JSONObject
+
+logger = logging.getLogger(__name__)
+
+
+class QueryExecutionMixin(SessionManagementMixin):
+    _query_repo: QueryTestResultRepository
+    _query_client: SourceQueryClient
+    _source_service: SourceManagementService
+    _template_repo: SourceTemplateRepository | None
+
+    async def execute_query_test(
+        self,
+        request: ExecuteQueryTestRequest,
+        owner_id: UUID | None = None,
+    ) -> QueryTestResult | None:
+        # Get session and catalog entry
+        session = (
+            self._session_repo.find_owned_session(request.session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(request.session_id)
+        )
+        catalog_entry = self._catalog_repo.find_by_id(request.catalog_entry_id)
+
+        if not session or not catalog_entry:
+            logger.warning(
+                "Session %s or catalog entry %s not found",
+                request.session_id,
+                request.catalog_entry_id,
+            )
+            return None
+
+        if not self._can_execute_source(
+            request.catalog_entry_id,
+            session.research_space_id,
+        ):
+            logger.warning(
+                "Catalog entry %s disabled for execution in session %s",
+                request.catalog_entry_id,
+                request.session_id,
+            )
+            return None
+
+        # Validate parameters
+        if not self._query_client.validate_parameters(
+            catalog_entry,
+            session.current_parameters,
+        ):
+            logger.warning("Invalid parameters for source %s", request.catalog_entry_id)
+            # Create failed result
+            failed_result = QueryTestResult(
+                id=uuid4(),
+                catalog_entry_id=request.catalog_entry_id,
+                session_id=request.session_id,
+                parameters=session.current_parameters,
+                status=TestResultStatus.VALIDATION_FAILED,
+                error_message="Invalid parameters for this source",
+                response_data=None,
+                response_url=None,
+                execution_time_ms=None,
+                data_quality_score=None,
+                completed_at=None,
+            )
+            return self._query_repo.save(failed_result)
+
+        error_message: str | None = None
+        response_data: JSONObject | None = None
+        response_url: str | None = None
+
+        try:
+            # Execute the query
+            if catalog_entry.param_type == QueryParameterType.API:
+                # For API sources, execute actual query
+                result_data = await self._query_client.execute_query(
+                    catalog_entry,
+                    session.current_parameters,
+                    request.timeout_seconds,
+                )
+                status = TestResultStatus.SUCCESS
+                response_data = result_data
+                response_url = None
+            else:
+                # For URL sources, generate URL
+                response_url = self._query_client.generate_url(
+                    catalog_entry,
+                    session.current_parameters,
+                )
+                status = (
+                    TestResultStatus.SUCCESS if response_url else TestResultStatus.ERROR
+                )
+                response_data = None
+                if not response_url:
+                    error_message = "Failed to generate URL"
+
+            # Create test result
+            test_result = QueryTestResult(
+                id=uuid4(),
+                catalog_entry_id=request.catalog_entry_id,
+                session_id=request.session_id,
+                parameters=session.current_parameters,
+                status=status,
+                response_data=response_data,
+                response_url=response_url,
+                error_message=error_message,
+                execution_time_ms=None,
+                data_quality_score=None,
+                completed_at=None,
+            )
+
+            # Save result
+            saved_result = self._query_repo.save(test_result)
+
+            # Update session statistics
+            updated_session = session.record_test(
+                request.catalog_entry_id,
+                success=status == TestResultStatus.SUCCESS,
+            )
+            self._session_repo.save(updated_session)
+
+            # Update catalog usage stats
+            self._catalog_repo.update_usage_stats(
+                request.catalog_entry_id,
+                success=status == TestResultStatus.SUCCESS,
+            )
+
+        except Exception as e:
+            logger.exception(
+                "Query test failed for source %s",
+                request.catalog_entry_id,
+            )
+
+            # Create error result
+            error_result = QueryTestResult(
+                id=uuid4(),
+                catalog_entry_id=request.catalog_entry_id,
+                session_id=request.session_id,
+                parameters=session.current_parameters,
+                status=TestResultStatus.ERROR,
+                error_message=str(e),
+                response_data=None,
+                response_url=None,
+                execution_time_ms=None,
+                data_quality_score=None,
+                completed_at=None,
+            )
+            saved_result = self._query_repo.save(error_result)
+
+            # Update session with failed test
+            updated_session = session.record_test(
+                request.catalog_entry_id,
+                success=False,
+            )
+            self._session_repo.save(updated_session)
+
+            return saved_result
+        else:
+            logger.info(
+                "Executed query test for source %s in session %s",
+                request.catalog_entry_id,
+                request.session_id,
+            )
+            return saved_result
+
+    def get_session_test_results(self, session_id: UUID) -> list[QueryTestResult]:
+        return self._query_repo.find_by_session(session_id)
+
+    async def add_source_to_space(
+        self,
+        request: AddSourceToSpaceRequest,
+        owner_id: UUID | None = None,
+    ) -> UUID | None:
+        # Get session and catalog entry
+        session = (
+            self._session_repo.find_owned_session(request.session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(request.session_id)
+        )
+        catalog_entry = self._catalog_repo.find_by_id(request.catalog_entry_id)
+
+        if not session or not catalog_entry:
+            logger.warning(
+                "Session %s or catalog entry %s not found",
+                request.session_id,
+                request.catalog_entry_id,
+            )
+            return None
+
+        if not self._can_execute_source(
+            request.catalog_entry_id,
+            session.research_space_id,
+        ):
+            logger.warning(
+                "Catalog entry %s lacks permission for space %s",
+                request.catalog_entry_id,
+                request.research_space_id,
+            )
+            return None
+
+        # Check if source has a template
+        template = None
+        if catalog_entry.source_template_id and self._template_repo:
+            template = self._template_repo.find_by_id(catalog_entry.source_template_id)
+
+        # Create UserDataSource
+        configuration = SourceConfiguration.model_validate(request.source_config or {})
+        source_type = template.source_type if template else SourceType.API
+        create_request = CreateSourceRequest(
+            owner_id=session.owner_id,
+            name=f"{catalog_entry.name} (from Data Discovery)",
+            source_type=source_type,
+            description=f"Added from Data Source Discovery: {catalog_entry.description}",
+            template_id=catalog_entry.source_template_id,
+            configuration=configuration,
+            research_space_id=request.research_space_id,
+            tags=["data-discovery", catalog_entry.category.lower()],
+        )
+
+        try:
+            # Create the data source
+            data_source = self._source_service.create_source(create_request)
+
+            # Update session to mark source as added to space
+            # Note: This would require extending the session entity to track added sources
+
+        except Exception:
+            logger.exception("Failed to add source to space")
+            return None
+        else:
+            logger.info(
+                "Added source %s to space %s",
+                request.catalog_entry_id,
+                request.research_space_id,
+            )
+            return data_source.id

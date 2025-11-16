@@ -59,7 +59,6 @@ class QualityAssuranceService:
     """
 
     def __init__(self) -> None:
-        """Initialize the quality assurance service."""
         # Quality thresholds
         self.thresholds = {
             "completeness": 0.8,  # 80% complete
@@ -75,16 +74,6 @@ class QualityAssuranceService:
         records: list[DataRecord],
         configuration: SourceConfiguration,
     ) -> QualityReport:
-        """
-        Assess quality of uploaded file data.
-
-        Args:
-            records: Parsed data records
-            configuration: Source configuration
-
-        Returns:
-            Comprehensive quality report
-        """
         if not records:
             return self._create_empty_report()
 
@@ -152,16 +141,6 @@ class QualityAssuranceService:
         result: APIRequestResult,
         configuration: SourceConfiguration,
     ) -> QualityReport:
-        """
-        Assess quality of API response data.
-
-        Args:
-            result: API request result
-            configuration: Source configuration
-
-        Returns:
-            Comprehensive quality report
-        """
         if not result.success or not result.data:
             return self._create_failure_report(result.errors)
 
@@ -229,15 +208,6 @@ class QualityAssuranceService:
         )
 
     def assess_source_health(self, source: UserDataSource) -> QualityReport:
-        """
-        Assess overall health of a data source based on its history.
-
-        Args:
-            source: The data source to assess
-
-        Returns:
-            Health assessment report
-        """
         existing_metrics = source.quality_metrics
 
         # Use existing metrics if available
@@ -298,7 +268,6 @@ class QualityAssuranceService:
         )
 
     def _calculate_completeness(self, records: list[DataRecord]) -> float:
-        """Calculate data completeness score."""
         if not records:
             return 0.0
 
@@ -314,7 +283,6 @@ class QualityAssuranceService:
         return filled_fields / total_fields if total_fields > 0 else 0.0
 
     def _calculate_consistency(self, records: list[DataRecord]) -> float:
-        """Calculate data consistency score."""
         if not records:
             return 0.0
 
@@ -339,7 +307,6 @@ class QualityAssuranceService:
         records: list[DataRecord],
         _configuration: SourceConfiguration,
     ) -> float:
-        """Calculate data validity score."""
         if not records:
             return 0.0
 
@@ -349,11 +316,9 @@ class QualityAssuranceService:
         return valid_records / total_records
 
     def _calculate_timeliness_file(self, _records: list[DataRecord]) -> float:
-        """Calculate timeliness for file data (always current)."""
         return 1.0  # File data is current when uploaded
 
     def _calculate_timeliness_api(self, result: APIRequestResult) -> float:
-        """Calculate timeliness for API data."""
         # Based on response time - faster is better
         fast_ms = 100
         ok_ms = 1000
@@ -367,7 +332,6 @@ class QualityAssuranceService:
         return 0.3
 
     def _calculate_source_timeliness(self, source: UserDataSource) -> float:
-        """Calculate timeliness based on source metadata."""
         if not source.last_ingested_at:
             return 0.0
 
@@ -404,7 +368,6 @@ class QualityAssuranceService:
         validity: float,
         timeliness: float,
     ) -> float:
-        """Calculate overall quality score."""
         weights = {
             "completeness": 0.25,
             "consistency": 0.25,
@@ -427,7 +390,6 @@ class QualityAssuranceService:
         validity: float,
         timeliness: float,
     ) -> tuple[list[str], list[str]]:
-        """Analyze issues and generate recommendations."""
         issues = []
         recommendations = []
 
@@ -469,14 +431,12 @@ class QualityAssuranceService:
         return issues, recommendations
 
     def _extract_columns(self, records: list[DataRecord]) -> list[str]:
-        """Extract column names from records."""
         columns: set[str] = set()
         for record in records:
             columns.update(record.data.keys())
         return sorted(columns)
 
     def _infer_data_types(self, records: list[DataRecord]) -> dict[str, str]:
-        """Infer data types for columns."""
         if not records:
             return {}
 
@@ -506,7 +466,6 @@ class QualityAssuranceService:
         return types
 
     def _count_duplicates(self, records: list[DataRecord]) -> int:
-        """Count duplicate records."""
         seen = set()
         duplicates = 0
 
@@ -521,7 +480,6 @@ class QualityAssuranceService:
         return duplicates
 
     def _calculate_null_stats(self, records: list[DataRecord]) -> dict[str, float]:
-        """Calculate null value statistics per column."""
         if not records:
             return {}
 
@@ -542,7 +500,6 @@ class QualityAssuranceService:
         return stats
 
     def _api_data_to_records(self, data: JSONValue) -> list[DataRecord]:
-        """Convert API response data to DataRecord format."""
         records = []
 
         if isinstance(data, list):
@@ -568,11 +525,9 @@ class QualityAssuranceService:
         self,
         records: list[DataRecord],
     ) -> dict[str, float]:
-        """Get completeness breakdown by column."""
         return self._calculate_null_stats(records)
 
     def _get_consistency_checks(self, records: list[DataRecord]) -> JSONObject:
-        """Get consistency check results."""
         types = self._infer_data_types(records)
         payload = {
             "inferred_types": types,
@@ -583,7 +538,6 @@ class QualityAssuranceService:
         return _as_json_object(payload)
 
     def _get_validity_errors(self, records: list[DataRecord]) -> dict[str, int]:
-        """Get breakdown of validation errors."""
         error_counts: dict[str, int] = {}
         for record in records:
             for error in record.validation_errors:
@@ -591,7 +545,6 @@ class QualityAssuranceService:
         return error_counts
 
     def _create_empty_report(self) -> QualityReport:
-        """Create a quality report for empty data."""
         return QualityReport(
             score=QualityScore(
                 overall=0.0,
@@ -607,7 +560,6 @@ class QualityAssuranceService:
         )
 
     def _create_failure_report(self, errors: list[str]) -> QualityReport:
-        """Create a quality report for failed operations."""
         return QualityReport(
             score=QualityScore(
                 overall=0.0,

@@ -8,9 +8,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.application.services.audit_service import AuditTrailService
-from src.application.services.data_discovery_service import (
+from src.application.services.data_discovery_service import DataDiscoveryService
+from src.application.services.data_discovery_service.requests import (
     CreateDataDiscoverySessionRequest,
-    DataDiscoveryService,
     UpdateSessionParametersRequest,
 )
 from src.database.seed import DEFAULT_RESEARCH_SPACE_ID

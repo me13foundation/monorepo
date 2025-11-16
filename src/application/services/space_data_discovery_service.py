@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from uuid import UUID  # noqa: TCH003
 
-from src.application.services.data_discovery_service import (
+from src.application.services.data_discovery_service.requests import (
     CreateDataDiscoverySessionRequest,
-    DataDiscoveryService,
     UpdateSessionParametersRequest,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from uuid import UUID
 
+    from src.application.services.data_discovery_service import DataDiscoveryService
     from src.domain.entities.data_discovery_session import (
         DataDiscoverySession,
         QueryParameters,
@@ -24,7 +24,11 @@ if TYPE_CHECKING:
 class SpaceDataDiscoveryService:
     """Helper service that enforces research space boundaries."""
 
-    def __init__(self, space_id: UUID, discovery_service: DataDiscoveryService) -> None:
+    def __init__(
+        self,
+        space_id: UUID,
+        discovery_service: DataDiscoveryService,
+    ) -> None:
         self._space_id = space_id
         self._service = discovery_service
 

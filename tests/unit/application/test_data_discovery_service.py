@@ -10,10 +10,10 @@ from uuid import uuid4
 
 import pytest
 
-from src.application.services.data_discovery_service import (
+from src.application.services.data_discovery_service import DataDiscoveryService
+from src.application.services.data_discovery_service.requests import (
     AddSourceToSpaceRequest,
     CreateDataDiscoverySessionRequest,
-    DataDiscoveryService,
     ExecuteQueryTestRequest,
     UpdateSessionParametersRequest,
 )

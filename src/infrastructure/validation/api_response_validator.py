@@ -33,7 +33,6 @@ class APIResponseValidator:
     def validate_clinvar_search_response(
         data: JSONValue,
     ) -> ClinVarSearchValidationResult:
-        """Validate ClinVar search API response."""
         start_time = time.time()
 
         issues: list[ValidationIssue] = []
@@ -173,7 +172,6 @@ class APIResponseValidator:
     def validate_clinvar_variant_response(
         data: JSONValue,
     ) -> ClinVarVariantValidationResult:
-        """Validate ClinVar variant details API response."""
         start_time = time.time()
 
         issues: list[ValidationIssue] = []
@@ -231,7 +229,6 @@ class APIResponseValidator:
     def validate_pubmed_search_response(
         data: JSONObject,
     ) -> APIResponseValidationResult:
-        """Validate PubMed search API response."""
         start_time = time.time()
 
         issues: list[ValidationIssue] = []
@@ -291,7 +288,6 @@ class APIResponseValidator:
     def validate_pubmed_article_response(
         data: JSONObject,
     ) -> APIResponseValidationResult:
-        """Validate PubMed article details API response."""
         start_time = time.time()
 
         issues: list[ValidationIssue] = []
@@ -362,17 +358,6 @@ class APIResponseValidator:
         required_fields: list[str],
         field_types: dict[str, type] | None = None,
     ) -> APIResponseValidationResult:
-        """
-        Generic validation for any API response.
-
-        Args:
-            data: The API response data
-            required_fields: List of required field names
-            field_types: Optional mapping of field names to expected types
-
-        Returns:
-            Validation result
-        """
         start_time = time.time()
 
         issues: list[ValidationIssue] = []

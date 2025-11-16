@@ -1,8 +1,4 @@
-"""
-Evidence API routes for MED13 Resource Library.
-
-RESTful endpoints for evidence management linking variants and phenotypes.
-"""
+"""Evidence API routes for MED13 Resource Library."""
 
 from typing import TYPE_CHECKING
 
@@ -37,24 +33,18 @@ router = APIRouter(prefix="/evidence", tags=["evidence"])
 
 
 class VariantEvidenceResponse(BaseModel):
-    """Response model for variant evidence collections."""
-
     variant_id: int
     total_count: int
     evidence: list[EvidenceResponse]
 
 
 class PhenotypeEvidenceResponse(BaseModel):
-    """Response model for phenotype evidence collections."""
-
     phenotype_id: int
     total_count: int
     evidence: list[EvidenceResponse]
 
 
 class EvidenceSearchResponse(BaseModel):
-    """Response model for evidence search results."""
-
     query: str
     total_results: int
     results: list[EvidenceResponse]
@@ -117,30 +107,23 @@ def _apply_review_updates(
 
 
 class EvidenceConflictsResponse(BaseModel):
-    """Response model for evidence conflict detection."""
-
     variant_id: int
     conflicts: list[JSONObject]
     total_conflicts: int
 
 
 class EvidenceConsensusResponse(BaseModel):
-    """Response model for evidence consensus calculations."""
-
     variant_id: int
     consensus: JSONObject
 
 
 class EvidenceStatisticsResponse(BaseModel):
-    """Response model for evidence statistics."""
-
     statistics: dict[str, int | float | bool | str | None]
 
 
 def get_evidence_service(
     db: Session = Depends(get_session),
 ) -> "EvidenceApplicationService":
-    """Dependency injection for evidence application service."""
     # Get unified container with legacy support
 
     container = get_legacy_dependency_container()
@@ -165,9 +148,6 @@ async def get_evidence(
     reviewed: bool | None = Query(None, description="Filter by review status"),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> PaginatedResponse[EvidenceResponse]:
-    """
-    Retrieve a paginated list of evidence records with optional search and filters.
-    """
     filters_payload: QueryFilters = {}
     if variant_id is not None:
         filters_payload["variant_id"] = variant_id
@@ -221,9 +201,6 @@ async def get_evidence_by_id(
     evidence_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> EvidenceResponse:
-    """
-    Retrieve a specific evidence record by its database ID.
-    """
     try:
         evidence = service.get_evidence_by_id(evidence_id)
         if not evidence:
@@ -251,9 +228,6 @@ async def create_evidence(
     evidence_data: EvidenceCreate,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> EvidenceResponse:
-    """
-    Create a new evidence record linking a variant and phenotype.
-    """
     try:
         evidence = service.create_evidence(
             variant_id=int(evidence_data.variant_id),
@@ -297,9 +271,6 @@ async def update_evidence(
     evidence_data: EvidenceUpdate,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> EvidenceResponse:
-    """
-    Update an existing evidence record by its database ID.
-    """
     try:
         # Validate evidence exists
         if not service.validate_evidence_exists(evidence_id):
@@ -328,9 +299,6 @@ async def delete_evidence(
     evidence_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> None:
-    """
-    Delete an evidence record by its database ID.
-    """
     try:
         if not service.validate_evidence_exists(evidence_id):
             raise HTTPException(
@@ -369,9 +337,6 @@ async def get_evidence_by_variant(
     ),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> VariantEvidenceResponse:
-    """
-    Retrieve all evidence associated with a specific variant.
-    """
     try:
         evidence_list = service.get_evidence_by_variant(variant_id)
 
@@ -408,9 +373,6 @@ async def get_evidence_by_phenotype(
     ),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> PhenotypeEvidenceResponse:
-    """
-    Retrieve all evidence associated with a specific phenotype.
-    """
     try:
         evidence_list = service.get_evidence_by_phenotype(phenotype_id)
 
@@ -443,9 +405,6 @@ async def search_evidence(
     phenotype_id: str | None = Query(None, description="Filter by phenotype ID"),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> EvidenceSearchResponse:
-    """
-    Search evidence records by description, summary, or other text fields.
-    """
     try:
         filters_payload: QueryFilters = {}
         if variant_id is not None:
@@ -480,9 +439,6 @@ async def get_evidence_conflicts(
     variant_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> EvidenceConflictsResponse:
-    """
-    Detect and list any conflicting evidence records for a given variant.
-    """
     try:
         conflicts = service.detect_evidence_conflicts(variant_id)
         return EvidenceConflictsResponse(
@@ -506,9 +462,6 @@ async def get_evidence_consensus(
     variant_id: int,
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> EvidenceConsensusResponse:
-    """
-    Calculate consensus from multiple evidence records for a variant.
-    """
     try:
         consensus = service.calculate_evidence_consensus(variant_id)
         return EvidenceConsensusResponse(
@@ -530,9 +483,6 @@ async def get_evidence_consensus(
 async def get_evidence_statistics(
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> EvidenceStatisticsResponse:
-    """
-    Retrieve statistics about evidence in the repository.
-    """
     try:
         stats = service.get_evidence_statistics()
         return EvidenceStatisticsResponse(statistics=stats)

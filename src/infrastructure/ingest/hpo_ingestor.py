@@ -41,17 +41,6 @@ class HPOIngestor(BaseIngestor):
         )
 
     async def fetch_data(self, **kwargs: JSONValue) -> list[RawRecord]:
-        """
-        Fetch HPO ontology data.
-
-        Downloads the latest HPO release and parses phenotype terms.
-
-        Args:
-            **kwargs: Additional parameters (e.g., version, specific_terms)
-
-        Returns:
-            List of HPO phenotype records
-        """
         # Get latest release info
         release_info = await self._get_latest_release()
         if not release_info:
@@ -95,12 +84,6 @@ class HPOIngestor(BaseIngestor):
         return phenotype_records
 
     async def _get_latest_release(self) -> JSONObject | None:
-        """
-        Get information about the latest HPO release.
-
-        Returns:
-            Release information including download URLs
-        """
         try:
             # GitHub API for latest release
             response = await self._make_request(
@@ -145,15 +128,6 @@ class HPOIngestor(BaseIngestor):
             }
 
     async def _download_ontology_file(self, url: str) -> str | None:
-        """
-        Download HPO ontology file.
-
-        Args:
-            url: URL to download from
-
-        Returns:
-            Ontology file content as string
-        """
         try:
             response = await self._make_request(
                 "GET",
@@ -176,15 +150,6 @@ class HPOIngestor(BaseIngestor):
             return content
 
     def _parse_hpo_ontology(self, ontology_content: str) -> list[RawRecord]:
-        """
-        Parse HPO ontology content into structured records.
-
-        Args:
-            ontology_content: Raw ontology file content
-
-        Returns:
-            List of parsed phenotype records
-        """
         phenotypes: list[RawRecord] = []
 
         try:
@@ -218,15 +183,6 @@ class HPOIngestor(BaseIngestor):
         return phenotypes
 
     def _parse_obo_format(self, content: str) -> list[RawRecord]:
-        """
-        Parse OBO (Open Biological Ontologies) format.
-
-        Args:
-            content: OBO format content
-
-        Returns:
-            List of phenotype records
-        """
         phenotypes: list[RawRecord] = []
         term_blocks = content.split("[Term]")
 
@@ -263,15 +219,6 @@ class HPOIngestor(BaseIngestor):
         self,
         term: dict[str, str | list[str]],
     ) -> RawRecord:
-        """
-        Normalize OBO term data into consistent structure.
-
-        Args:
-            term: Raw OBO term data
-
-        Returns:
-            Normalized phenotype record
-        """
         # Ensure lists for multi-value fields
         for field in ["is_a", "synonym", "xref"]:
             value = term.get(field)
@@ -303,15 +250,6 @@ class HPOIngestor(BaseIngestor):
         }
 
     def _parse_owl_format(self, content: str) -> list[RawRecord]:
-        """
-        Parse OWL/XML format (simplified implementation).
-
-        Args:
-            content: OWL/XML content
-
-        Returns:
-            List of phenotype records
-        """
         # Simplified OWL parsing - in production would use proper OWL library
         # This is a basic implementation that extracts basic information
 
@@ -342,7 +280,6 @@ class HPOIngestor(BaseIngestor):
         return phenotypes
 
     def _parse_owl_class(self, class_elem: Element) -> RawRecord | None:
-        """Parse individual OWL class element."""
         # Simplified OWL class parsing
         # In production would be much more comprehensive
         try:
@@ -375,15 +312,6 @@ class HPOIngestor(BaseIngestor):
         return None
 
     def _parse_simple_format(self, content: str) -> list[RawRecord]:
-        """
-        Fallback parser for unrecognized formats.
-
-        Args:
-            content: Raw content
-
-        Returns:
-            Basic error record
-        """
         return [
             {
                 "parsing_error": "Unrecognized ontology format",
@@ -399,15 +327,6 @@ class HPOIngestor(BaseIngestor):
         self,
         phenotypes: list[RawRecord],
     ) -> list[RawRecord]:
-        """
-        Filter phenotypes for MED13 relevance.
-
-        Args:
-            phenotypes: All phenotype records
-
-        Returns:
-            MED13-relevant phenotype records
-        """
         # MED13-related phenotypes based on known associations
         med13_keywords: list[str] = [
             "intellectual disability",
@@ -456,15 +375,6 @@ class HPOIngestor(BaseIngestor):
         self,
         root_term: str = "HP:0000118",
     ) -> JSONObject:
-        """
-        Fetch phenotype hierarchy starting from a root term.
-
-        Args:
-            root_term: Root HPO term ID (default: Phenotypic abnormality)
-
-        Returns:
-            Hierarchical phenotype data
-        """
         all_phenotypes = await self.fetch_data()
         if not all_phenotypes:
             return {"error": "No phenotypes loaded"}
@@ -477,16 +387,6 @@ class HPOIngestor(BaseIngestor):
         phenotypes: list[RawRecord],
         root_id: str,
     ) -> JSONObject:
-        """
-        Build hierarchical structure from flat phenotype list.
-
-        Args:
-            phenotypes: Flat list of phenotypes
-            root_id: Root term ID
-
-        Returns:
-            Hierarchical structure
-        """
         # Create lookup by ID
         phenotype_dict: dict[str, RawRecord] = {}
         for phenotype in phenotypes:
@@ -497,7 +397,6 @@ class HPOIngestor(BaseIngestor):
         # Build parent-child relationships
 
         def build_subtree(term_id: str, visited: set[str]) -> JSONObject:
-            """Recursively build subtree."""
             if term_id in visited:
                 return {"error": "Circular reference", "hpo_id": term_id}
 
@@ -541,16 +440,6 @@ class HPOIngestor(BaseIngestor):
         query: str,
         **kwargs: JSONValue,
     ) -> list[RawRecord]:
-        """
-        Search phenotypes by name or definition.
-
-        Args:
-            query: Search query
-            **kwargs: Additional search parameters
-
-        Returns:
-            Matching phenotype records
-        """
         all_phenotypes = await self.fetch_data(**kwargs)
 
         query_lower = query.lower()

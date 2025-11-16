@@ -85,20 +85,12 @@ class SourceManagementService:
         plugin_registry: SourcePluginRegistry | None = None,
         event_bus: DomainEventBus | None = None,
     ):
-        """
-        Initialize the source management service.
-
-        Args:
-            user_data_source_repository: Repository for user data sources
-            source_template_repository: Repository for source templates
-        """
         self._source_repository = user_data_source_repository
         self._template_repository = source_template_repository
         self._plugin_registry = plugin_registry or default_registry
         self._event_bus = event_bus or domain_event_bus
 
     def _require_template_repository(self) -> SourceTemplateRepository:
-        """Ensure the template repository is available."""
         if self._template_repository is None:
             msg = "Source template repository is not configured"
             raise RuntimeError(msg)
@@ -115,11 +107,9 @@ class SourceManagementService:
         return plugin.validate_configuration(configuration)
 
     def _publish_event(self, event: DomainEvent) -> None:
-        """Publish a domain event safely."""
         self._event_bus.publish(event)
 
     def _determine_changed_fields(self, request: UpdateSourceRequest) -> list[str]:
-        """Return a list of changed field names for update events."""
         changed: list[str] = []
         if request.name is not None:
             changed.append("name")
@@ -134,18 +124,6 @@ class SourceManagementService:
         return changed
 
     def create_source(self, request: CreateSourceRequest) -> UserDataSource:
-        """
-        Create a new user data source.
-
-        Args:
-            request: Creation request with source details
-
-        Returns:
-            The created UserDataSource entity
-
-        Raises:
-            ValueError: If validation fails
-        """
         # Validate template if provided
         if request.template_id:
             template_repository = self._require_template_repository()
@@ -186,16 +164,6 @@ class SourceManagementService:
         source_id: UUID,
         owner_id: UUID | None = None,
     ) -> UserDataSource | None:
-        """
-        Get a data source by ID.
-
-        Args:
-            source_id: The source ID
-            owner_id: Optional owner filter for security
-
-        Returns:
-            The UserDataSource if found and accessible, None otherwise
-        """
         source = self._source_repository.find_by_id(source_id)
         if source and owner_id and source.owner_id != owner_id:
             return None  # Not owned by this user
@@ -207,17 +175,6 @@ class SourceManagementService:
         skip: int = 0,
         limit: int = 50,
     ) -> list[UserDataSource]:
-        """
-        Get all data sources owned by a user.
-
-        Args:
-            owner_id: The user ID
-            skip: Pagination offset
-            limit: Maximum results
-
-        Returns:
-            List of user's data sources
-        """
         return self._source_repository.find_by_owner(owner_id, skip, limit)
 
     def update_source(
@@ -226,17 +183,6 @@ class SourceManagementService:
         request: UpdateSourceRequest,
         owner_id: UUID,
     ) -> UserDataSource | None:
-        """
-        Update a data source.
-
-        Args:
-            source_id: The source ID
-            request: Update request
-            owner_id: The user making the request (for authorization)
-
-        Returns:
-            The updated UserDataSource if successful, None if not found or not authorized
-        """
         source = self._source_repository.find_by_id(source_id)
         if not source or source.owner_id != owner_id:
             return None
@@ -276,16 +222,6 @@ class SourceManagementService:
         return saved_source
 
     def delete_source(self, source_id: UUID, owner_id: UUID) -> bool:
-        """
-        Delete a data source.
-
-        Args:
-            source_id: The source ID
-            owner_id: The user making the request (for authorization)
-
-        Returns:
-            True if deleted, False if not found or not authorized
-        """
         source = self._source_repository.find_by_id(source_id)
         if not source or source.owner_id != owner_id:
             return False
@@ -297,16 +233,6 @@ class SourceManagementService:
         source_id: UUID,
         owner_id: UUID,
     ) -> UserDataSource | None:
-        """
-        Activate a data source for ingestion.
-
-        Args:
-            source_id: The source ID
-            owner_id: The user making the request
-
-        Returns:
-            The activated source if successful
-        """
         source = self._source_repository.find_by_id(source_id)
         if not source or source.owner_id != owner_id:
             return None
@@ -327,16 +253,6 @@ class SourceManagementService:
         source_id: UUID,
         owner_id: UUID,
     ) -> UserDataSource | None:
-        """
-        Deactivate a data source.
-
-        Args:
-            source_id: The source ID
-            owner_id: The user making the request
-
-        Returns:
-            The deactivated source if successful
-        """
         source = self._source_repository.find_by_id(source_id)
         if not source or source.owner_id != owner_id:
             return None
@@ -353,15 +269,6 @@ class SourceManagementService:
         return saved_source
 
     def record_ingestion_success(self, source_id: UUID) -> UserDataSource | None:
-        """
-        Record successful data ingestion for a source.
-
-        Args:
-            source_id: The source ID
-
-        Returns:
-            The updated source if found
-        """
         return self._source_repository.record_ingestion(source_id)
 
     def update_quality_metrics(
@@ -369,16 +276,6 @@ class SourceManagementService:
         source_id: UUID,
         metrics: QualityMetrics,
     ) -> UserDataSource | None:
-        """
-        Update quality metrics for a source.
-
-        Args:
-            source_id: The source ID
-            metrics: The new quality metrics
-
-        Returns:
-            The updated source if found
-        """
         return self._source_repository.update_quality_metrics(source_id, metrics)
 
     def get_sources_by_type(
@@ -387,17 +284,6 @@ class SourceManagementService:
         skip: int = 0,
         limit: int = 50,
     ) -> list[UserDataSource]:
-        """
-        Get sources by type.
-
-        Args:
-            source_type: The source type to filter by
-            skip: Pagination offset
-            limit: Maximum results
-
-        Returns:
-            List of sources of the specified type
-        """
         return self._source_repository.find_by_type(source_type, skip, limit)
 
     def get_active_sources(
@@ -405,16 +291,6 @@ class SourceManagementService:
         skip: int = 0,
         limit: int = 50,
     ) -> list[UserDataSource]:
-        """
-        Get all active sources.
-
-        Args:
-            skip: Pagination offset
-            limit: Maximum results
-
-        Returns:
-            List of active sources
-        """
         return self._source_repository.find_active_sources(skip, limit)
 
     def search_sources(
@@ -424,18 +300,6 @@ class SourceManagementService:
         skip: int = 0,
         limit: int = 50,
     ) -> list[UserDataSource]:
-        """
-        Search sources by name.
-
-        Args:
-            query: Search query
-            owner_id: Optional owner filter
-            skip: Pagination offset
-            limit: Maximum results
-
-        Returns:
-            List of matching sources
-        """
         return self._source_repository.search_by_name(query, owner_id, skip, limit)
 
     def get_available_templates(
@@ -444,27 +308,10 @@ class SourceManagementService:
         skip: int = 0,
         limit: int = 50,
     ) -> list[SourceTemplate]:
-        """
-        Get templates available to a user.
-
-        Args:
-            user_id: The user ID (None for anonymous)
-            skip: Pagination offset
-            limit: Maximum results
-
-        Returns:
-            List of available templates
-        """
         template_repository = self._require_template_repository()
         return template_repository.find_available_for_user(user_id, skip, limit)
 
     def get_statistics(self) -> StatisticsResponse:
-        """
-        Get overall statistics about data sources.
-
-        Returns:
-            Dictionary with various statistics
-        """
         stats = self._source_repository.get_statistics()
         return {
             "total_sources": stats["total_sources"],
@@ -478,15 +325,6 @@ class SourceManagementService:
         self,
         source: UserDataSource,
     ) -> list[str]:
-        """
-        Validate a source's configuration.
-
-        Args:
-            source: The source to validate
-
-        Returns:
-            List of validation error messages (empty if valid)
-        """
         errors = []
 
         plugin = self._plugin_registry.get(source.source_type)

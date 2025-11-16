@@ -112,14 +112,6 @@ class DependencyContainer:
         jwt_secret_key: str | None = None,
         jwt_algorithm: str = "HS256",
     ):
-        """
-        Initialize the unified dependency container.
-
-        Args:
-            database_url: Optional async database connection string override
-            jwt_secret_key: Secret key for JWT signing
-            jwt_algorithm: JWT algorithm (default: HS256)
-        """
         resolved_db_url = database_url or resolve_async_database_url()
         self.database_url = resolved_db_url
         resolved_secret = jwt_secret_key or DEFAULT_DEV_JWT_SECRET
@@ -177,13 +169,11 @@ class DependencyContainer:
         self._evidence_domain_service: EvidenceDomainService | None = None
 
     def get_user_repository(self) -> SqlAlchemyUserRepository:
-        """Get the user repository instance."""
         if self._user_repository is None:
             self._user_repository = SqlAlchemyUserRepository(self.async_session_factory)
         return self._user_repository
 
     def get_session_repository(self) -> SqlAlchemySessionRepository:
-        """Get the session repository instance."""
         if self._session_repository is None:
             self._session_repository = SqlAlchemySessionRepository(
                 self.async_session_factory,
@@ -191,7 +181,6 @@ class DependencyContainer:
         return self._session_repository
 
     async def get_authentication_service(self) -> AuthenticationService:
-        """Get the authentication service instance."""
         current_loop = asyncio.get_running_loop()
         if (
             self._authentication_service is None
@@ -209,7 +198,6 @@ class DependencyContainer:
         return self._authentication_service
 
     async def get_authorization_service(self) -> AuthorizationService:
-        """Get the authorization service instance."""
         current_loop = asyncio.get_running_loop()
         if (
             self._authorization_service is None
@@ -223,7 +211,6 @@ class DependencyContainer:
         return self._authorization_service
 
     async def get_user_management_service(self) -> UserManagementService:
-        """Get the user management service instance."""
         current_loop = asyncio.get_running_loop()
         if (
             self._user_management_service is None
@@ -240,19 +227,16 @@ class DependencyContainer:
     # LEGACY SYSTEM METHODS (Sync SQLAlchemy for backward compatibility)
 
     def get_gene_domain_service(self) -> GeneDomainService:
-        """Get the gene domain service instance."""
         if self._gene_domain_service is None:
             self._gene_domain_service = GeneDomainService()
         return self._gene_domain_service
 
     def get_variant_domain_service(self) -> VariantDomainService:
-        """Get the variant domain service instance."""
         if self._variant_domain_service is None:
             self._variant_domain_service = VariantDomainService()
         return self._variant_domain_service
 
     def get_evidence_domain_service(self) -> EvidenceDomainService:
-        """Get the evidence domain service instance."""
         if self._evidence_domain_service is None:
             self._evidence_domain_service = EvidenceDomainService()
         return self._evidence_domain_service
@@ -260,7 +244,6 @@ class DependencyContainer:
     # LEGACY APPLICATION SERVICES
 
     def create_unified_search_service(self, session: Session) -> UnifiedSearchService:
-        """Create a unified search service with all entity services."""
         return UnifiedSearchService(
             gene_service=self.create_gene_application_service(session),
             variant_service=self.create_variant_application_service(session),
@@ -272,7 +255,6 @@ class DependencyContainer:
         self,
         session: Session,
     ) -> CurationDetailService:
-        """Create the curation detail service used by curator workflows."""
         conflict_detector = ConflictDetector(
             variant_domain_service=self.get_variant_domain_service(),
             evidence_domain_service=self.get_evidence_domain_service(),
@@ -288,7 +270,6 @@ class DependencyContainer:
         )
 
     async def get_db_session(self) -> AsyncGenerator[AsyncSession, None]:
-        """Get a database session (FastAPI dependency)."""
         async with self.async_session_factory() as session:
             try:
                 yield session
@@ -297,7 +278,6 @@ class DependencyContainer:
 
     @asynccontextmanager
     async def lifespan_context(self) -> AsyncGenerator[None, None]:
-        """FastAPI lifespan context manager."""
         # Startup
         try:
             yield
@@ -306,7 +286,6 @@ class DependencyContainer:
             await self.engine.dispose()
 
     async def health_check(self) -> HealthCheckResponse:
-        """Perform health check on all dependencies."""
         health_status: HealthCheckResponse = {
             "database": False,
             "jwt_provider": False,
@@ -353,7 +332,6 @@ class DependencyContainer:
         self,
         session: Session,
     ) -> GeneApplicationService:
-        """Create a gene application service with the given session."""
         gene_repository = SqlAlchemyGeneRepository(session)
         gene_domain_service = GeneDomainService()
         variant_repository = SqlAlchemyVariantRepository(session)
@@ -367,7 +345,6 @@ class DependencyContainer:
         self,
         session: Session,
     ) -> VariantApplicationService:
-        """Create a variant application service with the given session."""
         variant_repository = SqlAlchemyVariantRepository(session)
         variant_domain_service = VariantDomainService()
         evidence_repository = SqlAlchemyEvidenceRepository(session)
@@ -381,7 +358,6 @@ class DependencyContainer:
         self,
         session: Session,
     ) -> PhenotypeApplicationService:
-        """Create a phenotype application service with the given session."""
         phenotype_repository = SqlAlchemyPhenotypeRepository(session)
         return PhenotypeApplicationService(
             phenotype_repository=phenotype_repository,
@@ -391,7 +367,6 @@ class DependencyContainer:
         self,
         session: Session,
     ) -> EvidenceApplicationService:
-        """Create an evidence application service with the given session."""
         evidence_repository = SqlAlchemyEvidenceRepository(session)
         evidence_domain_service = EvidenceDomainService()
         return EvidenceApplicationService(
@@ -403,7 +378,6 @@ class DependencyContainer:
         self,
         session: Session,
     ) -> PublicationApplicationService:
-        """Create a publication application service with the given session."""
         publication_repository = SqlAlchemyPublicationRepository(session)
         evidence_repository = SqlAlchemyEvidenceRepository(session)
         return PublicationApplicationService(
@@ -412,7 +386,6 @@ class DependencyContainer:
         )
 
     def create_curation_service(self, session: Session) -> CurationService:
-        """Create a curation service with the given session."""
         return CurationService(
             review_repository=SqlAlchemyReviewRepository(),
             variant_service=self.create_variant_application_service(session),
@@ -421,7 +394,6 @@ class DependencyContainer:
         )
 
     def create_export_service(self, session: Session) -> BulkExportService:
-        """Create an export service with the given session."""
         return BulkExportService(
             gene_service=self.create_gene_application_service(session),
             variant_service=self.create_variant_application_service(session),
@@ -430,7 +402,6 @@ class DependencyContainer:
         )
 
     def create_search_service(self, session: Session) -> UnifiedSearchService:
-        """Create a search service with the given session."""
         return UnifiedSearchService(
             gene_service=self.create_gene_application_service(session),
             variant_service=self.create_variant_application_service(session),
@@ -442,7 +413,6 @@ class DependencyContainer:
         self,
         session: Session,
     ) -> SourceManagementService:
-        """Create a source management service with the given session."""
         # Create repositories
         user_data_source_repo = SqlAlchemyUserDataSourceRepository(session)
         template_repo = SqlAlchemySourceTemplateRepository(session)
@@ -452,7 +422,6 @@ class DependencyContainer:
         )
 
     def create_data_discovery_service(self, session: Session) -> DataDiscoveryService:
-        """Create a data discovery service with the given session."""
         # Create repositories
         session_repo = SQLAlchemyDataDiscoverySessionRepository(session)
         catalog_repo = SQLAlchemySourceCatalogRepository(session)
@@ -484,18 +453,16 @@ container = DependencyContainer()
 
 # LEGACY SESSION SETUP (for backward compatibility)
 def initialize_legacy_session(session: Session) -> None:
-    """Legacy function - no longer needed. Services now take session as parameter."""
     # This function is kept for backward compatibility but no longer does anything
+    pass
 
 
 # FastAPI dependency functions (these will be called synchronously by FastAPI)
 def get_user_repository_dependency() -> SqlAlchemyUserRepository:
-    """FastAPI dependency for user repository."""
     return container.get_user_repository()
 
 
 def get_authentication_service_dependency() -> AuthenticationService:
-    """FastAPI dependency for authentication service."""
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -523,7 +490,6 @@ def get_authentication_service_dependency() -> AuthenticationService:
 
 
 def get_user_management_service_dependency() -> UserManagementService:
-    """FastAPI dependency for user management service."""
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
@@ -544,7 +510,6 @@ def get_user_management_service_dependency() -> UserManagementService:
 
 # LEGACY DEPENDENCY FUNCTIONS (for backward compatibility)
 def get_legacy_dependency_container() -> DependencyContainer:
-    """Get the legacy dependency container for routes that still use the old system."""
     return container
 
 
@@ -552,7 +517,6 @@ def get_legacy_dependency_container() -> DependencyContainer:
 def get_data_discovery_service_dependency() -> (
     Generator[DataDiscoveryService, None, None]
 ):
-    """FastAPI dependency for data discovery service."""
     # Create a new session for this request
     session = SessionLocal()
     try:

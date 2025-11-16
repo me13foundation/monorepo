@@ -1,8 +1,4 @@
-"""
-Curation Service for MED13 Resource Library.
-
-Provides clinical data enrichment for curation workflows.
-"""
+"""Clinical curation service providing data enrichment for MED13 workflows."""
 
 from __future__ import annotations
 
@@ -36,12 +32,7 @@ logger = logging.getLogger(__name__)
 
 
 class CurationService:
-    """
-    Service for curation workflows that enriches review data with clinical context.
-
-    Provides clinical data enrichment for the curation dashboard, combining review
-    metadata with actual clinical information for informed decision making.
-    """
+    """Enriches review data with clinical context for the curation dashboard."""
 
     def __init__(
         self,

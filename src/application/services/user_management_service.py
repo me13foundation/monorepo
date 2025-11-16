@@ -60,30 +60,10 @@ class UserManagementService:
         user_repository: UserRepository,
         password_hasher: PasswordHasherService,
     ):
-        """
-        Initialize user management service.
-
-        Args:
-            user_repository: User data access
-            password_hasher: Password security
-        """
         self.user_repository = user_repository
         self.password_hasher = password_hasher
 
     async def register_user(self, request: RegisterUserRequest) -> User:
-        """
-        Register a new user account.
-
-        Args:
-            request: Registration data
-
-        Returns:
-            Created user entity
-
-        Raises:
-            UserAlreadyExistsError: If email or username already exists
-            ValueError: If password doesn't meet requirements
-        """
         logger.debug("Starting register_user for %s", request.email)
 
         # Check for existing users
@@ -138,19 +118,6 @@ class UserManagementService:
         return created_user
 
     async def create_user(self, request: CreateUserRequest, _created_by: UUID) -> User:
-        """
-        Create a user account (administrative operation).
-
-        Args:
-            request: User creation data
-            created_by: ID of admin creating the user
-
-        Returns:
-            Created user entity
-
-        Raises:
-            UserAlreadyExistsError: If email or username already exists
-        """
         # Check for existing users
         if await self.user_repository.exists_by_email(request.email):
             msg = "User with this email already exists"
@@ -179,20 +146,6 @@ class UserManagementService:
         request: UpdateUserRequest,
         updated_by: UUID | None = None,
     ) -> User:
-        """
-        Update user profile.
-
-        Args:
-            user_id: User to update
-            request: Update data
-            updated_by: ID of user making the update (for authorization)
-
-        Returns:
-            Updated user entity
-
-        Raises:
-            UserNotFoundError: If user doesn't exist
-        """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
             msg = "User not found"
@@ -217,19 +170,6 @@ class UserManagementService:
         user_id: UUID,
         request: AdminUpdateUserRequest,
     ) -> User:
-        """
-        Update user as administrator.
-
-        Args:
-            user_id: User to update
-            request: Admin update data
-
-        Returns:
-            Updated user entity
-
-        Raises:
-            UserNotFoundError: If user doesn't exist
-        """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
             msg = "User not found"
@@ -260,19 +200,6 @@ class UserManagementService:
         old_password: str,
         new_password: str,
     ) -> None:
-        """
-        Change user's password.
-
-        Args:
-            user_id: User ID
-            old_password: Current password
-            new_password: New password
-
-        Raises:
-            UserNotFoundError: If user doesn't exist
-            InvalidPasswordError: If old password is incorrect
-            ValueError: If new password doesn't meet requirements
-        """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
             msg = "User not found"
@@ -297,18 +224,6 @@ class UserManagementService:
         # TODO: Send password changed notification
 
     async def request_password_reset(self, email: str) -> str:
-        """
-        Request password reset for user.
-
-        Args:
-            email: User's email address
-
-        Returns:
-            Masked email for confirmation
-
-        Raises:
-            UserNotFoundError: If user doesn't exist
-        """
         user = await self.user_repository.get_by_email(email)
         if not user:
             # Return masked email even if user doesn't exist (security)
@@ -323,17 +238,6 @@ class UserManagementService:
         return self._mask_email(email)
 
     async def reset_password(self, token: str, new_password: str) -> None:
-        """
-        Reset password using reset token.
-
-        Args:
-            token: Password reset token
-            new_password: New password
-
-        Raises:
-            ValueError: If token is invalid or expired
-            ValueError: If password doesn't meet requirements
-        """
         # Find user with this token
         # Note: This is inefficient - in production, you'd want a token index
         # For now, we'll iterate through users (not recommended for large datasets)
@@ -373,15 +277,6 @@ class UserManagementService:
         # TODO: Send confirmation email
 
     async def verify_email(self, token: str) -> None:
-        """
-        Verify user's email address.
-
-        Args:
-            token: Email verification token
-
-        Raises:
-            EmailVerificationError: If token is invalid
-        """
         # Find user with this token
         # TODO: Implement proper token lookup in repository
         # For now, this is a placeholder implementation
@@ -403,15 +298,6 @@ class UserManagementService:
         # TODO: Send welcome email
 
     async def delete_user(self, user_id: UUID) -> None:
-        """
-        Delete a user account.
-
-        Args:
-            user_id: User to delete
-
-        Raises:
-            UserNotFoundError: If user doesn't exist
-        """
         user = await self.user_repository.get_by_id(user_id)
         if not user:
             msg = "User not found"
@@ -425,15 +311,6 @@ class UserManagementService:
         # TODO: Clean up related data (sessions, audit logs)
 
     async def get_user(self, user_id: UUID) -> User | None:
-        """
-        Get user by ID.
-
-        Args:
-            user_id: User ID
-
-        Returns:
-            User entity or None
-        """
         return await self.user_repository.get_by_id(user_id)
 
     async def list_users(
@@ -443,18 +320,6 @@ class UserManagementService:
         role: UserRole | None = None,
         status: UserStatus | None = None,
     ) -> UserListResponse:
-        """
-        List users with filtering and pagination.
-
-        Args:
-            skip: Number of records to skip
-            limit: Maximum records to return
-            role: Filter by role
-            status: Filter by status
-
-        Returns:
-            Paginated user list response
-        """
         users = await self.user_repository.list_users(
             skip=skip,
             limit=limit,
@@ -475,12 +340,6 @@ class UserManagementService:
         )
 
     async def get_user_statistics(self) -> UserStatisticsResponse:
-        """
-        Get comprehensive user statistics.
-
-        Returns:
-            User statistics response
-        """
         # Count by status
         active_count = await self.user_repository.count_users_by_status(
             UserStatus.ACTIVE,
@@ -523,13 +382,6 @@ class UserManagementService:
         user_id: UUID,
         _reason: str = "Administrative action",
     ) -> None:
-        """
-        Lock a user account.
-
-        Args:
-            user_id: User to lock
-            reason: Reason for locking
-        """
         await self.user_repository.lock_account(
             user_id,
             datetime.now(UTC) + timedelta(days=30),  # 30 day lock
@@ -539,27 +391,12 @@ class UserManagementService:
         # TODO: Send notification email
 
     async def unlock_user_account(self, user_id: UUID) -> None:
-        """
-        Unlock a user account.
-
-        Args:
-            user_id: User to unlock
-        """
         await self.user_repository.unlock_account(user_id)
 
         # TODO: Log security event
         # TODO: Send notification email
 
     def _mask_email(self, email: str) -> str:
-        """
-        Mask email address for privacy.
-
-        Args:
-            email: Email to mask
-
-        Returns:
-            Masked email (e.g., "u***@example.com")
-        """
         try:
             local, domain = email.split("@", 1)
         except ValueError:

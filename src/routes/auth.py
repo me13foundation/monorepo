@@ -86,13 +86,11 @@ class RouteListResponse(BaseModel):
 
 @auth_router.get("/test")
 async def test_endpoint() -> dict[str, str]:
-    """Simple test endpoint to check if auth routes are working."""
     return {"message": "Auth routes are working!"}
 
 
 @auth_router.get("/routes", response_model=RouteListResponse)
 async def list_routes() -> RouteListResponse:
-    """List all auth routes."""
     routes = [
         RouteInfo(
             path=getattr(route, "path", str(route)),
@@ -111,11 +109,6 @@ async def get_current_user(
         get_authentication_service_dependency,
     ),
 ) -> User:
-    """
-    FastAPI dependency to get the current authenticated user.
-
-    Raises HTTPException if authentication fails.
-    """
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -137,11 +130,6 @@ async def get_current_user(
 async def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """
-    FastAPI dependency to get the current active user.
-
-    Ensures the user account is active.
-    """
     if not current_user.can_authenticate():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -155,20 +143,6 @@ async def require_permission(
     current_user: User = Depends(get_current_active_user),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
 ) -> User:
-    """
-    FastAPI dependency to require specific permission.
-
-    Args:
-        permission: Required permission string (e.g., "user:create")
-        current_user: Current authenticated user
-        authz_service: Authorization service
-
-    Returns:
-        User if permission granted
-
-    Raises:
-        HTTPException if permission denied
-    """
     try:
         # Convert string to Permission enum
         perm_enum = Permission(permission)
@@ -185,19 +159,6 @@ async def require_role(
     role: str,
     current_user: User = Depends(get_current_active_user),
 ) -> User:
-    """
-    FastAPI dependency to require specific role.
-
-    Args:
-        role: Required role string (e.g., "admin")
-        current_user: Current authenticated user
-
-    Returns:
-        User if role matches
-
-    Raises:
-        HTTPException if role doesn't match
-    """
     try:
         required_role = UserRole(role.lower())
         if current_user.role != required_role:
@@ -226,9 +187,6 @@ async def login(
         get_authentication_service_dependency,
     ),
 ) -> LoginResponse:
-    """
-    Authenticate user and return access/refresh tokens.
-    """
     try:
         # Extract IP address and user agent from request
         ip_address = http_request.client.host if http_request.client else None
@@ -274,9 +232,6 @@ async def refresh_token(
     refresh_token: str,
     auth_service: AuthenticationService = Depends(container.get_authentication_service),
 ) -> TokenRefreshResponse:
-    """
-    Refresh access token using valid refresh token.
-    """
     try:
         response = await auth_service.refresh_token(refresh_token)
         return response
@@ -297,9 +252,6 @@ async def logout(
     current_user: User = Depends(get_current_user),
     auth_service: AuthenticationService = Depends(container.get_authentication_service),
 ) -> GenericSuccessResponse:
-    """
-    Logout user by revoking their session.
-    """
     try:
         # TODO: Get token from request and revoke it via service
         return GenericSuccessResponse(message="Logged out successfully")
@@ -318,9 +270,6 @@ async def logout(
 async def register_user(
     request: RegisterUserRequest,
 ) -> GenericSuccessResponse:
-    """
-    Register a new user account.
-    """
     try:
         # Create user directly using SQLAlchemy model
         password_hasher = PasswordHasher()
@@ -373,9 +322,6 @@ async def register_user(
 async def get_current_user_profile(
     current_user: User = Depends(get_current_active_user),
 ) -> UserProfileResponse:
-    """
-    Get current user's profile information.
-    """
     return UserProfileResponse(user=UserPublic.from_user(current_user))
 
 
@@ -392,9 +338,6 @@ async def update_user_profile(
         container.get_user_management_service,
     ),
 ) -> UserProfileResponse:
-    """
-    Update current user's profile.
-    """
     try:
         update_request = UpdateUserRequest(
             full_name=request.full_name,
@@ -425,9 +368,6 @@ async def change_password(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
-    """
-    Change current user's password.
-    """
     try:
         await user_service.change_password(
             user_id=current_user.id,
@@ -457,9 +397,6 @@ async def forgot_password(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
-    """
-    Request password reset for user.
-    """
     try:
         masked_email = await user_service.request_password_reset(request.email)
 
@@ -487,9 +424,6 @@ async def reset_password(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
-    """
-    Reset user password using reset token.
-    """
     try:
         await user_service.reset_password(
             token=request.token,
@@ -518,9 +452,6 @@ async def verify_email(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
-    """
-    Verify user email address using token.
-    """
     try:
         await user_service.verify_email(token)
         return GenericSuccessResponse(message="Email verified successfully")

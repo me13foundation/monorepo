@@ -119,8 +119,6 @@ class DataQualityValidator:
         entity_type: str,
         payload: JSONObject,
     ) -> ValidationResult:
-        """Validate a single entity payload and return the aggregated result."""
-
         issues: list[ValidationIssue] = []
 
         for rule in self._rules.get(entity_type, []):
@@ -154,8 +152,6 @@ class DataQualityValidator:
         entity_type: str,
         entities: Iterable[JSONObject],
     ) -> list[ValidationResult]:
-        """Validate a collection of entities."""
-
         return [self.validate_entity(entity_type, entity) for entity in entities]
 
     # --------------------------------------------------------------------- #
@@ -163,8 +159,6 @@ class DataQualityValidator:
     # --------------------------------------------------------------------- #
 
     def _build_rules(self) -> dict[str, list[ValidationRule]]:
-        """Construct the validation rules we support."""
-
         return {
             "gene": [
                 ValidationRule(
@@ -443,7 +437,6 @@ class DataQualityValidator:
 
     @staticmethod
     def calculate_quality_score(issues: list[ValidationIssue]) -> float:
-        """Public wrapper for quality-score calculation."""
         return DataQualityValidator._calculate_quality_score(issues)
 
 

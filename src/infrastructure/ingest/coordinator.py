@@ -94,16 +94,6 @@ class IngestionCoordinator:
         tasks: list[IngestionTask],
         **global_params: JSONValue,
     ) -> CoordinatorResult:
-        """
-        Coordinate ingestion across multiple data sources.
-
-        Args:
-            tasks: List of ingestion tasks to execute
-            **global_params: Parameters applied to all tasks
-
-        Returns:
-            Aggregated results from all ingestion tasks
-        """
         start_time = datetime.now(UTC)
 
         # Update phase
@@ -153,16 +143,6 @@ class IngestionCoordinator:
         tasks: list[IngestionTask],
         global_params: dict[str, JSONValue],
     ) -> list[IngestionResult]:
-        """
-        Execute ingestion tasks in parallel with concurrency control.
-
-        Args:
-            tasks: Tasks to execute
-            global_params: Global parameters
-
-        Returns:
-            List of ingestion results
-        """
         semaphore = asyncio.Semaphore(self.max_concurrent_ingestors)
         results: list[IngestionResult] = []
 
@@ -192,16 +172,6 @@ class IngestionCoordinator:
         tasks: list[IngestionTask],
         global_params: dict[str, JSONValue],
     ) -> list[IngestionResult]:
-        """
-        Execute ingestion tasks sequentially.
-
-        Args:
-            tasks: Tasks to execute
-            global_params: Global parameters
-
-        Returns:
-            List of ingestion results
-        """
         results: list[IngestionResult] = []
 
         for i, task in enumerate(tasks):
@@ -219,16 +189,6 @@ class IngestionCoordinator:
         task: IngestionTask,
         global_params: dict[str, JSONValue],
     ) -> IngestionResult:
-        """
-        Execute a single ingestion task.
-
-        Args:
-            task: Task to execute
-            global_params: Global parameters
-
-        Returns:
-            Ingestion result
-        """
         try:
             self.logger.info("Starting ingestion from %s", task.source)
 
@@ -284,16 +244,6 @@ class IngestionCoordinator:
         results: list[IngestionResult],
         start_time: datetime,
     ) -> CoordinatorResult:
-        """
-        Aggregate results from multiple ingestion tasks.
-
-        Args:
-            results: Individual ingestion results
-            start_time: Start time of coordination
-
-        Returns:
-            Aggregated coordinator result
-        """
         total_sources = len(results)
         completed_sources = sum(
             1 for r in results if r.status == IngestionStatus.COMPLETED
@@ -325,7 +275,6 @@ class IngestionCoordinator:
         phase: IngestionPhase,
         progress: float,
     ) -> None:
-        """Update progress if callback is provided."""
         if self.progress_callback:
             self.progress_callback(source, phase, progress)
 
@@ -334,16 +283,6 @@ class IngestionCoordinator:
         gene_symbol: str = "MED13",
         **global_params: JSONValue,
     ) -> CoordinatorResult:
-        """
-        Convenience method to ingest from all available sources.
-
-        Args:
-            gene_symbol: Gene symbol to focus on (default: MED13)
-            **global_params: Global parameters for all sources
-
-        Returns:
-            Coordinated ingestion result
-        """
         tasks = [
             IngestionTask(
                 source="clinvar",
@@ -378,16 +317,6 @@ class IngestionCoordinator:
         gene_symbol: str = "MED13",
         **global_params: JSONValue,
     ) -> CoordinatorResult:
-        """
-        Ingest only critical sources (ClinVar and UniProt) for faster execution.
-
-        Args:
-            gene_symbol: Gene symbol to focus on
-            **global_params: Global parameters
-
-        Returns:
-            Coordinated ingestion result
-        """
         tasks = [
             IngestionTask(
                 source="clinvar",
@@ -406,15 +335,6 @@ class IngestionCoordinator:
         return await self.coordinate_ingestion(tasks, **global_params)
 
     def get_ingestion_summary(self, result: CoordinatorResult) -> JSONObject:
-        """
-        Generate a summary of ingestion results.
-
-        Args:
-            result: Coordinator result to summarize
-
-        Returns:
-            Summary dictionary
-        """
         source_details: dict[str, JSONObject] = {}
 
         for source, source_result in result.source_results.items():
@@ -456,16 +376,6 @@ class IngestionCoordinator:
         previous_result: CoordinatorResult,
         **retry_params: JSONValue,
     ) -> CoordinatorResult:
-        """
-        Retry ingestion for failed sources.
-
-        Args:
-            previous_result: Result from previous ingestion attempt
-            **retry_params: Parameters for retry attempts
-
-        Returns:
-            New coordinated ingestion result
-        """
         failed_sources: list[str] = [
             source
             for source, result in previous_result.source_results.items()
