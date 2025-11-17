@@ -15,6 +15,10 @@ jest.mock('@/components/system-settings/StorageConfigurationManager', () => ({
   StorageConfigurationManager: () => <div data-testid="storage-configuration-manager" />,
 }))
 
+jest.mock('@/components/system-settings/MaintenanceModePanel', () => ({
+  MaintenanceModePanel: () => <div data-testid="maintenance-mode-panel" />,
+}))
+
 jest.mock('@/lib/queries/users', () => ({
   useSystemAdminAccess: () => mockUseSystemAdminAccess(),
   useAdminUserStats: () => mockUseAdminUserStats(),

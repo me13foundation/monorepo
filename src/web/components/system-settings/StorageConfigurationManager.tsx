@@ -44,6 +44,7 @@ import {
   useStorageMetrics,
   useStorageMutations,
 } from '@/lib/queries/storage'
+import { useMaintenanceState } from '@/lib/queries/system-status'
 import type {
   CreateStorageConfigurationRequest,
   StorageConfiguration,
@@ -87,6 +88,8 @@ const storageFormSchema = z.discriminatedUnion('provider', [
 ])
 
 type StorageFormValues = z.infer<typeof storageFormSchema>
+const DEFAULT_LOCAL_BASE_PATH = '/var/med13/storage'
+const DEFAULT_GCS_BASE_PATH = '/'
 
 const providerLabels: Record<StorageFormValues['provider'], string> = {
   local_filesystem: 'Local Filesystem',
@@ -103,7 +106,11 @@ const useCaseLabels: Record<StorageUseCase, string> = {
 interface StorageConfigurationCardProps {
   configuration: StorageConfiguration
   isToggling: boolean
-  onToggleEnabled: (configuration: StorageConfiguration, enabled: boolean) => Promise<void>
+  onToggleEnabled: (
+    configuration: StorageConfiguration,
+    enabled: boolean,
+    hasUsage: boolean,
+  ) => Promise<void>
   onTestConnection: (configuration: StorageConfiguration) => Promise<void>
   isTesting: boolean
 }
@@ -119,7 +126,8 @@ function StorageConfigurationCard({
   const healthQuery = useStorageHealth(configuration.id)
 
   const handleToggle = async (checked: boolean) => {
-    await onToggleEnabled(configuration, checked)
+    const hasUsage = (metricsQuery.data?.total_files ?? 0) > 0
+    await onToggleEnabled(configuration, checked, hasUsage)
   }
 
   return (
@@ -220,6 +228,10 @@ export function StorageConfigurationManager() {
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const storageQuery = useStorageConfigurations()
   const storageMutations = useStorageMutations()
+  const maintenanceQuery = useMaintenanceState()
+  const isMaintenanceActive = maintenanceQuery.data?.state.is_active ?? false
+  const [pendingCreate, setPendingCreate] = useState<StorageFormValues | null>(null)
+  const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false)
 
   const form = useForm<StorageFormValues>({
     resolver: zodResolver(storageFormSchema),
@@ -236,7 +248,7 @@ export function StorageConfigurationManager() {
 
   const selectedProvider = form.watch('provider')
 
-  const handleCreate = async (values: StorageFormValues) => {
+  const submitConfiguration = async (values: StorageFormValues) => {
     const payload = convertFormToPayload(values)
     try {
       await storageMutations.createConfiguration.mutateAsync(payload)
@@ -249,10 +261,40 @@ export function StorageConfigurationManager() {
     }
   }
 
+  const handleCreate = async (values: StorageFormValues) => {
+    const hasEnabledConfig = (storageQuery.data ?? []).some((config) => config.enabled)
+    const providerChanged = values.provider !== 'local_filesystem'
+    const basePathChanged =
+      (values.provider === 'local_filesystem' && values.base_path !== DEFAULT_LOCAL_BASE_PATH) ||
+      (values.provider === 'google_cloud_storage' && values.base_path !== DEFAULT_GCS_BASE_PATH)
+
+    if (
+      !isMaintenanceActive &&
+      hasEnabledConfig &&
+      (providerChanged || basePathChanged)
+    ) {
+      setPendingCreate(values)
+      setMaintenanceModalOpen(true)
+      return
+    }
+
+    await submitConfiguration(values)
+  }
+
   const handleToggleEnabled = async (
     configuration: StorageConfiguration,
     enabled: boolean,
+    hasUsage: boolean,
   ) => {
+    if (maintenanceQuery.isLoading) {
+      toast.error('Maintenance status is still loading. Please try again.')
+      return
+    }
+    if (hasUsage && !isMaintenanceActive) {
+      toast.error('Enable maintenance mode before changing a storage backend in use.')
+      return
+    }
+
     setTogglingId(configuration.id)
     try {
       await storageMutations.updateConfiguration.mutateAsync({
@@ -289,6 +331,16 @@ export function StorageConfigurationManager() {
 
   const configurations = storageQuery.data ?? []
   const hasConfigurations = configurations.length > 0
+
+  const handleMaintenanceConfirm = async () => {
+    if (!pendingCreate) {
+      setMaintenanceModalOpen(false)
+      return
+    }
+    await submitConfiguration(pendingCreate)
+    setPendingCreate(null)
+    setMaintenanceModalOpen(false)
+  }
 
   return (
     <section className="space-y-4">
@@ -579,6 +631,32 @@ export function StorageConfigurationManager() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={maintenanceModalOpen} onOpenChange={setMaintenanceModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Enable maintenance mode first</DialogTitle>
+            <DialogDescription>
+              At least one storage backend is currently enabled. Enable maintenance mode to log out
+              users and prevent writes before changing the provider or base path.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingCreate(null)
+                setMaintenanceModalOpen(false)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleMaintenanceConfirm}>
+              Continue without maintenance
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </section>

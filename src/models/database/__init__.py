@@ -50,6 +50,7 @@ from .storage import (
     StorageOperationTypeEnum,
     StorageProviderEnum,
 )
+from .system_status import SystemStatusModel
 from .user import UserModel
 from .user_data_source import (
     SourceStatusEnum as SourceStatus,
@@ -98,6 +99,7 @@ __all__ = [
     "StorageOperationStatusEnum",
     "StorageOperationTypeEnum",
     "StorageProviderEnum",
+    "SystemStatusModel",
     "SpaceStatusEnum",
     "TemplateCategory",
     "UserDataSourceModel",

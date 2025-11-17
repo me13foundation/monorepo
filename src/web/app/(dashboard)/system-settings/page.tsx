@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import SystemSettingsClient from './system-settings-client'
 import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
 import { fetchStorageConfigurations } from '@/lib/api/storage'
+import { fetchMaintenanceState } from '@/lib/api/system-status'
 import { userKeys } from '@/lib/query-keys/users'
 import { storageKeys } from '@/lib/query-keys/storage'
 import { INITIAL_USER_PARAMS } from './constants'
@@ -40,11 +41,15 @@ export default async function SystemSettingsPage() {
       queryKey: storageKeys.list(token),
       queryFn: () => fetchStorageConfigurations(token),
     }),
+    queryClient.prefetchQuery({
+      queryKey: ['system-status', 'maintenance', token] as const,
+      queryFn: () => fetchMaintenanceState(token),
+    }),
   ])
 
   prefetched.forEach((result, index) => {
     if (result.status === 'rejected') {
-      const target = ['user list', 'user stats', 'storage configurations'][index] ?? 'system setting'
+      const target = ['user list', 'user stats', 'storage configurations', 'maintenance state'][index] ?? 'system setting'
       console.error(`[SystemSettingsPage] Failed to prefetch ${target}:`, result.reason)
     }
   })

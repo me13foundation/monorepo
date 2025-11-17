@@ -44,6 +44,11 @@ from .storage import (
     StorageUsageMetrics,
     StorageUseCase,
 )
+from .system_status import (
+    EnableMaintenanceRequest,
+    MaintenanceModeResponse,
+    MaintenanceModeState,
+)
 
 __all__ = [
     "APIResponse",
@@ -76,6 +81,9 @@ __all__ = [
     "StorageUrlModel",
     "StorageUsageMetrics",
     "StorageUseCase",
+    "EnableMaintenanceRequest",
+    "MaintenanceModeResponse",
+    "MaintenanceModeState",
     "UniProtEntryResponse",
     "ValidationResult",
     "VariantUpdate",

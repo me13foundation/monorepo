@@ -119,6 +119,8 @@ async def update_storage_configuration(
 ) -> StorageConfigurationModel:
     try:
         configuration = await service.update_configuration(configuration_id, request)
+    except PermissionError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:  # pragma: no cover
         _handle_not_found(exc)
         raise

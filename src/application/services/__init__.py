@@ -32,6 +32,7 @@ from .storage_configuration_service import (
     StorageConfigurationValidator,
     UpdateStorageConfigurationRequest,
 )
+from .system_status_service import SystemStatusService
 from .template_management_service import (
     CreateTemplateRequest,
     TemplateManagementService,
@@ -55,6 +56,7 @@ __all__ = [
     "SpaceDataDiscoveryService",
     "StorageConfigurationService",
     "StorageConfigurationValidator",
+    "SystemStatusService",
     "TemplateManagementService",
     "UpdateSourceRequest",
     "UpdateStorageConfigurationRequest",

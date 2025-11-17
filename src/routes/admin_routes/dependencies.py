@@ -28,6 +28,7 @@ from src.application.services.source_management_service import (
 from src.application.services.storage_configuration_service import (
     StorageConfigurationService,
 )
+from src.application.services.system_status_service import SystemStatusService
 from src.application.services.template_management_service import (
     TemplateManagementService,
 )
@@ -44,6 +45,7 @@ if TYPE_CHECKING:
     from src.infrastructure.repositories.ingestion_job_repository import (
         SqlAlchemyIngestionJobRepository,
     )
+from src.infrastructure.dependency_injection.container import container
 from src.infrastructure.repositories.source_template_repository import (
     SqlAlchemySourceTemplateRepository,
 )
@@ -64,6 +66,11 @@ _STORAGE_REGISTRY = initialize_storage_plugins()
 def get_db_session() -> Session:
     """Create a bare SQLAlchemy session for admin services."""
     return SessionLocal()
+
+
+def get_system_status_service() -> SystemStatusService:
+    """Return the singleton system status service."""
+    return container.get_system_status_service()
 
 
 def get_source_service() -> SourceManagementService:
@@ -136,10 +143,12 @@ def get_storage_configuration_service() -> (
     """Yield a storage configuration service scoped to a session."""
 
     session = get_db_session()
+    status_service = get_system_status_service()
     service = StorageConfigurationService(
         configuration_repository=SqlAlchemyStorageConfigurationRepository(session),
         operation_repository=SqlAlchemyStorageOperationRepository(session),
         plugin_registry=_STORAGE_REGISTRY,
+        system_status_service=status_service,
     )
     try:
         yield service
@@ -158,5 +167,6 @@ __all__ = [
     "get_ingestion_job_repository",
     "get_source_service",
     "get_storage_configuration_service",
+    "get_system_status_service",
     "get_template_service",
 ]

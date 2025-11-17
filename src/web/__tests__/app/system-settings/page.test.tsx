@@ -4,6 +4,7 @@ import SystemSettingsPage from '@/app/(dashboard)/system-settings/page'
 import { INITIAL_USER_PARAMS } from '@/app/(dashboard)/system-settings/constants'
 import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
 import { fetchStorageConfigurations } from '@/lib/api/storage'
+import { fetchMaintenanceState } from '@/lib/api/system-status'
 import { getServerSession } from 'next-auth'
 
 jest.mock('next-auth', () => ({
@@ -22,6 +23,9 @@ jest.mock('@/lib/api/users', () => ({
 }))
 jest.mock('@/lib/api/storage', () => ({
   fetchStorageConfigurations: jest.fn(),
+}))
+jest.mock('@/lib/api/system-status', () => ({
+  fetchMaintenanceState: jest.fn(),
 }))
 
 const ADMIN_SESSION = {
@@ -85,6 +89,7 @@ describe('SystemSettingsPage (server)', () => {
       recent_logins: 0,
     })
     ;(fetchStorageConfigurations as jest.Mock).mockResolvedValue([])
+    ;(fetchMaintenanceState as jest.Mock).mockResolvedValue({ state: { is_active: false } })
     redirectMock.mockImplementation(() => undefined)
 
     const result = (await SystemSettingsPage()) as ReactElement
@@ -93,6 +98,7 @@ describe('SystemSettingsPage (server)', () => {
     expect(fetchUsers).toHaveBeenCalledWith(INITIAL_USER_PARAMS, 'admin-token')
     expect(fetchUserStatistics).toHaveBeenCalledWith('admin-token')
     expect(fetchStorageConfigurations).toHaveBeenCalledWith('admin-token')
+    expect(fetchMaintenanceState).toHaveBeenCalledWith('admin-token')
     expect(result).toBeTruthy()
   })
 })

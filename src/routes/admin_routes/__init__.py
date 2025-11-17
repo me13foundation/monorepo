@@ -10,6 +10,7 @@ from .catalog import router as catalog_router
 from .data_sources import router as data_sources_router
 from .stats import stats_router
 from .storage import router as storage_router
+from .system_status import router as system_router
 from .templates import router as templates_router
 
 router = APIRouter(
@@ -27,5 +28,6 @@ router.include_router(data_sources_router)
 router.include_router(catalog_router)
 router.include_router(stats_router)
 router.include_router(storage_router)
+router.include_router(system_router)
 
 __all__ = ["router"]

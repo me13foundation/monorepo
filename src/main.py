@@ -10,6 +10,7 @@ from src.background.ingestion_scheduler import run_ingestion_scheduler_loop
 from src.database.seed import (
     ensure_default_research_space_seeded,
     ensure_source_catalog_seeded,
+    ensure_system_status_initialized,
 )
 from src.database.session import get_session
 from src.infrastructure.dependency_injection.container import container
@@ -18,6 +19,7 @@ from src.infrastructure.dependency_injection.dependencies import (
 )
 from src.middleware.auth import AuthMiddleware
 from src.middleware.jwt_auth import JWTAuthMiddleware
+from src.middleware.maintenance_mode import MaintenanceModeMiddleware
 from src.middleware.rate_limit import EndpointRateLimitMiddleware
 from src.routes.admin import router as admin_router
 from src.routes.auth import auth_router
@@ -66,6 +68,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             initialize_legacy_session(legacy_session)
             ensure_source_catalog_seeded(legacy_session)
             ensure_default_research_space_seeded(legacy_session)
+            ensure_system_status_initialized(legacy_session)
             legacy_session.commit()
             if not _scheduler_disabled():
                 scheduler_task = asyncio.create_task(
@@ -129,6 +132,7 @@ def create_app() -> FastAPI:
 
     # Add rate limiting middleware
     app.add_middleware(EndpointRateLimitMiddleware)
+    app.add_middleware(MaintenanceModeMiddleware)
 
     # Root endpoint
     @app.get("/", summary="Welcome to MED13 Resource Library", tags=["info"])

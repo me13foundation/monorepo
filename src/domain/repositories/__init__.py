@@ -17,6 +17,7 @@ from .storage_repository import (
     StorageConfigurationRepository,
     StorageOperationRepository,
 )
+from .system_status_repository import SystemStatusRepository
 
 # Data Sources module repositories
 from .user_data_source_repository import UserDataSourceRepository
@@ -33,6 +34,7 @@ __all__ = [
     "SourceTemplateRepository",
     "StorageConfigurationRepository",
     "StorageOperationRepository",
+    "SystemStatusRepository",
     "UserDataSourceRepository",
     "VariantRepository",
     "DataSourceActivationRepository",

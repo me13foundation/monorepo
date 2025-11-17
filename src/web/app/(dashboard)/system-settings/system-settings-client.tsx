@@ -44,6 +44,7 @@ import type {
   UserListResponse,
 } from '@/lib/api/users'
 import { DataSourceAvailabilitySection } from '@/components/system-settings/DataSourceAvailabilitySection'
+import { MaintenanceModePanel } from '@/components/system-settings/MaintenanceModePanel'
 import { SpaceSourcePermissionsManager } from '@/components/system-settings/SpaceSourcePermissionsManager'
 import { StorageConfigurationManager } from '@/components/system-settings/StorageConfigurationManager'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -238,6 +239,7 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="permissions">Source Permissions</TabsTrigger>
           <TabsTrigger value="storage">Storage</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -467,6 +469,9 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
         </TabsContent>
         <TabsContent value="storage" className="space-y-6">
           <StorageConfigurationManager />
+        </TabsContent>
+        <TabsContent value="maintenance" className="space-y-6">
+          <MaintenanceModePanel />
         </TabsContent>
       </Tabs>
     </div>

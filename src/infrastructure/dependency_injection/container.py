@@ -42,8 +42,13 @@ from src.application.services.source_management_service import SourceManagementS
 from src.application.services.storage_configuration_service import (
     StorageConfigurationService,
 )
+from src.application.services.system_status_service import (
+    SessionRevocationContext,
+    SystemStatusService,
+)
 from src.application.services.user_management_service import UserManagementService
 from src.application.services.variant_service import VariantApplicationService
+from src.database.session import SessionLocal
 from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
 from src.database.url_resolver import resolve_async_database_url
 from src.domain.services.evidence_domain_service import EvidenceDomainService
@@ -80,6 +85,9 @@ from src.infrastructure.repositories.sqlalchemy_user_repository import (
 from src.infrastructure.repositories.storage_repository import (
     SqlAlchemyStorageConfigurationRepository,
     SqlAlchemyStorageOperationRepository,
+)
+from src.infrastructure.repositories.system_status_repository import (
+    SqlAlchemySystemStatusRepository,
 )
 from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
@@ -175,6 +183,8 @@ class DependencyContainer:
         self._variant_domain_service: VariantDomainService | None = None
         self._evidence_domain_service: EvidenceDomainService | None = None
         self._storage_plugin_registry = initialize_storage_plugins()
+        self._system_status_repository: SqlAlchemySystemStatusRepository | None = None
+        self._system_status_service: SystemStatusService | None = None
 
     def get_user_repository(self) -> SqlAlchemyUserRepository:
         if self._user_repository is None:
@@ -187,6 +197,23 @@ class DependencyContainer:
                 self.async_session_factory,
             )
         return self._session_repository
+
+    def get_system_status_repository(self) -> SqlAlchemySystemStatusRepository:
+        if self._system_status_repository is None:
+            self._system_status_repository = SqlAlchemySystemStatusRepository(
+                SessionLocal,
+            )
+        return self._system_status_repository
+
+    def get_system_status_service(self) -> SystemStatusService:
+        if self._system_status_service is None:
+            repository = self.get_system_status_repository()
+            session_revoker = SessionRevocationContext(SessionLocal)
+            self._system_status_service = SystemStatusService(
+                repository=repository,
+                session_revoker=session_revoker,
+            )
+        return self._system_status_service
 
     async def get_authentication_service(self) -> AuthenticationService:
         current_loop = asyncio.get_running_loop()

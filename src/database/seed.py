@@ -11,6 +11,9 @@ from uuid import UUID
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
+    from sqlalchemy.sql.schema import Table as SQLATable
+else:
+    SQLATable = object
 
 from src.database.seed_data import SOURCE_CATALOG_ENTRIES
 from src.domain.entities.user import UserRole, UserStatus
@@ -22,9 +25,12 @@ from src.models.database.research_space import (
     ResearchSpaceModel,
     SpaceStatusEnum,
 )
+from src.models.database.system_status import SystemStatusModel
 from src.models.database.user import UserModel
+from src.type_definitions.system_status import MaintenanceModeState
 
 logger = logging.getLogger(__name__)
+SYSTEM_STATUS_TABLE: SQLATable = SystemStatusModel.__table__  # type: ignore[assignment]
 
 SYSTEM_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
 SYSTEM_USER_ID_STR = str(SYSTEM_USER_ID)
@@ -173,3 +179,19 @@ def ensure_source_catalog_seeded(session: Session) -> None:
         inserted,
         updated,
     )
+
+
+def ensure_system_status_initialized(session: Session) -> None:
+    """Ensure maintenance mode state table & record exist."""
+    bind = session.get_bind()
+    if bind is not None:
+        SYSTEM_STATUS_TABLE.create(bind=bind, checkfirst=True)
+    record = session.get(SystemStatusModel, "maintenance_mode")
+    if record is None:
+        session.add(
+            SystemStatusModel(
+                key="maintenance_mode",
+                value=MaintenanceModeState().model_dump(mode="json"),
+            ),
+        )
+        session.commit()

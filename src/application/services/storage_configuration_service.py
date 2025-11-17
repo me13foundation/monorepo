@@ -43,6 +43,7 @@ from src.type_definitions.storage import (
 )
 
 if TYPE_CHECKING:
+    from src.application.services.system_status_service import SystemStatusService
     from src.domain.repositories.storage_repository import (
         StorageConfigurationRepository,
         StorageOperationRepository,
@@ -106,11 +107,13 @@ class StorageConfigurationService:
         operation_repository: StorageOperationRepository,
         plugin_registry: StoragePluginRegistry | None = None,
         validator: StorageConfigurationValidator | None = None,
+        system_status_service: SystemStatusService | None = None,
     ):
         self._configuration_repository = configuration_repository
         self._operation_repository = operation_repository
         self._plugin_registry = plugin_registry or default_storage_registry
         self._validator = validator or StorageConfigurationValidator()
+        self._system_status_service = system_status_service
 
     async def create_configuration(
         self,
@@ -154,6 +157,10 @@ class StorageConfigurationService:
         """Update an existing configuration."""
 
         current = self._require_configuration(configuration_id)
+        requires_maintenance = request.config is not None
+        if requires_maintenance:
+            await self._require_maintenance_mode()
+
         updated_config_model = request.config or current.config
         plugin = self._require_plugin(current.provider)
         validated_config = await plugin.validate_config(updated_config_model)
@@ -352,3 +359,9 @@ class StorageConfigurationService:
             msg = f"Storage configuration {configuration_id} not found"
             raise ValueError(msg)
         return configuration
+
+    async def _require_maintenance_mode(self) -> None:
+        """Ensure maintenance mode is active when a risky operation is requested."""
+        if self._system_status_service is None:
+            return
+        await self._system_status_service.require_active()
