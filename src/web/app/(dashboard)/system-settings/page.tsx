@@ -4,7 +4,7 @@ import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query
 import { authOptions } from '@/lib/auth'
 import SystemSettingsClient from './system-settings-client'
 import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
-import { fetchStorageConfigurations } from '@/lib/api/storage'
+import { fetchStorageConfigurations, fetchStorageOverview } from '@/lib/api/storage'
 import { fetchMaintenanceState } from '@/lib/api/system-status'
 import { userKeys } from '@/lib/query-keys/users'
 import { storageKeys } from '@/lib/query-keys/storage'
@@ -38,8 +38,16 @@ export default async function SystemSettingsPage() {
       queryFn: () => fetchUserStatistics(token),
     }),
     queryClient.prefetchQuery({
-      queryKey: storageKeys.list(token),
-      queryFn: () => fetchStorageConfigurations(token),
+      queryKey: storageKeys.list(token, 1, 100, true),
+      queryFn: () =>
+        fetchStorageConfigurations(
+          { page: 1, per_page: 100, include_disabled: true },
+          token,
+        ),
+    }),
+    queryClient.prefetchQuery({
+      queryKey: storageKeys.stats(token),
+      queryFn: () => fetchStorageOverview(token),
     }),
     queryClient.prefetchQuery({
       queryKey: ['system-status', 'maintenance', token] as const,

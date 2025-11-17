@@ -29,9 +29,9 @@ from .space_data_discovery_service import SpaceDataDiscoveryService
 from .storage_configuration_service import (
     CreateStorageConfigurationRequest,
     StorageConfigurationService,
-    StorageConfigurationValidator,
     UpdateStorageConfigurationRequest,
 )
+from .storage_configuration_validator import StorageConfigurationValidator
 from .system_status_service import SystemStatusService
 from .template_management_service import (
     CreateTemplateRequest,

@@ -230,16 +230,55 @@ class SignedUrlRequest(BaseModel):
     expires_in: timedelta = Field(default=timedelta(hours=1))
 
 
+class StorageConfigurationStats(BaseModel):
+    """Aggregated metrics for a storage configuration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    configuration: StorageConfigurationModel
+    usage: StorageUsageMetrics | None = None
+    health: StorageHealthReport | None = None
+
+
+class StorageOverviewTotals(BaseModel):
+    """Totals for the storage platform overview."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    total_configurations: int
+    enabled_configurations: int
+    disabled_configurations: int
+    healthy_configurations: int
+    degraded_configurations: int
+    offline_configurations: int
+    total_files: int
+    total_size_bytes: int
+    average_error_rate: float | None = None
+
+
+class StorageOverviewResponse(BaseModel):
+    """Overview response returned to the UI."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    generated_at: datetime
+    totals: StorageOverviewTotals
+    configurations: list[StorageConfigurationStats]
+
+
 __all__ = [
     "GoogleCloudStorageConfig",
     "LocalFilesystemConfig",
     "SignedUrlRequest",
     "StorageConfigurationModel",
+    "StorageConfigurationStats",
     "StorageHealthReport",
     "StorageHealthStatus",
     "StorageOperationRecord",
     "StorageOperationStatus",
     "StorageOperationType",
+    "StorageOverviewResponse",
+    "StorageOverviewTotals",
     "StorageProviderCapability",
     "StorageProviderConfig",
     "StorageProviderConfigModel",

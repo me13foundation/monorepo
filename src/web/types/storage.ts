@@ -88,3 +88,34 @@ export interface CreateStorageConfigurationRequest {
 export type UpdateStorageConfigurationRequest = Partial<
   Omit<CreateStorageConfigurationRequest, 'provider'>
 >
+
+export interface StorageConfigurationListResponse {
+  data: StorageConfiguration[]
+  total: number
+  page: number
+  per_page: number
+}
+
+export interface StorageConfigurationStats {
+  configuration: StorageConfiguration
+  usage: StorageUsageMetrics | null
+  health: StorageHealthReport | null
+}
+
+export interface StorageOverviewTotals {
+  total_configurations: number
+  enabled_configurations: number
+  disabled_configurations: number
+  healthy_configurations: number
+  degraded_configurations: number
+  offline_configurations: number
+  total_files: number
+  total_size_bytes: number
+  average_error_rate: number | null
+}
+
+export interface StorageOverviewResponse {
+  generated_at: string
+  totals: StorageOverviewTotals
+  configurations: StorageConfigurationStats[]
+}

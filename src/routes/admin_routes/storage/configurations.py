@@ -8,6 +8,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel
 
 from src.application.services.storage_configuration_service import (
     CreateStorageConfigurationRequest,
@@ -20,11 +21,21 @@ from src.type_definitions.storage import (
     StorageConfigurationModel,
     StorageHealthReport,
     StorageOperationRecord,
+    StorageOverviewResponse,
     StorageProviderTestResult,
     StorageUsageMetrics,
 )
 
 router = APIRouter(prefix="/storage", tags=["storage"])
+
+
+class StorageConfigurationListResponse(BaseModel):
+    """API response envelope for storage configuration listings."""
+
+    data: list[StorageConfigurationModel]
+    total: int
+    page: int
+    per_page: int
 
 
 def _serialize_configuration(
@@ -50,7 +61,7 @@ def _handle_not_found(exc: ValueError) -> None:
 
 @router.get(
     "/configurations",
-    response_model=list[StorageConfigurationModel],
+    response_model=StorageConfigurationListResponse,
     summary="List storage configurations",
 )
 async def list_storage_configurations(
@@ -59,13 +70,29 @@ async def list_storage_configurations(
         bool,
         Query(description="Include disabled configurations"),
     ] = False,
+    page: Annotated[int, Query(ge=1, description="Page number")] = 1,
+    per_page: Annotated[int, Query(ge=1, le=100, description="Items per page")] = 25,
     service: Annotated[
         StorageConfigurationService,
         Depends(get_storage_configuration_service),
     ],
-) -> list[StorageConfigurationModel]:
-    configurations = service.list_configurations(include_disabled=include_disabled)
-    return [_serialize_configuration(configuration) for configuration in configurations]
+) -> StorageConfigurationListResponse:
+    configurations = [
+        _serialize_configuration(configuration)
+        for configuration in service.list_configurations(
+            include_disabled=include_disabled,
+        )
+    ]
+    total = len(configurations)
+    start = (page - 1) * per_page
+    end = start + per_page
+    sliced = configurations[start:end]
+    return StorageConfigurationListResponse(
+        data=sliced,
+        total=total,
+        page=page,
+        per_page=per_page,
+    )
 
 
 @router.get(
@@ -125,6 +152,34 @@ async def update_storage_configuration(
         _handle_not_found(exc)
         raise
     return _serialize_configuration(configuration)
+
+
+@router.delete(
+    "/configurations/{configuration_id}",
+    status_code=status.HTTP_202_ACCEPTED,
+    summary="Delete or disable storage configuration",
+)
+async def delete_storage_configuration(
+    configuration_id: UUID,
+    service: Annotated[
+        StorageConfigurationService,
+        Depends(get_storage_configuration_service),
+    ],
+    *,
+    force: Annotated[
+        bool,
+        Query(
+            description="Permanently delete configuration instead of disabling it",
+        ),
+    ] = False,
+) -> dict[str, str]:
+    try:
+        deleted = service.delete_configuration(configuration_id, force=force)
+    except ValueError as exc:  # pragma: no cover
+        _handle_not_found(exc)
+        raise
+    action = "deleted" if force and deleted else "disabled"
+    return {"message": f"Storage configuration {action}"}
 
 
 @router.post(
@@ -203,3 +258,17 @@ async def list_storage_operations(
     except ValueError as exc:  # pragma: no cover
         _handle_not_found(exc)
         raise
+
+
+@router.get(
+    "/stats",
+    response_model=StorageOverviewResponse,
+    summary="Get storage platform overview",
+)
+async def get_storage_overview(
+    service: Annotated[
+        StorageConfigurationService,
+        Depends(get_storage_configuration_service),
+    ],
+) -> StorageOverviewResponse:
+    return service.get_overview()

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -37,17 +37,29 @@ import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { AlertCircle, HardDrive, Loader2, ShieldCheck, TestTube } from 'lucide-react'
+import {
+  AlertCircle,
+  BarChart3,
+  HardDrive,
+  Loader2,
+  ShieldCheck,
+  TestTube,
+  Trash2,
+  TrendingUp,
+} from 'lucide-react'
 import {
   useStorageConfigurations,
   useStorageHealth,
   useStorageMetrics,
   useStorageMutations,
+  useStorageOverview,
 } from '@/lib/queries/storage'
 import { useMaintenanceState } from '@/lib/queries/system-status'
 import type {
   CreateStorageConfigurationRequest,
   StorageConfiguration,
+  StorageConfigurationStats,
+  StorageOverviewResponse,
   StorageProviderConfig,
   StorageUseCase,
 } from '@/types/storage'
@@ -103,6 +115,14 @@ const useCaseLabels: Record<StorageUseCase, string> = {
   backup: 'Backups',
 }
 
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+  const value = bytes / 1024 ** exponent
+  return `${value.toFixed(1)} ${units[exponent]}`
+}
+
 interface StorageConfigurationCardProps {
   configuration: StorageConfiguration
   isToggling: boolean
@@ -113,6 +133,10 @@ interface StorageConfigurationCardProps {
   ) => Promise<void>
   onTestConnection: (configuration: StorageConfiguration) => Promise<void>
   isTesting: boolean
+  isSelected: boolean
+  onSelectionChange: (configurationId: string, selected: boolean) => void
+  onDelete: (configuration: StorageConfiguration, hasUsage: boolean) => Promise<void>
+  isDeleting: boolean
 }
 
 function StorageConfigurationCard({
@@ -121,18 +145,26 @@ function StorageConfigurationCard({
   isToggling,
   onTestConnection,
   isTesting,
+  isSelected,
+  onSelectionChange,
+  onDelete,
+  isDeleting,
 }: StorageConfigurationCardProps) {
   const metricsQuery = useStorageMetrics(configuration.id)
   const healthQuery = useStorageHealth(configuration.id)
+  const totalFiles = metricsQuery.data?.total_files ?? 0
 
   const handleToggle = async (checked: boolean) => {
-    const hasUsage = (metricsQuery.data?.total_files ?? 0) > 0
-    await onToggleEnabled(configuration, checked, hasUsage)
+    await onToggleEnabled(configuration, checked, totalFiles > 0)
+  }
+
+  const handleDelete = async () => {
+    await onDelete(configuration, totalFiles > 0)
   }
 
   return (
     <Card key={configuration.id}>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
+      <CardHeader className="flex flex-col gap-4 border-b border-border/50 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
             <HardDrive className="size-4 text-muted-foreground" />
@@ -140,7 +172,15 @@ function StorageConfigurationCard({
           </CardTitle>
           <CardDescription>{providerLabels[configuration.provider]}</CardDescription>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={isSelected ? 'default' : 'outline'}
+            onClick={() => onSelectionChange(configuration.id, !isSelected)}
+          >
+            {isSelected ? 'Selected' : 'Select'}
+          </Button>
           <Switch
             checked={configuration.enabled}
             onCheckedChange={handleToggle}
@@ -177,17 +217,19 @@ function StorageConfigurationCard({
           <div>
             <p className="text-xs text-muted-foreground">Health</p>
             <p className="flex items-center gap-2 font-medium">
-              <ShieldCheck className={cn('size-4', {
-                'text-emerald-500': healthQuery.data?.status === 'healthy',
-                'text-amber-500': healthQuery.data?.status === 'degraded',
-                'text-destructive': healthQuery.data?.status === 'offline',
-              })} />
+              <ShieldCheck
+                className={cn('size-4', {
+                  'text-emerald-500': healthQuery.data?.status === 'healthy',
+                  'text-amber-500': healthQuery.data?.status === 'degraded',
+                  'text-destructive': healthQuery.data?.status === 'offline',
+                })}
+              />
               {healthQuery.data?.status ?? 'Unknown'}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Files Managed</p>
-            <p className="font-medium">{metricsQuery.data?.total_files ?? 0}</p>
+            <p className="font-medium">{totalFiles}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Error Rate</p>
@@ -199,7 +241,7 @@ function StorageConfigurationCard({
           </div>
         </div>
       </CardContent>
-      <CardFooter className="justify-end gap-3">
+      <CardFooter className="flex flex-wrap justify-end gap-3 border-t border-border/50 pt-4">
         <Button
           variant="outline"
           onClick={() => onTestConnection(configuration)}
@@ -217,7 +259,162 @@ function StorageConfigurationCard({
             </>
           )}
         </Button>
+        <Button
+          variant="destructive"
+          onClick={handleDelete}
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Removing...
+            </>
+          ) : (
+            <>
+              <Trash2 className="mr-2 size-4" />
+              Delete
+            </>
+          )}
+        </Button>
       </CardFooter>
+    </Card>
+  )
+}
+
+function StorageOverviewSection({ overview }: { overview: StorageOverviewResponse }) {
+  const topConfigurations = useMemo(() => {
+    return overview.configurations
+      .slice()
+      .sort((a, b) => (b.usage?.total_files ?? 0) - (a.usage?.total_files ?? 0))
+      .slice(0, 3)
+  }, [overview.configurations])
+
+  const avgFilesPerConfig = overview.totals.enabled_configurations
+    ? Math.round(overview.totals.total_files / overview.totals.enabled_configurations)
+    : 0
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <BarChart3 className="size-4 text-muted-foreground" />
+          Storage Platform Overview
+        </CardTitle>
+        <CardDescription>
+          Updated {new Date(overview.generated_at).toLocaleTimeString()} – capacity forecasting and
+          recent usage trends.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Enabled configurations</p>
+            <p className="text-2xl font-semibold">
+              {overview.totals.enabled_configurations} / {overview.totals.total_configurations}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Files managed</p>
+            <p className="text-2xl font-semibold">{overview.totals.total_files.toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Storage consumed</p>
+            <p className="text-2xl font-semibold">
+              {formatBytes(overview.totals.total_size_bytes)}
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card className="border-dashed bg-muted/40">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <TrendingUp className="size-4 text-muted-foreground" />
+                Capacity planning
+              </CardTitle>
+              <CardDescription>
+                Average of {avgFilesPerConfig.toLocaleString()} files per active configuration.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Healthy: {overview.totals.healthy_configurations} • Degraded: {overview.totals.degraded_configurations} •
+                Offline: {overview.totals.offline_configurations}
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-dashed">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="size-4 text-muted-foreground" />
+                Top configurations
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {topConfigurations.map((entry) => (
+                <div key={entry.configuration.id} className="flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium">{entry.configuration.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {entry.usage?.total_files.toLocaleString() ?? 0} files •{' '}
+                      {entry.health?.status ?? 'unknown'}
+                    </p>
+                  </div>
+                  <span className="text-xs font-semibold">
+                    {formatBytes(entry.usage?.total_size_bytes ?? 0)}
+                  </span>
+                </div>
+              ))}
+              {topConfigurations.length === 0 && (
+                <p className="text-sm text-muted-foreground">No usage data yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function BulkActionBar({
+  count,
+  onClear,
+  onEnable,
+  onDisable,
+  onDelete,
+  isProcessing,
+}: {
+  count: number
+  onClear: () => void
+  onEnable: () => void
+  onDisable: () => void
+  onDelete: () => void
+  isProcessing: boolean
+}) {
+  if (count === 0) {
+    return null
+  }
+
+  return (
+    <Card className="border-dashed">
+      <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+        <div className="text-sm font-medium">
+          {count} configuration{count === 1 ? '' : 's'} selected
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" size="sm" onClick={onEnable} disabled={isProcessing}>
+            Enable
+          </Button>
+          <Button variant="outline" size="sm" onClick={onDisable} disabled={isProcessing}>
+            Disable
+          </Button>
+          <Button variant="destructive" size="sm" onClick={onDelete} disabled={isProcessing}>
+            Delete
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onClear}>
+            Clear
+          </Button>
+        </div>
+      </CardContent>
     </Card>
   )
 }
@@ -226,7 +423,11 @@ export function StorageConfigurationManager() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null)
   const storageQuery = useStorageConfigurations()
+  const overviewQuery = useStorageOverview()
   const storageMutations = useStorageMutations()
   const maintenanceQuery = useMaintenanceState()
   const isMaintenanceActive = maintenanceQuery.data?.state.is_active ?? false
@@ -238,7 +439,7 @@ export function StorageConfigurationManager() {
     defaultValues: {
       provider: 'local_filesystem',
       name: '',
-      base_path: '/var/med13/storage',
+      base_path: DEFAULT_LOCAL_BASE_PATH,
       create_directories: true,
       expose_file_urls: false,
       default_use_cases: ['pdf'],
@@ -247,6 +448,27 @@ export function StorageConfigurationManager() {
   })
 
   const selectedProvider = form.watch('provider')
+  const configurations = useMemo(
+    () => storageQuery.data?.data ?? [],
+    [storageQuery.data?.data],
+  )
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const overviewMap = useMemo(() => {
+    const map = new Map<string, StorageConfigurationStats>()
+    overviewQuery.data?.configurations.forEach((entry) => {
+      map.set(entry.configuration.id, entry)
+    })
+    return map
+  }, [overviewQuery.data])
+
+  useEffect(() => {
+    if (!configurations.length && selectedIds.length) {
+      setSelectedIds([])
+    } else {
+      const configurationIds = new Set(configurations.map((item) => item.id))
+      setSelectedIds((current) => current.filter((id) => configurationIds.has(id)))
+    }
+  }, [configurations, selectedIds.length])
 
   const submitConfiguration = async (values: StorageFormValues) => {
     const payload = convertFormToPayload(values)
@@ -261,40 +483,26 @@ export function StorageConfigurationManager() {
     }
   }
 
-  const handleCreate = async (values: StorageFormValues) => {
-    const hasEnabledConfig = (storageQuery.data ?? []).some((config) => config.enabled)
-    const providerChanged = values.provider !== 'local_filesystem'
-    const basePathChanged =
-      (values.provider === 'local_filesystem' && values.base_path !== DEFAULT_LOCAL_BASE_PATH) ||
-      (values.provider === 'google_cloud_storage' && values.base_path !== DEFAULT_GCS_BASE_PATH)
-
-    if (
-      !isMaintenanceActive &&
-      hasEnabledConfig &&
-      (providerChanged || basePathChanged)
-    ) {
-      setPendingCreate(values)
-      setMaintenanceModalOpen(true)
-      return
+  const requireMaintenance = (): boolean => {
+    if (maintenanceQuery.isLoading) {
+      toast.error('Maintenance status is still loading. Please try again.')
+      return true
     }
-
-    await submitConfiguration(values)
+    return false
   }
 
-  const handleToggleEnabled = async (
+  const updateConfigurationEnabled = async (
     configuration: StorageConfiguration,
     enabled: boolean,
     hasUsage: boolean,
   ) => {
-    if (maintenanceQuery.isLoading) {
-      toast.error('Maintenance status is still loading. Please try again.')
+    if (requireMaintenance()) {
       return
     }
     if (hasUsage && !isMaintenanceActive) {
       toast.error('Enable maintenance mode before changing a storage backend in use.')
       return
     }
-
     setTogglingId(configuration.id)
     try {
       await storageMutations.updateConfiguration.mutateAsync({
@@ -308,6 +516,22 @@ export function StorageConfigurationManager() {
     } finally {
       setTogglingId(null)
     }
+  }
+
+  const handleCreate = async (values: StorageFormValues) => {
+    const hasEnabledConfig = configurations.some((config) => config.enabled)
+    const providerChanged = values.provider !== 'local_filesystem'
+    const basePathChanged =
+      (values.provider === 'local_filesystem' && values.base_path !== DEFAULT_LOCAL_BASE_PATH) ||
+      (values.provider === 'google_cloud_storage' && values.base_path !== DEFAULT_GCS_BASE_PATH)
+
+    if (!isMaintenanceActive && hasEnabledConfig && (providerChanged || basePathChanged)) {
+      setPendingCreate(values)
+      setMaintenanceModalOpen(true)
+      return
+    }
+
+    await submitConfiguration(values)
   }
 
   const handleTestConnection = async (configuration: StorageConfiguration) => {
@@ -329,8 +553,67 @@ export function StorageConfigurationManager() {
     }
   }
 
-  const configurations = storageQuery.data ?? []
-  const hasConfigurations = configurations.length > 0
+  const handleDeleteConfiguration = async (
+    configuration: StorageConfiguration,
+    hasUsage: boolean,
+    force = false,
+  ) => {
+    if (requireMaintenance()) {
+      return
+    }
+    if (hasUsage && !isMaintenanceActive && !force) {
+      toast.error('Enable maintenance mode before deleting a storage backend in use.')
+      return
+    }
+    setDeletingId(configuration.id)
+    try {
+      await storageMutations.deleteConfiguration.mutateAsync({
+        configurationId: configuration.id,
+        force,
+      })
+      toast.success(force ? 'Configuration deleted' : 'Configuration disabled')
+    } catch (error) {
+      console.error('[StorageConfigurationManager] Failed to delete configuration', error)
+      toast.error('Unable to delete configuration')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  const handleBulkToggle = async (enabled: boolean) => {
+    setBulkAction(enabled ? 'enable' : 'disable')
+    try {
+      for (const configurationId of selectedIds) {
+        const configuration = configurations.find((item) => item.id === configurationId)
+        if (!configuration) {
+          continue
+        }
+        const usage = overviewMap.get(configuration.id)?.usage?.total_files ?? 0
+        await updateConfigurationEnabled(configuration, enabled, usage > 0)
+      }
+      toast.success(`Updated ${selectedIds.length} configuration${selectedIds.length === 1 ? '' : 's'}`)
+      setSelectedIds([])
+    } finally {
+      setBulkAction(null)
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkAction('delete')
+    try {
+      for (const configurationId of selectedIds) {
+        const configuration = configurations.find((item) => item.id === configurationId)
+        if (!configuration) {
+          continue
+        }
+        const usage = overviewMap.get(configuration.id)?.usage?.total_files ?? 0
+        await handleDeleteConfiguration(configuration, usage > 0)
+      }
+      setSelectedIds([])
+    } finally {
+      setBulkAction(null)
+    }
+  }
 
   const handleMaintenanceConfirm = async () => {
     if (!pendingCreate) {
@@ -342,34 +625,49 @@ export function StorageConfigurationManager() {
     setMaintenanceModalOpen(false)
   }
 
+  const hasConfigurations = configurations.length > 0
+
   return (
     <section className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Storage Configuration</h2>
+          <h2 className="text-lg font-semibold">Storage Platform</h2>
           <p className="text-sm text-muted-foreground">
             Manage where PDFs, exports, and raw source files are stored.
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          Add Configuration
-        </Button>
+        <Button onClick={() => setDialogOpen(true)}>Add Configuration</Button>
       </div>
+
+      {overviewQuery.isLoading ? (
+        <Skeleton className="h-48 w-full" />
+      ) : overviewQuery.data ? (
+        <StorageOverviewSection overview={overviewQuery.data} />
+      ) : null}
+
       {storageQuery.isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
         </div>
       ) : hasConfigurations ? (
-        <div className="grid gap-4">
+        <div className="space-y-4">
           {configurations.map((configuration) => (
             <StorageConfigurationCard
               key={configuration.id}
               configuration={configuration}
-              onToggleEnabled={handleToggleEnabled}
+              onToggleEnabled={updateConfigurationEnabled}
               onTestConnection={handleTestConnection}
               isTesting={testingId === configuration.id && storageMutations.testConfiguration.isPending}
               isToggling={togglingId === configuration.id && storageMutations.updateConfiguration.isPending}
+              isSelected={selectedSet.has(configuration.id)}
+              onSelectionChange={(id, selected) => {
+                setSelectedIds((current) =>
+                  selected ? [...new Set([...current, id])] : current.filter((item) => item !== id),
+                )
+              }}
+              onDelete={handleDeleteConfiguration}
+              isDeleting={deletingId === configuration.id && storageMutations.deleteConfiguration.isPending}
             />
           ))}
         </div>
@@ -381,6 +679,15 @@ export function StorageConfigurationManager() {
           </CardContent>
         </Card>
       )}
+
+      <BulkActionBar
+        count={selectedIds.length}
+        onClear={() => setSelectedIds([])}
+        onEnable={() => handleBulkToggle(true)}
+        onDisable={() => handleBulkToggle(false)}
+        onDelete={handleBulkDelete}
+        isProcessing={bulkAction !== null}
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-2xl">
@@ -513,107 +820,81 @@ export function StorageConfigurationManager() {
                     />
                     <FormField
                       control={form.control}
-                      name="signed_url_ttl_seconds"
+                      name="credentials_secret_name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Signed URL TTL (seconds)</FormLabel>
+                          <FormLabel>Credentials Secret</FormLabel>
                           <FormControl>
-                            <Input type="number" min={60} max={86400} {...field} />
+                            <Input placeholder="projects/.../secrets/med13" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
                   </div>
-                  <FormField
-                    control={form.control}
-                    name="credentials_secret_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Credential JSON Path</FormLabel>
-                        <FormControl>
-                          <Input placeholder="/secrets/gcs.json" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="public_read"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center justify-between rounded-md border p-3">
-                        <div>
-                          <FormLabel>Public file access</FormLabel>
-                          <FormDescription>Expose public URLs for stored files.</FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="public_read"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-md border p-3">
+                          <div>
+                            <FormLabel>Public Read</FormLabel>
+                            <FormDescription>Allow unsigned public downloads.</FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="signed_url_ttl_seconds"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Signed URL TTL (seconds)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               )}
+
+              <Separator />
 
               <FormField
                 control={form.control}
                 name="default_use_cases"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Use Cases</FormLabel>
-                    <div className="grid gap-2">
+                    <FormLabel>Default Use Cases</FormLabel>
+                    <div className="flex flex-wrap gap-2">
                       {STORAGE_USE_CASES.map((useCase) => {
-                        const checked = field.value?.includes(useCase)
+                        const selected = field.value.includes(useCase)
                         return (
-                          <label
+                          <Button
                             key={useCase}
-                            className="flex cursor-pointer items-center justify-between rounded-md border p-3 text-sm"
+                            type="button"
+                            size="sm"
+                            variant={selected ? 'default' : 'outline'}
+                            onClick={() => {
+                              const next = selected
+                                ? field.value.filter((item) => item !== useCase)
+                                : [...field.value, useCase]
+                              field.onChange(next)
+                            }}
                           >
-                            <div className="space-y-1 pr-4">
-                              <p className="font-medium">{useCaseLabels[useCase]}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {useCase === 'pdf' && 'PubMed PDF archive and metadata'}
-                                {useCase === 'export' && 'CSV/JSON exports from admin workflows'}
-                                {useCase === 'raw_source' && 'Raw ingestion payloads'}
-                                {useCase === 'backup' && 'Fallback backups for redundancy'}
-                              </p>
-                            </div>
-                            <Switch
-                              checked={checked}
-                              onCheckedChange={(next) => {
-                                if (next) {
-                                  field.onChange([...(field.value ?? []), useCase])
-                                } else {
-                                  field.onChange(
-                                    field.value?.filter((item) => item !== useCase) ?? [],
-                                  )
-                                }
-                              }}
-                            />
-                          </label>
+                            {useCaseLabels[useCase]}
+                          </Button>
                         )
                       })}
                     </div>
                     <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="enabled"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-md border p-3">
-                    <div>
-                      <FormLabel>Enable immediately</FormLabel>
-                      <FormDescription>
-                        Enabled configurations can be assigned to workflows.
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
                   </FormItem>
                 )}
               />

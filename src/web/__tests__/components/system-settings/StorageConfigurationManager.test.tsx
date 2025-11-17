@@ -6,6 +6,7 @@ const mockUseStorageConfigurations = jest.fn()
 const mockUseStorageMutations = jest.fn()
 const mockUseStorageMetrics = jest.fn()
 const mockUseStorageHealth = jest.fn()
+const mockUseStorageOverview = jest.fn()
 const mockUseMaintenanceState = jest.fn()
 
 let createMutation: { mutateAsync: jest.Mock; isPending: boolean }
@@ -24,6 +25,7 @@ jest.mock('@/lib/queries/storage', () => ({
   useStorageMutations: () => mockUseStorageMutations(),
   useStorageMetrics: (id: string) => mockUseStorageMetrics(id),
   useStorageHealth: (id: string) => mockUseStorageHealth(id),
+  useStorageOverview: () => mockUseStorageOverview(),
 }))
 
 jest.mock('@/lib/queries/system-status', () => ({
@@ -37,16 +39,40 @@ describe('StorageConfigurationManager', () => {
     updateMutation = { mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }
     testMutation = { mutateAsync: jest.fn().mockResolvedValue({ success: true }), isPending: false }
     mockUseStorageConfigurations.mockReturnValue({
-      data: [],
+      data: {
+        data: [],
+        total: 0,
+        page: 1,
+        per_page: 100,
+      },
       isLoading: false,
     })
     mockUseStorageMutations.mockReturnValue({
       createConfiguration: createMutation,
       updateConfiguration: updateMutation,
       testConfiguration: testMutation,
+      deleteConfiguration: { mutateAsync: jest.fn(), isPending: false },
     })
     mockUseStorageMetrics.mockReturnValue({ data: null })
     mockUseStorageHealth.mockReturnValue({ data: null })
+    mockUseStorageOverview.mockReturnValue({
+      data: {
+        generated_at: new Date().toISOString(),
+        totals: {
+          total_configurations: 0,
+          enabled_configurations: 0,
+          disabled_configurations: 0,
+          healthy_configurations: 0,
+          degraded_configurations: 0,
+          offline_configurations: 0,
+          total_files: 0,
+          total_size_bytes: 0,
+          average_error_rate: 0,
+        },
+        configurations: [],
+      },
+      isLoading: false,
+    })
     mockUseMaintenanceState.mockReturnValue({
       data: { state: { is_active: true } },
       isLoading: false,
@@ -88,25 +114,30 @@ describe('StorageConfigurationManager', () => {
   it('tests an existing configuration connection', async () => {
     const user = userEvent.setup()
     mockUseStorageConfigurations.mockReturnValue({
-      data: [
-        {
-          id: 'cfg-1',
-          name: 'Primary Storage',
-          provider: 'local_filesystem',
-          config: {
+      data: {
+        data: [
+          {
+            id: 'cfg-1',
+            name: 'Primary Storage',
             provider: 'local_filesystem',
-            base_path: '/var/lib/med13',
-            create_directories: true,
-            expose_file_urls: false,
+            config: {
+              provider: 'local_filesystem',
+              base_path: '/var/lib/med13',
+              create_directories: true,
+              expose_file_urls: false,
+            },
+            enabled: true,
+            supported_capabilities: ['pdf', 'export'],
+            default_use_cases: ['pdf'],
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           },
-          enabled: true,
-          supported_capabilities: ['pdf', 'export'],
-          default_use_cases: ['pdf'],
-          metadata: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ],
+        ],
+        total: 1,
+        page: 1,
+        per_page: 100,
+      },
       isLoading: false,
     })
     mockUseStorageMetrics.mockReturnValue({
@@ -142,20 +173,25 @@ describe('StorageConfigurationManager', () => {
       isLoading: false,
     })
     mockUseStorageConfigurations.mockReturnValue({
-      data: [
-        {
-          id: 'cfg-1',
-          name: 'Primary Storage',
-          provider: 'local_filesystem',
-          config: { provider: 'local_filesystem', base_path: '/tmp', create_directories: true, expose_file_urls: false },
-          enabled: true,
-          supported_capabilities: ['pdf'],
-          default_use_cases: ['pdf'],
-          metadata: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ],
+      data: {
+        data: [
+          {
+            id: 'cfg-1',
+            name: 'Primary Storage',
+            provider: 'local_filesystem',
+            config: { provider: 'local_filesystem', base_path: '/tmp', create_directories: true, expose_file_urls: false },
+            enabled: true,
+            supported_capabilities: ['pdf'],
+            default_use_cases: ['pdf'],
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+        total: 1,
+        page: 1,
+        per_page: 100,
+      },
       isLoading: false,
     })
     mockUseStorageMetrics.mockReturnValue({
@@ -183,20 +219,25 @@ describe('StorageConfigurationManager', () => {
       isLoading: false,
     })
     mockUseStorageConfigurations.mockReturnValue({
-      data: [
-        {
-          id: 'cfg-1',
-          name: 'Primary Storage',
-          provider: 'local_filesystem',
-          config: { provider: 'local_filesystem', base_path: '/var/med13/storage', create_directories: true, expose_file_urls: false },
-          enabled: true,
-          supported_capabilities: ['pdf'],
-          default_use_cases: ['pdf'],
-          metadata: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ],
+      data: {
+        data: [
+          {
+            id: 'cfg-1',
+            name: 'Primary Storage',
+            provider: 'local_filesystem',
+            config: { provider: 'local_filesystem', base_path: '/var/med13/storage', create_directories: true, expose_file_urls: false },
+            enabled: true,
+            supported_capabilities: ['pdf'],
+            default_use_cases: ['pdf'],
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+        total: 1,
+        page: 1,
+        per_page: 100,
+      },
       isLoading: false,
     })
 
@@ -224,20 +265,25 @@ describe('StorageConfigurationManager', () => {
       isLoading: false,
     })
     mockUseStorageConfigurations.mockReturnValue({
-      data: [
-        {
-          id: 'cfg-1',
-          name: 'Primary Storage',
-          provider: 'local_filesystem',
-          config: { provider: 'local_filesystem', base_path: '/var/med13/storage', create_directories: true, expose_file_urls: false },
-          enabled: true,
-          supported_capabilities: ['pdf'],
-          default_use_cases: ['pdf'],
-          metadata: {},
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ],
+      data: {
+        data: [
+          {
+            id: 'cfg-1',
+            name: 'Primary Storage',
+            provider: 'local_filesystem',
+            config: { provider: 'local_filesystem', base_path: '/var/med13/storage', create_directories: true, expose_file_urls: false },
+            enabled: true,
+            supported_capabilities: ['pdf'],
+            default_use_cases: ['pdf'],
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+        total: 1,
+        page: 1,
+        per_page: 100,
+      },
       isLoading: false,
     })
 

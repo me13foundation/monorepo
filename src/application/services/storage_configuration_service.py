@@ -29,11 +29,14 @@ from src.domain.services.storage_providers import (
 from src.type_definitions.common import JSONObject  # noqa: TC001
 from src.type_definitions.storage import (
     StorageConfigurationModel,
+    StorageConfigurationStats,
     StorageHealthReport,
     StorageHealthStatus,
     StorageOperationRecord,
     StorageOperationStatus,
     StorageOperationType,
+    StorageOverviewResponse,
+    StorageOverviewTotals,
     StorageProviderCapability,
     StorageProviderConfigModel,
     StorageProviderName,
@@ -42,32 +45,14 @@ from src.type_definitions.storage import (
     StorageUseCase,
 )
 
+from .storage_configuration_validator import StorageConfigurationValidator
+
 if TYPE_CHECKING:
     from src.application.services.system_status_service import SystemStatusService
     from src.domain.repositories.storage_repository import (
         StorageConfigurationRepository,
         StorageOperationRepository,
     )
-
-
-class StorageConfigurationValidator:
-    """Business rule validation for storage configurations."""
-
-    def ensure_unique_name(
-        self,
-        repository: StorageConfigurationRepository,
-        *,
-        name: str,
-        exclude_id: UUID | None = None,
-    ) -> None:
-        existing = repository.list_configurations(include_disabled=True)
-        for configuration in existing:
-            if configuration.name.lower() != name.lower():
-                continue
-            if exclude_id and configuration.id == exclude_id:
-                continue
-            msg = f"Storage configuration '{name}' already exists"
-            raise ValueError(msg)
 
 
 class CreateStorageConfigurationRequest(BaseModel):
@@ -127,6 +112,28 @@ class StorageConfigurationService:
         )
         plugin = self._require_plugin(request.provider)
         validated_config = await plugin.validate_config(request.config)
+        requested_capabilities = set(
+            request.supported_capabilities or plugin.capabilities(),
+        )
+        requested_use_cases = set(
+            request.default_use_cases or {StorageUseCase.PDF},
+        )
+        self._validator.ensure_capabilities_supported(
+            plugin=plugin,
+            provider=request.provider,
+            requested=requested_capabilities,
+        )
+        self._validator.ensure_use_cases_supported(
+            plugin=plugin,
+            provider=request.provider,
+            use_cases=requested_use_cases,
+        )
+        if request.enabled:
+            self._validator.ensure_use_case_exclusivity(
+                self._configuration_repository,
+                provider=request.provider,
+                use_cases=requested_use_cases,
+            )
 
         configuration = StorageConfiguration(
             id=uuid4(),
@@ -134,12 +141,8 @@ class StorageConfigurationService:
             provider=request.provider,
             config=validated_config,
             enabled=request.enabled,
-            supported_capabilities=tuple(
-                request.supported_capabilities or plugin.capabilities(),
-            ),
-            default_use_cases=tuple(
-                request.default_use_cases or {StorageUseCase.PDF},
-            ),
+            supported_capabilities=tuple(requested_capabilities),
+            default_use_cases=tuple(requested_use_cases),
             metadata=request.metadata,
         )
         persisted = self._configuration_repository.create(configuration)
@@ -164,20 +167,40 @@ class StorageConfigurationService:
         updated_config_model = request.config or current.config
         plugin = self._require_plugin(current.provider)
         validated_config = await plugin.validate_config(updated_config_model)
+        requested_capabilities = set(
+            request.supported_capabilities or current.supported_capabilities,
+        )
+        requested_use_cases = set(
+            request.default_use_cases or current.default_use_cases,
+        )
+        enabled = request.enabled if request.enabled is not None else current.enabled
+
+        self._validator.ensure_capabilities_supported(
+            plugin=plugin,
+            provider=current.provider,
+            requested=requested_capabilities,
+        )
+        self._validator.ensure_use_cases_supported(
+            plugin=plugin,
+            provider=current.provider,
+            use_cases=requested_use_cases,
+        )
+        if enabled:
+            self._validator.ensure_use_case_exclusivity(
+                self._configuration_repository,
+                provider=current.provider,
+                use_cases=requested_use_cases,
+                exclude_id=current.id,
+            )
+
         update_payload = current.model_copy(
             update={
                 "name": request.name or current.name,
                 "config": validated_config,
-                "supported_capabilities": tuple(
-                    request.supported_capabilities or current.supported_capabilities,
-                ),
-                "default_use_cases": tuple(
-                    request.default_use_cases or current.default_use_cases,
-                ),
+                "supported_capabilities": tuple(requested_capabilities),
+                "default_use_cases": tuple(requested_use_cases),
                 "metadata": request.metadata or current.metadata,
-                "enabled": (
-                    request.enabled if request.enabled is not None else current.enabled
-                ),
+                "enabled": enabled,
                 "updated_at": datetime.now(UTC),
             },
         )
@@ -203,18 +226,7 @@ class StorageConfigurationService:
         """Retrieve a configuration."""
 
         configuration = self._require_configuration(configuration_id)
-        return StorageConfigurationModel(
-            id=configuration.id,
-            name=configuration.name,
-            provider=configuration.provider,
-            config=configuration.config,
-            enabled=configuration.enabled,
-            supported_capabilities=set(configuration.supported_capabilities),
-            default_use_cases=set(configuration.default_use_cases),
-            metadata=configuration.metadata,
-            created_at=configuration.created_at,
-            updated_at=configuration.updated_at,
-        )
+        return self._to_model(configuration)
 
     def get_default_for_use_case(
         self,
@@ -228,6 +240,14 @@ class StorageConfigurationService:
             if configuration.applies_to_use_case(use_case):
                 return configuration
         return None
+
+    def resolve_backend_for_use_case(
+        self,
+        use_case: StorageUseCase,
+    ) -> StorageConfiguration | None:
+        """Public helper for other services to fetch use-case mappings."""
+
+        return self.get_default_for_use_case(use_case)
 
     def assign_use_cases(
         self,
@@ -343,6 +363,88 @@ class StorageConfigurationService:
             limit=limit,
         )
 
+    def delete_configuration(
+        self,
+        configuration_id: UUID,
+        *,
+        force: bool = False,
+    ) -> bool:
+        """Delete or disable a storage configuration."""
+
+        configuration = self._require_configuration(configuration_id)
+        if configuration.enabled and not force:
+            updated = configuration.model_copy(
+                update={
+                    "enabled": False,
+                    "updated_at": datetime.now(UTC),
+                },
+            )
+            self._configuration_repository.update(updated)
+            return True
+        return self._configuration_repository.delete(configuration_id)
+
+    def get_overview(self) -> StorageOverviewResponse:
+        """Return aggregated stats for all storage configurations."""
+
+        configurations = self._configuration_repository.list_configurations(
+            include_disabled=True,
+        )
+        stats: list[StorageConfigurationStats] = []
+        total_files = 0
+        total_size = 0
+        error_rates: list[float] = []
+        enabled = 0
+        healthy = degraded = offline = 0
+
+        for configuration in configurations:
+            usage = self._operation_repository.get_usage_metrics(configuration.id)
+            health_snapshot = self._operation_repository.get_health_snapshot(
+                configuration.id,
+            )
+            stats.append(
+                StorageConfigurationStats(
+                    configuration=self._to_model(configuration),
+                    usage=usage,
+                    health=health_snapshot.as_report() if health_snapshot else None,
+                ),
+            )
+            if configuration.enabled:
+                enabled += 1
+            if usage:
+                total_files += usage.total_files
+                total_size += usage.total_size_bytes
+                if usage.error_rate is not None:
+                    error_rates.append(usage.error_rate)
+            if health_snapshot:
+                match health_snapshot.status:
+                    case StorageHealthStatus.HEALTHY:
+                        healthy += 1
+                    case StorageHealthStatus.DEGRADED:
+                        degraded += 1
+                    case StorageHealthStatus.OFFLINE:
+                        offline += 1
+
+        disabled = len(configurations) - enabled
+        avg_error = sum(error_rates) / len(error_rates) if error_rates else None
+
+        totals = StorageOverviewTotals(
+            total_configurations=len(configurations),
+            enabled_configurations=enabled,
+            disabled_configurations=disabled,
+            healthy_configurations=healthy,
+            degraded_configurations=degraded,
+            offline_configurations=offline,
+            total_files=total_files,
+            total_size_bytes=total_size,
+            average_error_rate=avg_error,
+        )
+
+        return StorageOverviewResponse(
+            generated_at=datetime.now(UTC),
+            totals=totals,
+            configurations=stats,
+        )
+
     def _require_plugin(
         self,
         provider: StorageProviderName,
@@ -359,6 +461,23 @@ class StorageConfigurationService:
             msg = f"Storage configuration {configuration_id} not found"
             raise ValueError(msg)
         return configuration
+
+    def _to_model(
+        self,
+        configuration: StorageConfiguration,
+    ) -> StorageConfigurationModel:
+        return StorageConfigurationModel(
+            id=configuration.id,
+            name=configuration.name,
+            provider=configuration.provider,
+            config=configuration.config,
+            enabled=configuration.enabled,
+            supported_capabilities=set(configuration.supported_capabilities),
+            default_use_cases=set(configuration.default_use_cases),
+            metadata=configuration.metadata,
+            created_at=configuration.created_at,
+            updated_at=configuration.updated_at,
+        )
 
     async def _require_maintenance_mode(self) -> None:
         """Ensure maintenance mode is active when a risky operation is requested."""

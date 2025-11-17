@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import SystemSettingsPage from '@/app/(dashboard)/system-settings/page'
 import { INITIAL_USER_PARAMS } from '@/app/(dashboard)/system-settings/constants'
 import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
-import { fetchStorageConfigurations } from '@/lib/api/storage'
+import { fetchStorageConfigurations, fetchStorageOverview } from '@/lib/api/storage'
 import { fetchMaintenanceState } from '@/lib/api/system-status'
 import { getServerSession } from 'next-auth'
 
@@ -23,6 +23,7 @@ jest.mock('@/lib/api/users', () => ({
 }))
 jest.mock('@/lib/api/storage', () => ({
   fetchStorageConfigurations: jest.fn(),
+  fetchStorageOverview: jest.fn(),
 }))
 jest.mock('@/lib/api/system-status', () => ({
   fetchMaintenanceState: jest.fn(),
@@ -88,7 +89,27 @@ describe('SystemSettingsPage (server)', () => {
       recent_registrations: 0,
       recent_logins: 0,
     })
-    ;(fetchStorageConfigurations as jest.Mock).mockResolvedValue([])
+    ;(fetchStorageConfigurations as jest.Mock).mockResolvedValue({
+      data: [],
+      total: 0,
+      page: 1,
+      per_page: 100,
+    })
+    ;(fetchStorageOverview as jest.Mock).mockResolvedValue({
+      generated_at: new Date().toISOString(),
+      totals: {
+        total_configurations: 0,
+        enabled_configurations: 0,
+        disabled_configurations: 0,
+        healthy_configurations: 0,
+        degraded_configurations: 0,
+        offline_configurations: 0,
+        total_files: 0,
+        total_size_bytes: 0,
+        average_error_rate: 0,
+      },
+      configurations: [],
+    })
     ;(fetchMaintenanceState as jest.Mock).mockResolvedValue({ state: { is_active: false } })
     redirectMock.mockImplementation(() => undefined)
 
@@ -97,7 +118,11 @@ describe('SystemSettingsPage (server)', () => {
     expect(redirectMock).not.toHaveBeenCalled()
     expect(fetchUsers).toHaveBeenCalledWith(INITIAL_USER_PARAMS, 'admin-token')
     expect(fetchUserStatistics).toHaveBeenCalledWith('admin-token')
-    expect(fetchStorageConfigurations).toHaveBeenCalledWith('admin-token')
+    expect(fetchStorageConfigurations).toHaveBeenCalledWith(
+      { page: 1, per_page: 100, include_disabled: true },
+      'admin-token',
+    )
+    expect(fetchStorageOverview).toHaveBeenCalledWith('admin-token')
     expect(fetchMaintenanceState).toHaveBeenCalledWith('admin-token')
     expect(result).toBeTruthy()
   })
