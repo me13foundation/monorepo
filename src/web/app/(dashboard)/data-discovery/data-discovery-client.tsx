@@ -1,14 +1,13 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AxiosError } from 'axios'
 import dynamic from 'next/dynamic'
-import { ParameterBar } from '@/components/data-discovery/ParameterBar'
 import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
 import { CatalogSkeleton } from '@/components/data-discovery/CatalogSkeleton'
 import { ResultsSkeleton } from '@/components/data-discovery/ResultsSkeleton'
 import { useSpaceContext } from '@/components/space-context-provider'
-import type { QueryParameters, QueryTestResult } from '@/lib/types/data-discovery'
+import type { QueryParameters, QueryTestResult, SourceCatalogEntry } from '@/lib/types/data-discovery'
 import {
   useAddDiscoverySourceToSpace,
   useCreateDataDiscoverySession,
@@ -17,7 +16,6 @@ import {
   useSessionTestResults,
   useSourceCatalog,
   useToggleDataDiscoverySourceSelection,
-  useUpdateDataDiscoverySessionParameters,
   useSetDataDiscoverySelections,
 } from '@/lib/queries/data-discovery'
 import { toast } from 'sonner'
@@ -61,6 +59,7 @@ export default function DataDiscoveryClient({
 }: DataDiscoveryClientProps) {
   const [activeView, setActiveView] = useState<'select' | 'results'>('select')
   const [parameters, setParameters] = useState<QueryParameters>(initialParameters ?? DEFAULT_PARAMETERS)
+  const [sourceParameters, setSourceParameters] = useState<Record<string, QueryParameters>>({})
   const [selectedSources, setSelectedSources] = useState<string[]>(initialSelectedSources)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(initialSessionId)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -76,7 +75,6 @@ export default function DataDiscoveryClient({
   const refetchSessions = sessionsQuery.refetch
 
   const createSessionMutation = useCreateDataDiscoverySession()
-  const updateSessionParamsMutation = useUpdateDataDiscoverySessionParameters()
   const toggleSourceMutation = useToggleDataDiscoverySourceSelection()
   const executeTestMutation = useExecuteDataDiscoveryTest()
   const addToSpaceMutation = useAddDiscoverySourceToSpace()
@@ -87,7 +85,17 @@ export default function DataDiscoveryClient({
     isError: isCreateSessionError,
   } = createSessionMutation
 
-  const catalog = catalogQuery.data ?? []
+  const catalog: SourceCatalogEntry[] = useMemo(
+    () => catalogQuery.data ?? [],
+    [catalogQuery.data],
+  )
+  const catalogById = useMemo(() => {
+    const map = new Map<string, SourceCatalogEntry>()
+    catalog.forEach((entry) => {
+      map.set(entry.id, entry)
+    })
+    return map
+  }, [catalog])
   const testResults = testsQuery.data ?? []
   const catalogError = catalogQuery.error instanceof Error ? catalogQuery.error : null
 
@@ -147,19 +155,71 @@ export default function DataDiscoveryClient({
     }
   }, [isCreateSessionError])
 
-  const handleParametersChange = useCallback(
-    (newParams: QueryParameters) => {
-      setParameters(newParams)
-      if (!activeSessionId) {
-        return
-      }
-      updateSessionParamsMutation.mutate({
-        sessionId: activeSessionId,
-        payload: { parameters: newParams },
-      })
-    },
-    [activeSessionId, updateSessionParamsMutation],
+  const getParametersForSource = useCallback(
+    (sourceId: string) => sourceParameters[sourceId] ?? parameters,
+    [sourceParameters, parameters],
   )
+
+  const handleSourceParametersChange = useCallback(
+    (sourceId: string, nextParams: QueryParameters) => {
+      setSourceParameters((prev) => ({
+        ...prev,
+        [sourceId]: nextParams,
+      }))
+    },
+    [],
+  )
+
+  const resolveExecutionContext = useCallback(
+    (
+      sourceId: string,
+    ):
+      | {
+          parameters: QueryParameters
+          catalogEntry: SourceCatalogEntry
+        }
+      | null => {
+      const catalogEntry = catalogById.get(sourceId)
+      if (!catalogEntry) {
+        toast.error('Unable to load metadata for the selected source')
+        return null
+      }
+
+      const parametersForSource = getParametersForSource(sourceId)
+      const validationResult = validateParametersForSource(catalogEntry, parametersForSource)
+
+      if (!validationResult.ok) {
+        toast.error(`${catalogEntry.name}: ${validationResult.message}`)
+        return null
+      }
+
+      return { parameters: parametersForSource, catalogEntry }
+    },
+    [catalogById, getParametersForSource],
+  )
+
+  useEffect(() => {
+    setSourceParameters((current) => {
+      const next = { ...current }
+      let changed = false
+
+      selectedSources.forEach((sourceId) => {
+        if (!next[sourceId]) {
+          next[sourceId] = parameters
+          changed = true
+        }
+      })
+
+      Object.keys(next).forEach((sourceId) => {
+        if (!selectedSources.includes(sourceId)) {
+          delete next[sourceId]
+          changed = true
+        }
+      })
+
+      return changed ? next : current
+    })
+  }, [selectedSources, parameters])
 
   const handleToggleSource = useCallback(
     async (sourceId: string) => {
@@ -234,13 +294,18 @@ export default function DataDiscoveryClient({
         return
       }
 
+      const executionContext = resolveExecutionContext(sourceId)
+      if (!executionContext) {
+        return
+      }
+
       setIsGenerating(true)
       try {
         await executeTestMutation.mutateAsync({
           sessionId: activeSessionId,
           payload: {
             catalog_entry_id: sourceId,
-            parameters,
+            parameters: executionContext.parameters,
           },
         })
         toast.success('Test execution complete')
@@ -251,7 +316,7 @@ export default function DataDiscoveryClient({
         setIsGenerating(false)
       }
     },
-    [activeSessionId, executeTestMutation, parameters],
+    [activeSessionId, executeTestMutation, resolveExecutionContext],
   )
 
   const handleRunSingleTest = useCallback(
@@ -286,32 +351,14 @@ export default function DataDiscoveryClient({
     [activeSessionId, addToSpaceMutation],
   )
 
-  const handleGenerateResults = useCallback(async () => {
+  const handleGenerateResults = useCallback(() => {
     if (!activeSessionId || selectedSources.length === 0) {
-      toast.error('Select at least one data source before generating results')
+      toast.error('Select at least one data source before continuing')
       return
     }
-
-    setIsGenerating(true)
-    try {
-      for (const sourceId of selectedSources) {
-        await executeTestMutation.mutateAsync({
-          sessionId: activeSessionId,
-          payload: {
-            catalog_entry_id: sourceId,
-            parameters,
-          },
-        })
-      }
-      setActiveView('results')
-      toast.success('Data discovery tests executed')
-    } catch (error) {
-      console.error(error)
-      toast.error('Failed to execute discovery tests')
-    } finally {
-      setIsGenerating(false)
-    }
-  }, [activeSessionId, selectedSources, executeTestMutation, parameters])
+    setActiveView('results')
+    toast.success('Sources added to your testing list')
+  }, [activeSessionId, selectedSources])
 
   return (
     <div className="space-y-6">
@@ -323,18 +370,11 @@ export default function DataDiscoveryClient({
       />
 
       <DashboardSection
-        title="Query Parameters"
-        description="Tune gene and phenotype filters to personalize discovery runs."
-      >
-        <ParameterBar parameters={parameters} onParametersChange={handleParametersChange} />
-      </DashboardSection>
-
-      <DashboardSection
-        title={activeView === 'select' ? 'Select Data Sources' : 'View Generated Results'}
+        title={activeView === 'select' ? 'Select Data Sources' : 'Review & Run Tests'}
         description={
           activeView === 'select'
             ? 'Browse the catalog and choose sources to test.'
-            : 'Review generated outputs and promote sources into spaces.'
+            : 'Individually configure, execute, and promote each selected source.'
         }
       >
         <div className="mb-4 flex flex-wrap gap-2">
@@ -358,7 +398,7 @@ export default function DataDiscoveryClient({
                 : 'bg-muted text-muted-foreground hover:bg-muted/80',
             )}
           >
-            2. View Generated Results
+            2. Review & Test Sources
           </button>
         </div>
 
@@ -378,6 +418,10 @@ export default function DataDiscoveryClient({
             catalog={catalog}
             results={testResults}
             isLoading={testsQuery.isLoading}
+            selectedSourceIds={selectedSources}
+            sourceParameters={sourceParameters}
+            defaultParameters={parameters}
+            onUpdateSourceParameters={handleSourceParametersChange}
             onBackToSelect={() => setActiveView('select')}
             onAddToSpace={handleAddResultToSpace}
             onRunTest={handleRunSingleTest}
@@ -408,4 +452,57 @@ function isSameParameters(a: QueryParameters, b: QueryParameters) {
     a.gene_symbol === b.gene_symbol &&
     a.search_term === b.search_term
   )
+}
+
+function validateParametersForSource(
+  entry: SourceCatalogEntry,
+  params: QueryParameters,
+): { ok: boolean; message?: string } {
+  const paramType = normalizeParamType(entry.param_type)
+  const hasGene = Boolean(params.gene_symbol && params.gene_symbol.trim().length > 0)
+  const hasTerm = Boolean(params.search_term && params.search_term.trim().length > 0)
+
+  switch (paramType) {
+    case 'gene':
+      return hasGene ? { ok: true } : { ok: false, message: 'A gene symbol is required' }
+    case 'term':
+      return hasTerm ? { ok: true } : { ok: false, message: 'A phenotype or search term is required' }
+    case 'geneAndTerm':
+      if (!hasGene && !hasTerm) {
+        return { ok: false, message: 'Provide both a gene symbol and a phenotype term' }
+      }
+      if (!hasGene) {
+        return { ok: false, message: 'Gene symbol required' }
+      }
+      if (!hasTerm) {
+        return { ok: false, message: 'Phenotype/search term required' }
+      }
+      return { ok: true }
+    case 'none':
+      return { ok: true }
+    case 'api':
+      return hasGene || hasTerm
+        ? { ok: true }
+        : {
+            ok: false,
+            message: 'Provide at least one parameter before running this API source',
+          }
+    default:
+      return { ok: true }
+  }
+}
+
+function normalizeParamType(paramType: string): 'gene' | 'term' | 'geneAndTerm' | 'none' | 'api' {
+  switch (paramType) {
+    case 'gene_and_term':
+      return 'geneAndTerm'
+    case 'gene':
+    case 'term':
+    case 'none':
+    case 'api':
+    case 'geneAndTerm':
+      return paramType as 'gene' | 'term' | 'geneAndTerm' | 'none' | 'api'
+    default:
+      return 'geneAndTerm'
+  }
 }

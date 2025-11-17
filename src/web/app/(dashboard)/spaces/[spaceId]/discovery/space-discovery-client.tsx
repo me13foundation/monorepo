@@ -20,15 +20,12 @@ import {
   useSpaceDiscoverySessions,
   useSpaceSourceCatalog,
   useToggleSpaceDiscoverySourceSelection,
-  useUpdateSpaceDiscoverySessionParameters,
 } from '@/lib/queries/space-discovery'
 import { syncDiscoverySessionState } from '@/lib/state/discovery-session-sync'
 import { PageHero, DashboardSection } from '@/components/ui/composition-patterns'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { ParameterBar } from '@/components/data-discovery/ParameterBar'
-import { SourceParameterConfigurator } from '@/components/data-discovery/SourceParameterConfigurator'
 import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
 
 const SourceCatalog = dynamic(
@@ -72,7 +69,6 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
   const refetchSessions = sessionsQuery.refetch
 
   const createSessionMutation = useCreateSpaceDiscoverySession(spaceId)
-  const updateSessionParamsMutation = useUpdateSpaceDiscoverySessionParameters(spaceId)
   const toggleSourceMutation = useToggleSpaceDiscoverySourceSelection(spaceId)
   const executeTestMutation = useExecuteDataDiscoveryTest()
   const addToSpaceMutation = useAddDiscoverySourceToSpace()
@@ -175,20 +171,6 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
       return changed ? next : current
     })
   }, [selectedSources, parameters])
-
-  const handleParametersChange = useCallback(
-    (newParams: QueryParameters) => {
-      setParameters(newParams)
-      if (!activeSessionId) {
-        return
-      }
-      updateSessionParamsMutation.mutate({
-        sessionId: activeSessionId,
-        payload: { parameters: newParams },
-      })
-    },
-    [activeSessionId, updateSessionParamsMutation],
-  )
 
   const handleToggleSource = useCallback(
     async (sourceId: string) => {
@@ -361,44 +343,14 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     [activeSessionId, addToSpaceMutation],
   )
 
-  const handleGenerateResults = useCallback(async () => {
+  const handleGenerateResults = useCallback(() => {
     if (!activeSessionId || selectedSources.length === 0) {
-      toast.error('Select at least one data source before generating results')
+      toast.error('Select at least one data source before continuing')
       return
     }
-
-    const executionPayloads: Array<{ sourceId: string; parameters: QueryParameters }> = []
-    for (const sourceId of selectedSources) {
-      const executionContext = resolveExecutionContext(sourceId)
-      if (!executionContext) {
-        return
-      }
-      executionPayloads.push({
-        sourceId,
-        parameters: executionContext.parameters,
-      })
-    }
-
-    setIsGenerating(true)
-    try {
-      for (const payload of executionPayloads) {
-        await executeTestMutation.mutateAsync({
-          sessionId: activeSessionId,
-          payload: {
-            catalog_entry_id: payload.sourceId,
-            parameters: payload.parameters,
-          },
-        })
-      }
-      setActiveView('results')
-      toast.success('Data discovery tests executed')
-    } catch (error) {
-      console.error(error)
-      toast.error('Failed to execute discovery tests')
-    } finally {
-      setIsGenerating(false)
-    }
-  }, [activeSessionId, selectedSources, executeTestMutation, resolveExecutionContext])
+    setActiveView('results')
+    toast.success('Sources added to your testing list')
+  }, [activeSessionId, selectedSources])
 
   return (
     <div className="space-y-6">
@@ -410,27 +362,11 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
       />
 
       <DashboardSection
-        title="Query Parameters"
-        description="Define default filters and tailor query requirements for every selected data source."
-      >
-        <div className="space-y-4">
-          <ParameterBar parameters={parameters} onParametersChange={handleParametersChange} />
-          <SourceParameterConfigurator
-            catalog={catalog}
-            selectedSourceIds={selectedSources}
-            sourceParameters={sourceParameters}
-            defaultParameters={parameters}
-            onChange={handleSourceParametersChange}
-          />
-        </div>
-      </DashboardSection>
-
-      <DashboardSection
-        title={activeView === 'select' ? 'Select Data Sources' : 'View Generated Results'}
+        title={activeView === 'select' ? 'Select Data Sources' : 'Review & Run Tests'}
         description={
           activeView === 'select'
             ? 'Browse the catalog and choose sources to test within this space.'
-            : 'Review generated outputs and promote sources into spaces.'
+            : 'Individually configure, execute, and promote each selected source in this space.'
         }
       >
         <div className="mb-4 flex flex-wrap gap-2">
@@ -454,7 +390,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
                 : 'bg-muted text-muted-foreground hover:bg-muted/80',
             )}
           >
-            2. View Generated Results
+            2. Review & Test Sources
           </button>
         </div>
 
@@ -474,6 +410,10 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
             catalog={catalog}
             results={testResults}
             isLoading={testsQuery.isLoading}
+            selectedSourceIds={selectedSources}
+            sourceParameters={sourceParameters}
+            defaultParameters={parameters}
+            onUpdateSourceParameters={handleSourceParametersChange}
             onBackToSelect={() => setActiveView('select')}
             onAddToSpace={handleAddResultToSpace}
             onRunTest={handleRunSingleTest}
@@ -506,10 +446,11 @@ function validateParametersForSource(
   entry: SourceCatalogEntry,
   params: QueryParameters,
 ): { ok: boolean; message?: string } {
+  const paramType = normalizeParamType(entry.param_type)
   const hasGene = Boolean(params.gene_symbol && params.gene_symbol.trim().length > 0)
   const hasTerm = Boolean(params.search_term && params.search_term.trim().length > 0)
 
-  switch (entry.param_type) {
+  switch (paramType) {
     case 'gene':
       return hasGene ? { ok: true } : { ok: false, message: 'A gene symbol is required' }
     case 'term':
@@ -526,9 +467,30 @@ function validateParametersForSource(
       }
       return { ok: true }
     case 'none':
-    case 'api':
       return { ok: true }
+    case 'api':
+      return hasGene || hasTerm
+        ? { ok: true }
+        : {
+            ok: false,
+            message: 'Provide at least one parameter before running this API source',
+          }
     default:
       return { ok: true }
+  }
+}
+
+function normalizeParamType(paramType: string): 'gene' | 'term' | 'geneAndTerm' | 'none' | 'api' {
+  switch (paramType) {
+    case 'gene_and_term':
+      return 'geneAndTerm'
+    case 'gene':
+    case 'term':
+    case 'none':
+    case 'api':
+    case 'geneAndTerm':
+      return paramType as 'gene' | 'term' | 'geneAndTerm' | 'none' | 'api'
+    default:
+      return 'geneAndTerm'
   }
 }
