@@ -14,6 +14,10 @@ depends_on: Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if inspector.has_table("data_source_activation_rules"):
+        return
     op.create_table(
         "data_source_activation_rules",
         sa.Column("id", sa.UUID(), nullable=False),
@@ -80,6 +84,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_table("data_source_activation_rules"):
+        return
     op.drop_index(
         "ix_data_source_activation_rules_research_space_id",
         table_name="data_source_activation_rules",

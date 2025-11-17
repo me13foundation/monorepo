@@ -15,6 +15,7 @@ from src.domain.entities.data_discovery_session import (
     SourceCatalogEntry,
     TestResultStatus,
 )
+from src.domain.entities.user_data_source import SourceType
 
 
 def create_test_source_catalog_entry(
@@ -44,6 +45,7 @@ def create_test_source_catalog_entry(
         "subcategory": None,
         "description": f"Test description for {name}",
         "param_type": param_type,
+        "source_type": SourceType.API,
         "url_template": (
             f"https://example.com/{entry_id}/{{gene}}" if param_type == "gene" else None
         ),

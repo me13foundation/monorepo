@@ -8,6 +8,7 @@ from src.domain.entities.data_discovery_session import (
     QueryParameterType,
     TestResultStatus,
 )
+from src.domain.entities.user_data_source import SourceType
 from src.type_definitions.common import JSONObject
 
 
@@ -64,6 +65,7 @@ class SourceCatalogResponse(BaseModel):
     category: str
     subcategory: str | None
     description: str
+    source_type: SourceType
     param_type: QueryParameterType
     is_active: bool
     requires_auth: bool

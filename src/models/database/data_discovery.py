@@ -129,6 +129,12 @@ class SourceCatalogEntryModel(Base):
 
     # Classification and search
     tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    source_type: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="api",
+        server_default="api",
+    )
 
     # Query capabilities
     param_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)

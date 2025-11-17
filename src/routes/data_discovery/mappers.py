@@ -65,6 +65,7 @@ def catalog_entry_to_response(entry: SourceCatalogEntry) -> SourceCatalogRespons
         category=entry.category,
         subcategory=entry.subcategory,
         description=entry.description,
+        source_type=entry.source_type,
         param_type=entry.param_type,
         is_active=entry.is_active,
         requires_auth=entry.requires_auth,

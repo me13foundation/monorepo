@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   ExternalLink,
@@ -22,6 +22,11 @@ import type {
   QueryTestResult,
   SourceCatalogEntry,
 } from '@/lib/types/data-discovery'
+import {
+  DEFAULT_ADVANCED_SETTINGS,
+  type SourceAdvancedSettings,
+} from '@/components/data-discovery/advanced-settings'
+import type { ScheduleFrequency } from '@/types/data-source'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -52,6 +57,14 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   'AI Predictive Models': BrainCircuit,
 }
 
+const SOURCE_TYPE_LABELS: Record<SourceCatalogEntry['source_type'], string> = {
+  api: 'API',
+  database: 'Database',
+  file_upload: 'File Upload',
+  web_scraping: 'Web Scraping',
+  pubmed: 'PubMed',
+}
+
 const PARAMETER_LABELS = {
   gene: 'Gene-only',
   term: 'Phenotype-only',
@@ -75,12 +88,15 @@ interface ResultsViewProps {
   results: QueryTestResult[]
   selectedSourceIds: string[]
   sourceParameters: Record<string, QueryParameters>
+  advancedSettings: Record<string, SourceAdvancedSettings>
   defaultParameters: QueryParameters
+  defaultAdvancedSettings?: SourceAdvancedSettings
   isLoading: boolean
   onBackToSelect: () => void
   onAddToSpace: (result: QueryTestResult, spaceId: string) => Promise<void>
   onRunTest?: (catalogEntryId: string) => Promise<void>
   onUpdateSourceParameters: (sourceId: string, params: QueryParameters) => void
+  onUpdateAdvancedSettings: (sourceId: string, settings: SourceAdvancedSettings) => void
 }
 
 export function ResultsView({
@@ -90,12 +106,15 @@ export function ResultsView({
   results,
   selectedSourceIds,
   sourceParameters,
+  advancedSettings,
   defaultParameters,
+  defaultAdvancedSettings = DEFAULT_ADVANCED_SETTINGS,
   isLoading,
   onBackToSelect,
   onAddToSpace,
   onRunTest,
   onUpdateSourceParameters,
+  onUpdateAdvancedSettings,
 }: ResultsViewProps) {
   const [spaceSelectorOpen, setSpaceSelectorOpen] = useState(false)
   const [selectedResultForSpace, setSelectedResultForSpace] = useState<QueryTestResult | null>(null)
@@ -137,13 +156,28 @@ export function ResultsView({
             entry,
             latestResult: latestResultBySource.get(sourceId) ?? null,
             parameters: sourceParameters[sourceId] ?? defaultParameters,
+            advancedSettings: advancedSettings[sourceId] ?? defaultAdvancedSettings,
           }
         })
         .filter(
-          (value): value is { entry: SourceCatalogEntry; latestResult: QueryTestResult | null; parameters: QueryParameters } =>
-            value !== null,
+          (
+            value,
+          ): value is {
+            entry: SourceCatalogEntry
+            latestResult: QueryTestResult | null
+            parameters: QueryParameters
+            advancedSettings: SourceAdvancedSettings
+          } => value !== null,
         ),
-    [selectedSourceIds, catalogById, latestResultBySource, sourceParameters, defaultParameters],
+    [
+      selectedSourceIds,
+      catalogById,
+      latestResultBySource,
+      sourceParameters,
+      advancedSettings,
+      defaultParameters,
+      defaultAdvancedSettings,
+    ],
   )
 
   const handleAddToSpaceRequest = async (result: QueryTestResult) => {
@@ -197,6 +231,9 @@ export function ResultsView({
   const configuringEntry = configuringSourceId ? catalogById.get(configuringSourceId) ?? null : null
   const configuringParams =
     (configuringSourceId && (sourceParameters[configuringSourceId] ?? defaultParameters)) || defaultParameters
+  const configuringAdvancedSettings =
+    (configuringSourceId && (advancedSettings[configuringSourceId] ?? defaultAdvancedSettings))
+    || defaultAdvancedSettings
 
   const renderGeneratedResultsSection = () => {
     if (isLoading) {
@@ -278,12 +315,13 @@ export function ResultsView({
             </p>
           ) : (
             <div className="space-y-4">
-              {selectedSourcesWithMeta.map(({ entry, latestResult, parameters: sourceParams }) => (
+              {selectedSourcesWithMeta.map(({ entry, latestResult, parameters: sourceParams, advancedSettings: sourceAdvanced }) => (
                 <SelectedSourceCard
                   key={entry.id}
                   entry={entry}
                   latestResult={latestResult}
                   parameters={sourceParams}
+                  advancedSettings={sourceAdvanced}
                   isRunning={runningSourceId === entry.id}
                   onRunTest={onRunTest ? () => handleRunSelectedSource(entry.id) : undefined}
                   onConfigure={() => setConfiguringSourceId(entry.id)}
@@ -306,11 +344,14 @@ export function ResultsView({
         open={Boolean(configuringEntry)}
         entry={configuringEntry}
         parameters={configuringParams}
+        advancedSettings={configuringAdvancedSettings}
         defaultParameters={defaultParameters}
+        defaultAdvancedSettings={defaultAdvancedSettings}
         onClose={() => setConfiguringSourceId(null)}
-        onSave={(nextParams) => {
+        onSave={(nextParams, nextAdvancedSettings) => {
           if (configuringSourceId) {
             onUpdateSourceParameters(configuringSourceId, nextParams)
+            onUpdateAdvancedSettings(configuringSourceId, nextAdvancedSettings)
           }
           setConfiguringSourceId(null)
         }}
@@ -323,6 +364,7 @@ interface SelectedSourceCardProps {
   entry: SourceCatalogEntry
   latestResult: QueryTestResult | null
   parameters: QueryParameters
+  advancedSettings: SourceAdvancedSettings
   isRunning: boolean
   onRunTest?: () => Promise<void> | void
   onConfigure: () => void
@@ -332,12 +374,14 @@ function SelectedSourceCard({
   entry,
   latestResult,
   parameters,
+  advancedSettings,
   isRunning,
   onRunTest,
   onConfigure,
 }: SelectedSourceCardProps) {
   const IconComponent = CATEGORY_ICONS[entry.category] || Database
   const normalizedType = normalizeParamType(entry.param_type)
+  const typeLabel = SOURCE_TYPE_LABELS[entry.source_type]
 
   const statusBadge = latestResult ? (
     <Badge
@@ -368,12 +412,26 @@ function SelectedSourceCard({
             <h3 className="font-semibold text-foreground">{entry.name}</h3>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span>{entry.category}</span>
+              <Badge variant="outline" className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                {SOURCE_TYPE_LABELS[entry.source_type]}
+              </Badge>
               <Badge variant="secondary">{PARAMETER_LABELS[normalizedType]}</Badge>
             </div>
             <p className="text-xs text-muted-foreground">{lastRunLabel}</p>
             <p className="text-xs text-muted-foreground">
               Gene: {parameters.gene_symbol ?? '—'} • Phenotype: {parameters.search_term ?? '—'}
             </p>
+            <p className="text-xs text-muted-foreground">
+              Schedule:{' '}
+              {advancedSettings.scheduling.enabled
+                ? `${advancedSettings.scheduling.frequency.toUpperCase()} • ${advancedSettings.scheduling.timezone}`
+                : 'Manual'}
+            </p>
+            {advancedSettings.notes && (
+              <p className="line-clamp-1 text-xs text-muted-foreground">
+                Notes: {advancedSettings.notes}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -422,6 +480,7 @@ function ResultCard({
   const catalogEntry = catalog.find((entry) => entry.id === result.catalog_entry_id)
   const displayName = catalogEntry?.name || result.catalog_entry_id
   const category = catalogEntry?.category || 'Unknown'
+  const typeLabel = catalogEntry ? SOURCE_TYPE_LABELS[catalogEntry.source_type] : null
   const IconComponent = CATEGORY_ICONS[category] || Database
 
   const getStatusBadge = (status: string) => {
@@ -453,9 +512,15 @@ function ResultCard({
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-foreground">{displayName}</h3>
-              <p className="text-xs text-muted-foreground">
-                {category} • Test ID: {result.id.slice(-8)}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{category}</span>
+                {typeLabel && (
+                  <Badge variant="outline" className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                    {typeLabel}
+                  </Badge>
+                )}
+                <span>• Test ID: {result.id.slice(-8)}</span>
+              </div>
             </div>
           </div>
 
@@ -503,30 +568,59 @@ interface SourceParameterModalProps {
   open: boolean
   entry: SourceCatalogEntry | null
   parameters: QueryParameters
+  advancedSettings: SourceAdvancedSettings
   defaultParameters: QueryParameters
+  defaultAdvancedSettings: SourceAdvancedSettings
   onClose: () => void
-  onSave: (params: QueryParameters) => void
+  onSave: (params: QueryParameters, advanced: SourceAdvancedSettings) => void
 }
 
 function SourceParameterModal({
   open,
   entry,
   parameters,
+  advancedSettings,
   defaultParameters,
+  defaultAdvancedSettings,
   onClose,
   onSave,
 }: SourceParameterModalProps) {
   const [formValues, setFormValues] = useState<QueryParameters>(parameters)
+  const [advancedValues, setAdvancedValues] = useState<SourceAdvancedSettings>(advancedSettings)
+  const [isDirty, setIsDirty] = useState(false)
+  const previousEntryIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    setFormValues(parameters)
-  }, [parameters, entry?.id])
+    const currentEntryId = entry?.id ?? null
+
+    if (!open) {
+      previousEntryIdRef.current = currentEntryId
+      setFormValues(parameters)
+      setAdvancedValues(advancedSettings)
+      setIsDirty(false)
+      return
+    }
+
+    if (currentEntryId !== previousEntryIdRef.current) {
+      previousEntryIdRef.current = currentEntryId
+      setFormValues(parameters)
+      setAdvancedValues(advancedSettings)
+      setIsDirty(false)
+      return
+    }
+
+    if (!isDirty) {
+      setFormValues(parameters)
+      setAdvancedValues(advancedSettings)
+    }
+  }, [advancedSettings, entry?.id, isDirty, open, parameters])
 
   if (!entry) {
     return null
   }
 
   const normalizedType = normalizeParamType(entry.param_type)
+  const typeLabel = SOURCE_TYPE_LABELS[entry.source_type]
   const showGeneInput =
     normalizedType === 'gene' || normalizedType === 'geneAndTerm' || normalizedType === 'api'
   const showTermInput =
@@ -550,7 +644,12 @@ function SourceParameterModal({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-semibold text-foreground">{entry.category}</p>
-              <p className="text-xs text-muted-foreground">{PARAMETER_LABELS[normalizedType]}</p>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline" className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                  {typeLabel}
+                </Badge>
+                <span>{PARAMETER_LABELS[normalizedType]}</span>
+              </div>
             </div>
             {entry.requires_auth && (
               <Badge
@@ -601,6 +700,7 @@ function SourceParameterModal({
                         ...prev,
                         gene_symbol: value.trim() === '' ? null : value.trim(),
                       }))
+                      setIsDirty(true)
                     }}
                     className="mt-1 bg-background"
                   />
@@ -621,6 +721,7 @@ function SourceParameterModal({
                         ...prev,
                         search_term: value.trim() === '' ? null : value.trim(),
                       }))
+                      setIsDirty(true)
                     }}
                     className="mt-1 bg-background"
                   />
@@ -630,11 +731,156 @@ function SourceParameterModal({
           )}
         </div>
 
+        <div className="mt-6 space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Scheduling (optional)</p>
+              <p className="text-xs text-muted-foreground">
+                Configure how often MED13 should ingest this source once promoted to a research space.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <input
+                type="checkbox"
+                className="size-4 rounded border border-input"
+                checked={advancedValues.scheduling.enabled}
+                onChange={(event) => {
+                  setAdvancedValues((prev) => ({
+                    ...prev,
+                    scheduling: {
+                      ...prev.scheduling,
+                      enabled: event.target.checked,
+                    },
+                  }))
+                  setIsDirty(true)
+                }}
+              />
+              Enable
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Frequency</Label>
+              <select
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                value={advancedValues.scheduling.frequency}
+                disabled={!advancedValues.scheduling.enabled}
+                onChange={(event) => {
+                  const value = event.target.value as ScheduleFrequency
+                  setAdvancedValues((prev) => ({
+                    ...prev,
+                    scheduling: {
+                      ...prev.scheduling,
+                      frequency: value,
+                    },
+                  }))
+                  setIsDirty(true)
+                }}
+              >
+                <option value="manual">Manual</option>
+                <option value="hourly">Hourly</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="cron">Cron</option>
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Timezone</Label>
+              <Input
+                className="mt-1 bg-background"
+                placeholder="UTC"
+                value={advancedValues.scheduling.timezone}
+                disabled={!advancedValues.scheduling.enabled}
+                onChange={(event) => {
+                  setAdvancedValues((prev) => ({
+                    ...prev,
+                    scheduling: {
+                      ...prev.scheduling,
+                      timezone: event.target.value || 'UTC',
+                    },
+                  }))
+                  setIsDirty(true)
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Start time</Label>
+              <Input
+                type="datetime-local"
+                className="mt-1 bg-background"
+                value={advancedValues.scheduling.startTime ?? ''}
+                disabled={!advancedValues.scheduling.enabled}
+                onChange={(event) => {
+                  setAdvancedValues((prev) => ({
+                    ...prev,
+                    scheduling: {
+                      ...prev.scheduling,
+                      startTime: event.target.value || null,
+                    },
+                  }))
+                  setIsDirty(true)
+                }}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Cron expression</Label>
+              <Input
+                className="mt-1 bg-background"
+                placeholder="0 0 * * *"
+                value={advancedValues.scheduling.cronExpression ?? ''}
+                disabled={
+                  !advancedValues.scheduling.enabled ||
+                  advancedValues.scheduling.frequency !== 'cron'
+                }
+                onChange={(event) => {
+                  setAdvancedValues((prev) => ({
+                    ...prev,
+                    scheduling: {
+                      ...prev.scheduling,
+                      cronExpression: event.target.value || null,
+                    },
+                  }))
+                  setIsDirty(true)
+                }}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Only used when frequency is set to cron.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <Label className="text-xs text-muted-foreground">Notes / Integration details</Label>
+            <textarea
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              rows={3}
+              placeholder="Optional notes, credentials location, mapping requirements..."
+              value={advancedValues.notes}
+              onChange={(event) => {
+                setAdvancedValues((prev) => ({
+                  ...prev,
+                  notes: event.target.value,
+                }))
+                setIsDirty(true)
+              }}
+            />
+          </div>
+        </div>
+
         <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Button
             type="button"
             variant="ghost"
-            onClick={() => setFormValues(defaultParameters)}
+            onClick={() => {
+              setFormValues(defaultParameters)
+              setAdvancedValues(defaultAdvancedSettings)
+              setIsDirty(true)
+            }}
             className="justify-start sm:justify-center"
           >
             Reset to defaults
@@ -645,7 +891,8 @@ function SourceParameterModal({
             </Button>
             <Button
               onClick={() => {
-                onSave(formValues)
+                onSave(formValues, advancedValues)
+                setIsDirty(false)
               }}
             >
               Save Configuration

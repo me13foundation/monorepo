@@ -20,6 +20,10 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Add the pubmed value to sourcetypeenum."""
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        # SQLite stores enums as TEXT, so the additional value is implicit.
+        return
     op.execute("ALTER TYPE sourcetypeenum ADD VALUE IF NOT EXISTS 'pubmed'")
 
 
@@ -34,6 +38,10 @@ def downgrade() -> None:
     bind.execute(
         sa.text("DELETE FROM source_templates WHERE source_type = 'pubmed'"),
     )
+
+    if bind.dialect.name != "postgresql":
+        # Nothing further to do for SQLite since enums are represented as TEXT.
+        return
 
     # Recreate the enum without the pubmed value.
     op.execute("ALTER TYPE sourcetypeenum RENAME TO sourcetypeenum_old")

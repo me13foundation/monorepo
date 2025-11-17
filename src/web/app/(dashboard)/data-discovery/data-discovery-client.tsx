@@ -23,6 +23,11 @@ import { syncDiscoverySessionState } from '@/lib/state/discovery-session-sync'
 import { PageHero, DashboardSection } from '@/components/ui/composition-patterns'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import {
+  createDefaultAdvancedSettings,
+  DEFAULT_ADVANCED_SETTINGS as DEFAULT_ADVANCED_SOURCE_SETTINGS,
+  type SourceAdvancedSettings,
+} from '@/components/data-discovery/advanced-settings'
 
 // Code split heavy components - only load when needed
 const SourceCatalog = dynamic(
@@ -60,6 +65,7 @@ export default function DataDiscoveryClient({
   const [activeView, setActiveView] = useState<'select' | 'results'>('select')
   const [parameters, setParameters] = useState<QueryParameters>(initialParameters ?? DEFAULT_PARAMETERS)
   const [sourceParameters, setSourceParameters] = useState<Record<string, QueryParameters>>({})
+  const [sourceAdvancedSettings, setSourceAdvancedSettings] = useState<Record<string, SourceAdvancedSettings>>({})
   const [selectedSources, setSelectedSources] = useState<string[]>(initialSelectedSources)
   const [activeSessionId, setActiveSessionId] = useState<string | null>(initialSessionId)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -170,6 +176,16 @@ export default function DataDiscoveryClient({
     [],
   )
 
+  const handleSourceAdvancedSettingsChange = useCallback(
+    (sourceId: string, nextSettings: SourceAdvancedSettings) => {
+      setSourceAdvancedSettings((prev) => ({
+        ...prev,
+        [sourceId]: nextSettings,
+      }))
+    },
+    [],
+  )
+
   const resolveExecutionContext = useCallback(
     (
       sourceId: string,
@@ -220,6 +236,29 @@ export default function DataDiscoveryClient({
       return changed ? next : current
     })
   }, [selectedSources, parameters])
+
+  useEffect(() => {
+    setSourceAdvancedSettings((current) => {
+      const next = { ...current }
+      let changed = false
+
+      selectedSources.forEach((sourceId) => {
+        if (!next[sourceId]) {
+          next[sourceId] = createDefaultAdvancedSettings()
+          changed = true
+        }
+      })
+
+      Object.keys(next).forEach((sourceId) => {
+        if (!selectedSources.includes(sourceId)) {
+          delete next[sourceId]
+          changed = true
+        }
+      })
+
+      return changed ? next : current
+    })
+  }, [selectedSources])
 
   const handleToggleSource = useCallback(
     async (sourceId: string) => {
@@ -326,6 +365,33 @@ export default function DataDiscoveryClient({
     [handleRunTest],
   )
 
+  const buildSourceConfigPayload = useCallback(
+    (catalogEntryId: string) => {
+      const settings = sourceAdvancedSettings[catalogEntryId]
+      if (!settings) {
+        return {}
+      }
+      const { scheduling, notes } = settings
+      const payload: Record<string, unknown> = {
+        scheduling: {
+          enabled: scheduling.enabled,
+          frequency: scheduling.frequency,
+          timezone: scheduling.timezone || 'UTC',
+          start_time: scheduling.startTime ? new Date(scheduling.startTime).toISOString() : null,
+          cron_expression:
+            scheduling.frequency === 'cron'
+              ? scheduling.cronExpression?.trim() || null
+              : null,
+        },
+      }
+      if (notes.trim().length > 0) {
+        payload.metadata = { notes: notes.trim() }
+      }
+      return payload
+    },
+    [sourceAdvancedSettings],
+  )
+
   const handleAddResultToSpace = useCallback(
     async (result: QueryTestResult, spaceId: string) => {
       if (!activeSessionId) {
@@ -339,7 +405,7 @@ export default function DataDiscoveryClient({
           payload: {
             catalog_entry_id: result.catalog_entry_id,
             research_space_id: spaceId,
-            source_config: {},
+            source_config: buildSourceConfigPayload(result.catalog_entry_id),
           },
         })
         toast.success('Source added to research space')
@@ -348,7 +414,7 @@ export default function DataDiscoveryClient({
         toast.error('Failed to add source to space')
       }
     },
-    [activeSessionId, addToSpaceMutation],
+    [activeSessionId, addToSpaceMutation, buildSourceConfigPayload],
   )
 
   const handleGenerateResults = useCallback(() => {
@@ -420,8 +486,11 @@ export default function DataDiscoveryClient({
             isLoading={testsQuery.isLoading}
             selectedSourceIds={selectedSources}
             sourceParameters={sourceParameters}
+            advancedSettings={sourceAdvancedSettings}
             defaultParameters={parameters}
+            defaultAdvancedSettings={DEFAULT_ADVANCED_SOURCE_SETTINGS}
             onUpdateSourceParameters={handleSourceParametersChange}
+            onUpdateAdvancedSettings={handleSourceAdvancedSettingsChange}
             onBackToSelect={() => setActiveView('select')}
             onAddToSpace={handleAddResultToSpace}
             onRunTest={handleRunSingleTest}

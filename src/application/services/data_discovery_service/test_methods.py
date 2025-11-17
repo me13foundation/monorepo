@@ -234,13 +234,17 @@ class QueryExecutionMixin(SessionManagementMixin):
         if catalog_entry.source_template_id and self._template_repo:
             template = self._template_repo.find_by_id(catalog_entry.source_template_id)
 
+        # Determine the resulting source type
+        resolved_source_type = (
+            template.source_type if template else catalog_entry.source_type
+        )
+
         # Create UserDataSource
         configuration = SourceConfiguration.model_validate(request.source_config or {})
-        source_type = template.source_type if template else SourceType.API
         create_request = CreateSourceRequest(
             owner_id=session.owner_id,
             name=f"{catalog_entry.name} (from Data Discovery)",
-            source_type=source_type,
+            source_type=resolved_source_type or SourceType.API,
             description=f"Added from Data Source Discovery: {catalog_entry.description}",
             template_id=catalog_entry.source_template_id,
             configuration=configuration,

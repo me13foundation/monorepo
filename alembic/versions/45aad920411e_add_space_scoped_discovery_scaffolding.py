@@ -25,6 +25,7 @@ def upgrade() -> None:
     """Upgrade schema to support space-scoped discovery."""
     bind = op.get_bind()
     dialect_name = bind.dialect.name
+    inspector = sa.inspect(bind)
 
     # --- Data source permission levels ------------------------------------
     permission_enum = sa.Enum(
@@ -36,25 +37,38 @@ def upgrade() -> None:
     if dialect_name != "sqlite":
         permission_enum.create(bind, checkfirst=True)
 
-    op.add_column(
-        "data_source_activation_rules",
-        sa.Column(
-            "permission_level",
-            permission_enum if dialect_name != "sqlite" else sa.String(32),
-            nullable=False,
-            server_default="available",
-        ),
-    )
-    op.create_index(
-        "ix_data_source_activation_rules_permission_level",
-        "data_source_activation_rules",
-        ["permission_level"],
-    )
-    op.create_index(
-        "ix_data_source_activation_rules_space_permission",
-        "data_source_activation_rules",
-        ["research_space_id", "permission_level"],
-    )
+    existing_columns = {
+        column["name"]
+        for column in inspector.get_columns("data_source_activation_rules")
+    }
+    added_permission_column = False
+    if "permission_level" not in existing_columns:
+        op.add_column(
+            "data_source_activation_rules",
+            sa.Column(
+                "permission_level",
+                permission_enum if dialect_name != "sqlite" else sa.String(32),
+                nullable=False,
+                server_default="available",
+            ),
+        )
+        added_permission_column = True
+
+    existing_indexes = {
+        index["name"] for index in inspector.get_indexes("data_source_activation_rules")
+    }
+    if "ix_data_source_activation_rules_permission_level" not in existing_indexes:
+        op.create_index(
+            "ix_data_source_activation_rules_permission_level",
+            "data_source_activation_rules",
+            ["permission_level"],
+        )
+    if "ix_data_source_activation_rules_space_permission" not in existing_indexes:
+        op.create_index(
+            "ix_data_source_activation_rules_space_permission",
+            "data_source_activation_rules",
+            ["research_space_id", "permission_level"],
+        )
 
     # Align existing data with permission levels
     available_value = "available"
@@ -79,14 +93,15 @@ def upgrade() -> None:
     op.execute(sa.text(update_sql))
 
     # Remove server default now that data migrated
-    with op.batch_alter_table("data_source_activation_rules") as batch:
-        batch.alter_column(
-            "permission_level",
-            server_default=None,
-            existing_type=permission_enum
-            if dialect_name != "sqlite"
-            else sa.String(32),
-        )
+    if added_permission_column:
+        with op.batch_alter_table("data_source_activation_rules") as batch:
+            batch.alter_column(
+                "permission_level",
+                server_default=None,
+                existing_type=permission_enum
+                if dialect_name != "sqlite"
+                else sa.String(32),
+            )
 
     # --- Data discovery sessions must belong to a space --------------------
     op.execute(
@@ -116,6 +131,7 @@ def downgrade() -> None:
     """Revert schema changes."""
     bind = op.get_bind()
     dialect_name = bind.dialect.name
+    inspector = sa.inspect(bind)
 
     with op.batch_alter_table("data_discovery_sessions") as batch:
         batch.drop_index("ix_data_discovery_sessions_space_owner")
@@ -125,15 +141,25 @@ def downgrade() -> None:
             nullable=True,
         )
 
-    op.drop_index(
-        "ix_data_source_activation_rules_space_permission",
-        table_name="data_source_activation_rules",
-    )
-    op.drop_index(
-        "ix_data_source_activation_rules_permission_level",
-        table_name="data_source_activation_rules",
-    )
-    op.drop_column("data_source_activation_rules", "permission_level")
+    existing_indexes = {
+        index["name"] for index in inspector.get_indexes("data_source_activation_rules")
+    }
+    if "ix_data_source_activation_rules_space_permission" in existing_indexes:
+        op.drop_index(
+            "ix_data_source_activation_rules_space_permission",
+            table_name="data_source_activation_rules",
+        )
+    if "ix_data_source_activation_rules_permission_level" in existing_indexes:
+        op.drop_index(
+            "ix_data_source_activation_rules_permission_level",
+            table_name="data_source_activation_rules",
+        )
+    existing_columns = {
+        column["name"]
+        for column in inspector.get_columns("data_source_activation_rules")
+    }
+    if "permission_level" in existing_columns:
+        op.drop_column("data_source_activation_rules", "permission_level")
 
     if dialect_name != "sqlite":
         permission_enum = sa.Enum(

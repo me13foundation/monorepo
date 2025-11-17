@@ -11,6 +11,7 @@ from src.domain.entities.data_source_activation import (
     DataSourceActivation,
     PermissionLevel,
 )
+from src.domain.entities.user_data_source import SourceType
 
 
 class CatalogEntryResponse(BaseModel):
@@ -23,6 +24,7 @@ class CatalogEntryResponse(BaseModel):
     subcategory: str | None
     tags: list[str]
     param_type: str
+    source_type: SourceType
     is_active: bool
     requires_auth: bool
     usage_count: int
@@ -42,6 +44,7 @@ class CatalogEntryResponse(BaseModel):
                 if hasattr(entry.param_type, "value")
                 else entry.param_type
             ),
+            source_type=entry.source_type,
             is_active=entry.is_active,
             requires_auth=entry.requires_auth,
             usage_count=entry.usage_count,

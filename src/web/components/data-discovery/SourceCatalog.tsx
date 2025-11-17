@@ -104,6 +104,14 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   'AI Predictive Models': BrainCircuit,
 }
 
+const SOURCE_TYPE_LABELS: Record<SourceCatalogEntry['source_type'], string> = {
+  api: 'API',
+  database: 'Database',
+  file_upload: 'File Upload',
+  web_scraping: 'Web Scraping',
+  pubmed: 'PubMed',
+}
+
 interface SourceCatalogProps {
   catalog?: SourceCatalogEntry[]
   isLoading: boolean
@@ -325,9 +333,12 @@ function SourceCard({ source, isSelected, onToggle }: SourceCardProps) {
               <h3 className="mb-1 truncate font-semibold text-foreground">
                 {source.name}
               </h3>
-              <p className="mb-2 text-xs text-muted-foreground">
-                {source.category}
-              </p>
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{source.category}</span>
+                <Badge variant="outline" className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                  {SOURCE_TYPE_LABELS[source.source_type]}
+                </Badge>
+              </div>
               <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
                 {source.description}
               </p>

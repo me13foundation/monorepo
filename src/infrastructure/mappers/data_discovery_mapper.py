@@ -16,6 +16,7 @@ from src.domain.entities.data_discovery_session import (
     SourceCatalogEntry,
     TestResultStatus,
 )
+from src.domain.entities.user_data_source import SourceType
 from src.models.database.data_discovery import (
     DataDiscoverySessionModel,
     QueryTestResultModel,
@@ -135,6 +136,7 @@ def source_catalog_to_model(entity: SourceCatalogEntry) -> SourceCatalogEntryMod
         category=entity.category,
         subcategory=entity.subcategory,
         tags=entity.tags,
+        source_type=entity.source_type.value,
         param_type=entity.param_type.value,  # Convert enum to string
         url_template=entity.url_template,
         data_format=entity.data_format,
@@ -166,6 +168,7 @@ def source_catalog_to_entity(model: SourceCatalogEntryModel) -> SourceCatalogEnt
         category=model.category,
         subcategory=model.subcategory,
         tags=model.tags or [],
+        source_type=SourceType(model.source_type),
         param_type=QueryParameterType(model.param_type),
         url_template=model.url_template,
         data_format=model.data_format,

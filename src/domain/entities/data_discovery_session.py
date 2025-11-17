@@ -13,6 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from src.domain.entities.user_data_source import SourceType
 from src.type_definitions.common import JSONObject
 
 
@@ -59,6 +60,10 @@ class SourceCatalogEntry(BaseModel):
     # Description and metadata
     description: str = Field(..., max_length=1000, description="Detailed description")
     tags: list[str] = Field(default_factory=list, description="Searchable tags")
+    source_type: SourceType = Field(
+        default=SourceType.API,
+        description="Underlying ingestion type (api, file_upload, database, etc.)",
+    )
 
     # Query capabilities
     param_type: QueryParameterType = Field(

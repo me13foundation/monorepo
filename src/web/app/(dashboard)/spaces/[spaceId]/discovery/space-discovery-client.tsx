@@ -22,11 +22,17 @@ import {
   useToggleSpaceDiscoverySourceSelection,
 } from '@/lib/queries/space-discovery'
 import { syncDiscoverySessionState } from '@/lib/state/discovery-session-sync'
-import { PageHero, DashboardSection } from '@/components/ui/composition-patterns'
+import { DashboardSection } from '@/components/ui/composition-patterns'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
+
+import {
+  createDefaultAdvancedSettings,
+  DEFAULT_ADVANCED_SETTINGS as DEFAULT_ADVANCED_SOURCE_SETTINGS,
+  type SourceAdvancedSettings,
+} from '@/components/data-discovery/advanced-settings'
 
 const SourceCatalog = dynamic(
   () => import('@/components/data-discovery/SourceCatalog').then((mod) => ({ default: mod.SourceCatalog })),
@@ -55,6 +61,9 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
   const [activeView, setActiveView] = useState<'select' | 'results'>('select')
   const [parameters, setParameters] = useState<QueryParameters>(DEFAULT_PARAMETERS)
   const [sourceParameters, setSourceParameters] = useState<Record<string, QueryParameters>>({})
+  const [sourceAdvancedSettings, setSourceAdvancedSettings] = useState<
+    Record<string, SourceAdvancedSettings>
+  >({})
   const [selectedSources, setSelectedSources] = useState<string[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -172,6 +181,29 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     })
   }, [selectedSources, parameters])
 
+  useEffect(() => {
+    setSourceAdvancedSettings((current) => {
+      const next = { ...current }
+      let changed = false
+
+      selectedSources.forEach((sourceId) => {
+        if (!next[sourceId]) {
+          next[sourceId] = createDefaultAdvancedSettings()
+          changed = true
+        }
+      })
+
+      Object.keys(next).forEach((sourceId) => {
+        if (!selectedSources.includes(sourceId)) {
+          delete next[sourceId]
+          changed = true
+        }
+      })
+
+      return changed ? next : current
+    })
+  }, [selectedSources])
+
   const handleToggleSource = useCallback(
     async (sourceId: string) => {
       if (!activeSessionId) {
@@ -253,6 +285,16 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     [],
   )
 
+  const handleSourceAdvancedSettingsChange = useCallback(
+    (sourceId: string, nextSettings: SourceAdvancedSettings) => {
+      setSourceAdvancedSettings((prev) => ({
+        ...prev,
+        [sourceId]: nextSettings,
+      }))
+    },
+    [],
+  )
+
   const resolveExecutionContext = useCallback(
     (sourceId: string):
       | {
@@ -318,6 +360,33 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     [handleRunTest],
   )
 
+  const buildSourceConfigPayload = useCallback(
+    (catalogEntryId: string) => {
+      const settings = sourceAdvancedSettings[catalogEntryId]
+      if (!settings) {
+        return {}
+      }
+      const { scheduling, notes } = settings
+      const payload: Record<string, unknown> = {
+        scheduling: {
+          enabled: scheduling.enabled,
+          frequency: scheduling.frequency,
+          timezone: scheduling.timezone || 'UTC',
+          start_time: scheduling.startTime ? new Date(scheduling.startTime).toISOString() : null,
+          cron_expression:
+            scheduling.frequency === 'cron'
+              ? scheduling.cronExpression?.trim() || null
+              : null,
+        },
+      }
+      if (notes.trim().length > 0) {
+        payload.metadata = { notes: notes.trim() }
+      }
+      return payload
+    },
+    [sourceAdvancedSettings],
+  )
+
   const handleAddResultToSpace = useCallback(
     async (result: QueryTestResult, targetSpaceId: string) => {
       if (!activeSessionId) {
@@ -331,7 +400,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
           payload: {
             catalog_entry_id: result.catalog_entry_id,
             research_space_id: targetSpaceId,
-            source_config: {},
+            source_config: buildSourceConfigPayload(result.catalog_entry_id),
           },
         })
         toast.success('Source added to research space')
@@ -340,7 +409,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
         toast.error('Failed to add source to space')
       }
     },
-    [activeSessionId, addToSpaceMutation],
+    [activeSessionId, addToSpaceMutation, buildSourceConfigPayload],
   )
 
   const handleGenerateResults = useCallback(() => {
@@ -354,13 +423,6 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
 
   return (
     <div className="space-y-6">
-      <PageHero
-        title="Space Discovery Workbench"
-        description={`Discover, test, and activate data sources curated for ${displaySpaceName}.`}
-        variant="research"
-        actions={<Badge variant="secondary">Space-scoped</Badge>}
-      />
-
       <DashboardSection
         title={activeView === 'select' ? 'Select Data Sources' : 'Review & Run Tests'}
         description={
@@ -412,8 +474,11 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
             isLoading={testsQuery.isLoading}
             selectedSourceIds={selectedSources}
             sourceParameters={sourceParameters}
+            advancedSettings={sourceAdvancedSettings}
             defaultParameters={parameters}
+            defaultAdvancedSettings={DEFAULT_ADVANCED_SOURCE_SETTINGS}
             onUpdateSourceParameters={handleSourceParametersChange}
+            onUpdateAdvancedSettings={handleSourceAdvancedSettingsChange}
             onBackToSelect={() => setActiveView('select')}
             onAddToSpace={handleAddResultToSpace}
             onRunTest={handleRunSingleTest}

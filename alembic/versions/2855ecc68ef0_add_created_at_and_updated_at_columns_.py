@@ -20,30 +20,42 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Add created_at and updated_at columns to query_test_results table
-    op.add_column(
-        "query_test_results",
-        sa.Column(
-            "created_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            nullable=False,
-        ),
-    )
-    op.add_column(
-        "query_test_results",
-        sa.Column(
-            "updated_at",
-            sa.DateTime(timezone=True),
-            server_default=sa.func.now(),
-            onupdate=sa.func.now(),
-            nullable=False,
-        ),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_columns = {
+        column["name"] for column in inspector.get_columns("query_test_results")
+    }
+    if "created_at" not in existing_columns:
+        op.add_column(
+            "query_test_results",
+            sa.Column(
+                "created_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                nullable=False,
+            ),
+        )
+    if "updated_at" not in existing_columns:
+        op.add_column(
+            "query_test_results",
+            sa.Column(
+                "updated_at",
+                sa.DateTime(timezone=True),
+                server_default=sa.func.now(),
+                onupdate=sa.func.now(),
+                nullable=False,
+            ),
+        )
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    # Drop created_at and updated_at columns from query_test_results table
-    op.drop_column("query_test_results", "updated_at")
-    op.drop_column("query_test_results", "created_at")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_columns = {
+        column["name"] for column in inspector.get_columns("query_test_results")
+    }
+    if "updated_at" in existing_columns:
+        op.drop_column("query_test_results", "updated_at")
+    if "created_at" in existing_columns:
+        op.drop_column("query_test_results", "created_at")
