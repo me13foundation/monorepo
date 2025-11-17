@@ -14,6 +14,8 @@ from src.domain.repositories.data_source_activation_repository import (  # noqa:
     DataSourceActivationRepository,
 )
 
+DEFAULT_AVAILABLE_SOURCES: frozenset[str] = frozenset({"pubmed"})
+
 
 @dataclass(frozen=True)
 class DataSourceAvailabilitySummary:
@@ -31,6 +33,12 @@ class DataSourceActivationService:
 
     def __init__(self, repository: DataSourceActivationRepository) -> None:
         self._repository = repository
+
+    def _default_permission(self, catalog_entry_id: str) -> PermissionLevel:
+        """Return the default permission for catalog entries without explicit rules."""
+        if catalog_entry_id in DEFAULT_AVAILABLE_SOURCES:
+            return PermissionLevel.AVAILABLE
+        return PermissionLevel.BLOCKED
 
     def set_global_activation(
         self,
@@ -111,8 +119,7 @@ class DataSourceActivationService:
         if global_rule is not None:
             return global_rule.permission_level
 
-        # Default: sources are available when no rule exists.
-        return PermissionLevel.AVAILABLE
+        return self._default_permission(catalog_entry_id)
 
     def is_source_active(
         self,
@@ -168,7 +175,7 @@ class DataSourceActivationService:
         effective_permission = (
             global_rule.permission_level
             if global_rule is not None
-            else PermissionLevel.AVAILABLE
+            else self._default_permission(catalog_entry_id)
         )
         if project_rules:
             # Use the first project rule for deterministic ordering in summary (sorted below)

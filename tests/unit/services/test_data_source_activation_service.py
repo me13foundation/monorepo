@@ -111,10 +111,13 @@ def service() -> DataSourceActivationService:
     return DataSourceActivationService(InMemoryActivationRepository())
 
 
-def test_defaults_to_active_when_no_rules(service: DataSourceActivationService) -> None:
-    source_id = "catalog-1"
-    assert service.is_source_active(source_id)
-    assert service.is_source_active(source_id, uuid4())
+def test_default_permissions_block_all_except_pubmed(
+    service: DataSourceActivationService,
+) -> None:
+    assert service.is_source_active("pubmed") is True
+    assert service.is_source_active("pubmed", uuid4()) is True
+    assert service.is_source_active("clinvar") is False
+    assert service.is_source_active("clinvar", uuid4()) is False
 
 
 def test_global_rule_controls_default(service: DataSourceActivationService) -> None:
@@ -163,7 +166,14 @@ def test_clearing_rules_reverts_to_default(
         updated_by=admin_id,
     )
     service.clear_global_activation(source_id)
-    assert service.is_source_active(source_id) is True
+    assert service.is_source_active(source_id) is False
+    service.set_global_activation(
+        catalog_entry_id="pubmed",
+        permission_level=PermissionLevel.BLOCKED,
+        updated_by=admin_id,
+    )
+    service.clear_global_activation("pubmed")
+    assert service.is_source_active("pubmed") is True
 
 
 def test_bulk_summary_preserves_order(
@@ -185,5 +195,5 @@ def test_bulk_summary_preserves_order(
 
     summaries = service.get_availability_summaries([ids[1], ids[0]])
     assert [summary.catalog_entry_id for summary in summaries] == [ids[1], ids[0]]
-    assert summaries[0].effective_is_active is True
+    assert summaries[0].effective_is_active is False
     assert summaries[1].effective_is_active is False

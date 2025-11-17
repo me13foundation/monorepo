@@ -47,7 +47,7 @@ function getEffectivePermission(
   if (override) {
     return override.permission_level
   }
-  return summary.global_rule?.permission_level ?? 'available'
+  return summary.global_rule?.permission_level ?? summary.effective_permission_level ?? 'available'
 }
 
 export function SpaceSourcePermissionsManager() {
@@ -127,7 +127,10 @@ export function SpaceSourcePermissionsManager() {
                           (rule) => rule.research_space_id === space.id,
                         )
                         const effective = getEffectivePermission(summary, space.id)
-                        const inherited = summary?.global_rule?.permission_level ?? 'available'
+                        const inherited =
+                          summary?.global_rule?.permission_level ??
+                          summary?.effective_permission_level ??
+                          'available'
                         const selectValue = override ? override.permission_level : 'inherit'
                         return (
                           <TableCell key={`${source.id}-${space.id}`} className="text-center">
