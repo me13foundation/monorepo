@@ -41,6 +41,15 @@ from .source_template import (
 from .source_template import (
     TemplateCategoryEnum as TemplateCategory,
 )
+from .storage import (
+    StorageConfigurationModel,
+    StorageHealthSnapshotModel,
+    StorageHealthStatusEnum,
+    StorageOperationModel,
+    StorageOperationStatusEnum,
+    StorageOperationTypeEnum,
+    StorageProviderEnum,
+)
 from .user import UserModel
 from .user_data_source import (
     SourceStatusEnum as SourceStatus,
@@ -82,6 +91,13 @@ __all__ = [
     "SourceTemplateModel",
     "SourceType",
     "SourceTypeEnum",
+    "StorageConfigurationModel",
+    "StorageHealthSnapshotModel",
+    "StorageHealthStatusEnum",
+    "StorageOperationModel",
+    "StorageOperationStatusEnum",
+    "StorageOperationTypeEnum",
+    "StorageProviderEnum",
     "SpaceStatusEnum",
     "TemplateCategory",
     "UserDataSourceModel",

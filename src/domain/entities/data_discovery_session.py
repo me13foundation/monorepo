@@ -6,7 +6,7 @@ and validating data sources before adding them to Research Spaces.
 """
 
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import Enum
 from typing import assert_never
 from uuid import UUID
@@ -196,6 +196,66 @@ class QueryParameters(BaseModel):
             # API sources may have custom validation
             return True
         assert_never(param_type)
+
+
+class PubMedSortOption(str, Enum):
+    """Supported PubMed sort options."""
+
+    RELEVANCE = "relevance"
+    PUBLICATION_DATE = "publication_date"
+    AUTHOR = "author"
+    JOURNAL = "journal"
+    TITLE = "title"
+
+
+class AdvancedQueryParameters(QueryParameters):
+    """Extended query parameters with advanced filters."""
+
+    model_config = ConfigDict(frozen=True)
+
+    date_from: date | None = Field(
+        default=None,
+        description="Earliest publication date to include.",
+    )
+    date_to: date | None = Field(
+        default=None,
+        description="Latest publication date to include.",
+    )
+    publication_types: list[str] = Field(
+        default_factory=list,
+        description="Publication types (validated against PublicationType).",
+    )
+    languages: list[str] = Field(
+        default_factory=list,
+        description="Language filters (ISO codes).",
+    )
+    sort_by: PubMedSortOption = Field(
+        default=PubMedSortOption.RELEVANCE,
+        description="Sort order for PubMed results.",
+    )
+    max_results: int = Field(
+        default=100,
+        ge=1,
+        le=1000,
+        description="Maximum number of results to fetch.",
+    )
+    additional_terms: str | None = Field(
+        default=None,
+        description="Additional PubMed query syntax appended to the search.",
+    )
+
+
+class QueryParameterCapabilities(BaseModel):
+    """Describes which advanced parameters a source supports."""
+
+    model_config = ConfigDict(frozen=True)
+
+    supports_date_range: bool = False
+    supports_publication_types: bool = False
+    supports_language_filter: bool = False
+    supports_sort_options: bool = False
+    supports_additional_terms: bool = False
+    max_results_limit: int = Field(default=1000, ge=1, le=1000)
 
 
 class QueryTestResult(BaseModel):

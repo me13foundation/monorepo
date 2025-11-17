@@ -36,6 +36,13 @@ from .source_template import (
     TemplateUIConfig,
     ValidationRule,
 )
+from .storage_configuration import (
+    StorageConfiguration,
+    StorageHealthSnapshot,
+    StorageOperation,
+    StorageProviderMetadata,
+    StorageProviderTestResult,
+)
 from .user_data_source import (
     IngestionSchedule,
     QualityMetrics,
@@ -75,4 +82,9 @@ __all__ = [
     "Variant",
     "ActivationScope",
     "DataSourceActivation",
+    "StorageConfiguration",
+    "StorageHealthSnapshot",
+    "StorageOperation",
+    "StorageProviderMetadata",
+    "StorageProviderTestResult",
 ]

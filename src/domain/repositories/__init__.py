@@ -13,6 +13,10 @@ from .ingestion_job_repository import IngestionJobRepository
 from .phenotype_repository import PhenotypeRepository
 from .publication_repository import PublicationRepository
 from .source_template_repository import SourceTemplateRepository
+from .storage_repository import (
+    StorageConfigurationRepository,
+    StorageOperationRepository,
+)
 
 # Data Sources module repositories
 from .user_data_source_repository import UserDataSourceRepository
@@ -27,6 +31,8 @@ __all__ = [
     "QuerySpecification",
     "Repository",
     "SourceTemplateRepository",
+    "StorageConfigurationRepository",
+    "StorageOperationRepository",
     "UserDataSourceRepository",
     "VariantRepository",
     "DataSourceActivationRepository",

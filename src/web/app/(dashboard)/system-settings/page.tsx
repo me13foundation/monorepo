@@ -4,7 +4,9 @@ import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query
 import { authOptions } from '@/lib/auth'
 import SystemSettingsClient from './system-settings-client'
 import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
+import { fetchStorageConfigurations } from '@/lib/api/storage'
 import { userKeys } from '@/lib/query-keys/users'
+import { storageKeys } from '@/lib/query-keys/storage'
 import { INITIAL_USER_PARAMS } from './constants'
 
 export default async function SystemSettingsPage() {
@@ -34,11 +36,15 @@ export default async function SystemSettingsPage() {
       queryKey: userKeys.stats(token),
       queryFn: () => fetchUserStatistics(token),
     }),
+    queryClient.prefetchQuery({
+      queryKey: storageKeys.list(token),
+      queryFn: () => fetchStorageConfigurations(token),
+    }),
   ])
 
   prefetched.forEach((result, index) => {
     if (result.status === 'rejected') {
-      const target = index === 0 ? 'user list' : 'user stats'
+      const target = ['user list', 'user stats', 'storage configurations'][index] ?? 'system setting'
       console.error(`[SystemSettingsPage] Failed to prefetch ${target}:`, result.reason)
     }
   })

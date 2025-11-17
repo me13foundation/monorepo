@@ -25,6 +25,9 @@ if TYPE_CHECKING:
 from src.application.services.source_management_service import (
     SourceManagementService,
 )
+from src.application.services.storage_configuration_service import (
+    StorageConfigurationService,
+)
 from src.application.services.template_management_service import (
     TemplateManagementService,
 )
@@ -44,12 +47,18 @@ if TYPE_CHECKING:
 from src.infrastructure.repositories.source_template_repository import (
     SqlAlchemySourceTemplateRepository,
 )
+from src.infrastructure.repositories.storage_repository import (
+    SqlAlchemyStorageConfigurationRepository,
+    SqlAlchemyStorageOperationRepository,
+)
 from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
 )
+from src.infrastructure.storage import initialize_storage_plugins
 
 DEFAULT_OWNER_ID = UUID("00000000-0000-0000-0000-000000000001")
 SYSTEM_ACTOR_ID = DEFAULT_OWNER_ID
+_STORAGE_REGISTRY = initialize_storage_plugins()
 
 
 def get_db_session() -> Session:
@@ -121,6 +130,23 @@ def get_catalog_entry(session: Session, catalog_entry_id: str) -> SourceCatalogE
     return entry
 
 
+def get_storage_configuration_service() -> (
+    Generator[StorageConfigurationService, None, None]
+):
+    """Yield a storage configuration service scoped to a session."""
+
+    session = get_db_session()
+    service = StorageConfigurationService(
+        configuration_repository=SqlAlchemyStorageConfigurationRepository(session),
+        operation_repository=SqlAlchemyStorageOperationRepository(session),
+        plugin_registry=_STORAGE_REGISTRY,
+    )
+    try:
+        yield service
+    finally:
+        session.close()
+
+
 __all__ = [
     "DEFAULT_OWNER_ID",
     "SYSTEM_ACTOR_ID",
@@ -131,5 +157,6 @@ __all__ = [
     "get_ingestion_scheduling_service",
     "get_ingestion_job_repository",
     "get_source_service",
+    "get_storage_configuration_service",
     "get_template_service",
 ]

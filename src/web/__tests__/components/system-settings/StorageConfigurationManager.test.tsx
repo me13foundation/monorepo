@@ -1,0 +1,128 @@
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { StorageConfigurationManager } from '@/components/system-settings/StorageConfigurationManager'
+
+const mockUseStorageConfigurations = jest.fn()
+const mockUseStorageMutations = jest.fn()
+const mockUseStorageMetrics = jest.fn()
+const mockUseStorageHealth = jest.fn()
+
+let createMutation: { mutateAsync: jest.Mock; isPending: boolean }
+let updateMutation: { mutateAsync: jest.Mock; isPending: boolean }
+let testMutation: { mutateAsync: jest.Mock; isPending: boolean }
+
+jest.mock('sonner', () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+  },
+}))
+
+jest.mock('@/lib/queries/storage', () => ({
+  useStorageConfigurations: () => mockUseStorageConfigurations(),
+  useStorageMutations: () => mockUseStorageMutations(),
+  useStorageMetrics: (id: string) => mockUseStorageMetrics(id),
+  useStorageHealth: (id: string) => mockUseStorageHealth(id),
+}))
+
+describe('StorageConfigurationManager', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    createMutation = { mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }
+    updateMutation = { mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }
+    testMutation = { mutateAsync: jest.fn().mockResolvedValue({ success: true }), isPending: false }
+    mockUseStorageConfigurations.mockReturnValue({
+      data: [],
+      isLoading: false,
+    })
+    mockUseStorageMutations.mockReturnValue({
+      createConfiguration: createMutation,
+      updateConfiguration: updateMutation,
+      testConfiguration: testMutation,
+    })
+    mockUseStorageMetrics.mockReturnValue({ data: null })
+    mockUseStorageHealth.mockReturnValue({ data: null })
+  })
+
+  it('renders empty state when no configurations are available', () => {
+    render(<StorageConfigurationManager />)
+    expect(screen.getByText(/No storage configurations found/i)).toBeInTheDocument()
+  })
+
+  it('submits the new configuration form', async () => {
+    const user = userEvent.setup()
+    render(<StorageConfigurationManager />)
+
+    await user.click(screen.getByRole('button', { name: /Add Configuration/i }))
+    const nameInput = screen.getByLabelText(/Name/i)
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Local Archive')
+
+    await user.click(screen.getByRole('button', { name: /Create Configuration/i }))
+
+    await waitFor(() => {
+      expect(createMutation.mutateAsync).toHaveBeenCalledWith({
+        name: 'Local Archive',
+        provider: 'local_filesystem',
+        default_use_cases: ['pdf'],
+        enabled: true,
+        config: {
+          provider: 'local_filesystem',
+          base_path: '/var/med13/storage',
+          create_directories: true,
+          expose_file_urls: false,
+        },
+      })
+    })
+  })
+
+  it('tests an existing configuration connection', async () => {
+    const user = userEvent.setup()
+    mockUseStorageConfigurations.mockReturnValue({
+      data: [
+        {
+          id: 'cfg-1',
+          name: 'Primary Storage',
+          provider: 'local_filesystem',
+          config: {
+            provider: 'local_filesystem',
+            base_path: '/var/lib/med13',
+            create_directories: true,
+            expose_file_urls: false,
+          },
+          enabled: true,
+          supported_capabilities: ['pdf', 'export'],
+          default_use_cases: ['pdf'],
+          metadata: {},
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+      isLoading: false,
+    })
+    mockUseStorageMetrics.mockReturnValue({
+      data: {
+        configuration_id: 'cfg-1',
+        total_files: 5,
+        total_size_bytes: 1024,
+        last_operation_at: new Date().toISOString(),
+        error_rate: 0,
+      },
+    })
+    mockUseStorageHealth.mockReturnValue({
+      data: {
+        configuration_id: 'cfg-1',
+        provider: 'local_filesystem',
+        status: 'healthy',
+        last_checked_at: new Date().toISOString(),
+        details: {},
+      },
+    })
+
+    render(<StorageConfigurationManager />)
+
+    await user.click(screen.getByRole('button', { name: /Test Connection/i }))
+
+    expect(testMutation.mutateAsync).toHaveBeenCalledWith({ configurationId: 'cfg-1' })
+  })
+})

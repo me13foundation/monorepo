@@ -510,6 +510,17 @@ postgres-wait: ## Wait until Postgres is ready to accept connections
 ifeq ($(POSTGRES_ACTIVE),)
 	@echo "Postgres mode inactive; skipping wait."
 else
+	$(call ensure_postgres_env)
+	@if [ -z "$$($(POSTGRES_COMPOSE) ps -q $(POSTGRES_SERVICE))" ]; then \
+		if [ "$(MED13_SKIP_COMPOSE)" = "1" ]; then \
+			echo "Postgres container is not running and MED13_SKIP_COMPOSE=1; skipping auto-start."; \
+			echo "Skipping Postgres wait/migrate steps (tests will run with default DB)."; \
+			exit 0; \
+		else \
+			echo "Postgres container is not running; starting via $(POSTGRES_COMPOSE_FILE)..."; \
+			$(POSTGRES_COMPOSE) up -d $(POSTGRES_SERVICE); \
+		fi \
+	fi
 	@echo "Waiting for Postgres health check..."
 	$(call run_with_postgres_env,$(USE_PYTHON) scripts/wait_for_postgres.py)
 endif
@@ -730,7 +741,11 @@ check-env: ## Check if development environment is properly set up
 	@echo "Checking if requirements are installed..."
 	$(USE_PYTHON) -c "import fastapi, uvicorn, sqlalchemy, pydantic; print('✅ Core dependencies OK')" 2>/dev/null || echo "❌ Core dependencies missing - run 'make install-dev'"
 	@echo "Checking pre-commit..."
-	pre-commit --version 2>/dev/null || echo "⚠️  pre-commit not installed - run 'make setup-dev'"
+	@if command -v pre-commit >/dev/null 2>&1; then \
+		echo "pre-commit available"; \
+	else \
+		echo "⚠️  pre-commit not installed - run 'make setup-dev'"; \
+	fi
 
 # Documentation
 docs-serve: ## Serve documentation locally

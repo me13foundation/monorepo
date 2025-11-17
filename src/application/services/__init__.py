@@ -26,6 +26,12 @@ from .source_management_service import (
     UpdateSourceRequest,
 )
 from .space_data_discovery_service import SpaceDataDiscoveryService
+from .storage_configuration_service import (
+    CreateStorageConfigurationRequest,
+    StorageConfigurationService,
+    StorageConfigurationValidator,
+    UpdateStorageConfigurationRequest,
+)
 from .template_management_service import (
     CreateTemplateRequest,
     TemplateManagementService,
@@ -35,8 +41,11 @@ from .variant_service import VariantApplicationService
 
 __all__ = [
     "CreateSourceRequest",
+    "CreateStorageConfigurationRequest",
     "CreateTemplateRequest",
+    "DataSourceActivationService",
     "DataSourceAuthorizationService",
+    "DataSourceAvailabilitySummary",
     "DataSourcePermission",
     "EvidenceApplicationService",
     "GeneApplicationService",
@@ -44,11 +53,12 @@ __all__ = [
     "PublicationApplicationService",
     "SourceManagementService",
     "SpaceDataDiscoveryService",
+    "StorageConfigurationService",
+    "StorageConfigurationValidator",
     "TemplateManagementService",
     "UpdateSourceRequest",
+    "UpdateStorageConfigurationRequest",
     "UpdateTemplateRequest",
     "UserRole",
     "VariantApplicationService",
-    "DataSourceActivationService",
-    "DataSourceAvailabilitySummary",
 ]

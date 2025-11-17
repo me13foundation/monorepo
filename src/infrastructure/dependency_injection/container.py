@@ -39,6 +39,9 @@ from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.publication_service import PublicationApplicationService
 from src.application.services.source_management_service import SourceManagementService
+from src.application.services.storage_configuration_service import (
+    StorageConfigurationService,
+)
 from src.application.services.user_management_service import UserManagementService
 from src.application.services.variant_service import VariantApplicationService
 from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
@@ -74,6 +77,10 @@ from src.infrastructure.repositories.sqlalchemy_session_repository import (
 from src.infrastructure.repositories.sqlalchemy_user_repository import (
     SqlAlchemyUserRepository,
 )
+from src.infrastructure.repositories.storage_repository import (
+    SqlAlchemyStorageConfigurationRepository,
+    SqlAlchemyStorageOperationRepository,
+)
 from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
 )
@@ -82,6 +89,7 @@ from src.infrastructure.repositories.variant_repository import (
 )
 from src.infrastructure.security.jwt_provider import JWTProvider
 from src.infrastructure.security.password_hasher import PasswordHasher
+from src.infrastructure.storage import initialize_storage_plugins
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -166,6 +174,7 @@ class DependencyContainer:
         self._gene_domain_service: GeneDomainService | None = None
         self._variant_domain_service: VariantDomainService | None = None
         self._evidence_domain_service: EvidenceDomainService | None = None
+        self._storage_plugin_registry = initialize_storage_plugins()
 
     def get_user_repository(self) -> SqlAlchemyUserRepository:
         if self._user_repository is None:
@@ -382,6 +391,18 @@ class DependencyContainer:
         return PublicationApplicationService(
             publication_repository=publication_repository,
             evidence_repository=evidence_repository,
+        )
+
+    def create_storage_configuration_service(
+        self,
+        session: Session,
+    ) -> StorageConfigurationService:
+        configuration_repository = SqlAlchemyStorageConfigurationRepository(session)
+        operation_repository = SqlAlchemyStorageOperationRepository(session)
+        return StorageConfigurationService(
+            configuration_repository=configuration_repository,
+            operation_repository=operation_repository,
+            plugin_registry=self._storage_plugin_registry,
         )
 
     def create_curation_service(self, session: Session) -> CurationService:

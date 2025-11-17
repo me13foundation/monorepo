@@ -45,6 +45,7 @@ import type {
 } from '@/lib/api/users'
 import { DataSourceAvailabilitySection } from '@/components/system-settings/DataSourceAvailabilitySection'
 import { SpaceSourcePermissionsManager } from '@/components/system-settings/SpaceSourcePermissionsManager'
+import { StorageConfigurationManager } from '@/components/system-settings/StorageConfigurationManager'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 interface SystemSettingsClientProps {
@@ -236,6 +237,7 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
         <TabsList>
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="permissions">Source Permissions</TabsTrigger>
+          <TabsTrigger value="storage">Storage</TabsTrigger>
         </TabsList>
         <TabsContent value="users" className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -462,6 +464,9 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
         <TabsContent value="permissions" className="space-y-6">
           <DataSourceAvailabilitySection />
           <SpaceSourcePermissionsManager />
+        </TabsContent>
+        <TabsContent value="storage" className="space-y-6">
+          <StorageConfigurationManager />
         </TabsContent>
       </Tabs>
     </div>
