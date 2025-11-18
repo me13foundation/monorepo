@@ -46,6 +46,16 @@ class StorageConfigurationRepository(ABC):
         """Return available storage configurations."""
 
     @abstractmethod
+    def paginate_configurations(
+        self,
+        *,
+        include_disabled: bool = False,
+        page: int = 1,
+        per_page: int = 25,
+    ) -> tuple[list[StorageConfiguration], int]:
+        """Return a page of storage configurations and total count."""
+
+    @abstractmethod
     def delete(self, configuration_id: UUID) -> bool:
         """Delete (or soft-delete) a configuration."""
 

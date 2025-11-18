@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from src.database.url_resolver import to_async_database_url
+from src.models.database import storage as _storage_models  # noqa: F401
 from src.models.database.base import Base
 
 # Test database configuration

@@ -49,18 +49,12 @@ from src.infrastructure.dependency_injection.container import container
 from src.infrastructure.repositories.source_template_repository import (
     SqlAlchemySourceTemplateRepository,
 )
-from src.infrastructure.repositories.storage_repository import (
-    SqlAlchemyStorageConfigurationRepository,
-    SqlAlchemyStorageOperationRepository,
-)
 from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
 )
-from src.infrastructure.storage import initialize_storage_plugins
 
 DEFAULT_OWNER_ID = UUID("00000000-0000-0000-0000-000000000001")
 SYSTEM_ACTOR_ID = DEFAULT_OWNER_ID
-_STORAGE_REGISTRY = initialize_storage_plugins()
 
 
 def get_db_session() -> Session:
@@ -143,15 +137,19 @@ def get_storage_configuration_service() -> (
     """Yield a storage configuration service scoped to a session."""
 
     session = get_db_session()
-    status_service = get_system_status_service()
-    service = StorageConfigurationService(
-        configuration_repository=SqlAlchemyStorageConfigurationRepository(session),
-        operation_repository=SqlAlchemyStorageOperationRepository(session),
-        plugin_registry=_STORAGE_REGISTRY,
-        system_status_service=status_service,
-    )
+    service = container.create_storage_configuration_service(session)
     try:
         yield service
+    finally:
+        session.close()
+
+
+def get_admin_db_session() -> Generator[Session, None, None]:
+    """Yield a scoped SQLAlchemy session for admin endpoints."""
+
+    session = get_db_session()
+    try:
+        yield session
     finally:
         session.close()
 
@@ -167,6 +165,7 @@ __all__ = [
     "get_ingestion_job_repository",
     "get_source_service",
     "get_storage_configuration_service",
+    "get_admin_db_session",
     "get_system_status_service",
     "get_template_service",
 ]

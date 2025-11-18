@@ -24,57 +24,25 @@ from src.application.curation.conflict_detector import ConflictDetector
 from src.application.curation.repositories.review_repository import (
     SqlAlchemyReviewRepository,
 )
-from src.application.curation.services.curation_service import CurationService
 from src.application.curation.services.detail_service import CurationDetailService
-from src.application.export.export_service import BulkExportService
-from src.application.search.search_service import UnifiedSearchService
 from src.application.services.authentication_service import AuthenticationService
 from src.application.services.authorization_service import AuthorizationService
-from src.application.services.data_discovery_service import DataDiscoveryService
-from src.application.services.data_source_activation_service import (
-    DataSourceActivationService,
-)
-from src.application.services.evidence_service import EvidenceApplicationService
-from src.application.services.gene_service import GeneApplicationService
-from src.application.services.phenotype_service import PhenotypeApplicationService
-from src.application.services.publication_service import PublicationApplicationService
-from src.application.services.source_management_service import SourceManagementService
-from src.application.services.storage_configuration_service import (
-    StorageConfigurationService,
-)
 from src.application.services.system_status_service import (
     SessionRevocationContext,
     SystemStatusService,
 )
 from src.application.services.user_management_service import UserManagementService
-from src.application.services.variant_service import VariantApplicationService
 from src.database.session import SessionLocal
 from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
 from src.database.url_resolver import resolve_async_database_url
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.services.variant_domain_service import VariantDomainService
-from src.infrastructure.queries.source_query_client import HTTPQueryClient
-from src.infrastructure.repositories.data_discovery_repository_impl import (
-    SQLAlchemyDataDiscoverySessionRepository,
-    SQLAlchemyQueryTestResultRepository,
-    SQLAlchemySourceCatalogRepository,
+from src.infrastructure.observability.storage_metrics import (
+    build_storage_metrics_recorder,
 )
-from src.infrastructure.repositories.data_source_activation_repository import (
-    SqlAlchemyDataSourceActivationRepository,
-)
-from src.infrastructure.repositories.evidence_repository import (
-    SqlAlchemyEvidenceRepository,
-)
-from src.infrastructure.repositories.gene_repository import SqlAlchemyGeneRepository
 from src.infrastructure.repositories.phenotype_repository import (
     SqlAlchemyPhenotypeRepository,
-)
-from src.infrastructure.repositories.publication_repository import (
-    SqlAlchemyPublicationRepository,
-)
-from src.infrastructure.repositories.source_template_repository import (
-    SqlAlchemySourceTemplateRepository,
 )
 from src.infrastructure.repositories.sqlalchemy_session_repository import (
     SqlAlchemySessionRepository,
@@ -82,28 +50,21 @@ from src.infrastructure.repositories.sqlalchemy_session_repository import (
 from src.infrastructure.repositories.sqlalchemy_user_repository import (
     SqlAlchemyUserRepository,
 )
-from src.infrastructure.repositories.storage_repository import (
-    SqlAlchemyStorageConfigurationRepository,
-    SqlAlchemyStorageOperationRepository,
-)
 from src.infrastructure.repositories.system_status_repository import (
     SqlAlchemySystemStatusRepository,
-)
-from src.infrastructure.repositories.user_data_source_repository import (
-    SqlAlchemyUserDataSourceRepository,
-)
-from src.infrastructure.repositories.variant_repository import (
-    SqlAlchemyVariantRepository,
 )
 from src.infrastructure.security.jwt_provider import JWTProvider
 from src.infrastructure.security.password_hasher import PasswordHasher
 from src.infrastructure.storage import initialize_storage_plugins
+
+from .service_factories import ApplicationServiceFactoryMixin
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from sqlalchemy.orm import Session
 
+    from src.application.search.search_service import UnifiedSearchService
     from src.domain.services.security.jwt_provider import JWTProviderService
     from src.domain.services.security.password_hasher import PasswordHasherService
     from src.type_definitions.common import HealthCheckResponse
@@ -113,7 +74,7 @@ DEFAULT_DEV_JWT_SECRET = os.getenv("MED13_DEV_JWT_SECRET") or secrets.token_urls
 logger = logging.getLogger(__name__)
 
 
-class DependencyContainer:
+class DependencyContainer(ApplicationServiceFactoryMixin):
     """
     UNIFIED Dependency injection container for MED13 Resource Library.
 
@@ -183,6 +144,7 @@ class DependencyContainer:
         self._variant_domain_service: VariantDomainService | None = None
         self._evidence_domain_service: EvidenceDomainService | None = None
         self._storage_plugin_registry = initialize_storage_plugins()
+        self._storage_metrics_recorder = build_storage_metrics_recorder()
         self._system_status_repository: SqlAlchemySystemStatusRepository | None = None
         self._system_status_service: SystemStatusService | None = None
 
@@ -278,13 +240,13 @@ class DependencyContainer:
 
     # LEGACY APPLICATION SERVICES
 
-    def create_unified_search_service(self, session: Session) -> UnifiedSearchService:
-        return UnifiedSearchService(
-            gene_service=self.create_gene_application_service(session),
-            variant_service=self.create_variant_application_service(session),
-            phenotype_service=self.create_phenotype_application_service(session),
-            evidence_service=self.create_evidence_application_service(session),
-        )
+    def create_unified_search_service(
+        self,
+        session: Session,
+    ) -> UnifiedSearchService:
+        """Backward-compatible alias for the search service factory."""
+
+        return self.create_search_service(session)
 
     def create_curation_detail_service(
         self,
@@ -362,136 +324,6 @@ class DependencyContainer:
             logger.warning("Service initialization health check failed: %s", exc)
 
         return health_status
-
-    def create_gene_application_service(
-        self,
-        session: Session,
-    ) -> GeneApplicationService:
-        gene_repository = SqlAlchemyGeneRepository(session)
-        gene_domain_service = GeneDomainService()
-        variant_repository = SqlAlchemyVariantRepository(session)
-        return GeneApplicationService(
-            gene_repository=gene_repository,
-            gene_domain_service=gene_domain_service,
-            variant_repository=variant_repository,
-        )
-
-    def create_variant_application_service(
-        self,
-        session: Session,
-    ) -> VariantApplicationService:
-        variant_repository = SqlAlchemyVariantRepository(session)
-        variant_domain_service = VariantDomainService()
-        evidence_repository = SqlAlchemyEvidenceRepository(session)
-        return VariantApplicationService(
-            variant_repository=variant_repository,
-            variant_domain_service=variant_domain_service,
-            evidence_repository=evidence_repository,
-        )
-
-    def create_phenotype_application_service(
-        self,
-        session: Session,
-    ) -> PhenotypeApplicationService:
-        phenotype_repository = SqlAlchemyPhenotypeRepository(session)
-        return PhenotypeApplicationService(
-            phenotype_repository=phenotype_repository,
-        )
-
-    def create_evidence_application_service(
-        self,
-        session: Session,
-    ) -> EvidenceApplicationService:
-        evidence_repository = SqlAlchemyEvidenceRepository(session)
-        evidence_domain_service = EvidenceDomainService()
-        return EvidenceApplicationService(
-            evidence_repository=evidence_repository,
-            evidence_domain_service=evidence_domain_service,
-        )
-
-    def create_publication_application_service(
-        self,
-        session: Session,
-    ) -> PublicationApplicationService:
-        publication_repository = SqlAlchemyPublicationRepository(session)
-        evidence_repository = SqlAlchemyEvidenceRepository(session)
-        return PublicationApplicationService(
-            publication_repository=publication_repository,
-            evidence_repository=evidence_repository,
-        )
-
-    def create_storage_configuration_service(
-        self,
-        session: Session,
-    ) -> StorageConfigurationService:
-        configuration_repository = SqlAlchemyStorageConfigurationRepository(session)
-        operation_repository = SqlAlchemyStorageOperationRepository(session)
-        return StorageConfigurationService(
-            configuration_repository=configuration_repository,
-            operation_repository=operation_repository,
-            plugin_registry=self._storage_plugin_registry,
-        )
-
-    def create_curation_service(self, session: Session) -> CurationService:
-        return CurationService(
-            review_repository=SqlAlchemyReviewRepository(),
-            variant_service=self.create_variant_application_service(session),
-            evidence_service=self.create_evidence_application_service(session),
-            phenotype_service=self.create_phenotype_application_service(session),
-        )
-
-    def create_export_service(self, session: Session) -> BulkExportService:
-        return BulkExportService(
-            gene_service=self.create_gene_application_service(session),
-            variant_service=self.create_variant_application_service(session),
-            phenotype_service=self.create_phenotype_application_service(session),
-            evidence_service=self.create_evidence_application_service(session),
-        )
-
-    def create_search_service(self, session: Session) -> UnifiedSearchService:
-        return UnifiedSearchService(
-            gene_service=self.create_gene_application_service(session),
-            variant_service=self.create_variant_application_service(session),
-            phenotype_service=self.create_phenotype_application_service(session),
-            evidence_service=self.create_evidence_application_service(session),
-        )
-
-    def create_source_management_service(
-        self,
-        session: Session,
-    ) -> SourceManagementService:
-        # Create repositories
-        user_data_source_repo = SqlAlchemyUserDataSourceRepository(session)
-        template_repo = SqlAlchemySourceTemplateRepository(session)
-        return SourceManagementService(
-            user_data_source_repository=user_data_source_repo,
-            source_template_repository=template_repo,
-        )
-
-    def create_data_discovery_service(self, session: Session) -> DataDiscoveryService:
-        # Create repositories
-        session_repo = SQLAlchemyDataDiscoverySessionRepository(session)
-        catalog_repo = SQLAlchemySourceCatalogRepository(session)
-        query_repo = SQLAlchemyQueryTestResultRepository(session)
-
-        # Create query client
-        query_client = HTTPQueryClient()
-
-        # Create source management service
-        source_service = self.create_source_management_service(session)
-        template_repo = SqlAlchemySourceTemplateRepository(session)
-        activation_repo = SqlAlchemyDataSourceActivationRepository(session)
-        activation_service = DataSourceActivationService(activation_repo)
-
-        return DataDiscoveryService(
-            data_discovery_session_repository=session_repo,
-            source_catalog_repository=catalog_repo,
-            query_result_repository=query_repo,
-            source_query_client=query_client,
-            source_management_service=source_service,
-            source_template_repository=template_repo,
-            activation_service=activation_service,
-        )
 
 
 # Global container instance (will be configured in main.py)

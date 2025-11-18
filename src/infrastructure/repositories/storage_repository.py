@@ -79,6 +79,40 @@ class SqlAlchemyStorageConfigurationRepository(StorageConfigurationRepository):
         results = self._session.execute(stmt).scalars().all()
         return [StorageMapper.configuration_from_model(model) for model in results]
 
+    def paginate_configurations(
+        self,
+        *,
+        include_disabled: bool = False,
+        page: int = 1,
+        per_page: int = 25,
+    ) -> tuple[list[StorageConfiguration], int]:
+        page = max(page, 1)
+        if per_page < 1:
+            per_page = 25
+        filter_clause = (
+            StorageConfigurationModel.enabled.is_(True)
+            if not include_disabled
+            else None
+        )
+        stmt = select(StorageConfigurationModel)
+        count_stmt = select(func.count()).select_from(StorageConfigurationModel)
+        if filter_clause is not None:
+            stmt = stmt.where(filter_clause)
+            count_stmt = count_stmt.where(filter_clause)
+        stmt = (
+            stmt.order_by(StorageConfigurationModel.created_at.desc())
+            .limit(per_page)
+            .offset(
+                (page - 1) * per_page,
+            )
+        )
+        total = int(self._session.execute(count_stmt).scalar() or 0)
+        models = self._session.execute(stmt).scalars().all()
+        return (
+            [StorageMapper.configuration_from_model(model) for model in models],
+            total,
+        )
+
     def delete(self, configuration_id: UUID) -> bool:
         model = self._session.get(StorageConfigurationModel, str(configuration_id))
         if model is None:

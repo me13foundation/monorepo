@@ -26,12 +26,13 @@ from .source_management_service import (
     UpdateSourceRequest,
 )
 from .space_data_discovery_service import SpaceDataDiscoveryService
-from .storage_configuration_service import (
+from .storage_configuration_requests import (
     CreateStorageConfigurationRequest,
-    StorageConfigurationService,
     UpdateStorageConfigurationRequest,
 )
+from .storage_configuration_service import StorageConfigurationService
 from .storage_configuration_validator import StorageConfigurationValidator
+from .storage_operation_coordinator import StorageOperationCoordinator
 from .system_status_service import SystemStatusService
 from .template_management_service import (
     CreateTemplateRequest,
@@ -56,6 +57,7 @@ __all__ = [
     "SpaceDataDiscoveryService",
     "StorageConfigurationService",
     "StorageConfigurationValidator",
+    "StorageOperationCoordinator",
     "SystemStatusService",
     "TemplateManagementService",
     "UpdateSourceRequest",

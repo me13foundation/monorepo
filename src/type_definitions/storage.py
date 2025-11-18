@@ -59,6 +59,13 @@ class StorageOperationStatus(StrEnum):
     PENDING = "pending"
 
 
+class StorageMetricEventType(StrEnum):
+    """Metric classification for observability exports."""
+
+    STORE = "store"
+    TEST = "test"
+
+
 class StorageProviderConfig(BaseModel):
     """Base class for provider-specific configuration."""
 
@@ -266,6 +273,21 @@ class StorageOverviewResponse(BaseModel):
     configurations: list[StorageConfigurationStats]
 
 
+class StorageMetricEvent(BaseModel):
+    """Structured metric payload emitted for observability exports."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: UUID
+    configuration_id: UUID | None
+    provider: StorageProviderName
+    event_type: StorageMetricEventType
+    status: StorageOperationStatus
+    duration_ms: int | None = None
+    metadata: JSONObject = Field(default_factory=dict)
+    emitted_at: datetime
+
+
 __all__ = [
     "GoogleCloudStorageConfig",
     "LocalFilesystemConfig",
@@ -274,6 +296,8 @@ __all__ = [
     "StorageConfigurationStats",
     "StorageHealthReport",
     "StorageHealthStatus",
+    "StorageMetricEvent",
+    "StorageMetricEventType",
     "StorageOperationRecord",
     "StorageOperationStatus",
     "StorageOperationType",

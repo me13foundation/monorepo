@@ -67,6 +67,8 @@ import { STORAGE_PROVIDERS, STORAGE_USE_CASES } from '@/types/storage'
 import { cn } from '@/lib/utils'
 
 const storageUseCaseEnum = z.enum(STORAGE_USE_CASES)
+const STORAGE_DASHBOARD_BETA =
+  typeof process !== 'undefined' && process.env.NEXT_PUBLIC_STORAGE_DASHBOARD_BETA === 'true'
 
 const localConfigSchema = z.object({
   provider: z.literal('local_filesystem'),
@@ -137,6 +139,7 @@ interface StorageConfigurationCardProps {
   onSelectionChange: (configurationId: string, selected: boolean) => void
   onDelete: (configuration: StorageConfiguration, hasUsage: boolean) => Promise<void>
   isDeleting: boolean
+  enableSelection: boolean
 }
 
 function StorageConfigurationCard({
@@ -149,6 +152,7 @@ function StorageConfigurationCard({
   onSelectionChange,
   onDelete,
   isDeleting,
+  enableSelection,
 }: StorageConfigurationCardProps) {
   const metricsQuery = useStorageMetrics(configuration.id)
   const healthQuery = useStorageHealth(configuration.id)
@@ -163,7 +167,7 @@ function StorageConfigurationCard({
   }
 
   return (
-    <Card key={configuration.id}>
+    <Card data-testid={`storage-card-${configuration.id}`}>
       <CardHeader className="flex flex-col gap-4 border-b border-border/50 pb-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">
@@ -173,14 +177,16 @@ function StorageConfigurationCard({
           <CardDescription>{providerLabels[configuration.provider]}</CardDescription>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={isSelected ? 'default' : 'outline'}
-            onClick={() => onSelectionChange(configuration.id, !isSelected)}
-          >
-            {isSelected ? 'Selected' : 'Select'}
-          </Button>
+          {enableSelection && (
+            <Button
+              type="button"
+              size="sm"
+              variant={isSelected ? 'default' : 'outline'}
+              onClick={() => onSelectionChange(configuration.id, !isSelected)}
+            >
+              {isSelected ? 'Selected' : 'Select'}
+            </Button>
+          )}
           <Switch
             checked={configuration.enabled}
             onCheckedChange={handleToggle}
@@ -281,7 +287,44 @@ function StorageConfigurationCard({
   )
 }
 
-function StorageOverviewSection({ overview }: { overview: StorageOverviewResponse }) {
+function StorageTrendPlaceholder({ overview }: { overview: StorageOverviewResponse }) {
+  const points = useMemo(() => {
+    const usageValues =
+      overview.configurations
+        .map((entry) => entry.usage?.total_files ?? 0)
+        .filter((value) => value > 0) || []
+    if (usageValues.length === 0) {
+      return Array.from({ length: 7 }, (_, index) => (index + 1) * 10)
+    }
+    const base = usageValues.reduce((sum, value) => sum + value, 0) / usageValues.length
+    return Array.from({ length: 7 }, (_, index) =>
+      Math.max(5, Math.round(base * (1 + index / 10))),
+    )
+  }, [overview.configurations])
+  const maxValue = Math.max(...points, 1)
+  return (
+    <div className="space-y-2">
+      <div className="flex h-24 items-end gap-2">
+        {points.map((value, index) => (
+          <div
+            key={`trend-${index}`}
+            className="flex-1 rounded bg-primary/30"
+            style={{ height: `${Math.max(8, (value / maxValue) * 100)}%` }}
+          />
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground">Rolling seven day ingest estimate</p>
+    </div>
+  )
+}
+
+function StorageOverviewSection({
+  overview,
+  showBeta,
+}: {
+  overview: StorageOverviewResponse
+  showBeta: boolean
+}) {
   const topConfigurations = useMemo(() => {
     return overview.configurations
       .slice()
@@ -369,6 +412,17 @@ function StorageOverviewSection({ overview }: { overview: StorageOverviewRespons
               )}
             </CardContent>
           </Card>
+          {showBeta && (
+            <Card className="border-dashed bg-card/50 md:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base">Daily storage throughput</CardTitle>
+                <CardDescription>Beta visualization powered by aggregated totals.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <StorageTrendPlaceholder overview={overview} />
+              </CardContent>
+            </Card>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -382,6 +436,7 @@ function BulkActionBar({
   onDisable,
   onDelete,
   isProcessing,
+  showBeta,
 }: {
   count: number
   onClear: () => void
@@ -389,8 +444,9 @@ function BulkActionBar({
   onDisable: () => void
   onDelete: () => void
   isProcessing: boolean
+  showBeta: boolean
 }) {
-  if (count === 0) {
+  if (count === 0 || !showBeta) {
     return null
   }
 
@@ -433,6 +489,7 @@ export function StorageConfigurationManager() {
   const isMaintenanceActive = maintenanceQuery.data?.state.is_active ?? false
   const [pendingCreate, setPendingCreate] = useState<StorageFormValues | null>(null)
   const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false)
+  const showDashboardBeta = STORAGE_DASHBOARD_BETA
 
   const form = useForm<StorageFormValues>({
     resolver: zodResolver(storageFormSchema),
@@ -642,7 +699,7 @@ export function StorageConfigurationManager() {
       {overviewQuery.isLoading ? (
         <Skeleton className="h-48 w-full" />
       ) : overviewQuery.data ? (
-        <StorageOverviewSection overview={overviewQuery.data} />
+        <StorageOverviewSection overview={overviewQuery.data} showBeta={showDashboardBeta} />
       ) : null}
 
       {storageQuery.isLoading ? (
@@ -668,6 +725,7 @@ export function StorageConfigurationManager() {
               }}
               onDelete={handleDeleteConfiguration}
               isDeleting={deletingId === configuration.id && storageMutations.deleteConfiguration.isPending}
+              enableSelection={showDashboardBeta}
             />
           ))}
         </div>
@@ -687,6 +745,7 @@ export function StorageConfigurationManager() {
         onDisable={() => handleBulkToggle(false)}
         onDelete={handleBulkDelete}
         isProcessing={bulkAction !== null}
+        showBeta={showDashboardBeta}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

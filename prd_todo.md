@@ -7,39 +7,39 @@ This document tracks all outstanding work required to fulfill the **Unified Stor
 ## 1. Storage Platform Completion
 
 ### 1.1 Domain & Application Layer
-- [ ] **Validator parity** – extend `StorageConfigurationValidator` with:
+- [x] **Validator parity** – extend `StorageConfigurationValidator` with:
   - Duplicate name detection (already exists) plus conflicting default use case detection, provider quota guardrails, and `StorageValidationError`/`StorageQuotaError` errors instead of generic `ValueError`.
   - Validation helpers for allowed combinations of `supported_capabilities` vs provider advertised capabilities.
-- [ ] **Typed responses** – return `ApiResponse[StorageConfigurationModel]` and `PaginatedResponse[...]` DTOs from admin routes to satisfy PRD API schema.
-- [ ] **Delete/disable flow** – implement `delete_configuration` (soft delete + audit metadata) and expose `DELETE /api/admin/storage/configurations/{id}`.
-- [ ] **Aggregated stats endpoint** – add application service method that aggregates usage, health, and provider metadata for all configs; expose as `/api/admin/storage/stats`.
-- [ ] **Use case resolution API** – expose `get_backend_for(use_case: StorageUseCase)` that returns active configuration + plugin instance so ingest/export/discovery services can resolve file targets.
-- [ ] **Store operation orchestration** – add helper(s) (e.g., `StorageOperationExecutor`) that call `record_store_operation` and surface results to ingestion workflows.
+- [x] **Typed responses** – return `ApiResponse[StorageConfigurationModel]` and `PaginatedResponse[...]` DTOs from admin routes to satisfy PRD API schema.
+- [x] **Delete/disable flow** – implement `delete_configuration` (soft delete + audit metadata) and expose `DELETE /api/admin/storage/configurations/{id}`.
+- [x] **Aggregated stats endpoint** – add application service method that aggregates usage, health, and provider metadata for all configs; expose as `/api/admin/storage/stats`.
+- [x] **Use case resolution API** – expose `get_backend_for(use_case: StorageUseCase)` that returns active configuration + plugin instance so ingest/export/discovery services can resolve file targets.
+- [x] **Store operation orchestration** – add helper(s) (e.g., `StorageOperationExecutor`) that call `record_store_operation` and surface results to ingestion workflows.
 
 ### 1.2 Infrastructure Layer
-- [ ] **Repository updates** – ensure SQLAlchemy repositories support soft delete, stats aggregation, and paginated queries. Add `StorageStatsModel` view or compute via SQL window functions.
-- [ ] **Dependency wiring** – update `DependencyContainer` to provide storage services to ingestion/export/discovery modules, not only admin routes.
-- [ ] **Audit logging** – hook storage CRUD/test actions into `AuditTrailService`.
+- [x] **Repository updates** – ensure SQLAlchemy repositories support soft delete, stats aggregation, and paginated queries. Add `StorageStatsModel` view or compute via SQL window functions.
+- [x] **Dependency wiring** – update `DependencyContainer` to provide storage services to ingestion/export/discovery modules, not only admin routes.
+- [x] **Audit logging** – hook storage CRUD/test actions into `AuditTrailService`.
 
 ### 1.3 Presentation Layer (FastAPI)
-- [ ] Adopt shared response wrappers, enable pagination/filter parameters on list endpoint.
-- [ ] Add maintenance-mode guard rails to POST/PUT/DELETE routes.
-- [ ] Create `/admin/storage/stats` route returning usage & health aggregates.
+- [x] Adopt shared response wrappers, enable pagination/filter parameters on list endpoint.
+- [x] Add maintenance-mode guard rails to POST/PUT/DELETE routes.
+- [x] Create `/admin/storage/stats` route returning usage & health aggregates.
 
 ### 1.4 Presentation Layer (Next.js)
-- [ ] **Storage dashboard** – extend `StorageConfigurationManager` with:
-  - Overview cards (enabled configs, capacity used, error rate).
-  - Time-series chart placeholders fed by new stats endpoint.
-  - Bulk actions (multi-select enable/disable/default assignment) with React Query mutations.
-  - Feature flag plumbing for beta rollout.
-- [ ] **Prefetch** – server component should hydrate new stats query.
-- [ ] **Delete flow** – add UI affordance + confirmation modal.
+- [x] **Storage dashboard** – extend `StorageConfigurationManager` with:
+  - [x] Overview cards (enabled configs, capacity used, error rate).
+  - [x] Time-series chart placeholders fed by new stats endpoint.
+  - [x] Bulk actions (multi-select enable/disable/default assignment) with React Query mutations.
+  - [x] Feature flag plumbing for beta rollout.
+- [x] **Prefetch** – server component should hydrate new stats query.
+- [x] **Delete flow** – add UI affordance + confirmation modal.
 
 ### 1.5 Testing & Monitoring
-- [ ] Unit tests for validator, registry, new service helpers.
-- [ ] Integration tests hitting LocalFS + mocked GCS (filesystem or moto-style fake) to test CRUD, stats, delete.
-- [ ] Playwright/E2E coverage for storage tab flows (create, test, toggle, delete).
-- [ ] Observability dashboards: define metrics events (test success/fail, store latency) + add stub for exporter.
+- [x] Unit tests for validator, registry, new service helpers.
+- [x] Integration tests hitting LocalFS + mocked GCS (filesystem or moto-style fake) to test CRUD, stats, delete.
+- [x] Playwright/E2E coverage for storage tab flows (create, test, toggle, delete).
+- [x] Observability dashboards: define metrics events (test success/fail, store latency) + add stub for exporter.
 
 ---
 

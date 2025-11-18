@@ -9,6 +9,8 @@ const mockUseStorageHealth = jest.fn()
 const mockUseStorageOverview = jest.fn()
 const mockUseMaintenanceState = jest.fn()
 
+const originalBetaFlag = process.env.NEXT_PUBLIC_STORAGE_DASHBOARD_BETA
+
 let createMutation: { mutateAsync: jest.Mock; isPending: boolean }
 let updateMutation: { mutateAsync: jest.Mock; isPending: boolean }
 let testMutation: { mutateAsync: jest.Mock; isPending: boolean }
@@ -77,6 +79,15 @@ describe('StorageConfigurationManager', () => {
       data: { state: { is_active: true } },
       isLoading: false,
     })
+    process.env.NEXT_PUBLIC_STORAGE_DASHBOARD_BETA = 'true'
+  })
+
+  afterAll(() => {
+    if (originalBetaFlag === undefined) {
+      delete process.env.NEXT_PUBLIC_STORAGE_DASHBOARD_BETA
+    } else {
+      process.env.NEXT_PUBLIC_STORAGE_DASHBOARD_BETA = originalBetaFlag
+    }
   })
 
   it('renders empty state when no configurations are available', () => {

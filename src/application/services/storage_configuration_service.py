@@ -11,94 +11,77 @@ from collections.abc import Iterable  # noqa: TC003
 from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003
 from typing import TYPE_CHECKING
-from uuid import UUID, uuid4
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from src.domain.entities.storage_configuration import (
     StorageConfiguration,
     StorageHealthSnapshot,
-    StorageOperation,
+)
+from src.domain.services.storage_metrics import (
+    NoOpStorageMetricsRecorder,
+    StorageMetricsRecorder,
 )
 from src.domain.services.storage_providers import (
-    StorageOperationError,
     StoragePluginRegistry,
     StorageProviderPlugin,
     default_storage_registry,
 )
-from src.type_definitions.common import JSONObject  # noqa: TC001
 from src.type_definitions.storage import (
     StorageConfigurationModel,
-    StorageConfigurationStats,
     StorageHealthReport,
     StorageHealthStatus,
     StorageOperationRecord,
     StorageOperationStatus,
-    StorageOperationType,
     StorageOverviewResponse,
-    StorageOverviewTotals,
-    StorageProviderCapability,
-    StorageProviderConfigModel,
     StorageProviderName,
     StorageProviderTestResult,
     StorageUsageMetrics,
     StorageUseCase,
 )
 
+from . import storage_configuration_workflows as config_workflows
 from .storage_configuration_validator import StorageConfigurationValidator
+from .storage_operation_recorder import (
+    record_store_operation as execute_store_operation,
+)
+from .storage_operation_recorder import (
+    record_test_metric,
+)
+from .storage_overview_builder import build_storage_overview
 
 if TYPE_CHECKING:
+    from uuid import UUID
+
     from src.application.services.system_status_service import SystemStatusService
     from src.domain.repositories.storage_repository import (
         StorageConfigurationRepository,
         StorageOperationRepository,
     )
+    from src.type_definitions.common import JSONObject
 
-
-class CreateStorageConfigurationRequest(BaseModel):
-    """Request contract for creating a storage configuration."""
-
-    name: str
-    provider: StorageProviderName
-    config: StorageProviderConfigModel
-    supported_capabilities: set[StorageProviderCapability] | None = None
-    default_use_cases: set[StorageUseCase] | None = None
-    enabled: bool = True
-    metadata: JSONObject = Field(default_factory=dict)
-    ensure_storage_ready: bool = True
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-
-class UpdateStorageConfigurationRequest(BaseModel):
-    """Request contract for updating storage configurations."""
-
-    name: str | None = None
-    config: StorageProviderConfigModel | None = None
-    supported_capabilities: set[StorageProviderCapability] | None = None
-    default_use_cases: set[StorageUseCase] | None = None
-    metadata: JSONObject | None = None
-    enabled: bool | None = None
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
+    from .storage_configuration_requests import (
+        CreateStorageConfigurationRequest,
+        UpdateStorageConfigurationRequest,
+    )
 
 
 class StorageConfigurationService:
     """Application service orchestrating storage configuration use cases."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - explicit dependency wiring for Clean Architecture
         self,
         configuration_repository: StorageConfigurationRepository,
         operation_repository: StorageOperationRepository,
         plugin_registry: StoragePluginRegistry | None = None,
         validator: StorageConfigurationValidator | None = None,
         system_status_service: SystemStatusService | None = None,
+        metrics_recorder: StorageMetricsRecorder | None = None,
     ):
         self._configuration_repository = configuration_repository
         self._operation_repository = operation_repository
         self._plugin_registry = plugin_registry or default_storage_registry
         self._validator = validator or StorageConfigurationValidator()
         self._system_status_service = system_status_service
+        self._metrics_recorder = metrics_recorder or NoOpStorageMetricsRecorder()
 
     async def create_configuration(
         self,
@@ -106,51 +89,13 @@ class StorageConfigurationService:
     ) -> StorageConfiguration:
         """Create a new storage configuration."""
 
-        self._validator.ensure_unique_name(
-            self._configuration_repository,
-            name=request.name,
+        return await config_workflows.create_configuration(
+            request=request,
+            configuration_repository=self._configuration_repository,
+            validator=self._validator,
+            require_plugin=self._require_plugin,
+            require_maintenance_for_mutation=self._require_maintenance_for_mutation,
         )
-        plugin = self._require_plugin(request.provider)
-        validated_config = await plugin.validate_config(request.config)
-        requested_capabilities = set(
-            request.supported_capabilities or plugin.capabilities(),
-        )
-        requested_use_cases = set(
-            request.default_use_cases or {StorageUseCase.PDF},
-        )
-        self._validator.ensure_capabilities_supported(
-            plugin=plugin,
-            provider=request.provider,
-            requested=requested_capabilities,
-        )
-        self._validator.ensure_use_cases_supported(
-            plugin=plugin,
-            provider=request.provider,
-            use_cases=requested_use_cases,
-        )
-        if request.enabled:
-            self._validator.ensure_use_case_exclusivity(
-                self._configuration_repository,
-                provider=request.provider,
-                use_cases=requested_use_cases,
-            )
-
-        configuration = StorageConfiguration(
-            id=uuid4(),
-            name=request.name,
-            provider=request.provider,
-            config=validated_config,
-            enabled=request.enabled,
-            supported_capabilities=tuple(requested_capabilities),
-            default_use_cases=tuple(requested_use_cases),
-            metadata=request.metadata,
-        )
-        persisted = self._configuration_repository.create(configuration)
-
-        if request.ensure_storage_ready:
-            await plugin.ensure_storage_exists(validated_config)
-
-        return persisted
 
     async def update_configuration(
         self,
@@ -159,57 +104,15 @@ class StorageConfigurationService:
     ) -> StorageConfiguration:
         """Update an existing configuration."""
 
-        current = self._require_configuration(configuration_id)
-        requires_maintenance = request.config is not None
-        if requires_maintenance:
-            await self._require_maintenance_mode()
-
-        updated_config_model = request.config or current.config
-        plugin = self._require_plugin(current.provider)
-        validated_config = await plugin.validate_config(updated_config_model)
-        requested_capabilities = set(
-            request.supported_capabilities or current.supported_capabilities,
+        return await config_workflows.update_configuration(
+            configuration_id=configuration_id,
+            request=request,
+            configuration_repository=self._configuration_repository,
+            validator=self._validator,
+            require_configuration=self._require_configuration,
+            require_plugin=self._require_plugin,
+            require_maintenance_mode=self._require_maintenance_mode,
         )
-        requested_use_cases = set(
-            request.default_use_cases or current.default_use_cases,
-        )
-        enabled = request.enabled if request.enabled is not None else current.enabled
-
-        self._validator.ensure_capabilities_supported(
-            plugin=plugin,
-            provider=current.provider,
-            requested=requested_capabilities,
-        )
-        self._validator.ensure_use_cases_supported(
-            plugin=plugin,
-            provider=current.provider,
-            use_cases=requested_use_cases,
-        )
-        if enabled:
-            self._validator.ensure_use_case_exclusivity(
-                self._configuration_repository,
-                provider=current.provider,
-                use_cases=requested_use_cases,
-                exclude_id=current.id,
-            )
-
-        update_payload = current.model_copy(
-            update={
-                "name": request.name or current.name,
-                "config": validated_config,
-                "supported_capabilities": tuple(requested_capabilities),
-                "default_use_cases": tuple(requested_use_cases),
-                "metadata": request.metadata or current.metadata,
-                "enabled": enabled,
-                "updated_at": datetime.now(UTC),
-            },
-        )
-        self._validator.ensure_unique_name(
-            self._configuration_repository,
-            name=update_payload.name,
-            exclude_id=configuration_id,
-        )
-        return self._configuration_repository.update(update_payload)
 
     def list_configurations(
         self,
@@ -220,6 +123,21 @@ class StorageConfigurationService:
 
         return self._configuration_repository.list_configurations(
             include_disabled=include_disabled,
+        )
+
+    def paginate_configurations(
+        self,
+        *,
+        include_disabled: bool = False,
+        page: int = 1,
+        per_page: int = 25,
+    ) -> tuple[list[StorageConfiguration], int]:
+        """Return a paginated list of storage configurations."""
+
+        return self._configuration_repository.paginate_configurations(
+            include_disabled=include_disabled,
+            page=page,
+            per_page=per_page,
         )
 
     def get_configuration(self, configuration_id: UUID) -> StorageConfigurationModel:
@@ -268,6 +186,7 @@ class StorageConfigurationService:
 
         configuration = self._require_configuration(configuration_id)
         plugin = self._require_plugin(configuration.provider)
+        started_at = datetime.now(UTC)
         validated_config = await plugin.validate_config(configuration.config)
         result = await plugin.test_connection(
             validated_config,
@@ -286,6 +205,24 @@ class StorageConfigurationService:
             details=result.metadata,
         )
         self._operation_repository.upsert_health_snapshot(snapshot)
+        duration_ms = result.latency_ms or int(
+            (datetime.now(UTC) - started_at).total_seconds() * 1000,
+        )
+        test_metadata: JSONObject = {
+            "latency_ms": result.latency_ms,
+            "message": result.message,
+        }
+        record_test_metric(
+            configuration=configuration,
+            recorder=self._metrics_recorder,
+            status=(
+                StorageOperationStatus.SUCCESS
+                if result.success
+                else StorageOperationStatus.FAILED
+            ),
+            duration_ms=duration_ms,
+            metadata=test_metadata,
+        )
         return result
 
     async def record_store_operation(
@@ -300,39 +237,16 @@ class StorageConfigurationService:
         """Store a file using the provider and record the operation."""
 
         plugin = self._require_plugin(configuration.provider)
-        validated_config = await plugin.validate_config(configuration.config)
-        operation = StorageOperation(
-            id=uuid4(),
-            configuration_id=configuration.id,
-            user_id=user_id,
-            operation_type=StorageOperationType.STORE,
+        return await execute_store_operation(
+            configuration=configuration,
+            plugin=plugin,
+            operation_repository=self._operation_repository,
+            metrics_recorder=self._metrics_recorder,
             key=key,
-            status=StorageOperationStatus.PENDING,
-            created_at=datetime.now(UTC),
+            file_path=file_path,
+            content_type=content_type,
+            user_id=user_id,
         )
-        try:
-            storage_key = await plugin.store_file(
-                validated_config,
-                file_path=file_path,
-                key=key,
-                content_type=content_type,
-            )
-            success_operation = operation.model_copy(
-                update={
-                    "key": storage_key,
-                    "status": StorageOperationStatus.SUCCESS,
-                },
-            )
-            return self._operation_repository.record_operation(success_operation)
-        except StorageOperationError as exc:
-            failure_operation = operation.model_copy(
-                update={
-                    "status": StorageOperationStatus.FAILED,
-                    "error_message": str(exc),
-                },
-            )
-            self._operation_repository.record_operation(failure_operation)
-            raise
 
     def get_usage_metrics(self, configuration_id: UUID) -> StorageUsageMetrics | None:
         """Return aggregated usage metrics for a configuration."""
@@ -363,7 +277,7 @@ class StorageConfigurationService:
             limit=limit,
         )
 
-    def delete_configuration(
+    async def delete_configuration(
         self,
         configuration_id: UUID,
         *,
@@ -371,17 +285,13 @@ class StorageConfigurationService:
     ) -> bool:
         """Delete or disable a storage configuration."""
 
-        configuration = self._require_configuration(configuration_id)
-        if configuration.enabled and not force:
-            updated = configuration.model_copy(
-                update={
-                    "enabled": False,
-                    "updated_at": datetime.now(UTC),
-                },
-            )
-            self._configuration_repository.update(updated)
-            return True
-        return self._configuration_repository.delete(configuration_id)
+        return await config_workflows.delete_or_disable_configuration(
+            configuration_id=configuration_id,
+            configuration_repository=self._configuration_repository,
+            require_configuration=self._require_configuration,
+            require_maintenance_for_mutation=self._require_maintenance_for_mutation,
+            force=force,
+        )
 
     def get_overview(self) -> StorageOverviewResponse:
         """Return aggregated stats for all storage configurations."""
@@ -389,60 +299,10 @@ class StorageConfigurationService:
         configurations = self._configuration_repository.list_configurations(
             include_disabled=True,
         )
-        stats: list[StorageConfigurationStats] = []
-        total_files = 0
-        total_size = 0
-        error_rates: list[float] = []
-        enabled = 0
-        healthy = degraded = offline = 0
-
-        for configuration in configurations:
-            usage = self._operation_repository.get_usage_metrics(configuration.id)
-            health_snapshot = self._operation_repository.get_health_snapshot(
-                configuration.id,
-            )
-            stats.append(
-                StorageConfigurationStats(
-                    configuration=self._to_model(configuration),
-                    usage=usage,
-                    health=health_snapshot.as_report() if health_snapshot else None,
-                ),
-            )
-            if configuration.enabled:
-                enabled += 1
-            if usage:
-                total_files += usage.total_files
-                total_size += usage.total_size_bytes
-                if usage.error_rate is not None:
-                    error_rates.append(usage.error_rate)
-            if health_snapshot:
-                match health_snapshot.status:
-                    case StorageHealthStatus.HEALTHY:
-                        healthy += 1
-                    case StorageHealthStatus.DEGRADED:
-                        degraded += 1
-                    case StorageHealthStatus.OFFLINE:
-                        offline += 1
-
-        disabled = len(configurations) - enabled
-        avg_error = sum(error_rates) / len(error_rates) if error_rates else None
-
-        totals = StorageOverviewTotals(
-            total_configurations=len(configurations),
-            enabled_configurations=enabled,
-            disabled_configurations=disabled,
-            healthy_configurations=healthy,
-            degraded_configurations=degraded,
-            offline_configurations=offline,
-            total_files=total_files,
-            total_size_bytes=total_size,
-            average_error_rate=avg_error,
-        )
-
-        return StorageOverviewResponse(
-            generated_at=datetime.now(UTC),
-            totals=totals,
-            configurations=stats,
+        return build_storage_overview(
+            configurations=configurations,
+            operation_repository=self._operation_repository,
+            serializer=self._to_model,
         )
 
     def _require_plugin(
@@ -482,5 +342,16 @@ class StorageConfigurationService:
     async def _require_maintenance_mode(self) -> None:
         """Ensure maintenance mode is active when a risky operation is requested."""
         if self._system_status_service is None:
+            return
+        await self._system_status_service.require_active()
+
+    async def _require_maintenance_for_mutation(self) -> None:
+        """Require maintenance mode when mutating configs while active backends exist."""
+        if self._system_status_service is None:
+            return
+        has_enabled_config = bool(
+            self._configuration_repository.list_configurations(include_disabled=False),
+        )
+        if not has_enabled_config:
             return
         await self._system_status_service.require_active()

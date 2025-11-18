@@ -9,14 +9,23 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from src.application.services.storage_configuration_service import (
+from src.application.services.audit_service import AuditTrailService
+from src.application.services.storage_configuration_requests import (
     CreateStorageConfigurationRequest,
-    StorageConfigurationService,
     UpdateStorageConfigurationRequest,
 )
+from src.application.services.storage_configuration_service import (
+    StorageConfigurationService,
+)
 from src.domain.entities.storage_configuration import StorageConfiguration
-from src.routes.admin_routes.dependencies import get_storage_configuration_service
+from src.routes.admin_routes.dependencies import (
+    SYSTEM_ACTOR_ID,
+    get_admin_db_session,
+    get_storage_configuration_service,
+)
+from src.routes.data_discovery.dependencies import get_audit_trail_service
 from src.type_definitions.storage import (
     StorageConfigurationModel,
     StorageHealthReport,
@@ -77,18 +86,15 @@ async def list_storage_configurations(
         Depends(get_storage_configuration_service),
     ],
 ) -> StorageConfigurationListResponse:
-    configurations = [
-        _serialize_configuration(configuration)
-        for configuration in service.list_configurations(
-            include_disabled=include_disabled,
-        )
-    ]
-    total = len(configurations)
-    start = (page - 1) * per_page
-    end = start + per_page
-    sliced = configurations[start:end]
+    configurations, total = service.paginate_configurations(
+        include_disabled=include_disabled,
+        page=page,
+        per_page=per_page,
+    )
     return StorageConfigurationListResponse(
-        data=sliced,
+        data=[
+            _serialize_configuration(configuration) for configuration in configurations
+        ],
         total=total,
         page=page,
         per_page=per_page,
@@ -126,8 +132,20 @@ async def create_storage_configuration(
         StorageConfigurationService,
         Depends(get_storage_configuration_service),
     ],
+    db: Annotated[Session, Depends(get_admin_db_session)],
+    audit_service: Annotated[
+        AuditTrailService,
+        Depends(get_audit_trail_service),
+    ],
 ) -> StorageConfigurationModel:
     configuration = await service.create_configuration(request)
+    audit_service.record_action(
+        db,
+        action="admin.storage.create",
+        target=("storage_configuration", str(configuration.id)),
+        actor_id=SYSTEM_ACTOR_ID,
+        details={"name": configuration.name, "provider": configuration.provider.value},
+    )
     return _serialize_configuration(configuration)
 
 
@@ -143,6 +161,11 @@ async def update_storage_configuration(
         StorageConfigurationService,
         Depends(get_storage_configuration_service),
     ],
+    db: Annotated[Session, Depends(get_admin_db_session)],
+    audit_service: Annotated[
+        AuditTrailService,
+        Depends(get_audit_trail_service),
+    ],
 ) -> StorageConfigurationModel:
     try:
         configuration = await service.update_configuration(configuration_id, request)
@@ -151,6 +174,13 @@ async def update_storage_configuration(
     except ValueError as exc:  # pragma: no cover
         _handle_not_found(exc)
         raise
+    audit_service.record_action(
+        db,
+        action="admin.storage.update",
+        target=("storage_configuration", str(configuration.id)),
+        actor_id=SYSTEM_ACTOR_ID,
+        details=request.model_dump(exclude_unset=True),
+    )
     return _serialize_configuration(configuration)
 
 
@@ -172,13 +202,25 @@ async def delete_storage_configuration(
             description="Permanently delete configuration instead of disabling it",
         ),
     ] = False,
+    db: Annotated[Session, Depends(get_admin_db_session)],
+    audit_service: Annotated[
+        AuditTrailService,
+        Depends(get_audit_trail_service),
+    ],
 ) -> dict[str, str]:
     try:
-        deleted = service.delete_configuration(configuration_id, force=force)
+        deleted = await service.delete_configuration(configuration_id, force=force)
     except ValueError as exc:  # pragma: no cover
         _handle_not_found(exc)
         raise
     action = "deleted" if force and deleted else "disabled"
+    audit_service.record_action(
+        db,
+        action=f"admin.storage.{action}",
+        target=("storage_configuration", str(configuration_id)),
+        actor_id=SYSTEM_ACTOR_ID,
+        details={"force": force},
+    )
     return {"message": f"Storage configuration {action}"}
 
 
@@ -193,12 +235,25 @@ async def test_storage_configuration(
         StorageConfigurationService,
         Depends(get_storage_configuration_service),
     ],
+    db: Annotated[Session, Depends(get_admin_db_session)],
+    audit_service: Annotated[
+        AuditTrailService,
+        Depends(get_audit_trail_service),
+    ],
 ) -> StorageProviderTestResult:
     try:
-        return await service.test_configuration(configuration_id)
+        result = await service.test_configuration(configuration_id)
     except ValueError as exc:  # pragma: no cover
         _handle_not_found(exc)
         raise
+    audit_service.record_action(
+        db,
+        action="admin.storage.test",
+        target=("storage_configuration", str(configuration_id)),
+        actor_id=SYSTEM_ACTOR_ID,
+        details={"success": result.success},
+    )
+    return result
 
 
 @router.get(
