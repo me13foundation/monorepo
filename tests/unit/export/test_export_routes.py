@@ -14,7 +14,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.application.export.export_service import CompressionFormat, ExportFormat
+from src.application.export.types import CompressionFormat, ExportFormat
 from src.routes.export import router
 
 

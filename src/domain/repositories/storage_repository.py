@@ -15,6 +15,7 @@ if TYPE_CHECKING:
         StorageHealthSnapshot,
         StorageOperation,
     )
+    from src.type_definitions.common import JSONObject
     from src.type_definitions.storage import (
         StorageOperationRecord,
         StorageProviderTestResult,
@@ -75,6 +76,22 @@ class StorageOperationRepository(ABC):
         limit: int = 100,
     ) -> list[StorageOperationRecord]:
         """List recent operations."""
+
+    @abstractmethod
+    def list_failed_store_operations(
+        self,
+        *,
+        limit: int = 100,
+    ) -> list[StorageOperationRecord]:
+        """Return recent failed store operations for retry workflows."""
+
+    @abstractmethod
+    def update_operation_metadata(
+        self,
+        operation_id: UUID,
+        metadata: JSONObject,
+    ) -> StorageOperationRecord:
+        """Persist metadata changes for an operation."""
 
     @abstractmethod
     def upsert_health_snapshot(

@@ -9,10 +9,8 @@ from datetime import UTC, datetime
 from typing import NamedTuple
 from uuid import UUID, uuid4
 
-from src.domain.entities.data_discovery_session import (
-    DataDiscoverySession,
-    QueryParameters,
-)
+from src.domain.entities.data_discovery_parameters import AdvancedQueryParameters
+from src.domain.entities.data_discovery_session import DataDiscoverySession
 
 
 # Test data types using NamedTuple for immutable, typed test data
@@ -556,6 +554,7 @@ def create_test_space_discovery_session(
     *,
     owner_id: UUID | None = None,
     name: str = "Space Discovery Session",
+    current_parameters: AdvancedQueryParameters | None = None,
     selected_sources: list[str] | None = None,
     tested_sources: list[str] | None = None,
 ) -> DataDiscoverySession:
@@ -568,7 +567,8 @@ def create_test_space_discovery_session(
         owner_id=owner_id or uuid4(),
         research_space_id=space_id,
         name=name,
-        current_parameters=QueryParameters(
+        current_parameters=current_parameters
+        or AdvancedQueryParameters(
             gene_symbol="MED13L",
             search_term="atrial defect",
         ),

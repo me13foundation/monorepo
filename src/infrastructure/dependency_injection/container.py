@@ -38,8 +38,8 @@ from src.database.url_resolver import resolve_async_database_url
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.services.variant_domain_service import VariantDomainService
-from src.infrastructure.observability.storage_metrics import (
-    build_storage_metrics_recorder,
+from src.infrastructure.observability.logging_metrics_recorder import (
+    LoggingStorageMetricsRecorder,
 )
 from src.infrastructure.repositories.phenotype_repository import (
     SqlAlchemyPhenotypeRepository,
@@ -144,7 +144,7 @@ class DependencyContainer(ApplicationServiceFactoryMixin):
         self._variant_domain_service: VariantDomainService | None = None
         self._evidence_domain_service: EvidenceDomainService | None = None
         self._storage_plugin_registry = initialize_storage_plugins()
-        self._storage_metrics_recorder = build_storage_metrics_recorder()
+        self._storage_metrics_recorder = LoggingStorageMetricsRecorder()
         self._system_status_repository: SqlAlchemySystemStatusRepository | None = None
         self._system_status_service: SystemStatusService | None = None
 

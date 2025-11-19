@@ -37,6 +37,7 @@ if TYPE_CHECKING:
         StorageHealthSnapshot,
         StorageOperation,
     )
+    from src.type_definitions.common import JSONObject
 
 
 class SqlAlchemyStorageConfigurationRepository(StorageConfigurationRepository):
@@ -149,6 +150,37 @@ class SqlAlchemyStorageOperationRepository(StorageOperationRepository):
         )
         results = self._session.execute(stmt).scalars().all()
         return [StorageMapper.operation_record_from_model(model) for model in results]
+
+    def list_failed_store_operations(
+        self,
+        *,
+        limit: int = 100,
+    ) -> list[StorageOperationRecord]:
+        stmt = (
+            select(StorageOperationModel)
+            .where(
+                StorageOperationModel.operation_type == StorageOperationTypeEnum.STORE,
+                StorageOperationModel.status == StorageOperationStatusEnum.FAILED,
+            )
+            .order_by(StorageOperationModel.created_at.desc())
+            .limit(limit)
+        )
+        results = self._session.execute(stmt).scalars().all()
+        return [StorageMapper.operation_record_from_model(model) for model in results]
+
+    def update_operation_metadata(
+        self,
+        operation_id: UUID,
+        metadata: JSONObject,
+    ) -> StorageOperationRecord:
+        model = self._session.get(StorageOperationModel, str(operation_id))
+        if model is None:
+            msg = f"Storage operation {operation_id} not found"
+            raise ValueError(msg)
+        model.metadata_payload = metadata
+        self._session.commit()
+        self._session.refresh(model)
+        return StorageMapper.operation_record_from_model(model)
 
     def upsert_health_snapshot(
         self,

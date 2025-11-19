@@ -54,6 +54,9 @@ async def execute_query_test(
             session_id=session_id,
             catalog_entry_id=request.catalog_entry_id,
             timeout_seconds=request.timeout_seconds,
+            parameters=(
+                request.parameters.to_domain_model() if request.parameters else None
+            ),
         )
 
         result = await service.execute_query_test(

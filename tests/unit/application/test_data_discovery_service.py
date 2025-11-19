@@ -17,8 +17,8 @@ from src.application.services.data_discovery_service.requests import (
     ExecuteQueryTestRequest,
     UpdateSessionParametersRequest,
 )
-from src.domain.entities.data_discovery_session import (
-    QueryParameters,
+from src.domain.entities.data_discovery_parameters import (
+    AdvancedQueryParameters,
     QueryParameterType,
     TestResultStatus,
 )
@@ -58,7 +58,7 @@ class TestDataDiscoveryService:
             owner_id=owner_id,
             name="Test Session",
             research_space_id=uuid4(),
-            initial_parameters=QueryParameters(
+            initial_parameters=AdvancedQueryParameters(
                 gene_symbol="MED13L",
                 search_term="atrial septal defect",
             ),
@@ -102,7 +102,7 @@ class TestDataDiscoveryService:
     def test_update_session_parameters(self, service: DataDiscoveryService) -> None:
         """Test updating session parameters."""
         session_id = TEST_SESSION_ACTIVE.id
-        new_params = QueryParameters(gene_symbol="TP53", search_term="cancer")
+        new_params = AdvancedQueryParameters(gene_symbol="TP53", search_term="cancer")
 
         # Mock the repository
         service._session_repo.find_by_id.return_value = TEST_SESSION_ACTIVE
@@ -133,7 +133,7 @@ class TestDataDiscoveryService:
 
         request = UpdateSessionParametersRequest(
             session_id=session_id,
-            parameters=QueryParameters(),
+            parameters=AdvancedQueryParameters(),
         )
 
         result = service.update_session_parameters(request)
@@ -323,7 +323,10 @@ class TestDataDiscoveryService:
         session_id = TEST_SESSION_ACTIVE.id
         session_without_params = create_test_data_discovery_session(
             id=session_id,
-            current_parameters=QueryParameters(gene_symbol=None, search_term=None),
+            current_parameters=AdvancedQueryParameters(
+                gene_symbol=None,
+                search_term=None,
+            ),
         )
         service._session_repo.find_by_id.return_value = session_without_params
         source_requires_gene = TEST_SOURCE_CLINVAR.model_copy()
@@ -342,7 +345,10 @@ class TestDataDiscoveryService:
         session_id = TEST_SESSION_ACTIVE.id
         session_without_params = create_test_data_discovery_session(
             id=session_id,
-            current_parameters=QueryParameters(gene_symbol=None, search_term=None),
+            current_parameters=AdvancedQueryParameters(
+                gene_symbol=None,
+                search_term=None,
+            ),
         )
         service._session_repo.find_by_id.return_value = session_without_params
         source_paramless = TEST_SOURCE_CLINVAR.model_copy(

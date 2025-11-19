@@ -41,16 +41,19 @@ async def record_store_operation(  # noqa: PLR0913 - explicit workflow inputs ke
     file_path: Path,
     content_type: str | None,
     user_id: UUID | None,
+    metadata: JSONObject | None,
 ) -> StorageOperationRecord:
     """Store a file and persist audit + metric events."""
 
     validated_config = await plugin.validate_config(configuration.config)
+    operation_metadata: JSONObject = metadata or {}
     operation = StorageOperation(
         id=uuid4(),
         configuration_id=configuration.id,
         user_id=user_id,
         operation_type=StorageOperationType.STORE,
         key=key,
+        metadata=operation_metadata,
         status=StorageOperationStatus.PENDING,
         created_at=datetime.now(UTC),
     )
@@ -76,7 +79,10 @@ async def record_store_operation(  # noqa: PLR0913 - explicit workflow inputs ke
             },
         )
         operation_repository.record_operation(failure_operation)
-        failure_metadata: JSONObject = {"error": str(exc)}
+        failure_metadata: JSONObject = {
+            **operation_metadata,
+            "error": str(exc),
+        }
         _record_metric(
             recorder=metrics_recorder,
             configuration=configuration,
@@ -88,7 +94,10 @@ async def record_store_operation(  # noqa: PLR0913 - explicit workflow inputs ke
         raise
     else:
         recorded = operation_repository.record_operation(success_operation)
-        success_metadata: JSONObject = {"key": storage_key}
+        success_metadata: JSONObject = {
+            **operation_metadata,
+            "key": storage_key,
+        }
         _record_metric(
             recorder=metrics_recorder,
             configuration=configuration,

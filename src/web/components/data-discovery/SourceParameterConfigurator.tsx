@@ -1,6 +1,9 @@
 "use client"
 
-import type { QueryParameters, SourceCatalogEntry } from '@/lib/types/data-discovery'
+import type {
+  AdvancedQueryParameters,
+  SourceCatalogEntry,
+} from '@/lib/types/data-discovery'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
@@ -11,9 +14,9 @@ import { KeyRound, Layers3 } from 'lucide-react'
 interface SourceParameterConfiguratorProps {
   catalog: SourceCatalogEntry[]
   selectedSourceIds: string[]
-  sourceParameters: Record<string, QueryParameters>
-  defaultParameters: QueryParameters
-  onChange: (sourceId: string, parameters: QueryParameters) => void
+  sourceParameters: Record<string, AdvancedQueryParameters>
+  defaultParameters: AdvancedQueryParameters
+  onChange: (sourceId: string, parameters: AdvancedQueryParameters) => void
 }
 
 const PARAMETER_LABELS: Record<SourceCatalogEntry['param_type'], string> = {

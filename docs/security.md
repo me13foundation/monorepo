@@ -1,6 +1,7 @@
 # MED13 Resource Library – Security Assessment & Remediation Plan
 
 _Generated: 2025-01-09_
+_Updated: 2025-11-18_
 
 This document captures the current security posture of the MED13 Resource Library, highlights priority issues, and prescribes a remediation plan. The assessment spans backend (FastAPI), frontend (Next.js), infrastructure, and delivery pipelines.
 
@@ -23,6 +24,8 @@ The platform demonstrates solid foundations (strict typing, layered architecture
 | 9 | **[Resolved] CI runs Next.js lint/type-check/test/audit tasks** before deploy. | — |
 |10 | **[Resolved] Production boot disallows default DB creds and FastAPI container runs as non-root.** | — |
 |11 | **Distributed rate limiter backed by Redis (optional) extends protection across Cloud Run instances; audit logging now records every high-risk curation and discovery event.** | Low |
+|12 | **[New] Storage credentials handling** – Storage provider plugins must resolve credentials from Secret Manager rather than storing them in the database configuration blob. | High (Credential Leakage) |
+|13 | **[New] Preset sharing access control** – Shared presets must verify that the viewing user is a member of the target research space. Currently, scope validation is primarily at the presentation layer. | Medium (Unauthorized Access) |
 
 ## Remediation Plan
 
@@ -61,6 +64,7 @@ The platform demonstrates solid foundations (strict typing, layered architecture
 8. **Centralize rate limiting & audit logs (Completed)**
    - Redis-backed distributed rate limiting ships with Docker/Postgres workflows and production deployments.
    - High-risk curation and data-discovery routes now record append-only events in `audit_logs`, satisfying the audit traceability requirement.
+   - **[Update]** Storage operations (CRUD, test, store) and advanced discovery workflows (search, PDF download) now emit structured audit logs.
 
 9. **Harden containers & databases (Completed for current scope)**
    - FastAPI container runs as non-root, is pinned to `python:3.12.8-slim`, and CI executes Trivy scans on every image build.
@@ -69,6 +73,21 @@ The platform demonstrates solid foundations (strict typing, layered architecture
 10. **Security regression tests (Completed)**
     - Added regression tests (`tests/routes/test_security_regressions.py`) for unauthenticated curation calls and cross-user data discovery access.
     - Schemathesis smoke tests (`tests/security/test_schemathesis_contracts.py`) now run with Hypothesis to fuzz the OpenAPI contract and ensure protected endpoints never emit unexpected 5xx responses. Future work can layer OWASP ZAP for full DAST coverage if required.
+
+### Phase 3 – Storage & Data Sovereignty (New)
+
+11. **Storage Credential Isolation**
+    - **Risk**: Storing API keys/service account JSONs in the `StorageConfiguration` JSON blob in the database exposes them to anyone with DB read access or `admin:storage:read` permissions.
+    - **Mitigation**:
+        - Storage plugins must accept references to Secret Manager secrets (e.g., `credentials_secret_name`) instead of raw values.
+        - The `StorageConfigurationValidator` should reject configs containing apparent secrets (regex checks).
+        - Infrastructure layer must implement a `SecretProvider` interface to fetch actual credentials at runtime.
+
+12. **Preset Sharing Authorization**
+    - **Risk**: Presets shared to a space (`scope="space"`) might be accessible to non-members if the API only checks `scope` and not membership.
+    - **Mitigation**:
+        - `DiscoveryConfigurationService.list_pubmed_presets` must join against `user_research_spaces` when filtering by `research_space_id`.
+        - Integration tests must verify that a user cannot list presets for a space they do not belong to.
 
 ## Ownership & Tracking
 
@@ -79,5 +98,6 @@ The platform demonstrates solid foundations (strict typing, layered architecture
 | Token hardening & CSP/HSTS | Web team (Next.js) | Following sprint |
 | CI expansion | DevOps | Following sprint |
 | Rate limiting/audit centralization | Platform team | Phase 2 |
+| Storage & Preset Security | Backend team | Phase 3 |
 
 Security should review each fix before release and ensure `make all` plus `make security-audit` remain green. Document residual risks after each phase in this file.

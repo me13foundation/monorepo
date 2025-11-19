@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+import logging
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
+from src.application.services.pubmed_discovery_service import (
+    PUBMED_STORAGE_METADATA_ARTICLE_ID_KEY,
+    PUBMED_STORAGE_METADATA_JOB_ID_KEY,
+    PUBMED_STORAGE_METADATA_OWNER_ID_KEY,
+    PUBMED_STORAGE_METADATA_RETRYABLE_KEY,
+    PUBMED_STORAGE_METADATA_USE_CASE_KEY,
+    PubMedDiscoveryService,
+    PubmedDownloadRequest,
+)
 from src.domain.entities.ingestion_job import (
     IngestionError,
     IngestionJob,
@@ -17,12 +28,14 @@ from src.domain.entities.user_data_source import (
     SourceType,
     UserDataSource,
 )
+from src.domain.services.storage_providers import StorageOperationError
 from src.models.value_objects.provenance import (
     DataSource as ProvenanceSource,
 )
 from src.models.value_objects.provenance import (
     Provenance,
 )
+from src.type_definitions.storage import StorageOperationRecord, StorageUseCase
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping
@@ -34,16 +47,19 @@ if TYPE_CHECKING:
     from src.domain.repositories.ingestion_job_repository import (
         IngestionJobRepository,
     )
+    from src.domain.repositories.storage_repository import StorageOperationRepository
     from src.domain.repositories.user_data_source_repository import (
         UserDataSourceRepository,
     )
     from src.domain.services.pubmed_ingestion import PubMedIngestionSummary
 
+logger = logging.getLogger(__name__)
+
 
 class IngestionSchedulingService:
     """Coordinates scheduler registration and execution of ingestion jobs."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - scheduler wiring requires explicit dependencies
         self,
         scheduler: SchedulerPort,
         source_repository: UserDataSourceRepository,
@@ -52,11 +68,17 @@ class IngestionSchedulingService:
             SourceType,
             Callable[[UserDataSource], Awaitable[PubMedIngestionSummary]],
         ],
+        storage_operation_repository: StorageOperationRepository | None = None,
+        pubmed_discovery_service: PubMedDiscoveryService | None = None,
+        retry_batch_size: int = 25,
     ) -> None:
         self._scheduler = scheduler
         self._source_repository = source_repository
         self._job_repository = job_repository
         self._ingestion_services = dict(ingestion_services)
+        self._storage_operation_repository = storage_operation_repository
+        self._pubmed_discovery_service = pubmed_discovery_service
+        self._retry_batch_size = max(retry_batch_size, 1)
 
     async def schedule_source(self, source_id: UUID) -> ScheduledJob:
         """Register a source with the scheduler backend."""
@@ -92,6 +114,7 @@ class IngestionSchedulingService:
         due_jobs = self._scheduler.get_due_jobs(as_of=as_of)
         for job in due_jobs:
             await self._execute_job(job)
+        await self._retry_failed_pdf_downloads()
 
     async def trigger_ingestion(
         self,
@@ -185,3 +208,115 @@ class IngestionSchedulingService:
                 updates["next_run_at"] = job.next_run_at
         updated_schedule = schedule.model_copy(update=updates)
         self._source_repository.update_ingestion_schedule(source.id, updated_schedule)
+
+    async def _retry_failed_pdf_downloads(self) -> None:
+        """Retry failed PDF storage operations for PubMed discovery jobs."""
+        if (
+            self._storage_operation_repository is None
+            or self._pubmed_discovery_service is None
+        ):
+            return
+
+        operations = self._storage_operation_repository.list_failed_store_operations(
+            limit=self._retry_batch_size,
+        )
+        for operation in operations:
+            context = self._build_pdf_retry_context(operation)
+            if context is None:
+                continue
+            job = self._pubmed_discovery_service.get_search_job(
+                context.owner_id,
+                context.job_id,
+            )
+            if job is None:
+                self._mark_operation_retry_disabled(operation)
+                continue
+
+            if self._article_already_stored(job.result_metadata, context.article_id):
+                self._mark_operation_retry_disabled(operation)
+                continue
+
+            try:
+                await self._pubmed_discovery_service.download_article_pdf(
+                    context.owner_id,
+                    PubmedDownloadRequest(
+                        job_id=context.job_id,
+                        article_id=context.article_id,
+                    ),
+                )
+            except (
+                RuntimeError,
+                ValueError,
+                StorageOperationError,
+            ) as exc:  # pragma: no cover - defensive logging upstream
+                logger.warning(
+                    "PubMed PDF retry failed",
+                    extra={
+                        "job_id": str(context.job_id),
+                        "article_id": context.article_id,
+                        "error": str(exc),
+                    },
+                )
+                continue
+            else:
+                self._mark_operation_retry_disabled(operation)
+
+    @staticmethod
+    def _article_already_stored(
+        metadata: Mapping[str, object],
+        article_id: str,
+    ) -> bool:
+        stored_assets = metadata.get("stored_assets")
+        if not isinstance(stored_assets, dict):
+            return False
+        normalized_id = str(article_id)
+        stored_keys = {str(key) for key in stored_assets}
+        return normalized_id in stored_keys
+
+    def _build_pdf_retry_context(
+        self,
+        operation: StorageOperationRecord,
+    ) -> _PdfRetryContext | None:
+        metadata = operation.metadata or {}
+        use_case = metadata.get(PUBMED_STORAGE_METADATA_USE_CASE_KEY)
+        retryable = metadata.get(PUBMED_STORAGE_METADATA_RETRYABLE_KEY, True)
+        if use_case != StorageUseCase.PDF.value or not bool(retryable):
+            return None
+        job_id_raw = metadata.get(PUBMED_STORAGE_METADATA_JOB_ID_KEY)
+        owner_id_raw = metadata.get(PUBMED_STORAGE_METADATA_OWNER_ID_KEY)
+        article_id_raw = metadata.get(PUBMED_STORAGE_METADATA_ARTICLE_ID_KEY)
+        if not job_id_raw or not owner_id_raw or not article_id_raw:
+            return None
+        try:
+            return _PdfRetryContext(
+                operation_id=operation.id,
+                job_id=UUID(str(job_id_raw)),
+                owner_id=UUID(str(owner_id_raw)),
+                article_id=str(article_id_raw),
+            )
+        except ValueError:
+            return None
+
+    def _mark_operation_retry_disabled(
+        self,
+        operation: StorageOperationRecord,
+    ) -> None:
+        if self._storage_operation_repository is None:
+            return
+        metadata = (
+            dict(operation.metadata) if isinstance(operation.metadata, dict) else {}
+        )
+        metadata[PUBMED_STORAGE_METADATA_RETRYABLE_KEY] = False
+        metadata["retry_completed_at"] = datetime.now(UTC).isoformat()
+        self._storage_operation_repository.update_operation_metadata(
+            operation.id,
+            metadata,
+        )
+
+
+@dataclass(frozen=True)
+class _PdfRetryContext:
+    operation_id: UUID
+    job_id: UUID
+    owner_id: UUID
+    article_id: str

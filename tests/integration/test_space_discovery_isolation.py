@@ -107,6 +107,7 @@ def _add_catalog_entries(session: Session) -> None:
                 requires_auth=False,
                 usage_count=10,
                 success_rate=0.9,
+                query_capabilities={},
             ),
             SourceCatalogEntryModel(
                 id="hpo",
@@ -124,6 +125,7 @@ def _add_catalog_entries(session: Session) -> None:
                 requires_auth=False,
                 usage_count=5,
                 success_rate=0.95,
+                query_capabilities={},
             ),
         ],
     )

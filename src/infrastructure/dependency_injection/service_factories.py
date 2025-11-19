@@ -16,10 +16,15 @@ from src.application.services.data_discovery_service import DataDiscoveryService
 from src.application.services.data_source_activation_service import (
     DataSourceActivationService,
 )
+from src.application.services.discovery_configuration_service import (
+    DiscoveryConfigurationService,
+)
 from src.application.services.evidence_service import EvidenceApplicationService
 from src.application.services.gene_service import GeneApplicationService
 from src.application.services.phenotype_service import PhenotypeApplicationService
 from src.application.services.publication_service import PublicationApplicationService
+from src.application.services.pubmed_discovery_service import PubMedDiscoveryService
+from src.application.services.pubmed_query_builder import PubMedQueryBuilder
 from src.application.services.source_management_service import SourceManagementService
 from src.application.services.storage_configuration_service import (
     StorageConfigurationService,
@@ -31,9 +36,15 @@ from src.application.services.variant_service import VariantApplicationService
 from src.domain.services.evidence_domain_service import EvidenceDomainService
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.services.variant_domain_service import VariantDomainService
+from src.infrastructure.data_sources.pubmed_search_gateway import (
+    DeterministicPubMedSearchGateway,
+    SimplePubMedPdfGateway,
+)
 from src.infrastructure.queries.source_query_client import HTTPQueryClient
 from src.infrastructure.repositories.data_discovery_repository_impl import (
     SQLAlchemyDataDiscoverySessionRepository,
+    SQLAlchemyDiscoveryPresetRepository,
+    SQLAlchemyDiscoverySearchJobRepository,
     SQLAlchemyQueryTestResultRepository,
     SQLAlchemySourceCatalogRepository,
 )
@@ -139,6 +150,16 @@ class ApplicationServiceFactoryMixin:
             evidence_repository=evidence_repository,
         )
 
+    def create_discovery_configuration_service(
+        self,
+        session: Session,
+    ) -> DiscoveryConfigurationService:
+        preset_repository = SQLAlchemyDiscoveryPresetRepository(session)
+        return DiscoveryConfigurationService(
+            preset_repository=preset_repository,
+            pubmed_query_builder=PubMedQueryBuilder(),
+        )
+
     def create_storage_configuration_service(
         self,
         session: Session,
@@ -163,6 +184,23 @@ class ApplicationServiceFactoryMixin:
         storage_service = self.create_storage_configuration_service(session)
         return StorageOperationCoordinator(storage_service)
 
+    def create_pubmed_discovery_service(
+        self,
+        session: Session,
+    ) -> PubMedDiscoveryService:
+        job_repository = SQLAlchemyDiscoverySearchJobRepository(session)
+        query_builder = PubMedQueryBuilder()
+        search_gateway = DeterministicPubMedSearchGateway(query_builder)
+        pdf_gateway = SimplePubMedPdfGateway()
+        storage_coordinator = self.create_storage_operation_coordinator(session)
+        return PubMedDiscoveryService(
+            job_repository=job_repository,
+            query_builder=query_builder,
+            search_gateway=search_gateway,
+            pdf_gateway=pdf_gateway,
+            storage_coordinator=storage_coordinator,
+        )
+
     def create_curation_service(self, session: Session) -> CurationService:
         return CurationService(
             review_repository=SqlAlchemyReviewRepository(),
@@ -177,6 +215,7 @@ class ApplicationServiceFactoryMixin:
             variant_service=self.create_variant_application_service(session),
             phenotype_service=self.create_phenotype_application_service(session),
             evidence_service=self.create_evidence_application_service(session),
+            storage_service=self.create_storage_configuration_service(session),
         )
 
     def create_search_service(self, session: Session) -> UnifiedSearchService:

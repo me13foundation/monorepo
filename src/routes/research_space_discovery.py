@@ -13,7 +13,7 @@ from src.application.services.space_data_discovery_service import (
     SpaceDataDiscoveryService,
 )
 from src.database.session import get_session
-from src.domain.entities.data_discovery_session import QueryParameters
+from src.domain.entities.data_discovery_parameters import AdvancedQueryParameters
 from src.domain.entities.user import User, UserRole
 from src.infrastructure.dependency_injection.container import container
 from src.infrastructure.repositories.research_space_membership_repository import (
@@ -28,11 +28,16 @@ from .data_discovery.dependencies import (
     get_audit_trail_service,
     owner_filter_for_user,
 )
-from .data_discovery.mappers import catalog_entry_to_response, session_to_response
+from .data_discovery.mappers import (
+    catalog_entry_to_response,
+    preset_to_response,
+    session_to_response,
+)
 from .data_discovery.schemas import (
+    AdvancedQueryParametersModel,
     CreateSessionRequest,
     DataDiscoverySessionResponse,
-    QueryParametersModel,
+    DiscoveryPresetResponse,
     SourceCatalogResponse,
     UpdateParametersRequest,
     UpdateSelectionRequest,
@@ -67,7 +72,12 @@ def get_space_discovery_context(
         )
 
     data_discovery_service = container.create_data_discovery_service(db)
-    service = SpaceDataDiscoveryService(space_id, data_discovery_service)
+    discovery_config_service = container.create_discovery_configuration_service(db)
+    service = SpaceDataDiscoveryService(
+        space_id,
+        data_discovery_service,
+        discovery_config_service,
+    )
     return SpaceDiscoveryContext(db_session=db, service=service)
 
 
@@ -94,12 +104,11 @@ def require_space_access(
         )
 
 
-def _build_query_parameters(model: QueryParametersModel) -> QueryParameters:
+def _build_query_parameters(
+    model: AdvancedQueryParametersModel,
+) -> AdvancedQueryParameters:
     """Convert API model to domain query parameters."""
-    return QueryParameters(
-        gene_symbol=model.gene_symbol,
-        search_term=model.search_term,
-    )
+    return model.to_domain_model()
 
 
 @router.get(
@@ -193,6 +202,65 @@ async def create_space_session(
         },
     )
     return session_to_response(session_entity)
+
+
+@router.get(
+    "/presets",
+    response_model=list[DiscoveryPresetResponse],
+    summary="List PubMed presets available within the space",
+)
+async def list_space_presets(
+    owner_id: UUID
+    | None = Query(
+        None,
+        description="Filter presets by owner (admin only)",
+    ),
+    context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
+    current_user: User = Depends(get_current_active_user),
+) -> list[DiscoveryPresetResponse]:
+    """Return presets the user can access within this space."""
+    require_space_access(context, current_user)
+    effective_owner = (
+        owner_id
+        if current_user.role == UserRole.ADMIN and owner_id
+        else current_user.id
+    )
+    try:
+        presets = context.service.list_pubmed_presets(
+            effective_owner,
+            include_space_presets=True,
+        )
+    except RuntimeError as exc:  # pragma: no cover - dependency misconfiguration
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Preset service unavailable",
+        ) from exc
+    return [preset_to_response(preset) for preset in presets]
+
+
+@router.get(
+    "/defaults",
+    response_model=AdvancedQueryParametersModel,
+    summary="Get default advanced parameters for the space",
+)
+async def get_space_default_parameters(
+    owner_id: UUID
+    | None = Query(
+        None,
+        description="Override owner when requesting defaults (admin only)",
+    ),
+    context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
+    current_user: User = Depends(get_current_active_user),
+) -> AdvancedQueryParametersModel:
+    """Return default advanced parameters derived from recent sessions or presets."""
+    require_space_access(context, current_user)
+    effective_owner = (
+        owner_id
+        if current_user.role == UserRole.ADMIN and owner_id
+        else current_user.id
+    )
+    defaults = context.service.get_default_parameters(owner_id=effective_owner)
+    return AdvancedQueryParametersModel.from_domain(defaults)
 
 
 @router.get(

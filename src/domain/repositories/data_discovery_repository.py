@@ -8,12 +8,14 @@ related to data discovery sessions, source catalogs, and query testing.
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from src.domain.entities.data_discovery_parameters import QueryParameters
 from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
-    QueryParameters,
     QueryTestResult,
     SourceCatalogEntry,
 )
+from src.domain.entities.discovery_preset import DiscoveryPreset
+from src.domain.entities.discovery_search_job import DiscoverySearchJob
 from src.type_definitions.common import JSONObject
 
 
@@ -281,6 +283,62 @@ class QueryTestResultRepository(ABC):
         Returns:
             Number of results deleted
         """
+
+
+class DiscoveryPresetRepository(ABC):
+    """Repository interface for discovery preset operations."""
+
+    @abstractmethod
+    def create(self, preset: DiscoveryPreset) -> DiscoveryPreset:
+        """Persist a new preset."""
+
+    @abstractmethod
+    def update(self, preset: DiscoveryPreset) -> DiscoveryPreset:
+        """Update an existing preset."""
+
+    @abstractmethod
+    def delete(self, preset_id: UUID, owner_id: UUID) -> bool:
+        """Delete a preset if owned by the given user."""
+
+    @abstractmethod
+    def get_owned_preset(
+        self,
+        preset_id: UUID,
+        owner_id: UUID,
+    ) -> DiscoveryPreset | None:
+        """Return a preset owned by the specified user."""
+
+    @abstractmethod
+    def list_for_owner(self, owner_id: UUID) -> list[DiscoveryPreset]:
+        """List presets created by a specific user."""
+
+    @abstractmethod
+    def list_for_space(self, space_id: UUID) -> list[DiscoveryPreset]:
+        """List presets shared with the specified research space."""
+
+
+class DiscoverySearchJobRepository(ABC):
+    """Repository interface for asynchronous discovery search jobs."""
+
+    @abstractmethod
+    def create(self, job: DiscoverySearchJob) -> DiscoverySearchJob:
+        """Persist a new search job record."""
+
+    @abstractmethod
+    def update(self, job: DiscoverySearchJob) -> DiscoverySearchJob:
+        """Update an existing job record."""
+
+    @abstractmethod
+    def get(self, job_id: UUID) -> DiscoverySearchJob | None:
+        """Retrieve a job by identifier."""
+
+    @abstractmethod
+    def list_for_owner(self, owner_id: UUID) -> list[DiscoverySearchJob]:
+        """List jobs initiated by the specified owner."""
+
+    @abstractmethod
+    def list_for_session(self, session_id: UUID) -> list[DiscoverySearchJob]:
+        """List jobs associated with a discovery session."""
 
 
 class SourceQueryClient(ABC):

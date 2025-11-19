@@ -27,6 +27,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
 
     from src.application.services.data_discovery_service import DataDiscoveryService
+    from src.application.services.discovery_configuration_service import (
+        DiscoveryConfigurationService,
+    )
+    from src.application.services.pubmed_discovery_service import PubMedDiscoveryService
     from src.infrastructure.repositories.sqlalchemy_user_repository import (
         SqlAlchemyUserRepository,
     )
@@ -111,6 +115,30 @@ def get_data_discovery_service_dependency() -> (
     session = SessionLocal()
     try:
         service = container.create_data_discovery_service(session)
+        yield service
+    finally:
+        session.close()
+
+
+def get_discovery_configuration_service_dependency() -> (
+    Generator[DiscoveryConfigurationService, None, None]
+):
+    """Provide a scoped DiscoveryConfigurationService for FastAPI routes."""
+    session = SessionLocal()
+    try:
+        service = container.create_discovery_configuration_service(session)
+        yield service
+    finally:
+        session.close()
+
+
+def get_pubmed_discovery_service_dependency() -> (
+    Generator[PubMedDiscoveryService, None, None]
+):
+    """Provide a scoped PubMedDiscoveryService for FastAPI routes."""
+    session = SessionLocal()
+    try:
+        service = container.create_pubmed_discovery_service(session)
         yield service
     finally:
         session.close()

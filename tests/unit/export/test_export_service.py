@@ -9,15 +9,20 @@ Follows type safety examples from type_examples.md:
 
 import gzip
 import json
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
+from uuid import uuid4
 
 import pytest
 
-from src.application.export.export_service import (
-    BulkExportService,
-    CompressionFormat,
-    ExportFormat,
+from src.application.export.export_service import BulkExportService
+from src.application.export.serialization import item_to_csv_row, serialize_item
+from src.application.export.types import CompressionFormat, ExportFormat
+from src.application.export.utils import get_gene_fields, get_variants_fields
+from src.application.services.storage_configuration_service import (
+    StorageConfigurationService,
 )
+from src.domain.entities.storage_configuration import StorageConfiguration
+from src.type_definitions.storage import StorageUseCase
 from tests.test_types.fixtures import (
     TEST_EVIDENCE_PATHOGENIC as TEST_EVIDENCE_CLINICAL_REPORT,
 )
@@ -277,7 +282,7 @@ class TestBulkExportService:
     ) -> None:
         """Test that CSV field mappings include all expected fields."""
         # Test gene fields
-        gene_fields = export_service._get_gene_fields()
+        gene_fields = get_gene_fields()
         expected_gene_fields = [
             "id",
             "gene_id",
@@ -297,7 +302,7 @@ class TestBulkExportService:
         assert gene_fields == expected_gene_fields
 
         # Test variant fields
-        variant_fields = export_service._get_variant_fields()
+        variant_fields = get_variants_fields()
         expected_variant_fields = [
             "id",
             "variant_id",
@@ -335,7 +340,7 @@ class TestBulkExportService:
         }
 
         # Act: Serialize the object
-        serialized = export_service._serialize_item(complex_obj)
+        serialized = serialize_item(complex_obj)
 
         # Assert: Verify nested structure is preserved
         assert serialized["id"] == 1
@@ -353,7 +358,7 @@ class TestBulkExportService:
         incomplete_obj = {"id": 1, "name": "Test"}
 
         # Act: Convert to CSV row
-        row = export_service._item_to_csv_row(
+        row = item_to_csv_row(
             incomplete_obj,
             ["id", "name", "missing_field"],
         )
@@ -377,7 +382,7 @@ class TestBulkExportService:
         }
 
         # Act: Convert to CSV row
-        row = export_service._item_to_csv_row(
+        row = item_to_csv_row(
             complex_obj,
             ["id", "tags", "optional_field", "number"],
         )
@@ -387,3 +392,46 @@ class TestBulkExportService:
         assert row["tags"] == "tag1;tag2"  # List joined with semicolons
         assert row["optional_field"] == ""  # None becomes empty string
         assert row["number"] == "42"  # Number converted to string
+
+    @pytest.mark.asyncio
+    async def test_export_to_storage_orchestrates_operation(
+        self,
+        mock_gene_service: Mock,
+        mock_variant_service: Mock,
+        mock_phenotype_service: Mock,
+        mock_evidence_service: Mock,
+    ) -> None:
+        """Test streaming export to storage backend."""
+        # Mock storage service
+        mock_storage = Mock(spec=StorageConfigurationService)
+        mock_config = Mock(spec=StorageConfiguration)
+        mock_storage.resolve_backend_for_use_case.return_value = mock_config
+        mock_storage.record_store_operation = AsyncMock()
+
+        service = BulkExportService(
+            mock_gene_service,
+            mock_variant_service,
+            mock_phenotype_service,
+            mock_evidence_service,
+            storage_service=mock_storage,
+        )
+
+        user_id = uuid4()
+        await service.export_to_storage(
+            entity_type="genes",
+            export_format=ExportFormat.JSON,
+            user_id=user_id,
+        )
+
+        # Verify interactions
+        mock_storage.resolve_backend_for_use_case.assert_called_with(
+            StorageUseCase.EXPORT,
+        )
+        mock_storage.record_store_operation.assert_called_once()
+
+        # Verify call args
+        call_args = mock_storage.record_store_operation.call_args
+        assert call_args.kwargs["configuration"] == mock_config
+        assert call_args.kwargs["content_type"] == "application/json"
+        assert call_args.kwargs["user_id"] == user_id
+        assert "exports/genes/" in call_args.kwargs["key"]

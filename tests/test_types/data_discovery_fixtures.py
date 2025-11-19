@@ -8,12 +8,15 @@ test fixtures with proper typing and mock data.
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
+from src.domain.entities.data_discovery_parameters import (
+    AdvancedQueryParameters,
+    QueryParameterCapabilities,
+    TestResultStatus,
+)
 from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
-    QueryParameters,
     QueryTestResult,
     SourceCatalogEntry,
-    TestResultStatus,
 )
 from src.domain.entities.user_data_source import SourceType
 
@@ -59,6 +62,7 @@ def create_test_source_catalog_entry(
         "success_rate": 0.85,
         "source_template_id": uuid4(),
         "tags": ["test", "mock"],
+        "capabilities": QueryParameterCapabilities(),
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
@@ -94,7 +98,7 @@ def create_test_data_discovery_session(
         "owner_id": owner_id or uuid4(),
         "research_space_id": research_space_id,
         "name": name,
-        "current_parameters": QueryParameters(
+        "current_parameters": AdvancedQueryParameters(
             gene_symbol="MED13L",
             search_term="atrial septal defect",
         ),
@@ -138,7 +142,7 @@ def create_test_query_test_result(
         "id": result_id or uuid4(),
         "session_id": session_id or uuid4(),
         "catalog_entry_id": catalog_entry_id,
-        "parameters": QueryParameters(
+        "parameters": AdvancedQueryParameters(
             gene_symbol="MED13L",
             search_term="atrial septal defect",
         ),

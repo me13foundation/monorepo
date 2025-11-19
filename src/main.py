@@ -13,6 +13,7 @@ from src.database.seed import (
     ensure_system_status_initialized,
 )
 from src.database.session import get_session
+from src.infrastructure.api.exception_handlers import register_exception_handlers
 from src.infrastructure.dependency_injection.container import container
 from src.infrastructure.dependency_injection.dependencies import (
     initialize_legacy_session,
@@ -107,6 +108,8 @@ def create_app() -> FastAPI:
         },
         lifespan=lifespan,
     )
+
+    register_exception_handlers(app)
 
     app.add_middleware(
         CORSMiddleware,

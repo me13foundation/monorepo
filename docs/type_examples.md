@@ -13,6 +13,8 @@ This document demonstrates how to effectively use the comprehensive type safety 
 7. [Publishing Pipeline Types](#publishing-pipeline-types)
 8. [Property-Based Testing](#property-based-testing)
 9. [JSON Packaging Helpers](#json-packaging-helpers)
+10. [Unified Storage Types](#unified-storage-types)
+11. [Discovery Presets](#discovery-presets)
 
 ## Typed Test Fixtures
 
@@ -532,6 +534,84 @@ def build_rocrate_metadata(
 ```
 
 See `src/application/packaging/rocrate/builder.py` and `src/application/packaging/provenance/metadata.py` for full implementations that avoid `typing.Any` while still modelling flexible JSON payloads.
+
+## Unified Storage Types
+
+The storage platform uses a discriminated union `StorageProviderConfigModel` to enforce valid configurations for each provider type, avoiding generic dictionaries.
+
+### Type-Safe Configuration Creation
+
+```python
+from uuid import uuid4
+from src.domain.entities.storage_configuration import StorageConfiguration
+from src.type_definitions.storage import (
+    LocalFilesystemConfig,
+    StorageProviderName,
+    StorageProviderCapability,
+    StorageUseCase,
+)
+
+def create_local_storage_config() -> StorageConfiguration:
+    """Create a strictly typed local filesystem configuration."""
+
+    # Config model specific to LocalFS
+    provider_config = LocalFilesystemConfig(
+        base_path="/data/med13/raw",
+        create_if_missing=True,
+        max_capacity_gb=100
+    )
+
+    return StorageConfiguration(
+        id=uuid4(),
+        name="Primary Raw Storage",
+        provider=StorageProviderName.LOCAL_FS,
+        config=provider_config,  # Validated against discriminated union
+        supported_capabilities=(
+            StorageProviderCapability.READ,
+            StorageProviderCapability.WRITE,
+        ),
+        default_use_cases=(
+            StorageUseCase.RAW_SOURCE,
+        )
+    )
+```
+
+## Discovery Presets
+
+Discovery presets use strict schema validation for `AdvancedQueryParameters` to ensure reproducible searches.
+
+### Creating Valid Presets
+
+```python
+from uuid import uuid4
+from src.domain.entities.discovery_preset import (
+    DiscoveryPreset,
+    DiscoveryProvider,
+    PresetScope
+)
+from src.domain.entities.data_discovery_session import AdvancedQueryParameters
+
+def create_pubmed_preset() -> DiscoveryPreset:
+    """Create a typed discovery preset."""
+
+    # Parameters are validated against the Pydantic model
+    params = AdvancedQueryParameters(
+        term="MED13[Title/Abstract] AND variants",
+        min_date="2023-01-01",
+        max_date="2024-01-01",
+        max_results=50,
+        article_types=["Journal Article", "Clinical Trial"]
+    )
+
+    return DiscoveryPreset(
+        id=uuid4(),
+        owner_id=uuid4(),
+        provider=DiscoveryProvider.PUBMED,
+        scope=PresetScope.USER,
+        name="Recent MED13 Clinical Trials",
+        parameters=params
+    )
+```
 
 ## Best Practices
 

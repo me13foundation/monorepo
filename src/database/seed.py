@@ -163,14 +163,16 @@ def ensure_source_catalog_seeded(session: Session) -> None:
     updated = 0
 
     for entry_data in SOURCE_CATALOG_ENTRIES:
-        entry_id = entry_data["id"]
+        entry_payload = dict(entry_data)
+        entry_payload.setdefault("query_capabilities", {})
+        entry_id = str(entry_payload["id"])
         model = existing_entries.get(entry_id)
         if model:
-            for field, value in entry_data.items():
+            for field, value in entry_payload.items():
                 setattr(model, field, value)
             updated += 1
         else:
-            session.add(SourceCatalogEntryModel(**entry_data))
+            session.add(SourceCatalogEntryModel(**entry_payload))
             inserted += 1
 
     logger.info(

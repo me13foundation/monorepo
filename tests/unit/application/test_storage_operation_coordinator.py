@@ -67,6 +67,10 @@ class DummyStorageOperationRepository:
         del configuration_id, limit
         return []
 
+    def list_failed_store_operations(self, *, limit=100):
+        del limit
+        return []
+
     def get_usage_metrics(self, configuration_id):  # pragma: no cover
         del configuration_id
 
@@ -76,6 +80,15 @@ class DummyStorageOperationRepository:
 
     def get_health_snapshot(self, configuration_id):  # pragma: no cover
         del configuration_id
+
+    def update_operation_metadata(self, operation_id, metadata):
+        for index, operation in enumerate(self.operations):
+            if operation.id == operation_id:
+                updated = operation.model_copy(update={"metadata": metadata})
+                self.operations[index] = updated
+                return updated
+        message = "operation not found"
+        raise ValueError(message)
 
 
 def _make_configuration(base_path: str) -> StorageConfiguration:
@@ -135,3 +148,32 @@ async def test_store_for_use_case_raises_when_missing_configuration():
             key="missing.pdf",
             file_path=Path(__file__),
         )
+
+
+@pytest.mark.asyncio
+async def test_store_for_use_case_includes_metadata(tmp_path):
+    configuration = _make_configuration(str(tmp_path / "storage"))
+    configuration_repository = DummyStorageConfigurationRepository(configuration)
+    operation_repository = DummyStorageOperationRepository()
+    registry = StoragePluginRegistry()
+    registry.register(LocalFilesystemStorageProvider(), override=True)
+    service = StorageConfigurationService(
+        configuration_repository=configuration_repository,
+        operation_repository=operation_repository,
+        plugin_registry=registry,
+    )
+    coordinator = StorageOperationCoordinator(service)
+
+    metadata = {
+        "use_case": StorageUseCase.PDF.value,
+        "extra": "context",
+    }
+    result = await coordinator.store_for_use_case(
+        StorageUseCase.PDF,
+        key="discovery/test.pdf",
+        file_path=Path(__file__),
+        metadata=metadata,
+    )
+
+    assert result.metadata == metadata
+    assert operation_repository.operations[-1].metadata == metadata

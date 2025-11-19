@@ -16,11 +16,14 @@ import {
   Network,
   Settings2,
   KeyRound,
+  CheckCircle2,
+  Slash,
 } from 'lucide-react'
 import type {
-  QueryParameters,
+  AdvancedQueryParameters,
   QueryTestResult,
   SourceCatalogEntry,
+  QueryParameterCapabilities,
 } from '@/lib/types/data-discovery'
 import {
   DEFAULT_ADVANCED_SETTINGS,
@@ -65,6 +68,37 @@ const SOURCE_TYPE_LABELS: Record<SourceCatalogEntry['source_type'], string> = {
   pubmed: 'PubMed',
 }
 
+const STORAGE_TARGET_SUMMARY: Record<
+  SourceCatalogEntry['source_type'],
+  { label: string; description: string; useCase: string }
+> = {
+  pubmed: {
+    label: 'PDF storage backend',
+    description: 'Articles are saved via the StorageUseCase.PDF configuration.',
+    useCase: 'PDF',
+  },
+  api: {
+    label: 'Raw source storage',
+    description: 'Data exports persist through StorageUseCase.RAW_SOURCE.',
+    useCase: 'RAW_SOURCE',
+  },
+  database: {
+    label: 'Raw source storage',
+    description: 'Records are captured for reproducible ingestion snapshots.',
+    useCase: 'RAW_SOURCE',
+  },
+  file_upload: {
+    label: 'Export storage',
+    description: 'Uploaded artifacts are stored via StorageUseCase.EXPORT.',
+    useCase: 'EXPORT',
+  },
+  web_scraping: {
+    label: 'Raw source storage',
+    description: 'Scraped payloads are routed to StorageUseCase.RAW_SOURCE.',
+    useCase: 'RAW_SOURCE',
+  },
+}
+
 const PARAMETER_LABELS = {
   gene: 'Gene-only',
   term: 'Phenotype-only',
@@ -81,21 +115,50 @@ const PARAMETER_DESCRIPTIONS = {
   api: 'Parameters depend on the upstream API. Provide the values documented for this integration.',
 } as const
 
+type CapabilityFlag = Exclude<
+  keyof QueryParameterCapabilities,
+  'max_results_limit' | 'supported_storage_use_cases'
+>
+
+const CAPABILITY_LABELS: Record<CapabilityFlag, string> = {
+  supports_date_range: 'Date range',
+  supports_publication_types: 'Publication types',
+  supports_language_filter: 'Language filter',
+  supports_sort_options: 'Sort options',
+  supports_additional_terms: 'Additional terms',
+  supports_variation_type: 'Variation types',
+  supports_clinical_significance: 'Clinical significance',
+  supports_review_status: 'Review status',
+  supports_organism: 'Organism',
+}
+
+const CAPABILITY_ORDER: CapabilityFlag[] = [
+  'supports_date_range',
+  'supports_publication_types',
+  'supports_language_filter',
+  'supports_sort_options',
+  'supports_additional_terms',
+  'supports_variation_type',
+  'supports_clinical_significance',
+  'supports_review_status',
+  'supports_organism',
+]
+
 interface ResultsViewProps {
-  parameters: QueryParameters
+  parameters: AdvancedQueryParameters
   currentSpaceId: string | null
   catalog: SourceCatalogEntry[]
   results: QueryTestResult[]
   selectedSourceIds: string[]
-  sourceParameters: Record<string, QueryParameters>
+  sourceParameters: Record<string, AdvancedQueryParameters>
   advancedSettings: Record<string, SourceAdvancedSettings>
-  defaultParameters: QueryParameters
+  defaultParameters: AdvancedQueryParameters
   defaultAdvancedSettings?: SourceAdvancedSettings
   isLoading: boolean
   onBackToSelect: () => void
   onAddToSpace: (result: QueryTestResult, spaceId: string) => Promise<void>
   onRunTest?: (catalogEntryId: string) => Promise<void>
-  onUpdateSourceParameters: (sourceId: string, params: QueryParameters) => void
+  onUpdateSourceParameters: (sourceId: string, params: AdvancedQueryParameters) => void
   onUpdateAdvancedSettings: (sourceId: string, settings: SourceAdvancedSettings) => void
 }
 
@@ -165,7 +228,7 @@ export function ResultsView({
           ): value is {
             entry: SourceCatalogEntry
             latestResult: QueryTestResult | null
-            parameters: QueryParameters
+            parameters: AdvancedQueryParameters
             advancedSettings: SourceAdvancedSettings
           } => value !== null,
         ),
@@ -363,7 +426,7 @@ export function ResultsView({
 interface SelectedSourceCardProps {
   entry: SourceCatalogEntry
   latestResult: QueryTestResult | null
-  parameters: QueryParameters
+  parameters: AdvancedQueryParameters
   advancedSettings: SourceAdvancedSettings
   isRunning: boolean
   onRunTest?: () => Promise<void> | void
@@ -459,7 +522,7 @@ function SelectedSourceCard({
 
 interface ResultCardProps {
   result: QueryTestResult
-  parameters: QueryParameters
+  parameters: AdvancedQueryParameters
   catalog: SourceCatalogEntry[]
   onAddToSpace: () => Promise<void> | void
   onRunTest?: () => Promise<void> | void
@@ -567,15 +630,15 @@ function ResultCard({
 interface SourceParameterModalProps {
   open: boolean
   entry: SourceCatalogEntry | null
-  parameters: QueryParameters
+  parameters: AdvancedQueryParameters
   advancedSettings: SourceAdvancedSettings
-  defaultParameters: QueryParameters
+  defaultParameters: AdvancedQueryParameters
   defaultAdvancedSettings: SourceAdvancedSettings
   onClose: () => void
-  onSave: (params: QueryParameters, advanced: SourceAdvancedSettings) => void
+  onSave: (params: AdvancedQueryParameters, advanced: SourceAdvancedSettings) => void
 }
 
-function SourceParameterModal({
+export function SourceParameterModal({
   open,
   entry,
   parameters,
@@ -585,7 +648,7 @@ function SourceParameterModal({
   onClose,
   onSave,
 }: SourceParameterModalProps) {
-  const [formValues, setFormValues] = useState<QueryParameters>(parameters)
+  const [formValues, setFormValues] = useState<AdvancedQueryParameters>(parameters)
   const [advancedValues, setAdvancedValues] = useState<SourceAdvancedSettings>(advancedSettings)
   const [isDirty, setIsDirty] = useState(false)
   const previousEntryIdRef = useRef<string | null>(null)
@@ -628,6 +691,12 @@ function SourceParameterModal({
   const geneRequired = normalizedType === 'gene' || normalizedType === 'geneAndTerm'
   const termRequired = normalizedType === 'term' || normalizedType === 'geneAndTerm'
   const requiresParameters = normalizedType !== 'none'
+  const storageSummary = STORAGE_TARGET_SUMMARY[entry.source_type] ?? STORAGE_TARGET_SUMMARY.api
+  const capabilityFlags = CAPABILITY_ORDER.map((flag) => ({
+    key: flag,
+    label: CAPABILITY_LABELS[flag],
+    enabled: Boolean(entry.capabilities[flag]),
+  }))
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
@@ -663,6 +732,42 @@ function SourceParameterModal({
           </div>
 
           <p className="text-sm text-muted-foreground">{PARAMETER_DESCRIPTIONS[normalizedType]}</p>
+
+          <div className="grid gap-3 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/20 p-3">
+            <div className="flex flex-col gap-1 rounded-md border border-border/60 bg-background/70 p-3">
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Storage target</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{storageSummary.label}</p>
+                  <p className="text-xs text-muted-foreground">{storageSummary.description}</p>
+                </div>
+                <Badge variant="secondary" className="text-[11px] font-semibold uppercase tracking-wide">
+                  {storageSummary.useCase}
+                </Badge>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase text-muted-foreground">Advanced filter capabilities</p>
+              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {capabilityFlags.map((flag) => (
+                  <div
+                    key={flag.key}
+                    className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs ${
+                      flag.enabled
+                        ? 'border-emerald-400/60 text-emerald-700 dark:text-emerald-200'
+                        : 'border-border/60 text-muted-foreground'
+                    }`}
+                  >
+                    {flag.enabled ? <CheckCircle2 className="size-3" /> : <Slash className="size-3" />}
+                    <span>{flag.label}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Max results limit: {entry.capabilities.max_results_limit}
+              </p>
+            </div>
+          </div>
 
           {entry.requires_auth && (
             <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
@@ -725,6 +830,119 @@ function SourceParameterModal({
                     }}
                     className="mt-1 bg-background"
                   />
+                </div>
+              )}
+
+              {/* ClinVar Specific Inputs */}
+              {entry.capabilities.supports_variation_type && (
+                <div>
+                  <Label htmlFor={`${entry.id}-variation-types`} className="text-xs text-muted-foreground">
+                    Variation Types (comma-separated)
+                  </Label>
+                  <Input
+                    id={`${entry.id}-variation-types`}
+                    placeholder="e.g., single_nucleotide_variant"
+                    value={(formValues.variation_types ?? []).join(', ')}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setFormValues((prev) => ({
+                        ...prev,
+                        variation_types: value
+                          ? value.split(',').map((s) => s.trim())
+                          : [],
+                      }))
+                      setIsDirty(true)
+                    }}
+                    className="mt-1 bg-background"
+                  />
+                </div>
+              )}
+
+              {entry.capabilities.supports_clinical_significance && (
+                <div>
+                  <Label htmlFor={`${entry.id}-clinical-sig`} className="text-xs text-muted-foreground">
+                    Clinical Significance (comma-separated)
+                  </Label>
+                  <Input
+                    id={`${entry.id}-clinical-sig`}
+                    placeholder="e.g., pathogenic, benign"
+                    value={(formValues.clinical_significance ?? []).join(', ')}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setFormValues((prev) => ({
+                        ...prev,
+                        clinical_significance: value
+                          ? value.split(',').map((s) => s.trim())
+                          : [],
+                      }))
+                      setIsDirty(true)
+                    }}
+                    className="mt-1 bg-background"
+                  />
+                </div>
+              )}
+
+              {/* UniProt Specific Inputs */}
+              {entry.capabilities.supports_organism && (
+                <div>
+                  <Label htmlFor={`${entry.id}-organism`} className="text-xs text-muted-foreground">
+                    Organism
+                  </Label>
+                  <Input
+                    id={`${entry.id}-organism`}
+                    placeholder="e.g., Human, Mouse"
+                    value={formValues.organism ?? ''}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setFormValues((prev) => ({
+                        ...prev,
+                        organism: value.trim() === '' ? null : value.trim(),
+                      }))
+                      setIsDirty(true)
+                    }}
+                    className="mt-1 bg-background"
+                  />
+                </div>
+              )}
+
+              {entry.capabilities.supports_review_status && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Review Status</Label>
+                  <div className="mt-1 flex gap-2">
+                    <Button
+                      type="button"
+                      variant={formValues.is_reviewed === true ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setFormValues((prev) => ({ ...prev, is_reviewed: true }))
+                        setIsDirty(true)
+                      }}
+                    >
+                      Swiss-Prot
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formValues.is_reviewed === false ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setFormValues((prev) => ({ ...prev, is_reviewed: false }))
+                        setIsDirty(true)
+                      }}
+                    >
+                      TrEMBL
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={formValues.is_reviewed === null ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setFormValues((prev) => ({ ...prev, is_reviewed: null }))
+                        setIsDirty(true)
+                      }}
+                    >
+                      All
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

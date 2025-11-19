@@ -9,16 +9,20 @@ from src.application.services.data_discovery_service.requests import (
     CreateDataDiscoverySessionRequest,
     UpdateSessionParametersRequest,
 )
+from src.domain.entities.data_discovery_parameters import AdvancedQueryParameters
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from src.application.services.data_discovery_service import DataDiscoveryService
+    from src.application.services.discovery_configuration_service import (
+        DiscoveryConfigurationService,
+    )
     from src.domain.entities.data_discovery_session import (
         DataDiscoverySession,
-        QueryParameters,
         SourceCatalogEntry,
     )
+    from src.domain.entities.discovery_preset import DiscoveryPreset
 
 
 class SpaceDataDiscoveryService:
@@ -28,9 +32,11 @@ class SpaceDataDiscoveryService:
         self,
         space_id: UUID,
         discovery_service: DataDiscoveryService,
+        discovery_configuration_service: DiscoveryConfigurationService | None = None,
     ) -> None:
         self._space_id = space_id
         self._service = discovery_service
+        self._config_service = discovery_configuration_service
 
     @property
     def space_id(self) -> UUID:
@@ -54,7 +60,7 @@ class SpaceDataDiscoveryService:
         *,
         owner_id: UUID,
         name: str,
-        parameters: QueryParameters,
+        parameters: AdvancedQueryParameters,
     ) -> DataDiscoverySession:
         """Create a session pinned to this space."""
         request = CreateDataDiscoverySessionRequest(
@@ -100,7 +106,7 @@ class SpaceDataDiscoveryService:
     def update_parameters(
         self,
         session_id: UUID,
-        parameters: QueryParameters,
+        parameters: AdvancedQueryParameters,
         *,
         owner_id: UUID | None,
     ) -> DataDiscoverySession | None:
@@ -167,6 +173,48 @@ class SpaceDataDiscoveryService:
             return False
         return self._service.delete_session(session_id)
 
+    def list_pubmed_presets(
+        self,
+        owner_id: UUID,
+        *,
+        include_space_presets: bool = True,
+    ) -> list[DiscoveryPreset]:
+        """Return PubMed presets visible within this space."""
+        config_service = self._require_config_service()
+        space_id = self._space_id if include_space_presets else None
+        return config_service.list_pubmed_presets(
+            owner_id,
+            research_space_id=space_id,
+        )
+
+    def get_default_parameters(
+        self,
+        owner_id: UUID | None = None,
+    ) -> AdvancedQueryParameters:
+        """Return default advanced parameters for the space."""
+        sessions = self._service.get_sessions_for_space(
+            self._space_id,
+            owner_id=owner_id,
+            include_inactive=True,
+        )
+        if sessions:
+            return sessions[0].current_parameters
+
+        if owner_id:
+            config_service = self._config_service
+            if config_service:
+                presets = config_service.list_pubmed_presets(
+                    owner_id,
+                    research_space_id=self._space_id,
+                )
+                if presets:
+                    return presets[0].parameters
+
+        return AdvancedQueryParameters(
+            gene_symbol=None,
+            search_term=None,
+        )
+
     def _session_accessible(
         self,
         session_id: UUID,
@@ -189,6 +237,12 @@ class SpaceDataDiscoveryService:
         if session.research_space_id != self._space_id:
             return None
         return session
+
+    def _require_config_service(self) -> DiscoveryConfigurationService:
+        if self._config_service is None:
+            message = "Discovery configuration service is not configured"
+            raise RuntimeError(message)
+        return self._config_service
 
 
 __all__ = ["SpaceDataDiscoveryService"]

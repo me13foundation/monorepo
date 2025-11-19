@@ -6,10 +6,8 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4  # noqa: TCH003
 
-from src.domain.entities.data_discovery_session import (
-    DataDiscoverySession,
-    QueryParameterType,
-)
+from src.domain.entities.data_discovery_parameters import QueryParameterType
+from src.domain.entities.data_discovery_session import DataDiscoverySession
 
 from .catalog_methods import CatalogPermissionMixin
 

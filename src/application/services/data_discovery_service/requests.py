@@ -6,7 +6,7 @@ from uuid import UUID  # noqa: TCH003
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.domain.entities.data_discovery_session import QueryParameters
+from src.domain.entities.data_discovery_parameters import AdvancedQueryParameters
 from src.type_definitions.common import JSONObject  # noqa: TCH001
 
 
@@ -16,8 +16,8 @@ class CreateDataDiscoverySessionRequest(BaseModel):
     owner_id: UUID
     name: str = "Untitled Session"
     research_space_id: UUID | None = None
-    initial_parameters: QueryParameters = Field(
-        default_factory=lambda: QueryParameters(
+    initial_parameters: AdvancedQueryParameters = Field(
+        default_factory=lambda: AdvancedQueryParameters(
             gene_symbol=None,
             search_term=None,
         ),
@@ -30,7 +30,7 @@ class UpdateSessionParametersRequest(BaseModel):
     """Request model for updating session parameters."""
 
     session_id: UUID
-    parameters: QueryParameters
+    parameters: AdvancedQueryParameters
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -41,6 +41,7 @@ class ExecuteQueryTestRequest(BaseModel):
     session_id: UUID
     catalog_entry_id: str
     timeout_seconds: int = 30
+    parameters: AdvancedQueryParameters | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 

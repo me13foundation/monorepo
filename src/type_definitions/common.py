@@ -120,6 +120,15 @@ class APIResponse(TypedDict, total=False):
     message: str
 
 
+class ApiErrorResponse(TypedDict):
+    """Standard API error response structure."""
+
+    success: Literal[False]
+    error_type: str
+    message: str
+    details: JSONObject | None
+
+
 class PaginatedResponse(TypedDict, total=False):
     """Paginated API response structure."""
 

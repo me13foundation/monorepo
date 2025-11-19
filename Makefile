@@ -156,13 +156,31 @@ generate-ts-types: ## Generate TypeScript definitions from backend models
 	$(USE_PYTHON) scripts/generate_ts_types.py
 
 # Testing
-test: ## Run all tests
+test: ## Run all tests (excluding heavy performance tests)
 	$(call check_venv)
 ifeq ($(POSTGRES_ACTIVE),)
-	$(USE_PYTHON) -m pytest
+	$(USE_PYTHON) -m pytest -m "not performance"
 else
 	@$(MAKE) postgres-migrate
-	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest)
+	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest -m "not performance")
+endif
+
+test-performance: ## Run performance tests
+	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
+	$(USE_PYTHON) -m pytest tests/performance
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest tests/performance)
+endif
+
+test-contract: ## Run API contract tests
+	$(call check_venv)
+ifeq ($(POSTGRES_ACTIVE),)
+	$(USE_PYTHON) -m pytest tests/security/test_schemathesis_contracts.py
+else
+	@$(MAKE) postgres-migrate
+	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest tests/security/test_schemathesis_contracts.py)
 endif
 
 validate-architecture: ## Validate architectural compliance

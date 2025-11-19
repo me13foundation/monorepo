@@ -9,7 +9,7 @@ from uuid import uuid4
 
 import pytest
 
-from src.domain.entities.data_discovery_session import (
+from src.domain.entities.data_discovery_parameters import (
     QueryParameters,
     QueryParameterType,
     TestResultStatus,

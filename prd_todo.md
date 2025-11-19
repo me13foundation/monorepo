@@ -46,81 +46,79 @@ This document tracks all outstanding work required to fulfill the **Unified Stor
 ## 2. Advanced Discovery & Presets
 
 ### 2.1 Data Model & Types
-- [ ] Update `DataDiscoverySessionModel` to store `pubmed_search_config` JSONB column (already migrated) plus optional future connector configs.
-- [ ] Extend mappers to read/write `AdvancedQueryParameters`.
-- [ ] Introduce `DiscoveryPreset` domain model + repository + TypedDict for API responses.
-- [ ] Add `QueryParameterCapabilities` fields to `SourceCatalogEntry` metadata and include them in API responses.
-- [ ] Update TypeScript types (`src/web/lib/types/data-discovery.ts`) to include advanced parameter shape & presets.
+- [x] Update `DataDiscoverySessionModel` to store `pubmed_search_config` JSONB column (already migrated) plus optional future connector configs.
+- [x] Extend mappers to read/write `AdvancedQueryParameters`.
+- [x] Introduce `DiscoveryPreset` domain model + repository + TypedDict for API responses.
+- [x] Add `QueryParameterCapabilities` fields to `SourceCatalogEntry` metadata and include them in API responses.
+- [x] Update TypeScript types (`src/web/lib/types/data-discovery.ts`) to include advanced parameter shape & presets.
 
-### 2.2 Application Services
-- [ ] Build `DiscoveryConfigurationService` with responsibilities:
+- [x] Build `DiscoveryConfigurationService` with responsibilities:
   - Manage presets (create, list, delete) scoped to user or research space.
   - Provide capability metadata to UI.
   - Validate parameter payloads via `PubMedQueryBuilder`.
-- [ ] Implement `PubMedQueryBuilder` that:
+- [x] Implement `PubMedQueryBuilder` that:
   - Converts `AdvancedQueryParameters` to E-utilities query strings.
-  - Provides preview text and validation results (date ordering, allowed publication types, etc.).
-- [ ] Create `PDFDownloadService`/`PDFDownloadOrchestrator`:
+      - Provides preview text and validation results (date ordering, allowed publication types, etc.).
+- [x] Create `PDFDownloadService`/`PDFDownloadOrchestrator`:
   - Fetch PDFs/PMC exports for PubMed results.
   - Use `StorageConfigurationService.get_backend_for(StorageUseCase.PDF)` to persist files (and `RAW_SOURCE` for other connectors).
   - Emit `StorageOperationRecord`s and audit events.
-- [ ] Extend `SpaceDataDiscoveryService` to surface presets and default advanced parameters per space.
+- [x] Extend `SpaceDataDiscoveryService` to surface presets and default advanced parameters per space.
 
 ### 2.3 FastAPI Routes
-- [ ] `/api/data-discovery/pubmed/presets` – CRUD for presets using new service.
-- [ ] `/api/data-discovery/pubmed/search` & `/search/{id}` – start advanced searches + poll results (with storage automation hooks).
-- [ ] `/api/data-discovery/pubmed/download` – trigger PDF download and return storage metadata.
-- [ ] Update existing `/data-discovery/sessions` endpoints to accept/return `AdvancedQueryParameters` where applicable.
-- [ ] Apply capability data to catalog responses so UI can dynamically enable filters.
+- [x] `/api/data-discovery/pubmed/presets` – CRUD for presets using new service.
+- [x] `/api/data-discovery/pubmed/search` & `/search/{id}` – start advanced searches + poll results (with storage automation hooks).
+- [x] `/api/data-discovery/pubmed/download` – trigger PDF download and return storage metadata.
+- [x] Update existing `/data-discovery/sessions` endpoints to accept/return `AdvancedQueryParameters` where applicable.
+- [x] Apply capability data to catalog responses so UI can dynamically enable filters.
 
-### 2.4 Infrastructure
-- [ ] Implement SQLAlchemy models/tables for discovery presets (columns: id, owner_id, scope, provider, parameters JSON, metadata, timestamps).
-- [ ] Add repositories for presets and for asynchronous search runs (jobs table tracking search status, storage key, etc.).
-- [ ] Integrate storage adapters with ingestion scheduler so PDF downloads can be retried/resumed.
+- [x] Implement SQLAlchemy models/tables for discovery presets (columns: id, owner_id, scope, provider, parameters JSON, metadata, timestamps).
+- [x] Add repositories for presets and for asynchronous search runs (jobs table tracking search status, storage key, etc.).
+- [x] Integrate storage adapters with ingestion scheduler so PDF downloads can be retried/resumed.
 
 ### 2.5 Next.js UI
-- [ ] **Advanced parameter bar** – add sections (Basics, Filters, Output) covering:
+- [x] **Advanced parameter bar** – add sections (Basics, Filters, Output) covering:
   - Date range pickers, publication type multi-select, language chips, sort selectors, result limits, additional terms.
   - Real-time validation + query preview using server endpoint.
-- [ ] **Preset modal** – save/load/delete presets, with sharing scope selector (user vs space) behind feature flag as per PRD.
-- [ ] **Discovery modal enhancements** – show storage target summary, capability-driven field toggles.
-- [ ] **PDF automation UX** – button/state in Results view to download articles; display toast + link to stored asset.
-- [ ] Update React Query hooks to consume new endpoints and hydrate capability metadata.
+- [x] **Preset modal** – save/load/delete presets, with sharing scope selector (user vs space) behind feature flag as per PRD.
+- [x] **Discovery modal enhancements** – show storage target summary, capability-driven field toggles.
+- [x] **PDF automation UX** – button/state in Results view to download articles; display toast + link to stored asset.
+- [x] Update React Query hooks to consume new endpoints and hydrate capability metadata.
 
 ### 2.6 Testing
-- [ ] Unit tests for `PubMedQueryBuilder`, preset service, capability enforcement.
-- [ ] Integration tests for new routes (pytest) using fixtures for advanced params & presets.
-- [ ] Frontend tests (React Testing Library + Playwright) for parameter forms, preset workflows, PDF download flows.
+- [x] Unit tests for `PubMedQueryBuilder`, preset service, capability enforcement.
+- [x] Integration tests for new routes (pytest) using fixtures for advanced params & presets.
+- [x] Frontend tests (React Testing Library + Playwright) for parameter forms, preset workflows, PDF download flows.
 
 ---
 
 ## 3. Cross-Source Adoption (ClinVar, UniProt, Custom APIs)
 
-- [ ] Extend `SourceCatalogEntry` metadata to declare connector-specific advanced parameters and compatible storage use cases.
-- [ ] Implement capability-driven forms in UI for these connectors (reusing advanced parameter components).
-- [ ] Add new API endpoints or extend existing ones to trigger ClinVar/UniProt searches using shared preset service.
-- [ ] Ensure ingestion pipelines call `StorageConfigurationService` for RAW_SOURCE and EXPORT use cases.
-- [ ] Document provider onboarding steps (new plugin + typed config) in `docs/` per PRD.
+- [x] Extend `SourceCatalogEntry` metadata to declare connector-specific advanced parameters and compatible storage use cases.
+- [x] Implement capability-driven forms in UI for these connectors (reusing advanced parameter components).
+- [x] Add new API endpoints or extend existing ones to trigger ClinVar/UniProt searches using shared preset service.
+- [x] Ensure ingestion pipelines call `StorageConfigurationService` for RAW_SOURCE and EXPORT use cases.
+- [x] Document provider onboarding steps (new plugin + typed config) in `docs/` per PRD.
 
 ---
 
 ## 4. Monitoring, Security, and Audit
 
-- [ ] Expand audit events to cover:
+- [x] Expand audit events to cover:
   - Storage CRUD/test/delete, preset changes, advanced search executions, PDF downloads, automated store operations.
-- [ ] Enforce typed `ApiErrorResponse` for rate-limit violations, storage errors, PDF failures.
-- [ ] Add observability hooks (metrics/logs) for provider latency, discovery search success rate, automation coverage (≥99.9% stored PDFs).
-- [ ] Update `docs/security.md` with new threat considerations (storage credentials, preset sharing permissions).
+- [x] Enforce typed `ApiErrorResponse` for rate-limit violations, storage errors, PDF failures.
+- [x] Add observability hooks (metrics/logs) for provider latency, discovery search success rate, automation coverage (≥99.9% stored PDFs).
+- [x] Update `docs/security.md` with new threat considerations (storage credentials, preset sharing permissions).
 
 ---
 
 ## 5. Testing & Quality Gates
 
-- [ ] Increase unit + integration coverage for all new services to maintain ≥85% target.
-- [ ] Update `make all` to include new test suites (preset, discovery, PDF downloads).
-- [ ] Create synthetic performance tests for storage upload/download (100 MB <10s) and concurrent plugin ops (≥10 parallel).
-- [ ] Add contract tests for storage APIs to ensure TS/py parity.
-- [ ] Set up Playwright scenarios covering storage dashboard, advanced discovery parameter UX, preset flows, and PDF automation.
+- [x] Increase unit + integration coverage for all new services to maintain ≥85% target.
+- [x] Update `make all` to include new test suites (preset, discovery, PDF downloads).
+- [x] Create synthetic performance tests for storage upload/download (100 MB <10s) and concurrent plugin ops (≥10 parallel).
+- [x] Add contract tests for storage APIs to ensure TS/py parity.
+- [x] Set up Playwright scenarios covering storage dashboard, advanced discovery parameter UX, preset flows, and PDF automation.
 
 ---
 
@@ -128,9 +126,9 @@ This document tracks all outstanding work required to fulfill the **Unified Stor
 
 - [ ] Align implementation phases (1–6) with PRD timeline:
   - Track progress per phase in this TODO and link to Jira/GitHub issues.
-- [ ] Update `docs/EngineeringArchitecture.md`, `docs/frontend/EngineeringArchitectureNext.md`, and `docs/type_examples.md` with new patterns.
-- [ ] Provide runbooks for storage plugin onboarding, preset management, and PDF automation troubleshooting.
-- [ ] Ensure release notes capture feature flags, migration steps, and rollback plans.
+- [x] Update `docs/EngineeringArchitecture.md`, `docs/frontend/EngineeringArchitectureNext.md`, and `docs/type_examples.md` with new patterns.
+- [x] Provide runbooks for storage plugin onboarding, preset management, and PDF automation troubleshooting.
+- [x] Ensure release notes capture feature flags, migration steps, and rollback plans.
 
 ---
 

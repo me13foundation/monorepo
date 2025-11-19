@@ -11,7 +11,9 @@ from src.database.seed import DEFAULT_RESEARCH_SPACE_ID
 from src.infrastructure.repositories.data_discovery_repository_impl import (
     SQLAlchemyDataDiscoverySessionRepository,
     SQLAlchemyQueryTestResultRepository,
-    _owner_identifier_candidates,
+)
+from src.infrastructure.repositories.data_discovery_repository_utils import (
+    owner_identifier_candidates,
 )
 from src.models.database.base import Base
 from src.models.database.data_discovery import (
@@ -132,7 +134,7 @@ def test_owner_identifier_candidates_skip_numeric_when_legacy_disabled() -> None
     """Ensure legacy numeric fallback is disabled when not allowed."""
     owner_uuid = UUID("00000000-0000-0000-0000-000000000001")
 
-    candidates = _owner_identifier_candidates(
+    candidates = owner_identifier_candidates(
         owner_uuid,
         allow_legacy_formats=False,
     )
@@ -145,7 +147,7 @@ def test_owner_identifier_candidates_include_numeric_with_legacy_enabled() -> No
     owner_uuid = UUID("00000000-0000-0000-0000-000000000001")
 
     candidates = set(
-        _owner_identifier_candidates(
+        owner_identifier_candidates(
             owner_uuid,
             allow_legacy_formats=True,
         ),

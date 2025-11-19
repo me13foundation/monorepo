@@ -6,9 +6,7 @@ and validating data sources before adding them to Research Spaces.
 """
 
 from collections.abc import Sequence
-from datetime import UTC, date, datetime
-from enum import Enum
-from typing import assert_never
+from datetime import UTC, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -16,27 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.domain.entities.user_data_source import SourceType
 from src.type_definitions.common import JSONObject
 
-
-class QueryParameterType(str, Enum):
-    """Types of query parameters supported by data sources."""
-
-    GENE = "gene"
-    TERM = "term"
-    GENE_AND_TERM = "gene_and_term"
-    NONE = "none"
-    API = "api"  # Special type for AI models and programmatic access
-
-
-class TestResultStatus(str, Enum):
-    """Status of a query test result."""
-
-    __test__ = False  # Prevent pytest from treating this Enum as a test class
-
-    PENDING = "pending"
-    SUCCESS = "success"
-    ERROR = "error"
-    TIMEOUT = "timeout"
-    VALIDATION_FAILED = "validation_failed"
+from .data_discovery_parameters import (
+    AdvancedQueryParameters,
+    PubMedSortOption,
+    QueryParameterCapabilities,
+    QueryParameters,
+    QueryParameterType,
+    TestResultStatus,
+)
 
 
 class SourceCatalogEntry(BaseModel):
@@ -116,6 +101,10 @@ class SourceCatalogEntry(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="When this catalog entry was last updated",
     )
+    capabilities: QueryParameterCapabilities = Field(
+        default_factory=QueryParameterCapabilities,
+        description="Advanced query parameter capabilities supported by this source",
+    )
 
     @field_validator("tags")
     @classmethod
@@ -159,105 +148,6 @@ class SourceCatalogEntry(BaseModel):
         )
 
 
-class QueryParameters(BaseModel):
-    """
-    Domain entity representing parameters for a query test.
-
-    Contains the gene symbol and phenotype/search terms used for testing sources.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    gene_symbol: str | None = Field(
-        None,
-        description="Gene symbol to query (e.g., MED13)",
-    )
-    search_term: str | None = Field(None, description="Phenotype or search term")
-
-    def has_gene(self) -> bool:
-        """Check if gene symbol is provided."""
-        return self.gene_symbol is not None and self.gene_symbol.strip() != ""
-
-    def has_term(self) -> bool:
-        """Check if search term is provided."""
-        return self.search_term is not None and self.search_term.strip() != ""
-
-    def can_run_query(self, param_type: QueryParameterType) -> bool:
-        """Check if these parameters can run a query of the given type."""
-        if param_type == QueryParameterType.GENE:
-            return self.has_gene()
-        if param_type == QueryParameterType.TERM:
-            return self.has_term()
-        if param_type == QueryParameterType.GENE_AND_TERM:
-            return self.has_gene() and self.has_term()
-        if param_type == QueryParameterType.NONE:
-            return True
-        if param_type == QueryParameterType.API:
-            # API sources may have custom validation
-            return True
-        assert_never(param_type)
-
-
-class PubMedSortOption(str, Enum):
-    """Supported PubMed sort options."""
-
-    RELEVANCE = "relevance"
-    PUBLICATION_DATE = "publication_date"
-    AUTHOR = "author"
-    JOURNAL = "journal"
-    TITLE = "title"
-
-
-class AdvancedQueryParameters(QueryParameters):
-    """Extended query parameters with advanced filters."""
-
-    model_config = ConfigDict(frozen=True)
-
-    date_from: date | None = Field(
-        default=None,
-        description="Earliest publication date to include.",
-    )
-    date_to: date | None = Field(
-        default=None,
-        description="Latest publication date to include.",
-    )
-    publication_types: list[str] = Field(
-        default_factory=list,
-        description="Publication types (validated against PublicationType).",
-    )
-    languages: list[str] = Field(
-        default_factory=list,
-        description="Language filters (ISO codes).",
-    )
-    sort_by: PubMedSortOption = Field(
-        default=PubMedSortOption.RELEVANCE,
-        description="Sort order for PubMed results.",
-    )
-    max_results: int = Field(
-        default=100,
-        ge=1,
-        le=1000,
-        description="Maximum number of results to fetch.",
-    )
-    additional_terms: str | None = Field(
-        default=None,
-        description="Additional PubMed query syntax appended to the search.",
-    )
-
-
-class QueryParameterCapabilities(BaseModel):
-    """Describes which advanced parameters a source supports."""
-
-    model_config = ConfigDict(frozen=True)
-
-    supports_date_range: bool = False
-    supports_publication_types: bool = False
-    supports_language_filter: bool = False
-    supports_sort_options: bool = False
-    supports_additional_terms: bool = False
-    max_results_limit: int = Field(default=1000, ge=1, le=1000)
-
-
 class QueryTestResult(BaseModel):
     """
     Domain entity representing the result of a query test.
@@ -273,7 +163,10 @@ class QueryTestResult(BaseModel):
     session_id: UUID = Field(..., description="Workbench session this test belongs to")
 
     # Test execution
-    parameters: QueryParameters = Field(..., description="Parameters used for the test")
+    parameters: AdvancedQueryParameters = Field(
+        ...,
+        description="Parameters used for the test",
+    )
     status: TestResultStatus = Field(..., description="Outcome status of the test")
 
     # Results
@@ -348,8 +241,8 @@ class DataDiscoverySession(BaseModel):
     )
 
     # Current state
-    current_parameters: QueryParameters = Field(
-        default_factory=lambda: QueryParameters(
+    current_parameters: AdvancedQueryParameters = Field(
+        default_factory=lambda: AdvancedQueryParameters(
             gene_symbol=None,
             search_term=None,
         ),
@@ -474,3 +367,16 @@ class DataDiscoverySession(BaseModel):
         if self.total_tests_run == 0:
             return 0.0
         return self.successful_tests / self.total_tests_run
+
+
+__all__ = [
+    "AdvancedQueryParameters",
+    "DataDiscoverySession",
+    "PubMedSortOption",
+    "QueryParameterCapabilities",
+    "QueryParameters",
+    "QueryParameterType",
+    "QueryTestResult",
+    "SourceCatalogEntry",
+    "TestResultStatus",
+]

@@ -56,6 +56,22 @@ The MED13 Resource Library implements a robust **Clean Architecture** with compl
 - **Presentation Layer**: REST API endpoints + Next.js management interface
 - **Quality Assurance**: Comprehensive testing, type safety, validation
 
+### ✅ **Unified Storage Platform - INTEGRATED**
+**Features:**
+- **Clean Abstraction**: `StorageConfiguration` entity separates logic from providers (GCS, LocalFS, S3)
+- **Validation Rules**: Strict checks for capability matching, use case exclusivity, and naming uniqueness
+- **Observability**: Aggregated health stats, usage metrics, and audit trails for all storage ops
+- **Orchestration**: `StorageOperationCoordinator` manages reliable file transfer and metadata recording
+- **Maintenance Mode**: Guard rails to prevent data corruption during maintenance windows
+- **Stats Aggregation**: Centralized health and usage reporting for all storage backends
+
+### ✅ **Advanced Discovery Module - PRODUCTION READY**
+**Features:**
+- **PubMed Integration**: Deterministic search gateway with caching and PDF retrieval
+- **Query Builder**: Type-safe construction of E-utilities queries with validation
+- **Presets System**: User and Space-scoped search configurations for reproducible research
+- **Automation**: Background jobs for PDF downloading and ingestion linkage
+
 ### ✅ **Production Infrastructure - ESTABLISHED**
 - **Cloud Run Deployment**: Multi-service container orchestration
 - **PostgreSQL Ready**: Production database configuration

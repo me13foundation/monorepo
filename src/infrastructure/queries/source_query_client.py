@@ -16,11 +16,12 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from src.domain.entities.data_discovery_session import (
+from src.domain.entities.data_discovery_parameters import (
+    AdvancedQueryParameters,
     QueryParameters,
     QueryParameterType,
-    SourceCatalogEntry,
 )
+from src.domain.entities.data_discovery_session import SourceCatalogEntry
 from src.domain.repositories.data_discovery_repository import SourceQueryClient
 from src.type_definitions.common import JSONObject, JSONValue
 
@@ -268,28 +269,67 @@ class HTTPQueryClient(SourceQueryClient):
         """Construct request parameters for API queries."""
         request_params: dict[str, str] = {}
 
+        self._add_basic_params(request_params, parameters)
+        self._add_advanced_params(request_params, parameters)
+        self._add_config_params(request_params, catalog_entry)
+
+        return request_params
+
+    def _add_basic_params(
+        self,
+        request_params: dict[str, str],
+        parameters: QueryParameters,
+    ) -> None:
         if parameters.gene_symbol:
             request_params["gene"] = parameters.gene_symbol
 
         if parameters.search_term:
             request_params["term"] = parameters.search_term
 
-        configuration = getattr(catalog_entry, "configuration", None)
-        if configuration:
-            if hasattr(configuration, "model_dump"):
-                config_dict = configuration.model_dump()
-            elif isinstance(configuration, dict):
-                config_dict = configuration
-            else:
-                config_dict = None
-            if isinstance(config_dict, dict):
-                api_params = config_dict.get("api_params", {})
-                if isinstance(api_params, dict):
-                    request_params.update(
-                        {str(key): str(value) for key, value in api_params.items()},
-                    )
+    def _add_advanced_params(
+        self,
+        request_params: dict[str, str],
+        parameters: QueryParameters,
+    ) -> None:
+        if not isinstance(parameters, AdvancedQueryParameters):
+            return
 
-        return request_params
+        # ClinVar parameters
+        if parameters.variation_types:
+            request_params["variation_type"] = ",".join(parameters.variation_types)
+        if parameters.clinical_significance:
+            request_params["clinical_significance"] = ",".join(
+                parameters.clinical_significance,
+            )
+
+        # UniProt parameters
+        if parameters.is_reviewed is not None:
+            request_params["reviewed"] = "true" if parameters.is_reviewed else "false"
+        if parameters.organism:
+            request_params["organism"] = parameters.organism
+
+    def _add_config_params(
+        self,
+        request_params: dict[str, str],
+        catalog_entry: SourceCatalogEntry,
+    ) -> None:
+        configuration = getattr(catalog_entry, "configuration", None)
+        if not configuration:
+            return
+
+        if hasattr(configuration, "model_dump"):
+            config_dict = configuration.model_dump()
+        elif isinstance(configuration, dict):
+            config_dict = configuration
+        else:
+            config_dict = None
+
+        if isinstance(config_dict, dict):
+            api_params = config_dict.get("api_params", {})
+            if isinstance(api_params, dict):
+                request_params.update(
+                    {str(key): str(value) for key, value in api_params.items()},
+                )
 
     async def _parse_response_payload(
         self,

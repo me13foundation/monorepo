@@ -225,7 +225,7 @@ class StorageConfigurationService:
         )
         return result
 
-    async def record_store_operation(
+    async def record_store_operation(  # noqa: PLR0913 - orchestrator requires explicit context inputs
         self,
         configuration: StorageConfiguration,
         *,
@@ -233,6 +233,7 @@ class StorageConfigurationService:
         file_path: Path,
         content_type: str | None,
         user_id: UUID | None,
+        metadata: JSONObject | None = None,
     ) -> StorageOperationRecord:
         """Store a file using the provider and record the operation."""
 
@@ -246,6 +247,7 @@ class StorageConfigurationService:
             file_path=file_path,
             content_type=content_type,
             user_id=user_id,
+            metadata=metadata,
         )
 
     def get_usage_metrics(self, configuration_id: UUID) -> StorageUsageMetrics | None:

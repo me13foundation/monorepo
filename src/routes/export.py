@@ -11,11 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from src.application.export.export_service import (
-    BulkExportService,
-    CompressionFormat,
-    ExportFormat,
-)
+from src.application.export.export_service import BulkExportService
+from src.application.export.types import CompressionFormat, ExportFormat
 from src.database.session import get_session
 from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,

@@ -5,17 +5,26 @@ These entities represent the core business objects and their relationships.
 """
 
 # Data Discovery entities
-from .data_discovery_session import (
-    DataDiscoverySession,
+from .data_discovery_parameters import (
+    AdvancedQueryParameters,
+    PubMedSortOption,
+    QueryParameterCapabilities,
     QueryParameters,
     QueryParameterType,
+    TestResultStatus,
+)
+from .data_discovery_session import (
+    DataDiscoverySession,
     QueryTestResult,
     SourceCatalogEntry,
-    TestResultStatus,
 )
 from .data_source_activation import (
     ActivationScope,
     DataSourceActivation,
+)
+from .discovery_search_job import (
+    DiscoverySearchJob,
+    DiscoverySearchStatus,
 )
 from .evidence import Evidence
 from .gene import Gene
@@ -54,6 +63,7 @@ from .user_data_source import (
 from .variant import Variant
 
 __all__ = [
+    "AdvancedQueryParameters",
     "DataDiscoverySession",
     "Evidence",
     "Gene",
@@ -65,7 +75,9 @@ __all__ = [
     "JobMetrics",
     "Phenotype",
     "Publication",
+    "PubMedSortOption",
     "QualityMetrics",
+    "QueryParameterCapabilities",
     "QueryParameterType",
     "QueryParameters",
     "QueryTestResult",
@@ -87,4 +99,6 @@ __all__ = [
     "StorageOperation",
     "StorageProviderMetadata",
     "StorageProviderTestResult",
+    "DiscoverySearchJob",
+    "DiscoverySearchStatus",
 ]

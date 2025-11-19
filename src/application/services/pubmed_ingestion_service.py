@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
+from pathlib import Path
 from typing import TYPE_CHECKING
+from uuid import uuid4
 
 from src.domain.entities.data_source_configs import PubMedQueryConfig
 from src.domain.entities.publication import Publication  # noqa: TCH001
@@ -15,10 +19,14 @@ from src.domain.services.pubmed_ingestion import PubMedGateway, PubMedIngestionS
 from src.domain.transform.transformers.pubmed_record_transformer import (
     PubMedRecordTransformer,
 )
+from src.type_definitions.storage import StorageUseCase
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from src.application.services.storage_configuration_service import (
+        StorageConfigurationService,
+    )
     from src.domain.repositories.publication_repository import PublicationRepository
     from src.type_definitions.common import (
         PublicationUpdate,
@@ -35,10 +43,12 @@ class PubMedIngestionService:
         gateway: PubMedGateway,
         publication_repository: PublicationRepository,
         transformer: PubMedRecordTransformer | None = None,
+        storage_service: StorageConfigurationService | None = None,
     ) -> None:
         self._gateway = gateway
         self._publication_repository = publication_repository
         self._transformer = transformer or PubMedRecordTransformer()
+        self._storage_service = storage_service
 
     async def ingest(self, source: UserDataSource) -> PubMedIngestionSummary:
         """Execute ingestion for a PubMed data source."""
@@ -46,6 +56,11 @@ class PubMedIngestionService:
         config = self._build_config(source.configuration)
 
         raw_records = await self._gateway.fetch_records(config)
+
+        # Persist raw records if a storage backend is configured
+        if self._storage_service:
+            await self._persist_raw_records(raw_records, source)
+
         publications = self._transform_records(raw_records)
         created, updated = self._persist_publications(publications)
 
@@ -56,6 +71,47 @@ class PubMedIngestionService:
             created_publications=created,
             updated_publications=updated,
         )
+
+    async def _persist_raw_records(
+        self,
+        records: Iterable[RawRecord],
+        source: UserDataSource,
+    ) -> None:
+        """Persist raw records to storage if backend is available."""
+        if not self._storage_service:
+            return
+
+        backend = self._storage_service.resolve_backend_for_use_case(
+            StorageUseCase.RAW_SOURCE,
+        )
+        if not backend:
+            return
+
+        # Create a temporary file to store the raw records
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+            json.dump(list(records), tmp, default=str)
+            tmp_path = Path(tmp.name)
+
+        try:
+            # Generate a unique key for this ingestion run
+            timestamp = source.updated_at.strftime("%Y%m%d_%H%M%S")
+            key = f"pubmed/{source.id}/raw/{timestamp}_{uuid4().hex[:8]}.json"
+
+            await self._storage_service.record_store_operation(
+                configuration=backend,
+                key=key,
+                file_path=tmp_path,
+                content_type="application/json",
+                user_id=source.owner_id,
+                metadata={
+                    "source_id": str(source.id),
+                    "record_count": len(list(records)),
+                },
+            )
+        finally:
+            # clean up temp file
+            if tmp_path.exists():
+                tmp_path.unlink()
 
     def _transform_records(self, records: Iterable[RawRecord]) -> list[Publication]:
         transformed: list[Publication] = []

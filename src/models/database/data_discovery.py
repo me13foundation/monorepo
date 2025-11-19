@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003
+from enum import Enum  # noqa: TC003
 from uuid import UUID  # noqa: TC003
 
 from sqlalchemy import (
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Text,
     func,
 )
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -74,6 +76,12 @@ class DataDiscoverySessionModel(Base):
         nullable=False,
         default=list,
         doc="IDs of tested catalog entries",
+    )
+    pubmed_search_config: Mapped[JSONObject] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+        doc="Advanced PubMed search parameters stored for the session",
     )
 
     # Statistics
@@ -149,6 +157,11 @@ class SourceCatalogEntryModel(Base):
     # Usage statistics
     usage_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     success_rate: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    query_capabilities: Mapped[JSONObject] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
 
     # Template integration
     source_template_id: Mapped[UUID | None] = mapped_column(
@@ -211,6 +224,11 @@ class QueryTestResultModel(Base):
     response_data: Mapped[JSONObject | None] = mapped_column(JSON, nullable=True)
     response_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parameters_payload: Mapped[JSONObject] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
 
     # Metadata
     execution_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -229,3 +247,92 @@ class QueryTestResultModel(Base):
 
     # Relationships
     session = relationship("DataDiscoverySessionModel", back_populates="test_results")
+
+
+class PresetScopeEnum(str, Enum):
+    """Database enum for preset scopes."""
+
+    USER = "user"
+    SPACE = "space"
+
+
+class DiscoveryPresetModel(Base):
+    """SQLAlchemy model for saved discovery presets."""
+
+    __tablename__ = "discovery_presets"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    scope: Mapped[PresetScopeEnum] = mapped_column(
+        SQLEnum(PresetScopeEnum),
+        nullable=False,
+        default=PresetScopeEnum.USER,
+    )
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parameters: Mapped[JSONObject] = mapped_column(JSON, nullable=False, default=dict)
+    metadata_payload: Mapped[JSONObject] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
+    research_space_id: Mapped[str | None] = mapped_column(
+        PGUUID(as_uuid=False),
+        ForeignKey("research_spaces.id"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
+class DiscoverySearchJobModel(Base):
+    """SQLAlchemy model for asynchronous discovery search jobs."""
+
+    __tablename__ = "discovery_search_jobs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    session_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("data_discovery_sessions.id"),
+        nullable=True,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    query_preview: Mapped[str] = mapped_column(Text, nullable=False)
+    parameters: Mapped[JSONObject] = mapped_column(JSON, nullable=False, default=dict)
+    total_results: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    result_payload: Mapped[JSONObject] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    storage_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )

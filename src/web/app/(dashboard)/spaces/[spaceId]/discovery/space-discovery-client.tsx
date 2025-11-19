@@ -5,7 +5,8 @@ import dynamic from 'next/dynamic'
 import { AxiosError } from 'axios'
 import { useSpaceContext } from '@/components/space-context-provider'
 import type {
-  QueryParameters,
+  AdvancedQueryParameters,
+  QueryParameterCapabilities,
   QueryTestResult,
   SourceCatalogEntry,
 } from '@/lib/types/data-discovery'
@@ -27,6 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
+import { ParameterBar } from '@/components/data-discovery/ParameterBar'
 
 import {
   createDefaultAdvancedSettings,
@@ -48,9 +50,34 @@ const ResultsView = dynamic(
   },
 )
 
-const DEFAULT_PARAMETERS: QueryParameters = {
+const DEFAULT_PARAMETERS: AdvancedQueryParameters = {
   gene_symbol: 'MED13L',
   search_term: 'atrial septal defect',
+  date_from: null,
+  date_to: null,
+  publication_types: [],
+  languages: [],
+  sort_by: 'relevance',
+  max_results: 100,
+  additional_terms: null,
+  variation_types: [],
+  clinical_significance: [],
+  is_reviewed: null,
+  organism: null,
+}
+
+const DEFAULT_CAPABILITIES: QueryParameterCapabilities = {
+  supports_date_range: true,
+  supports_publication_types: true,
+  supports_language_filter: true,
+  supports_sort_options: true,
+  supports_additional_terms: true,
+  max_results_limit: 1000,
+  supported_storage_use_cases: [],
+  supports_variation_type: false,
+  supports_clinical_significance: false,
+  supports_review_status: false,
+  supports_organism: false,
 }
 
 interface SpaceDiscoveryClientProps {
@@ -59,8 +86,10 @@ interface SpaceDiscoveryClientProps {
 
 export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientProps) {
   const [activeView, setActiveView] = useState<'select' | 'results'>('select')
-  const [parameters, setParameters] = useState<QueryParameters>(DEFAULT_PARAMETERS)
-  const [sourceParameters, setSourceParameters] = useState<Record<string, QueryParameters>>({})
+  const [parameters, setParameters] = useState<AdvancedQueryParameters>(DEFAULT_PARAMETERS)
+  const [sourceParameters, setSourceParameters] = useState<
+    Record<string, AdvancedQueryParameters>
+  >({})
   const [sourceAdvancedSettings, setSourceAdvancedSettings] = useState<
     Record<string, SourceAdvancedSettings>
   >({})
@@ -103,6 +132,47 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     })
     return map
   }, [catalog])
+  const activeCapabilities = useMemo(() => {
+    if (selectedSources.length === 0) {
+      return { ...DEFAULT_CAPABILITIES }
+    }
+    return selectedSources.reduce((acc, sourceId) => {
+      const entry = catalogById.get(sourceId)
+      if (!entry) {
+        return acc
+      }
+      const caps = entry.capabilities ?? DEFAULT_CAPABILITIES
+      return {
+        supports_date_range: acc.supports_date_range && Boolean(caps.supports_date_range),
+        supports_publication_types:
+          acc.supports_publication_types && Boolean(caps.supports_publication_types),
+        supports_language_filter:
+          acc.supports_language_filter && Boolean(caps.supports_language_filter),
+        supports_sort_options:
+          acc.supports_sort_options && Boolean(caps.supports_sort_options),
+        supports_additional_terms:
+          acc.supports_additional_terms && Boolean(caps.supports_additional_terms),
+        max_results_limit: Math.min(
+          acc.max_results_limit,
+          caps.max_results_limit ?? DEFAULT_CAPABILITIES.max_results_limit,
+        ),
+        supported_storage_use_cases: Array.from(
+          new Set([
+            ...acc.supported_storage_use_cases,
+            ...(caps.supported_storage_use_cases || []),
+          ]),
+        ),
+        // Use OR logic for specific capabilities so they appear if any selected source supports them
+        supports_variation_type:
+          acc.supports_variation_type || Boolean(caps.supports_variation_type),
+        supports_clinical_significance:
+          acc.supports_clinical_significance || Boolean(caps.supports_clinical_significance),
+        supports_review_status:
+          acc.supports_review_status || Boolean(caps.supports_review_status),
+        supports_organism: acc.supports_organism || Boolean(caps.supports_organism),
+      }
+    }, { ...DEFAULT_CAPABILITIES })
+  }, [catalogById, selectedSources])
 
   useEffect(() => {
     if (!sessionsQuery.isSuccess) {
@@ -151,6 +221,61 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
     isCreatingSession,
     createSession,
   ])
+
+  useEffect(() => {
+    setParameters((current) => {
+      let changed = false
+      const next: AdvancedQueryParameters = { ...current }
+      if (!activeCapabilities.supports_date_range) {
+        if (next.date_from) {
+          next.date_from = null
+          changed = true
+        }
+        if (next.date_to) {
+          next.date_to = null
+          changed = true
+        }
+      }
+      if (!activeCapabilities.supports_publication_types && next.publication_types?.length) {
+        next.publication_types = []
+        changed = true
+      }
+      if (!activeCapabilities.supports_language_filter && next.languages?.length) {
+        next.languages = []
+        changed = true
+      }
+      if (!activeCapabilities.supports_additional_terms && next.additional_terms) {
+        next.additional_terms = null
+        changed = true
+      }
+      if (!activeCapabilities.supports_variation_type && next.variation_types?.length) {
+        next.variation_types = []
+        changed = true
+      }
+      if (!activeCapabilities.supports_clinical_significance && next.clinical_significance?.length) {
+        next.clinical_significance = []
+        changed = true
+      }
+      if (!activeCapabilities.supports_review_status && next.is_reviewed !== null) {
+        next.is_reviewed = null
+        changed = true
+      }
+      if (!activeCapabilities.supports_organism && next.organism) {
+        next.organism = null
+        changed = true
+      }
+      if (!activeCapabilities.supports_sort_options && next.sort_by) {
+        next.sort_by = 'relevance'
+        changed = true
+      }
+      const maxLimit = activeCapabilities.max_results_limit ?? DEFAULT_CAPABILITIES.max_results_limit
+      if ((next.max_results ?? 100) > maxLimit) {
+        next.max_results = maxLimit
+        changed = true
+      }
+      return changed ? next : current
+    })
+  }, [activeCapabilities])
 
   useEffect(() => {
     if (isCreateSessionError) {
@@ -276,7 +401,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
   )
 
   const handleSourceParametersChange = useCallback(
-    (sourceId: string, nextParams: QueryParameters) => {
+    (sourceId: string, nextParams: AdvancedQueryParameters) => {
       setSourceParameters((prev) => ({
         ...prev,
         [sourceId]: nextParams,
@@ -298,7 +423,7 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
   const resolveExecutionContext = useCallback(
     (sourceId: string):
       | {
-          parameters: QueryParameters
+          parameters: AdvancedQueryParameters
           catalogEntry: SourceCatalogEntry
         }
       | null => {
@@ -423,6 +548,12 @@ export default function SpaceDiscoveryClient({ spaceId }: SpaceDiscoveryClientPr
 
   return (
     <div className="space-y-6">
+      <ParameterBar
+        parameters={parameters}
+        capabilities={activeCapabilities}
+        onParametersChange={setParameters}
+      />
+
       <DashboardSection
         title={activeView === 'select' ? 'Select Data Sources' : 'Review & Run Tests'}
         description={
@@ -503,13 +634,23 @@ function areArraysEqual(a: string[], b: string[]) {
   return a.every((value) => setB.has(value))
 }
 
-function isSameParameters(a: QueryParameters, b: QueryParameters) {
-  return a.gene_symbol === b.gene_symbol && a.search_term === b.search_term
+function isSameParameters(a: AdvancedQueryParameters, b: AdvancedQueryParameters) {
+  return (
+    a.gene_symbol === b.gene_symbol &&
+    a.search_term === b.search_term &&
+    a.date_from === b.date_from &&
+    a.date_to === b.date_to &&
+    a.max_results === b.max_results &&
+    a.sort_by === b.sort_by &&
+    a.additional_terms === b.additional_terms &&
+    areArraysEqual(a.publication_types ?? [], b.publication_types ?? []) &&
+    areArraysEqual(a.languages ?? [], b.languages ?? [])
+  )
 }
 
 function validateParametersForSource(
   entry: SourceCatalogEntry,
-  params: QueryParameters,
+  params: AdvancedQueryParameters,
 ): { ok: boolean; message?: string } {
   const paramType = normalizeParamType(entry.param_type)
   const hasGene = Boolean(params.gene_symbol && params.gene_symbol.trim().length > 0)

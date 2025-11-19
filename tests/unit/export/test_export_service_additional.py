@@ -16,10 +16,21 @@ from unittest.mock import Mock, call
 
 import pytest
 
-from src.application.export.export_service import (
-    BulkExportService,
-    CompressionFormat,
-    ExportFormat,
+from src.application.export.export_service import BulkExportService
+from src.application.export.serialization import (
+    coerce_scalar,
+    item_to_csv_row,
+    resolve_nested_value,
+    serialize_item,
+)
+from src.application.export.types import CompressionFormat, ExportFormat
+from src.application.export.utils import (
+    collect_paginated,
+    copy_filters,
+    get_evidence_fields,
+    get_gene_fields,
+    get_phenotype_fields,
+    get_variants_fields,
 )
 
 if TYPE_CHECKING:
@@ -165,7 +176,7 @@ class TestBulkExportServiceAdditional:
                 (["item1", "item2"], 2),  # page 1: 2 items total
             ]
 
-            result = export_service._collect_paginated(mock_fetcher, chunk_size=10)
+            result = collect_paginated(mock_fetcher, chunk_size=10)
 
             assert result == ["item1", "item2"]
             mock_fetcher.assert_called_once_with(1, 10)
@@ -181,7 +192,7 @@ class TestBulkExportServiceAdditional:
                 (["item3", "item4"], 5),  # page 2: 2 items, total 5
                 (["item5"], 5),  # page 3: 1 item, total 5
             ]
-            result = export_service._collect_paginated(mock_fetcher, chunk_size=2)
+            result = collect_paginated(mock_fetcher, chunk_size=2)
 
             assert result == ["item1", "item2", "item3", "item4", "item5"]
             assert mock_fetcher.call_count == 3
@@ -201,7 +212,7 @@ class TestBulkExportServiceAdditional:
             mock_fetcher = Mock()
             mock_fetcher.return_value = ([], 0)
 
-            result = export_service._collect_paginated(mock_fetcher, chunk_size=10)
+            result = collect_paginated(mock_fetcher, chunk_size=10)
 
             assert result == []
             mock_fetcher.assert_called_once_with(1, 10)
@@ -219,7 +230,7 @@ class TestBulkExportServiceAdditional:
                 ([], 3),  # sentinel to terminate
             ]
 
-            result = export_service._collect_paginated(mock_fetcher, chunk_size=1)
+            result = collect_paginated(mock_fetcher, chunk_size=1)
 
             assert result == ["item1", "item2", "item3"]
             assert mock_fetcher.call_count == 4
@@ -233,7 +244,7 @@ class TestBulkExportServiceAdditional:
         ) -> None:
             """Test serializing a dictionary object."""
             data = {"key": "value", "number": 42}
-            result = export_service._serialize_item(data)
+            result = serialize_item(data)
             assert result == data
 
         def test_serialize_item_with_pydantic_model(
@@ -248,7 +259,7 @@ class TestBulkExportServiceAdditional:
                 value: int
 
             model = TestModel(name="test", value=123)
-            result = export_service._serialize_item(model)
+            result = serialize_item(model)
 
             assert isinstance(result, dict)
             assert result["name"] == "test"
@@ -266,7 +277,7 @@ class TestBulkExportServiceAdditional:
 
             point = Point(x=10, y=20)
 
-            result = export_service._serialize_item(point)
+            result = serialize_item(point)
 
             assert isinstance(result, dict)
             assert result["x"] == 10
@@ -285,7 +296,7 @@ class TestBulkExportServiceAdditional:
                     self._private = "ignored"
 
             obj = CustomObject()
-            result = export_service._serialize_item(obj)
+            result = serialize_item(obj)
 
             assert isinstance(result, dict)
             assert result["attr1"] == "value1"
@@ -298,7 +309,7 @@ class TestBulkExportServiceAdditional:
         ) -> None:
             """Test serializing a list."""
             data = [1, "string", {"key": "value"}]
-            result = export_service._serialize_item(data)
+            result = serialize_item(data)
             assert result == data
 
         def test_serialize_item_with_primitive(
@@ -306,33 +317,10 @@ class TestBulkExportServiceAdditional:
             export_service: BulkExportService,
         ) -> None:
             """Test serializing primitive values."""
-            assert export_service._serialize_item(item="string") == "string"
-            assert export_service._serialize_item(item=42) == 42
-            assert export_service._serialize_item(item=True) is True
-            assert export_service._serialize_item(item=None) is None
-
-        def test_is_namedtuple_detection(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
-            """Test namedtuple detection."""
-
-            class Point(NamedTuple):
-                x: int
-                y: int
-
-            point = Point(x=1, y=2)
-
-            # Should detect as namedtuple
-            assert export_service._is_namedtuple(point) is True
-
-            # Regular tuple should not be detected
-            regular_tuple = (1, 2)
-            assert export_service._is_namedtuple(regular_tuple) is False
-
-            # Other objects should not be detected
-            assert export_service._is_namedtuple({"x": 1, "y": 2}) is False
-            assert export_service._is_namedtuple("string") is False
+            assert serialize_item("string") == "string"
+            assert serialize_item(42) == 42
+            assert serialize_item(item=True) is True
+            assert serialize_item(None) is None
 
         def test_serialize_namedtuple(self, export_service: BulkExportService) -> None:
             """Test namedtuple serialization."""
@@ -343,7 +331,7 @@ class TestBulkExportServiceAdditional:
 
             point = Point(x=10.5, y=20.8)
 
-            result = export_service._serialize_namedtuple(point)
+            result = serialize_item(point)
 
             assert isinstance(result, dict)
             assert result["x"] == 10.5
@@ -360,7 +348,7 @@ class TestBulkExportServiceAdditional:
                     self.__dunder_attr = "dunder"
 
             obj = TestObject()
-            result = export_service._serialize_object(obj)
+            result = serialize_item(obj)
 
             assert isinstance(result, dict)
             assert result["public_attr"] == "public"
@@ -371,7 +359,7 @@ class TestBulkExportServiceAdditional:
         def test_serialize_sequence(self, export_service: BulkExportService) -> None:
             """Test sequence serialization."""
             items = ["string", 42, {"key": "value"}]
-            result = export_service._serialize_sequence(items)
+            result = serialize_item(items)
 
             assert isinstance(result, list)
             assert len(result) == 3
@@ -395,7 +383,7 @@ class TestBulkExportServiceAdditional:
             }
             field_names = ["id", "name", "value", "optional", "missing"]
 
-            result = export_service._item_to_csv_row(item, field_names)
+            result = item_to_csv_row(item, field_names)
 
             expected = {
                 "id": "123",
@@ -421,7 +409,7 @@ class TestBulkExportServiceAdditional:
             model = TestModel(id="abc", name="Test", count=5)
             field_names = ["id", "name", "count"]
 
-            result = export_service._item_to_csv_row(model, field_names)
+            result = item_to_csv_row(model, field_names)
 
             expected = {
                 "id": "abc",
@@ -441,7 +429,7 @@ class TestBulkExportServiceAdditional:
             }
             field_names = ["gene.symbol", "variant.id", "gene.id"]
 
-            result = export_service._item_to_csv_row(item, field_names)
+            result = item_to_csv_row(item, field_names)
 
             expected = {
                 "gene.symbol": "MED13",
@@ -450,108 +438,84 @@ class TestBulkExportServiceAdditional:
             }
             assert result == expected
 
-        def test_resolve_nested_value_simple(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
+        def test_resolve_nested_value_simple(self) -> None:
             """Test resolving simple nested values."""
             data = {"key": "value"}
-            assert export_service._resolve_nested_value(data, ["key"]) == "value"
+            assert resolve_nested_value(data, ["key"]) == "value"
 
-        def test_resolve_nested_value_nested(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
+        def test_resolve_nested_value_nested(self) -> None:
             """Test resolving nested object values."""
             data = {"parent": {"child": "value"}}
             assert (
-                export_service._resolve_nested_value(
+                resolve_nested_value(
                     data,
                     ["parent", "child"],
                 )
                 == "value"
             )
 
-        def test_resolve_nested_value_deeply_nested(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
+        def test_resolve_nested_value_deeply_nested(self) -> None:
             """Test resolving deeply nested values."""
             data = {"a": {"b": {"c": {"d": "deep_value"}}}}
             assert (
-                export_service._resolve_nested_value(
+                resolve_nested_value(
                     data,
                     ["a", "b", "c", "d"],
                 )
                 == "deep_value"
             )
 
-        def test_resolve_nested_value_missing_key(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
+        def test_resolve_nested_value_missing_key(self) -> None:
             """Test resolving missing keys."""
             data = {"key": "value"}
-            assert export_service._resolve_nested_value(data, ["missing"]) == ""
+            assert resolve_nested_value(data, ["missing"]) == ""
 
-        def test_resolve_nested_value_missing_nested_key(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
+        def test_resolve_nested_value_missing_nested_key(self) -> None:
             """Test resolving missing nested keys."""
             data = {"parent": {"child": "value"}}
             assert (
-                export_service._resolve_nested_value(
+                resolve_nested_value(
                     data,
                     ["parent", "missing"],
                 )
                 == ""
             )
 
-        def test_resolve_nested_value_non_dict_parent(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
+        def test_resolve_nested_value_non_dict_parent(self) -> None:
             """Test resolving when parent is not a dict."""
             data = {"parent": "not_a_dict"}
             assert (
-                export_service._resolve_nested_value(
+                resolve_nested_value(
                     data,
                     ["parent", "child"],
                 )
                 == ""
             )
 
-        def test_resolve_nested_value_none_data(
-            self,
-            export_service: BulkExportService,
-        ) -> None:
+        def test_resolve_nested_value_none_data(self) -> None:
             """Test resolving with None data."""
-            assert export_service._resolve_nested_value(None, ["key"]) == ""
+            assert resolve_nested_value(None, ["key"]) == ""
 
-        def test_coerce_scalar_values(self, export_service: BulkExportService) -> None:
+        def test_coerce_scalar_values(self) -> None:
             """Test scalar value coercion for CSV."""
             # Already scalar values should pass through
-            assert export_service._coerce_scalar(value="string") == "string"
-            assert export_service._coerce_scalar(value=42) == 42
-            assert export_service._coerce_scalar(value=3.14) == 3.14
-            assert export_service._coerce_scalar(value=True) is True
-            assert export_service._coerce_scalar(value=False) is False
-            assert export_service._coerce_scalar(value=None) is None
+            assert coerce_scalar(value="string") == "string"
+            assert coerce_scalar(value=42) == 42
+            assert coerce_scalar(value=3.14) == 3.14
+            assert coerce_scalar(value=True) is True
+            assert coerce_scalar(value=False) is False
+            assert coerce_scalar(value=None) is None
 
             # Complex objects should be converted to strings
-            assert (
-                export_service._coerce_scalar(value={"key": "value"})
-                == "{'key': 'value'}"
-            )
-            assert export_service._coerce_scalar(value=[1, 2, 3]) == "[1, 2, 3]"
+            assert coerce_scalar(value={"key": "value"}) == "{'key': 'value'}"
+            assert coerce_scalar(value=[1, 2, 3]) == "[1, 2, 3]"
 
     class TestFieldMappings:
         """Test field mapping methods."""
 
-        def test_get_gene_fields(self, export_service: BulkExportService) -> None:
+        def test_get_gene_fields(self) -> None:
             """Test gene field mappings."""
-            fields = export_service._get_gene_fields()
+            fields = get_gene_fields()
             expected_fields = [
                 "id",
                 "gene_id",
@@ -570,9 +534,9 @@ class TestBulkExportServiceAdditional:
             ]
             assert fields == expected_fields
 
-        def test_get_variant_fields(self, export_service: BulkExportService) -> None:
+        def test_get_variant_fields(self) -> None:
             """Test variant field mappings."""
-            fields = export_service._get_variant_fields()
+            fields = get_variants_fields()
             expected_fields = [
                 "id",
                 "variant_id",
@@ -596,9 +560,9 @@ class TestBulkExportServiceAdditional:
             ]
             assert fields == expected_fields
 
-        def test_get_phenotype_fields(self, export_service: BulkExportService) -> None:
+        def test_get_phenotype_fields(self) -> None:
             """Test phenotype field mappings."""
-            fields = export_service._get_phenotype_fields()
+            fields = get_phenotype_fields()
             expected_fields = [
                 "id",
                 "identifier.hpo_id",
@@ -615,9 +579,9 @@ class TestBulkExportServiceAdditional:
             ]
             assert fields == expected_fields
 
-        def test_get_evidence_fields(self, export_service: BulkExportService) -> None:
+        def test_get_evidence_fields(self) -> None:
             """Test evidence field mappings."""
-            fields = export_service._get_evidence_fields()
+            fields = get_evidence_fields()
             expected_fields = [
                 "id",
                 "variant_id",
@@ -644,13 +608,13 @@ class TestBulkExportServiceAdditional:
 
         def test_copy_filters_none(self, export_service: BulkExportService) -> None:
             """Test copying None filters."""
-            result = export_service._copy_filters(None)
+            result = copy_filters(None)
             assert result == {}
 
         def test_copy_filters_empty(self, export_service: BulkExportService) -> None:
             """Test copying empty filters."""
             filters: QueryFilters = {}
-            result = export_service._copy_filters(filters)
+            result = copy_filters(filters)
             assert result == {}
             assert result is not filters  # Should be a copy
 
@@ -666,7 +630,7 @@ class TestBulkExportServiceAdditional:
                 "sort_by": "symbol",
                 "nested": {"key": "value"},
             }
-            result = export_service._copy_filters(filters)
+            result = copy_filters(filters)
 
             assert result == filters
             assert result is not filters  # Should be a new mapping

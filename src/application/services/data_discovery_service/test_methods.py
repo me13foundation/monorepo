@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 from uuid import UUID, uuid4  # noqa: TCH003
 
 from src.application.services.source_management_service import CreateSourceRequest
-from src.domain.entities.data_discovery_session import (
+from src.domain.entities.data_discovery_parameters import (
     QueryParameterType,
-    QueryTestResult,
     TestResultStatus,
 )
+from src.domain.entities.data_discovery_session import QueryTestResult
 from src.domain.entities.user_data_source import SourceConfiguration, SourceType
 
 from .session_methods import SessionManagementMixin
@@ -74,10 +74,13 @@ class QueryExecutionMixin(SessionManagementMixin):
             )
             return None
 
+        # Use request parameters if provided, else session parameters
+        parameters = request.parameters or session.current_parameters
+
         # Validate parameters
         if not self._query_client.validate_parameters(
             catalog_entry,
-            session.current_parameters,
+            parameters,
         ):
             logger.warning("Invalid parameters for source %s", request.catalog_entry_id)
             # Create failed result
@@ -85,7 +88,7 @@ class QueryExecutionMixin(SessionManagementMixin):
                 id=uuid4(),
                 catalog_entry_id=request.catalog_entry_id,
                 session_id=request.session_id,
-                parameters=session.current_parameters,
+                parameters=parameters,
                 status=TestResultStatus.VALIDATION_FAILED,
                 error_message="Invalid parameters for this source",
                 response_data=None,
@@ -106,7 +109,7 @@ class QueryExecutionMixin(SessionManagementMixin):
                 # For API sources, execute actual query
                 result_data = await self._query_client.execute_query(
                     catalog_entry,
-                    session.current_parameters,
+                    parameters,
                     request.timeout_seconds,
                 )
                 status = TestResultStatus.SUCCESS
@@ -116,7 +119,7 @@ class QueryExecutionMixin(SessionManagementMixin):
                 # For URL sources, generate URL
                 response_url = self._query_client.generate_url(
                     catalog_entry,
-                    session.current_parameters,
+                    parameters,
                 )
                 status = (
                     TestResultStatus.SUCCESS if response_url else TestResultStatus.ERROR
@@ -130,7 +133,7 @@ class QueryExecutionMixin(SessionManagementMixin):
                 id=uuid4(),
                 catalog_entry_id=request.catalog_entry_id,
                 session_id=request.session_id,
-                parameters=session.current_parameters,
+                parameters=parameters,
                 status=status,
                 response_data=response_data,
                 response_url=response_url,

@@ -7,7 +7,6 @@ for data discovery sessions, source catalogs, and query test results.
 
 from uuid import UUID
 
-from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from src.database.sqlite_utils import retry_on_sqlite_lock
@@ -16,89 +15,49 @@ from src.domain.entities.data_discovery_session import (
     QueryTestResult,
     SourceCatalogEntry,
 )
+from src.domain.entities.discovery_preset import DiscoveryPreset
+from src.domain.entities.discovery_search_job import DiscoverySearchJob
 from src.domain.repositories.data_discovery_repository import (
     DataDiscoverySessionRepository,
+    DiscoveryPresetRepository,
+    DiscoverySearchJobRepository,
     QueryTestResultRepository,
     SourceCatalogRepository,
 )
 from src.infrastructure.mappers.data_discovery_mapper import (
+    preset_to_entity,
+    preset_to_model,
     query_result_to_entity,
     query_result_to_model,
+    search_job_to_entity,
+    search_job_to_model,
     session_to_entity,
     session_to_model,
     source_catalog_to_entity,
     source_catalog_to_model,
 )
+from src.infrastructure.repositories.data_discovery_repository_utils import (
+    dialect_name_for_session,
+    expand_identifier,
+    owner_identifier_candidates,
+)
 from src.models.database.data_discovery import (
     DataDiscoverySessionModel,
+    DiscoveryPresetModel,
+    DiscoverySearchJobModel,
+    PresetScopeEnum,
     QueryTestResultModel,
     SourceCatalogEntryModel,
 )
 
-LEGACY_OWNER_ID_THRESHOLD = 1_000
-
-
-def _expand_identifier(
-    identifier: UUID | str,
-    *,
-    allow_legacy_formats: bool = True,
-) -> list[str]:
-    raw_value = str(identifier)
-    if not allow_legacy_formats:
-        return [raw_value]
-
-    candidates = {raw_value}
-    compact = raw_value.replace("-", "")
-    if compact:
-        candidates.add(compact)
-    return list(candidates)
-
-
-def _owner_identifier_candidates(
-    identifier: UUID | str,
-    *,
-    allow_legacy_formats: bool,
-) -> list[str]:
-    raw_value = str(identifier)
-    if not allow_legacy_formats:
-        return [raw_value]
-
-    candidates = {raw_value}
-    compact = raw_value.replace("-", "")
-    if compact:
-        candidates.add(compact)
-        stripped = compact.lstrip("0")
-        if stripped and stripped.isdigit():
-            int_value = int(stripped)
-            if int_value < LEGACY_OWNER_ID_THRESHOLD:
-                candidates.add(str(int_value))
-    return list(candidates)
-
-
-def _dialect_name_for_session(session: Session) -> str:
-    try:
-        bind = session.get_bind()
-    except RuntimeError:
-        return ""
-    if not isinstance(bind, Engine):
-        return ""
-    return bind.dialect.name
-
 
 class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
-    """
-    SQLAlchemy implementation of DataDiscoverySessionRepository.
-
-    Provides database operations for data discovery sessions using SQLAlchemy ORM.
-    """
+    """SQLAlchemy implementation of DataDiscoverySessionRepository."""
 
     def __init__(self, session: Session):
         self._session = session
-        dialect_name = _dialect_name_for_session(session)
+        dialect_name = dialect_name_for_session(session)
         self._allow_legacy_identifiers = dialect_name == "sqlite"
-        dialect_name = _dialect_name_for_session(session)
-        self._allow_legacy_identifiers = dialect_name == "sqlite"
-        dialect_name = _dialect_name_for_session(session)
         self._allow_legacy_owner_formats = dialect_name == "sqlite"
 
     def save(self, session: DataDiscoverySession) -> DataDiscoverySession:
@@ -112,7 +71,7 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         return session
 
     def find_by_id(self, session_id: UUID) -> DataDiscoverySession | None:
-        for candidate in _expand_identifier(
+        for candidate in expand_identifier(
             session_id,
             allow_legacy_formats=self._allow_legacy_owner_formats,
         ):
@@ -126,11 +85,11 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         session_id: UUID,
         owner_id: UUID,
     ) -> DataDiscoverySession | None:
-        session_candidates = _expand_identifier(
+        session_candidates = expand_identifier(
             session_id,
             allow_legacy_formats=self._allow_legacy_owner_formats,
         )
-        owner_candidates = _owner_identifier_candidates(
+        owner_candidates = owner_identifier_candidates(
             owner_id,
             allow_legacy_formats=self._allow_legacy_owner_formats,
         )
@@ -152,7 +111,7 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         *,
         include_inactive: bool = False,
     ) -> list[DataDiscoverySession]:
-        owner_candidates = _owner_identifier_candidates(
+        owner_candidates = owner_identifier_candidates(
             owner_id,
             allow_legacy_formats=self._allow_legacy_owner_formats,
         )
@@ -173,7 +132,7 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         include_inactive: bool = False,
     ) -> list[DataDiscoverySession]:
         # Convert UUID to string for database query (database stores UUIDs as strings)
-        space_ids = _expand_identifier(
+        space_ids = expand_identifier(
             space_id,
             allow_legacy_formats=self._allow_legacy_owner_formats,
         )
@@ -189,7 +148,7 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
         return [session_to_entity(model) for model in models]
 
     def delete(self, session_id: UUID) -> bool:
-        for candidate in _expand_identifier(
+        for candidate in expand_identifier(
             session_id,
             allow_legacy_formats=self._allow_legacy_owner_formats,
         ):
@@ -206,11 +165,7 @@ class SQLAlchemyDataDiscoverySessionRepository(DataDiscoverySessionRepository):
 
 
 class SQLAlchemySourceCatalogRepository(SourceCatalogRepository):
-    """
-    SQLAlchemy implementation of SourceCatalogRepository.
-
-    Provides database operations for the source catalog using SQLAlchemy ORM.
-    """
+    """SQLAlchemy implementation of SourceCatalogRepository."""
 
     def __init__(self, session: Session):
         self._session = session
@@ -310,15 +265,11 @@ class SQLAlchemySourceCatalogRepository(SourceCatalogRepository):
 
 
 class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
-    """
-    SQLAlchemy implementation of QueryTestResultRepository.
-
-    Provides database operations for query test results using SQLAlchemy ORM.
-    """
+    """SQLAlchemy implementation of QueryTestResultRepository."""
 
     def __init__(self, session: Session):
         self._session = session
-        dialect_name = _dialect_name_for_session(session)
+        dialect_name = dialect_name_for_session(session)
         self._allow_legacy_identifiers = dialect_name == "sqlite"
 
     def save(self, result: QueryTestResult) -> QueryTestResult:
@@ -332,7 +283,7 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
         return result
 
     def find_by_session(self, session_id: UUID) -> list[QueryTestResult]:
-        session_ids = _expand_identifier(
+        session_ids = expand_identifier(
             session_id,
             allow_legacy_formats=self._allow_legacy_identifiers,
         )
@@ -365,7 +316,7 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
         return query_result_to_entity(model) if model else None
 
     def delete_session_results(self, session_id: UUID) -> int:
-        session_ids = _expand_identifier(
+        session_ids = expand_identifier(
             session_id,
             allow_legacy_formats=self._allow_legacy_identifiers,
         )
@@ -382,3 +333,159 @@ class SQLAlchemyQueryTestResultRepository(QueryTestResultRepository):
 
         retry_on_sqlite_lock(_commit)
         return deleted_count
+
+
+class SQLAlchemyDiscoveryPresetRepository(DiscoveryPresetRepository):
+    """SQLAlchemy repository for discovery presets."""
+
+    def __init__(self, session: Session):
+        self._session = session
+        self._allow_legacy_identifiers = dialect_name_for_session(session) == "sqlite"
+
+    def create(self, preset: DiscoveryPreset) -> DiscoveryPreset:
+        model = preset_to_model(preset)
+        self._session.merge(model)
+
+        def _commit() -> None:
+            self._session.commit()
+
+        retry_on_sqlite_lock(_commit)
+        return preset
+
+    def update(self, preset: DiscoveryPreset) -> DiscoveryPreset:
+        model = preset_to_model(preset)
+        self._session.merge(model)
+
+        def _commit() -> None:
+            self._session.commit()
+
+        retry_on_sqlite_lock(_commit)
+        return preset
+
+    def delete(self, preset_id: UUID, owner_id: UUID) -> bool:
+        preset = self.get_owned_preset(preset_id, owner_id)
+        if preset is None:
+            return False
+        for candidate in expand_identifier(
+            preset_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        ):
+            model = self._session.get(DiscoveryPresetModel, candidate)
+            if model is None:
+                continue
+            self._session.delete(model)
+
+            def _commit() -> None:
+                self._session.commit()
+
+            retry_on_sqlite_lock(_commit)
+            return True
+        return False
+
+    def get_owned_preset(
+        self,
+        preset_id: UUID,
+        owner_id: UUID,
+    ) -> DiscoveryPreset | None:
+        preset_candidates = expand_identifier(
+            preset_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
+        owner_candidates = owner_identifier_candidates(
+            owner_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
+        model = (
+            self._session.query(DiscoveryPresetModel)
+            .filter(
+                DiscoveryPresetModel.id.in_(preset_candidates),
+                DiscoveryPresetModel.owner_id.in_(owner_candidates),
+            )
+            .first()
+        )
+        return preset_to_entity(model) if model else None
+
+    def list_for_owner(self, owner_id: UUID) -> list[DiscoveryPreset]:
+        owner_candidates = owner_identifier_candidates(
+            owner_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
+        models = (
+            self._session.query(DiscoveryPresetModel)
+            .filter(DiscoveryPresetModel.owner_id.in_(owner_candidates))
+            .order_by(DiscoveryPresetModel.created_at.desc())
+            .all()
+        )
+        return [preset_to_entity(model) for model in models]
+
+    def list_for_space(self, space_id: UUID) -> list[DiscoveryPreset]:
+        space_candidates = expand_identifier(
+            space_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
+        models = (
+            self._session.query(DiscoveryPresetModel)
+            .filter(
+                DiscoveryPresetModel.research_space_id.in_(space_candidates),
+                DiscoveryPresetModel.scope == PresetScopeEnum.SPACE,
+            )
+            .order_by(DiscoveryPresetModel.created_at.desc())
+            .all()
+        )
+        return [preset_to_entity(model) for model in models]
+
+
+class SQLAlchemyDiscoverySearchJobRepository(DiscoverySearchJobRepository):
+    """SQLAlchemy repository for coordinating discovery search jobs."""
+
+    def __init__(self, session: Session):
+        self._session = session
+        self._allow_legacy_identifiers = dialect_name_for_session(session) == "sqlite"
+
+    def create(self, job: DiscoverySearchJob) -> DiscoverySearchJob:
+        model = search_job_to_model(job)
+        self._session.merge(model)
+        self._session.commit()
+        return job
+
+    def update(self, job: DiscoverySearchJob) -> DiscoverySearchJob:
+        model = search_job_to_model(job)
+        self._session.merge(model)
+        self._session.commit()
+        return job
+
+    def get(self, job_id: UUID) -> DiscoverySearchJob | None:
+        for candidate in expand_identifier(
+            job_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        ):
+            model = self._session.get(DiscoverySearchJobModel, candidate)
+            if model:
+                return search_job_to_entity(model)
+        return None
+
+    def list_for_owner(self, owner_id: UUID) -> list[DiscoverySearchJob]:
+        owner_candidates = owner_identifier_candidates(
+            owner_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
+        models = (
+            self._session.query(DiscoverySearchJobModel)
+            .filter(DiscoverySearchJobModel.owner_id.in_(owner_candidates))
+            .order_by(DiscoverySearchJobModel.created_at.desc())
+            .all()
+        )
+        return [search_job_to_entity(model) for model in models]
+
+    def list_for_session(self, session_id: UUID) -> list[DiscoverySearchJob]:
+        session_candidates = expand_identifier(
+            session_id,
+            allow_legacy_formats=self._allow_legacy_identifiers,
+        )
+        models = (
+            self._session.query(DiscoverySearchJobModel)
+            .filter(DiscoverySearchJobModel.session_id.in_(session_candidates))
+            .order_by(DiscoverySearchJobModel.created_at.desc())
+            .all()
+        )
+        return [search_job_to_entity(model) for model in models]

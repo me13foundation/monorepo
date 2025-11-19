@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
-from src.domain.entities.data_discovery_session import QueryParameters
+from src.domain.entities.data_discovery_parameters import AdvancedQueryParameters
+from src.domain.entities.discovery_preset import (
+    DiscoveryPreset,
+    DiscoveryProvider,
+    PresetScope,
+)
 from tests.test_types.data_discovery_fixtures import create_test_source_catalog_entry
 from tests.test_types.fixtures import create_test_space_discovery_session
 from tests.test_types.mocks import create_mock_space_discovery_service
@@ -14,7 +20,7 @@ def test_create_session_enforces_space_id() -> None:
     """Ensure new sessions are pinned to the scoped space."""
     space_id = uuid4()
     service, base_service = create_mock_space_discovery_service(space_id)
-    params = QueryParameters(gene_symbol="MED13", search_term=None)
+    params = AdvancedQueryParameters(gene_symbol="MED13", search_term=None)
 
     result = service.create_session(
         owner_id=uuid4(),
@@ -77,3 +83,77 @@ def test_get_catalog_scopes_requests_to_space() -> None:
         research_space_id=space_id,
     )
     assert entries == [catalog_entry]
+
+
+def test_get_default_parameters_returns_latest_session() -> None:
+    space_id = uuid4()
+    owner_id = uuid4()
+    session = create_test_space_discovery_session(
+        space_id,
+        owner_id=owner_id,
+        current_parameters=AdvancedQueryParameters(
+            gene_symbol="TP53",
+            search_term="cancer",
+        ),
+    )
+    service, base_service = create_mock_space_discovery_service(
+        space_id,
+        sessions=[session],
+    )
+
+    result = service.get_default_parameters(owner_id=owner_id)
+
+    base_service.get_sessions_for_space.assert_called_with(
+        space_id,
+        owner_id=owner_id,
+        include_inactive=True,
+    )
+    assert result.gene_symbol == "TP53"
+    assert result.search_term == "cancer"
+
+
+def test_get_default_parameters_falls_back_to_preset() -> None:
+    space_id = uuid4()
+    owner_id = uuid4()
+    preset = DiscoveryPreset(
+        id=uuid4(),
+        owner_id=owner_id,
+        provider=DiscoveryProvider.PUBMED,
+        scope=PresetScope.USER,
+        name="Fallback",
+        description=None,
+        parameters=AdvancedQueryParameters(gene_symbol="MED13", search_term="cardiac"),
+        metadata={},
+        research_space_id=space_id,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
+    service, base_service = create_mock_space_discovery_service(
+        space_id,
+        sessions=[],
+        presets=[preset],
+    )
+
+    result = service.get_default_parameters(owner_id=owner_id)
+
+    base_service.get_sessions_for_space.assert_called_with(
+        space_id,
+        owner_id=owner_id,
+        include_inactive=True,
+    )
+    assert result.gene_symbol == "MED13"
+    assert result.search_term == "cardiac"
+
+
+def test_list_pubmed_presets_forwards_to_config_service() -> None:
+    space_id = uuid4()
+    owner_id = uuid4()
+    service, _ = create_mock_space_discovery_service(space_id)
+
+    service.list_pubmed_presets(owner_id)
+
+    config_mock = service._config_service_mock
+    config_mock.list_pubmed_presets.assert_called_once_with(
+        owner_id,
+        research_space_id=space_id,
+    )

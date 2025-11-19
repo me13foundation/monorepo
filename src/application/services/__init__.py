@@ -18,6 +18,11 @@ from .evidence_service import EvidenceApplicationService
 from .gene_service import GeneApplicationService
 from .phenotype_service import PhenotypeApplicationService
 from .publication_service import PublicationApplicationService
+from .pubmed_discovery_service import (
+    PubMedDiscoveryService,
+    PubmedDownloadRequest,
+    RunPubmedSearchRequest,
+)
 
 # Data Sources module services
 from .source_management_service import (
@@ -52,7 +57,10 @@ __all__ = [
     "EvidenceApplicationService",
     "GeneApplicationService",
     "PhenotypeApplicationService",
+    "PubMedDiscoveryService",
+    "PubmedDownloadRequest",
     "PublicationApplicationService",
+    "RunPubmedSearchRequest",
     "SourceManagementService",
     "SpaceDataDiscoveryService",
     "StorageConfigurationService",

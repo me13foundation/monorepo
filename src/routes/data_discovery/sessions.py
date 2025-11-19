@@ -15,7 +15,6 @@ from src.application.services.data_discovery_service.requests import (
 )
 from src.database.seed import DEFAULT_RESEARCH_SPACE_ID
 from src.database.session import get_session
-from src.domain.entities.data_discovery_session import QueryParameters
 from src.domain.entities.user import User, UserRole
 from src.infrastructure.dependency_injection.dependencies import (
     get_data_discovery_service_dependency,
@@ -75,10 +74,7 @@ async def create_session(
             owner_id=current_user.id,
             name=request.name,
             research_space_id=enforced_space_id,
-            initial_parameters=QueryParameters(
-                gene_symbol=request.initial_parameters.gene_symbol,
-                search_term=request.initial_parameters.search_term,
-            ),
+            initial_parameters=request.initial_parameters.to_domain_model(),
         )
 
         try:
@@ -198,10 +194,7 @@ async def update_session_parameters(
 
         update_request = UpdateSessionParametersRequest(
             session_id=session_id,
-            parameters=QueryParameters(
-                gene_symbol=request.parameters.gene_symbol,
-                search_term=request.parameters.search_term,
-            ),
+            parameters=request.parameters.to_domain_model(),
         )
 
         updated_session = service.update_session_parameters(

@@ -8,17 +8,32 @@ from infrastructure concerns.
 
 from uuid import UUID
 
+from src.domain.entities.data_discovery_parameters import (
+    AdvancedQueryParameters,
+    QueryParameterCapabilities,
+    QueryParameterType,
+    TestResultStatus,
+)
 from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
-    QueryParameters,
-    QueryParameterType,
     QueryTestResult,
     SourceCatalogEntry,
-    TestResultStatus,
+)
+from src.domain.entities.discovery_preset import (
+    DiscoveryPreset,
+    DiscoveryProvider,
+    PresetScope,
+)
+from src.domain.entities.discovery_search_job import (
+    DiscoverySearchJob,
+    DiscoverySearchStatus,
 )
 from src.domain.entities.user_data_source import SourceType
 from src.models.database.data_discovery import (
     DataDiscoverySessionModel,
+    DiscoveryPresetModel,
+    DiscoverySearchJobModel,
+    PresetScopeEnum,
     QueryTestResultModel,
     SourceCatalogEntryModel,
 )
@@ -80,6 +95,7 @@ def session_to_model(entity: DataDiscoverySession) -> DataDiscoverySessionModel:
         created_at=entity.created_at,
         updated_at=entity.updated_at,
         last_activity_at=entity.last_activity_at,
+        pubmed_search_config=entity.current_parameters.model_dump(),
     )
 
 
@@ -97,10 +113,15 @@ def session_to_entity(model: DataDiscoverySessionModel) -> DataDiscoverySession:
     owner_id = _coerce_uuid(model.owner_id)
     research_space_id = _coerce_uuid_or_none(model.research_space_id)
 
-    parameters = QueryParameters(
-        gene_symbol=model.gene_symbol,
-        search_term=model.search_term,
-    )
+    parameters_payload = model.pubmed_search_config or {}
+    derived_parameters: dict[str, object | None] = {
+        "gene_symbol": model.gene_symbol,
+        "search_term": model.search_term,
+    }
+    if isinstance(parameters_payload, dict):
+        derived_parameters.update(parameters_payload)
+
+    parameters = AdvancedQueryParameters.model_validate(derived_parameters)
 
     return DataDiscoverySession(
         id=session_id,
@@ -148,6 +169,7 @@ def source_catalog_to_model(entity: SourceCatalogEntry) -> SourceCatalogEntryMod
         source_template_id=entity.source_template_id,
         created_at=entity.created_at,
         updated_at=entity.updated_at,
+        query_capabilities=entity.capabilities.model_dump(),
     )
 
 
@@ -180,6 +202,9 @@ def source_catalog_to_entity(model: SourceCatalogEntryModel) -> SourceCatalogEnt
         source_template_id=model.source_template_id,
         created_at=model.created_at,
         updated_at=model.updated_at,
+        capabilities=QueryParameterCapabilities.model_validate(
+            model.query_capabilities or {},
+        ),
     )
 
 
@@ -212,6 +237,7 @@ def query_result_to_model(entity: QueryTestResult) -> QueryTestResultModel:
         data_quality_score=entity.data_quality_score,
         started_at=entity.started_at,
         completed_at=entity.completed_at,
+        parameters_payload=entity.parameters.model_dump(),
     )
 
 
@@ -230,10 +256,15 @@ def query_result_to_entity(model: QueryTestResultModel) -> QueryTestResult:
     result_id = _coerce_uuid(model.id)
     session_id = _coerce_uuid(model.session_id)
 
-    parameters = QueryParameters(
-        gene_symbol=model.gene_symbol,
-        search_term=model.search_term,
-    )
+    parameters_payload = model.parameters_payload or {}
+    derived_parameters: dict[str, object | None] = {
+        "gene_symbol": model.gene_symbol,
+        "search_term": model.search_term,
+    }
+    if isinstance(parameters_payload, dict):
+        derived_parameters.update(parameters_payload)
+
+    parameters = AdvancedQueryParameters.model_validate(derived_parameters)
 
     return QueryTestResult(
         id=result_id,
@@ -247,5 +278,85 @@ def query_result_to_entity(model: QueryTestResultModel) -> QueryTestResult:
         execution_time_ms=model.execution_time_ms,
         data_quality_score=model.data_quality_score,
         started_at=model.started_at,
+        completed_at=model.completed_at,
+    )
+
+
+def preset_to_model(entity: DiscoveryPreset) -> DiscoveryPresetModel:
+    """Convert a DiscoveryPreset entity to a database model."""
+    return DiscoveryPresetModel(
+        id=str(entity.id),
+        owner_id=str(entity.owner_id),
+        scope=PresetScopeEnum(entity.scope.value),
+        provider=entity.provider.value,
+        name=entity.name,
+        description=entity.description,
+        parameters=entity.parameters.model_dump(mode="json"),
+        metadata_payload=entity.metadata,
+        research_space_id=(
+            str(entity.research_space_id)
+            if entity.research_space_id is not None
+            else None
+        ),
+        created_at=entity.created_at,
+        updated_at=entity.updated_at,
+    )
+
+
+def preset_to_entity(model: DiscoveryPresetModel) -> DiscoveryPreset:
+    """Convert a DiscoveryPresetModel to a domain entity."""
+    parameters_payload = model.parameters or {}
+    advanced_parameters = AdvancedQueryParameters.model_validate(parameters_payload)
+    return DiscoveryPreset(
+        id=_coerce_uuid(model.id),
+        owner_id=_coerce_uuid(model.owner_id),
+        provider=DiscoveryProvider(model.provider),
+        scope=PresetScope(PresetScopeEnum(model.scope).value),
+        name=model.name,
+        description=model.description,
+        parameters=advanced_parameters,
+        metadata=model.metadata_payload or {},
+        research_space_id=_coerce_uuid_or_none(model.research_space_id),
+        created_at=model.created_at,
+        updated_at=model.updated_at,
+    )
+
+
+def search_job_to_model(entity: DiscoverySearchJob) -> DiscoverySearchJobModel:
+    """Convert a DiscoverySearchJob entity into a persistence model."""
+    return DiscoverySearchJobModel(
+        id=str(entity.id),
+        owner_id=str(entity.owner_id),
+        session_id=str(entity.session_id) if entity.session_id else None,
+        provider=entity.provider.value,
+        status=entity.status.value,
+        query_preview=entity.query_preview,
+        parameters=entity.parameters.model_dump(),
+        total_results=entity.total_results,
+        result_payload=entity.result_metadata,
+        error_message=entity.error_message,
+        storage_key=entity.storage_key,
+        created_at=entity.created_at,
+        updated_at=entity.updated_at,
+        completed_at=entity.completed_at,
+    )
+
+
+def search_job_to_entity(model: DiscoverySearchJobModel) -> DiscoverySearchJob:
+    """Convert a DiscoverySearchJobModel to a domain entity."""
+    return DiscoverySearchJob(
+        id=_coerce_uuid(model.id),
+        owner_id=_coerce_uuid(model.owner_id),
+        session_id=_coerce_uuid_or_none(model.session_id),
+        provider=DiscoveryProvider(model.provider),
+        status=DiscoverySearchStatus(model.status),
+        query_preview=model.query_preview,
+        parameters=AdvancedQueryParameters.model_validate(model.parameters or {}),
+        total_results=model.total_results,
+        result_metadata=model.result_payload or {},
+        error_message=model.error_message,
+        storage_key=model.storage_key,
+        created_at=model.created_at,
+        updated_at=model.updated_at,
         completed_at=model.completed_at,
     )

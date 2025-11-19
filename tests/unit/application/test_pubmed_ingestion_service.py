@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
 
 from src.application.services.pubmed_ingestion_service import PubMedIngestionService
+from src.application.services.storage_configuration_service import (
+    StorageConfigurationService,
+)
 from src.domain.entities.publication import Publication, PublicationType
+from src.domain.entities.storage_configuration import StorageConfiguration
 from src.domain.entities.user_data_source import (
     SourceConfiguration,
     SourceType,
@@ -17,6 +22,7 @@ from src.domain.entities.user_data_source import (
 from src.domain.repositories.publication_repository import PublicationRepository
 from src.domain.services.pubmed_ingestion import PubMedGateway
 from src.domain.value_objects.identifiers import PublicationIdentifier
+from src.type_definitions.storage import StorageUseCase
 
 if TYPE_CHECKING:
     from src.type_definitions.common import RawRecord
@@ -269,6 +275,37 @@ async def test_ingest_creates_and_updates_publications() -> None:
     assert summary.updated_publications == 1
     assert repository.created[0].identifier.pubmed_id == "200"
     assert repository.updated[0][0] == 1
+
+
+@pytest.mark.asyncio
+async def test_ingest_stores_raw_records_if_configured() -> None:
+    """Test that raw records are stored when storage service is available."""
+    repository = StubPublicationRepository()
+    gateway = StubGateway(records=[{"pubmed_id": "100", "title": "Test"}])
+
+    # Mock storage service
+    mock_storage = Mock(spec=StorageConfigurationService)
+    mock_config = Mock(spec=StorageConfiguration)
+    mock_storage.resolve_backend_for_use_case.return_value = mock_config
+    mock_storage.record_store_operation = AsyncMock()
+
+    service = PubMedIngestionService(gateway, repository, storage_service=mock_storage)
+    source = _build_source({"query": "MED13"})
+
+    await service.ingest(source)
+
+    # Verify storage interactions
+    mock_storage.resolve_backend_for_use_case.assert_called_with(
+        StorageUseCase.RAW_SOURCE,
+    )
+    mock_storage.record_store_operation.assert_called_once()
+
+    # Verify call args
+    call_args = mock_storage.record_store_operation.call_args
+    assert call_args.kwargs["configuration"] == mock_config
+    assert call_args.kwargs["content_type"] == "application/json"
+    assert call_args.kwargs["user_id"] == source.owner_id
+    assert "raw/" in call_args.kwargs["key"]
 
 
 @pytest.mark.asyncio

@@ -19,6 +19,7 @@ from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
     SourceCatalogEntry,
 )
+from src.domain.entities.discovery_preset import DiscoveryPreset
 from src.domain.entities.evidence import Evidence
 from src.domain.entities.gene import Gene
 from src.domain.entities.phenotype import Phenotype
@@ -177,6 +178,7 @@ def create_mock_space_discovery_service(
     *,
     sessions: list[DataDiscoverySession] | None = None,
     catalog_entries: list[SourceCatalogEntry] | None = None,
+    presets: list[DiscoveryPreset] | None = None,
 ) -> tuple[SpaceDataDiscoveryService, MagicMock]:
     """
     Create a space discovery service backed by a mocked DataDiscoveryService.
@@ -225,7 +227,11 @@ def create_mock_space_discovery_service(
     base_service.set_source_selection.return_value = None
     base_service.delete_session.return_value = True
 
-    service = SpaceDataDiscoveryService(space_id, base_service)
+    config_service = MagicMock()
+    config_service.list_pubmed_presets.return_value = presets or []
+
+    service = SpaceDataDiscoveryService(space_id, base_service, config_service)
+    service._config_service_mock = config_service  # test hook
     return service, base_service
 
 
@@ -863,6 +869,23 @@ class DataDiscoveryRepositoryMocks(TypedDict):
     session_repo: MockDataDiscoverySessionRepository
     catalog_repo: MockSourceCatalogRepository
     query_repo: MockQueryTestResultRepository
+    search_job_repo: "MockDiscoverySearchJobRepository"
+
+
+class MockDiscoverySearchJobRepository:
+    """Mock repository for discovery search jobs."""
+
+    def __init__(self):
+        self.jobs: dict[UUID, object] = {}
+        self.create = MagicMock(side_effect=self._store_job)
+        self.update = MagicMock(side_effect=self._store_job)
+        self.get = MagicMock(side_effect=self.jobs.get)
+        self.list_for_owner = MagicMock(return_value=[])
+        self.list_for_session = MagicMock(return_value=[])
+
+    def _store_job(self, job):
+        self.jobs[job.id] = job
+        return job
 
 
 def create_mock_data_discovery_repositories() -> DataDiscoveryRepositoryMocks:
@@ -875,6 +898,7 @@ def create_mock_data_discovery_repositories() -> DataDiscoveryRepositoryMocks:
     session_repo = MockDataDiscoverySessionRepository()
     catalog_repo = MockSourceCatalogRepository()
     query_repo = MockQueryTestResultRepository()
+    search_job_repo = MockDiscoverySearchJobRepository()
 
     # Don't set up default behaviors - let individual tests configure mocks as needed
     # This allows tests to have full control over mock behavior
@@ -883,6 +907,7 @@ def create_mock_data_discovery_repositories() -> DataDiscoveryRepositoryMocks:
         "session_repo": session_repo,
         "catalog_repo": catalog_repo,
         "query_repo": query_repo,
+        "search_job_repo": search_job_repo,
     }
 
 

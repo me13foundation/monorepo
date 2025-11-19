@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from src.application.services.storage_configuration_service import (
         StorageConfigurationService,
     )
+    from src.type_definitions.common import JSONObject
     from src.type_definitions.storage import (
         StorageOperationRecord,
         StorageUseCase,
@@ -25,7 +26,7 @@ class StorageOperationCoordinator:
     def __init__(self, storage_service: StorageConfigurationService) -> None:
         self._storage_service = storage_service
 
-    async def store_for_use_case(
+    async def store_for_use_case(  # noqa: PLR0913 - explicit storage inputs maintain clarity
         self,
         use_case: StorageUseCase,
         *,
@@ -33,6 +34,7 @@ class StorageOperationCoordinator:
         file_path: Path,
         content_type: str | None = None,
         user_id: UUID | None = None,
+        metadata: JSONObject | None = None,
     ) -> StorageOperationRecord:
         """
         Store an artifact using the storage configuration assigned to the use case.
@@ -51,6 +53,7 @@ class StorageOperationCoordinator:
             file_path=file_path,
             content_type=content_type,
             user_id=user_id,
+            metadata=metadata,
         )
 
 
