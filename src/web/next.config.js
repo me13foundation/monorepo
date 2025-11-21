@@ -21,6 +21,27 @@ const nextConfig = {
   swcMinify: true,
   // Enable standalone output for Docker
   output: 'standalone',
+  // Suppress font warnings
+  logging: {
+    fetches: {
+      fullUrl: false,
+    },
+  },
+  // Webpack configuration
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+      }
+    }
+    return config
+  },
+  // Suppress specific Next.js warnings
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
+  },
   // Configure headers for security
   async headers() {
     return [

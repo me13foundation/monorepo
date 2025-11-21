@@ -9,10 +9,11 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Database, Loader2, Clock, RefreshCw, Info } from 'lucide-react'
+import { Plus, Database, Loader2, Clock, RefreshCw, Info, Search } from 'lucide-react'
 import { CreateDataSourceDialog } from './CreateDataSourceDialog'
 import { DataSourceScheduleDialog } from './DataSourceScheduleDialog'
 import { DataSourceIngestionDetailsDialog, type ManualIngestionSummary } from './DataSourceIngestionDetailsDialog'
+import { DiscoverSourcesDialog } from './DiscoverSourcesDialog'
 import type { DataSource } from '@/types/data-source'
 import { componentRegistry } from '@/lib/components/registry'
 import type { IngestionRunResponse } from '@/lib/api/data-sources'
@@ -27,6 +28,7 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
   const [detailSourceId, setDetailSourceId] = useState<string | null>(null)
   const triggerIngestion = useTriggerDataSourceIngestion(spaceId)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [isDiscoverDialogOpen, setIsDiscoverDialogOpen] = useState(false)
   const [scheduleDialogSource, setScheduleDialogSource] = useState<DataSource | null>(null)
   const [runningSourceId, setRunningSourceId] = useState<string | null>(null)
   const StatusBadge = componentRegistry.get<{ status: string }>('dataSource.statusBadge')
@@ -125,10 +127,16 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
             {data?.total || 0} data source{data?.total !== 1 ? 's' : ''} in this space
           </p>
         </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          Create Data Source
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsDiscoverDialogOpen(true)}>
+            <Search className="mr-2 size-4" />
+            Discover Sources
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            Create Data Source
+          </Button>
+        </div>
       </div>
 
       {dataSources.length === 0 ? (
@@ -140,10 +148,16 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
               <p className="mb-4 text-muted-foreground">
                 Get started by creating your first data source for this research space.
               </p>
-              <Button onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="mr-2 size-4" />
-                Create Data Source
-              </Button>
+              <div className="flex justify-center gap-3">
+                <Button onClick={() => setIsDiscoverDialogOpen(true)}>
+                  <Search className="mr-2 size-4" />
+                  Discover Sources
+                </Button>
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
+                  <Plus className="mr-2 size-4" />
+                  Create Data Source
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -274,6 +288,11 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
             setDetailSourceId(null)
           }
         }}
+      />
+      <DiscoverSourcesDialog
+        spaceId={spaceId}
+        open={isDiscoverDialogOpen}
+        onOpenChange={setIsDiscoverDialogOpen}
       />
     </div>
   )

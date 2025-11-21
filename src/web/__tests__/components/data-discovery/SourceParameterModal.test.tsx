@@ -66,7 +66,8 @@ describe('SourceParameterModal', () => {
     expect(screen.getByText(/Storage target/i)).toBeInTheDocument()
     expect(screen.getByText(/PDF storage backend/i)).toBeInTheDocument()
     expect(screen.getByText(/Advanced filter capabilities/i)).toBeInTheDocument()
-    expect(screen.getByText(/Date range/i)).toBeInTheDocument()
+    // Date range appears in both the collapsible section header and the label
+    expect(screen.getAllByText(/Date range/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Max results limit: 250/i)).toBeInTheDocument()
   })
 })

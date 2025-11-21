@@ -11,7 +11,6 @@ import {
   FileText,
   LayoutDashboard,
   Users,
-  Search,
 } from 'lucide-react'
 import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 
@@ -30,7 +29,6 @@ export function SpaceNavigation() {
     prefetchSpaceDetail,
     prefetchSpaceMembers,
     prefetchSpaceCuration,
-    prefetchSpaceDiscovery,
   } = usePrefetchOnHover()
   const [isMounted, setIsMounted] = useState(false)
 
@@ -44,20 +42,13 @@ export function SpaceNavigation() {
 
   const basePath = `/spaces/${currentSpaceId}`
 
-  const navItems: NavItem[] = [
+  const mainNavItems: NavItem[] = [
     {
       label: 'Overview',
       href: basePath,
       icon: LayoutDashboard,
       description: 'Space details and information',
       prefetch: prefetchSpaceDetail,
-    },
-    {
-      label: 'Discover Sources',
-      href: `${basePath}/discovery`,
-      icon: Search,
-      description: 'Discover and test data sources within this space',
-      prefetch: prefetchSpaceDiscovery,
     },
     {
       label: 'Data Sources',
@@ -80,21 +71,26 @@ export function SpaceNavigation() {
       description: 'Manage team members',
       prefetch: prefetchSpaceMembers,
     },
-    {
-      label: 'Settings',
-      href: `${basePath}/settings`,
-      icon: Settings,
-      description: 'Space configuration',
-      prefetch: prefetchSpaceDetail,
-    },
   ]
+
+  const settingsItem: NavItem = {
+    label: 'Settings',
+    href: `${basePath}/settings`,
+    icon: Settings,
+    description: 'Space configuration',
+    prefetch: prefetchSpaceDetail,
+  }
+
+  const isSettingsActive =
+    pathname === settingsItem.href || pathname.startsWith(`${settingsItem.href}/`)
+  const SettingsIcon = settingsItem.icon
 
   return (
     <nav className="border-b border-border bg-card">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex overflow-x-auto">
+        <div className="flex items-center justify-between overflow-x-auto">
           <div className="flex min-w-0 space-x-1">
-            {navItems.map((item) => {
+            {mainNavItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
               const Icon = item.icon
 
@@ -129,6 +125,32 @@ export function SpaceNavigation() {
                 </Link>
               )
             })}
+          </div>
+          <div className="flex shrink-0">
+            <Link
+              href={settingsItem.href}
+              className={cn(
+                'flex items-center justify-center size-9 rounded-md text-sm font-medium transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                isSettingsActive
+                  ? 'text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+              )}
+              title={settingsItem.description}
+              onMouseEnter={() => {
+                if (settingsItem.prefetch && currentSpaceId) {
+                  settingsItem.prefetch(currentSpaceId)
+                }
+              }}
+              onFocus={() => {
+                if (settingsItem.prefetch && currentSpaceId) {
+                  settingsItem.prefetch(currentSpaceId)
+                }
+              }}
+              prefetch={true}
+            >
+              <SettingsIcon className="size-4" />
+            </Link>
           </div>
         </div>
       </div>

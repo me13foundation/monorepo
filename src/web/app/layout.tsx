@@ -17,18 +17,26 @@ const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-body',
+  adjustFontFallback: true,
+  fallback: ['system-ui', 'arial'],
 })
 
 const nunitoSans = Nunito_Sans({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-heading',
+  weight: ['400', '600', '700', '800'],
+  adjustFontFallback: true,
+  fallback: ['system-ui', 'arial'],
+  preload: true,
 })
 
 const playfairDisplay = Playfair_Display({
   subsets: ['latin'],
   display: 'swap',
   variable: '--font-display',
+  adjustFontFallback: true,
+  fallback: ['Georgia', 'serif'],
 })
 
 export const metadata: Metadata = {

@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import type {
   AdvancedQueryParameters,
   PubmedSortOption,
@@ -70,10 +71,29 @@ export function ParameterBar({
 
   const queryPreview = useMemo(() => buildQueryPreview(parameters), [parameters])
 
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    basics: true,
+    filters: true,
+    sourceSpecific: true,
+    output: true,
+  })
+
+  const toggleSection = (section: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }
+
   return (
-    <div className="space-y-6 rounded-lg border border-border bg-card/60 p-4">
-      <SectionHeading title="Basics" description="Core terms to seed your PubMed search." />
-      <div className="grid gap-4 md:grid-cols-2">
+    <div className="space-y-4 rounded-lg border border-border bg-card/60 p-3 sm:space-y-6 sm:p-4">
+      <CollapsibleSection
+        title="Basics"
+        description="Core terms to seed your PubMed search."
+        isExpanded={expandedSections.basics}
+        onToggle={() => toggleSection('basics')}
+      >
+      <div className="grid gap-4 lg:grid-cols-2">
         <LabeledInput
           id="geneSymbol"
           label="Gene Symbol"
@@ -91,16 +111,19 @@ export function ParameterBar({
           onChange={(value) => updateParameters({ search_term: value || null })}
         />
       </div>
+      </CollapsibleSection>
 
-      <SectionHeading
+      <CollapsibleSection
         title="Filters"
         description="Control time ranges, publication types, languages, and additional PubMed syntax."
-      />
+        isExpanded={expandedSections.filters}
+        onToggle={() => toggleSection('filters')}
+      >
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         <div>
           <Label className="mb-1 block text-sm text-foreground">Date Range</Label>
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-2">
             <Input
               type="date"
               value={parameters.date_from ?? ''}
@@ -201,17 +224,19 @@ export function ParameterBar({
           )}
         </div>
       </div>
+      </CollapsibleSection>
 
       {(capabilities.supports_variation_type ||
         capabilities.supports_clinical_significance ||
         capabilities.supports_review_status ||
         capabilities.supports_organism) && (
-        <>
-          <SectionHeading
-            title="Source Specific"
-            description="Filters for specialized sources like ClinVar and UniProt."
-          />
-          <div className="grid gap-4 md:grid-cols-2">
+        <CollapsibleSection
+          title="Source Specific"
+          description="Filters for specialized sources like ClinVar and UniProt."
+          isExpanded={expandedSections.sourceSpecific}
+          onToggle={() => toggleSection('sourceSpecific')}
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
             {capabilities.supports_variation_type && (
               <LabeledInput
                 id="variationTypes"
@@ -297,14 +322,16 @@ export function ParameterBar({
               </div>
             )}
           </div>
-        </>
+        </CollapsibleSection>
       )}
 
-      <SectionHeading
+      <CollapsibleSection
         title="Output"
         description="Control sort order and result limits for the query."
-      />
-      <div className="grid gap-4 md:grid-cols-2">
+        isExpanded={expandedSections.output}
+        onToggle={() => toggleSection('output')}
+      >
+      <div className="grid gap-4 lg:grid-cols-2">
         <div>
           <Label className="mb-1 block text-sm text-foreground">Sort Order</Label>
           <div className="flex flex-wrap gap-2">
@@ -358,6 +385,7 @@ export function ParameterBar({
           </p>
         </div>
       </div>
+      </CollapsibleSection>
 
       <Separator />
 
@@ -369,6 +397,41 @@ export function ParameterBar({
           {queryPreview}
         </div>
       </div>
+    </div>
+  )
+}
+
+function CollapsibleSection({
+  title,
+  description,
+  isExpanded,
+  onToggle,
+  children,
+}: {
+  title: string
+  description: string
+  isExpanded: boolean
+  onToggle: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-3">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between rounded-md p-2 text-left transition-colors hover:bg-muted/50"
+      >
+        <div className="space-y-1">
+          <p className="text-sm font-semibold text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        {isExpanded ? (
+          <ChevronUp className="size-4 text-muted-foreground" />
+        ) : (
+          <ChevronDown className="size-4 text-muted-foreground" />
+        )}
+      </button>
+      {isExpanded && <div className="space-y-4">{children}</div>}
     </div>
   )
 }

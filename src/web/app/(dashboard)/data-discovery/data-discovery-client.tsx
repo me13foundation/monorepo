@@ -6,7 +6,6 @@ import dynamic from 'next/dynamic'
 import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
 import { CatalogSkeleton } from '@/components/data-discovery/CatalogSkeleton'
 import { ResultsSkeleton } from '@/components/data-discovery/ResultsSkeleton'
-import { ParameterBar } from '@/components/data-discovery/ParameterBar'
 import { useSpaceContext } from '@/components/space-context-provider'
 import type {
   AdvancedQueryParameters,
@@ -712,11 +711,6 @@ useEffect(() => {
       />
 
       <div className="space-y-4">
-        <ParameterBar
-          parameters={parameters}
-          onParametersChange={setParameters}
-          capabilities={activeCapabilities}
-        />
         {presetBetaEnabled && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-muted-foreground/40 bg-muted/30 p-3">
             <div>
