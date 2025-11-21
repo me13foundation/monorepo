@@ -132,10 +132,10 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
             <Search className="mr-2 size-4" />
             Discover Sources
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="mr-2 size-4" />
-            Create Data Source
-          </Button>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Plus className="mr-2 size-4" />
+          Create Data Source
+        </Button>
         </div>
       </div>
 
@@ -154,9 +154,9 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
                   Discover Sources
                 </Button>
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="mr-2 size-4" />
-                  Create Data Source
-                </Button>
+                <Plus className="mr-2 size-4" />
+                Create Data Source
+              </Button>
               </div>
             </div>
           </CardContent>

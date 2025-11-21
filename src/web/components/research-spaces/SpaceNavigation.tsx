@@ -11,8 +11,15 @@ import {
   FileText,
   LayoutDashboard,
   Users,
+  EllipsisVertical,
 } from 'lucide-react'
 import { usePrefetchOnHover } from '@/hooks/use-prefetch'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 interface NavItem {
   label: string
@@ -64,6 +71,9 @@ export function SpaceNavigation() {
       description: 'Curate and review data',
       prefetch: prefetchSpaceCuration,
     },
+  ]
+
+  const menuItems: NavItem[] = [
     {
       label: 'Members',
       href: `${basePath}/members`,
@@ -71,19 +81,18 @@ export function SpaceNavigation() {
       description: 'Manage team members',
       prefetch: prefetchSpaceMembers,
     },
+    {
+      label: 'Settings',
+      href: `${basePath}/settings`,
+      icon: Settings,
+      description: 'Space configuration',
+      prefetch: prefetchSpaceDetail,
+    },
   ]
 
-  const settingsItem: NavItem = {
-    label: 'Settings',
-    href: `${basePath}/settings`,
-    icon: Settings,
-    description: 'Space configuration',
-    prefetch: prefetchSpaceDetail,
-  }
-
-  const isSettingsActive =
-    pathname === settingsItem.href || pathname.startsWith(`${settingsItem.href}/`)
-  const SettingsIcon = settingsItem.icon
+  const isMenuActive = menuItems.some(
+    (item) => pathname === item.href || pathname.startsWith(`${item.href}/`)
+  )
 
   return (
     <nav className="border-b border-border bg-card">
@@ -127,30 +136,51 @@ export function SpaceNavigation() {
             })}
           </div>
           <div className="flex shrink-0">
-            <Link
-              href={settingsItem.href}
-              className={cn(
-                'flex items-center justify-center size-9 rounded-md text-sm font-medium transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                isSettingsActive
-                  ? 'text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-              )}
-              title={settingsItem.description}
-              onMouseEnter={() => {
-                if (settingsItem.prefetch && currentSpaceId) {
-                  settingsItem.prefetch(currentSpaceId)
-                }
-              }}
-              onFocus={() => {
-                if (settingsItem.prefetch && currentSpaceId) {
-                  settingsItem.prefetch(currentSpaceId)
-                }
-              }}
-              prefetch={true}
-            >
-              <SettingsIcon className="size-4" />
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    'flex items-center justify-center size-9 rounded-md text-sm font-medium transition-colors',
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                    isMenuActive
+                      ? 'text-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                  )}
+                  title="Space options"
+                >
+                  <EllipsisVertical className="size-5" strokeWidth={2.5} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {menuItems.map((item) => {
+                  const isActive =
+                    pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  const Icon = item.icon
+
+                  return (
+                    <DropdownMenuItem key={item.href} asChild>
+                      <Link
+                        href={item.href}
+                        className={cn(
+                          'flex items-center gap-2 cursor-pointer transition-colors',
+                          'hover:bg-accent/50 hover:text-foreground',
+                          isActive && 'bg-accent/50 text-foreground'
+                        )}
+                        onMouseEnter={() => {
+                          if (item.prefetch && currentSpaceId) {
+                            item.prefetch(currentSpaceId)
+                          }
+                        }}
+                        prefetch={true}
+                      >
+                        <Icon className="size-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
