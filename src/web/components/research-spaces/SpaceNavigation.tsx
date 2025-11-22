@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
   Users,
   EllipsisVertical,
+  Waypoints,
 } from 'lucide-react'
 import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 import {
@@ -70,6 +71,13 @@ export function SpaceNavigation() {
       icon: FileText,
       description: 'Curate and review data',
       prefetch: prefetchSpaceCuration,
+    },
+    {
+      label: 'Knowledge Graph',
+      href: `${basePath}/knowledge-graph`,
+      icon: Waypoints,
+      description: 'Explore knowledge graph',
+      prefetch: prefetchSpaceDetail,
     },
   ]
 
