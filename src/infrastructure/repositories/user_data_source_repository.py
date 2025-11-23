@@ -324,6 +324,13 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         )
         return self.session.execute(stmt).scalar_one()
 
+    def count_by_research_space(self, research_space_id: UUID) -> int:
+        """Count the number of data sources in a specific research space."""
+        stmt = select(func.count()).where(
+            UserDataSourceModel.research_space_id == str(research_space_id),
+        )
+        return self.session.execute(stmt).scalar_one()
+
     def exists(self, source_id: UUID) -> bool:
         """Check if a data source exists."""
         stmt = select(func.count()).where(UserDataSourceModel.id == str(source_id))

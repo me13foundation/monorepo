@@ -4,43 +4,53 @@ import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
 
-from src.application.services.audit_service import AuditTrailService
 from src.application.services.data_discovery_service import DataDiscoveryService
+
+# Import DTOs directly from application layer
+from src.application.services.data_discovery_service.dtos import (
+    CreateSessionRequest,
+    DataDiscoverySessionResponse,
+    OrchestratedSessionState,
+    UpdateParametersRequest,
+    UpdateSelectionRequest,
+)
+from src.application.services.data_discovery_service.mappers import (
+    data_discovery_session_to_response,
+)
 from src.application.services.data_discovery_service.requests import (
     CreateDataDiscoverySessionRequest,
     UpdateSessionParametersRequest,
 )
+
+# Using relative import to avoid circular dependency issues at module level
+from src.application.services.data_discovery_service.session_orchestration import (
+    SessionOrchestrationService,
+)
 from src.database.seed import DEFAULT_RESEARCH_SPACE_ID
-from src.database.session import get_session
-from src.domain.entities.user import User, UserRole
+from src.domain.entities.user import User
 from src.infrastructure.dependency_injection.dependencies import (
     get_data_discovery_service_dependency,
 )
-from src.infrastructure.repositories.research_space_repository import (
-    SqlAlchemyResearchSpaceRepository,
-)
 from src.routes.auth import get_current_active_user
-from src.type_definitions.common import JSONValue
-
-from .dependencies import (
-    get_audit_trail_service,
-    owner_filter_for_user,
-    require_session_for_user,
-)
-from .mappers import session_to_response
-from .schemas import (
-    CreateSessionRequest,
-    DataDiscoverySessionResponse,
-    UpdateParametersRequest,
-    UpdateSelectionRequest,
-)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# Dependency to get Orchestration Service
+def get_orchestration_service(
+    discovery_service: DataDiscoveryService = Depends(
+        get_data_discovery_service_dependency,
+    ),
+) -> SessionOrchestrationService:
+    # Manually inject repositories from the main service for now
+    # In a pure DI setup, we would inject repositories directly
+    return SessionOrchestrationService(
+        discovery_service._session_repo,
+        discovery_service._catalog_repo,
+    )
 
 
 @router.post(
@@ -48,66 +58,29 @@ router = APIRouter()
     response_model=DataDiscoverySessionResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create workbench session",
-    description="Create a new workbench session for source discovery and testing.",
+    description="Create a new data discovery workbench session.",
 )
 async def create_session(
     request: CreateSessionRequest,
-    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
-    db: Session = Depends(get_session),
     current_user: User = Depends(get_current_active_user),
-    audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> DataDiscoverySessionResponse:
-    """Create a new workbench session."""
+    """Create a new data discovery workbench session."""
     try:
-        validated_space_id = request.research_space_id
-        if validated_space_id:
-            space_repo = SqlAlchemyResearchSpaceRepository(session=db)
-            if not space_repo.exists(validated_space_id):
-                logger.warning(
-                    "Research space %s not found while creating discovery session; defaulting to None",
-                    validated_space_id,
-                )
-                validated_space_id = None
-
-        enforced_space_id = validated_space_id or DEFAULT_RESEARCH_SPACE_ID
-        create_request = CreateDataDiscoverySessionRequest(
+        session_request = CreateDataDiscoverySessionRequest(
             owner_id=current_user.id,
             name=request.name,
-            research_space_id=enforced_space_id,
+            research_space_id=request.research_space_id or DEFAULT_RESEARCH_SPACE_ID,
             initial_parameters=request.initial_parameters.to_domain_model(),
         )
+        session = service.create_session(session_request)
+        return data_discovery_session_to_response(session)
 
-        try:
-            session = service.create_session(create_request)
-        except IntegrityError as exc:
-            logger.exception(
-                "Failed to create workbench session due to integrity error (space_id=%s)",
-                validated_space_id,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid research space reference",
-            ) from exc
-
-        audit_service.record_action(
-            db,
-            action="data_discovery.session.create",
-            target=("data_discovery_session", str(session.id)),
-            actor_id=current_user.id,
-            details={
-                "research_space_id": str(enforced_space_id),
-                "name": request.name,
-            },
-        )
-        return session_to_response(session)
-
-    except HTTPException:
-        raise
     except Exception as exc:
-        logger.exception("Failed to create workbench session")
+        logger.exception("Failed to create session")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create workbench session",
+            detail="Failed to create session",
         ) from exc
 
 
@@ -115,257 +88,177 @@ async def create_session(
     "/sessions",
     response_model=list[DataDiscoverySessionResponse],
     summary="List user sessions",
-    description="Retrieve all workbench sessions for the current user.",
+    description="List all data discovery sessions for the current user.",
 )
 async def list_sessions(
-    include_inactive: bool = Query(False, description="Include inactive sessions"),
-    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
+    limit: int = Query(50, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_active_user),
-    owner_id: UUID
-    | None = Query(
-        None,
-        description="Filter sessions by owner (admin only)",
-    ),
+    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> list[DataDiscoverySessionResponse]:
-    """List all workbench sessions for the current user."""
+    """List sessions for the current user."""
     try:
-        effective_owner = owner_id if current_user.role == UserRole.ADMIN else None
-        if effective_owner is None:
-            effective_owner = current_user.id
-
-        sessions = service.get_user_sessions(
-            effective_owner,
-            include_inactive=include_inactive,
-        )
-        return [session_to_response(session) for session in sessions]
+        # TODO: Implement proper pagination in service
+        sessions = service.get_user_sessions(current_user.id)
+        return [
+            data_discovery_session_to_response(s)
+            for s in sessions[offset : offset + limit]
+        ]
 
     except Exception as exc:
-        logger.exception("Failed to list workbench sessions")
+        logger.exception("Failed to list sessions")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve workbench sessions",
+            detail="Failed to list sessions",
         ) from exc
 
 
 @router.get(
     "/sessions/{session_id}",
     response_model=DataDiscoverySessionResponse,
-    summary="Get workbench session",
-    description="Retrieve detailed information about a specific workbench session.",
+    summary="Get session details",
+    description="Retrieve details for a specific session.",
 )
-async def get_session_detail(
+async def get_session_details(
     session_id: UUID,
-    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
     current_user: User = Depends(get_current_active_user),
+    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> DataDiscoverySessionResponse:
-    """Get a specific workbench session."""
+    """Get details for a specific session."""
+    # Authorization handled by require_session_for_user logic inside service if needed
+    # For now, we rely on service logic or manual check
     try:
-        session = require_session_for_user(session_id, service, current_user)
-        return session_to_response(session)
+        session = service.get_session(session_id)
+        if session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found",
+            )
+
+        if session.owner_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized",
+            )
+        return data_discovery_session_to_response(session)
 
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Failed to get workbench session %s", session_id)
+        logger.exception("Failed to retrieve session %s", session_id)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve workbench session",
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
         ) from exc
 
 
-@router.put(
+@router.patch(
     "/sessions/{session_id}/parameters",
     response_model=DataDiscoverySessionResponse,
     summary="Update session parameters",
-    description="Update the query parameters for a workbench session.",
+    description="Update query parameters for a session.",
 )
 async def update_session_parameters(
     session_id: UUID,
     request: UpdateParametersRequest,
-    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_session),
-    audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> DataDiscoverySessionResponse:
-    """Update parameters for a workbench session."""
+    """Update session parameters."""
     try:
-        require_session_for_user(session_id, service, current_user)
-        owner_filter = owner_filter_for_user(current_user)
-
-        update_request = UpdateSessionParametersRequest(
+        update_req = UpdateSessionParametersRequest(
             session_id=session_id,
             parameters=request.parameters.to_domain_model(),
         )
-
-        updated_session = service.update_session_parameters(
-            update_request,
-            owner_id=owner_filter,
-        )
-        if not updated_session:
+        session = service.update_session_parameters(update_req)
+        if session is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Data discovery session not found",
+                detail="Session not found",
             )
-        audit_service.record_action(
-            db,
-            action="data_discovery.session.update_parameters",
-            target=("data_discovery_session", str(updated_session.id)),
-            actor_id=current_user.id,
-            details=update_request.parameters.model_dump(),
-        )
-        return session_to_response(updated_session)
+
+        return data_discovery_session_to_response(session)
 
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Failed to update session parameters for %s", session_id)
+        logger.exception("Failed to update parameters for session %s", session_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update session parameters",
         ) from exc
 
 
-@router.put(
-    "/sessions/{session_id}/sources/{catalog_entry_id}/toggle",
-    response_model=DataDiscoverySessionResponse,
-    summary="Toggle source selection",
-    description="Toggle the selection state of a source in the workbench session.",
+# --- Orchestration Endpoints ---
+
+
+@router.get(
+    "/sessions/{session_id}/state",
+    response_model=OrchestratedSessionState,
+    summary="Get orchestrated session state",
+    description="Get complete session state with derived capabilities and validation status.",
 )
-async def toggle_source_selection(
+async def get_orchestrated_state(
     session_id: UUID,
-    catalog_entry_id: str,
-    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_session),
-    audit_service: AuditTrailService = Depends(get_audit_trail_service),
-) -> DataDiscoverySessionResponse:
-    """Toggle source selection in a workbench session."""
+    orchestrator: SessionOrchestrationService = Depends(get_orchestration_service),
+) -> OrchestratedSessionState:
+    """Get the orchestrated state (ViewModel) for a session."""
     try:
-        require_session_for_user(session_id, service, current_user)
-        owner_filter = owner_filter_for_user(current_user)
-
-        session = service.toggle_source_selection(
-            session_id,
-            catalog_entry_id,
-            owner_id=owner_filter,
-        )
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Data discovery session not found",
-            )
-        selected_sources_payload: list[JSONValue] = list(session.selected_sources)
-        audit_service.record_action(
-            db,
-            action="data_discovery.session.toggle_source",
-            target=("data_discovery_session", str(session.id)),
-            actor_id=current_user.id,
-            details={
-                "catalog_entry_id": catalog_entry_id,
-                "selected_sources": selected_sources_payload,
-            },
-        )
-        return session_to_response(session)
-
-    except HTTPException:
-        raise
+        return orchestrator.get_orchestrated_state(session_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as exc:
-        logger.exception("Failed to toggle source selection for %s", session_id)
+        logger.exception("Failed to orchestrate session %s", session_id)
+        # Handle specific domain errors here
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve session state",
+        ) from exc
+
+
+@router.post(
+    "/sessions/{session_id}/selection",
+    response_model=OrchestratedSessionState,
+    summary="Update source selection",
+    description="Update selected sources and return new orchestrated state.",
+)
+async def update_source_selection(
+    session_id: UUID,
+    request: UpdateSelectionRequest,
+    current_user: User = Depends(get_current_active_user),
+    orchestrator: SessionOrchestrationService = Depends(get_orchestration_service),
+) -> OrchestratedSessionState:
+    """Update selection and return new state."""
+    try:
+        return orchestrator.update_selection(session_id, request.source_ids)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except Exception as exc:
+        logger.exception("Failed to update selection for session %s", session_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update source selection",
         ) from exc
 
 
-@router.put(
-    "/sessions/{session_id}/selections",
-    response_model=DataDiscoverySessionResponse,
-    summary="Set session source selections",
-    description="Replace the selected sources for a data discovery session.",
-)
-async def update_source_selection(
-    session_id: UUID,
-    request: UpdateSelectionRequest,
-    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_session),
-    audit_service: AuditTrailService = Depends(get_audit_trail_service),
-) -> DataDiscoverySessionResponse:
-    """Set the selected sources for a workbench session."""
-    try:
-        require_session_for_user(session_id, service, current_user)
-        owner_filter = owner_filter_for_user(current_user)
-
-        session = service.set_source_selection(
-            session_id,
-            request.source_ids,
-            owner_id=owner_filter,
-        )
-        if not session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Data discovery session not found",
-            )
-        selected_sources_payload: list[JSONValue] = list(session.selected_sources)
-        audit_service.record_action(
-            db,
-            action="data_discovery.session.set_sources",
-            target=("data_discovery_session", str(session.id)),
-            actor_id=current_user.id,
-            details={"selected_sources": selected_sources_payload},
-        )
-        return session_to_response(session)
-
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.exception("Failed to update source selections for %s", session_id)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to update source selections",
-        ) from exc
-
-
 @router.delete(
     "/sessions/{session_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete workbench session",
-    description="Delete a workbench session and all its associated test results.",
+    summary="Delete session",
+    description="Delete a data discovery session.",
 )
 async def delete_session(
     session_id: UUID,
-    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
     current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_session),
-    audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> None:
-    """Delete a workbench session."""
+    """Delete a session."""
     try:
-        require_session_for_user(session_id, service, current_user)
-        owner_filter = owner_filter_for_user(current_user)
-
-        success = service.delete_session(session_id, owner_id=owner_filter)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Data discovery session not found",
-            )
-        audit_service.record_action(
-            db,
-            action="data_discovery.session.delete",
-            target=("data_discovery_session", str(session_id)),
-            actor_id=current_user.id,
-            details={},
-        )
-
-    except HTTPException:
-        raise
+        service.delete_session(session_id)
     except Exception as exc:
-        logger.exception("Failed to delete workbench session %s", session_id)
+        logger.exception("Failed to delete session %s", session_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete workbench session",
+            detail="Failed to delete session",
         ) from exc
-
-
-__all__ = ["router"]

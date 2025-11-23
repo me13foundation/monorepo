@@ -2,6 +2,127 @@
 /* eslint-disable */
 /* prettier-ignore */
 
+export interface ActivityFeedItem {
+  message: string;
+  category: string;
+  icon?: string | null;
+  created_at: string;
+}
+
+export interface AddToSpaceRequest {
+  catalog_entry_id: string;
+  research_space_id: string;
+  source_config?: Record<string, unknown>;
+}
+
+export interface AdvancedQueryParameters {
+  gene_symbol?: string | null;
+  search_term?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  publication_types?: string[];
+  languages?: string[];
+  sort_by?: 'relevance' | 'publication_date' | 'author' | 'journal' | 'title';
+  max_results?: number;
+  additional_terms?: string | null;
+  variation_types?: string[];
+  clinical_significance?: string[];
+  is_reviewed?: boolean | null;
+  organism?: string | null;
+}
+
+export interface AdvancedQueryParametersModel {
+  gene_symbol?: string | null;
+  search_term?: string | null;
+  date_from?: string | null;
+  date_to?: string | null;
+  publication_types?: string[];
+  languages?: string[];
+  sort_by?: string | null;
+  max_results?: number;
+  additional_terms?: string | null;
+  variation_types?: string[];
+  clinical_significance?: string[];
+  is_reviewed?: boolean | null;
+  organism?: string | null;
+}
+
+export interface AuthorInfo {
+  name: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  affiliation?: string | null;
+  orcid?: string | null;
+}
+
+export interface CreatePubmedPresetRequestModel {
+  name: string;
+  description?: string | null;
+  scope?: 'user' | 'space';
+  research_space_id?: string | null;
+  parameters: AdvancedQueryParametersModel;
+}
+
+export interface CreateSessionRequest {
+  name?: string;
+  research_space_id?: string | null;
+  initial_parameters?: AdvancedQueryParametersModel;
+}
+
+export interface DashboardSummary {
+  pending_count: number;
+  approved_count: number;
+  rejected_count: number;
+  total_items: number;
+  entity_counts?: Record<string, number>;
+}
+
+export interface DataDiscoverySessionResponse {
+  id: string;
+  owner_id: string;
+  research_space_id: string | null;
+  name: string;
+  current_parameters: AdvancedQueryParametersModel;
+  selected_sources: string[];
+  tested_sources: string[];
+  total_tests_run: number;
+  successful_tests: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  last_activity_at: string;
+}
+
+export interface DiscoveryPresetResponse {
+  id: string;
+  name: string;
+  description: string | null;
+  provider: 'pubmed';
+  scope: 'user' | 'space';
+  research_space_id: string | null;
+  parameters: AdvancedQueryParametersModel;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoverySearchJobResponse {
+  id: string;
+  owner_id: string;
+  session_id: string | null;
+  provider: 'pubmed';
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  query_preview: string;
+  parameters: AdvancedQueryParametersModel;
+  total_results: number;
+  result_metadata: Record<string, unknown>;
+  error_message: string | null;
+  storage_key: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
 export interface ErrorDetail {
   field?: string | null;
   message: string;
@@ -13,37 +134,6 @@ export interface ErrorResponse {
   message: string;
   details?: ErrorDetail[] | null;
   request_id?: string | null;
-}
-
-export interface HealthComponent {
-  status: string;
-  message?: string | null;
-  details?: Record<string, unknown> | null;
-}
-
-export interface HealthResponse {
-  status: string;
-  timestamp: string;
-  version: string;
-  uptime?: string | null;
-  components?: Record<string, HealthComponent> | null;
-}
-
-export interface PaginatedResponse {
-  items: unknown[];
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
-  has_next: boolean;
-  has_prev: boolean;
-}
-
-export interface PaginationParams {
-  page?: number;
-  per_page?: number;
-  sort_by?: string | null;
-  sort_order?: string;
 }
 
 export interface EvidenceCreate {
@@ -88,6 +178,54 @@ export interface EvidenceResponse {
   publication?: PublicationSummary | null;
 }
 
+export interface EvidenceResponse {
+  id: number;
+  variant_id: string;
+  phenotype_id: string;
+  publication_id?: string | null;
+  description: string;
+  summary?: string | null;
+  evidence_level: 'definitive' | 'strong' | 'moderate' | 'supporting' | 'weak' | 'disproven';
+  evidence_type: 'clinical_report' | 'functional_study' | 'animal_model' | 'biochemical' | 'computational' | 'literature_review' | 'expert_opinion';
+  confidence_score: number;
+  quality_score?: number | null;
+  sample_size?: number | null;
+  study_type?: string | null;
+  statistical_significance?: string | null;
+  reviewed: boolean;
+  review_date?: string | null;
+  reviewer_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  variant?: VariantLinkSummary | null;
+  phenotype?: PhenotypeSummary | null;
+  publication?: PublicationSummary | null;
+}
+
+export interface EvidenceSummaryResponse {
+  id?: number | null;
+  evidence_level: string;
+  evidence_type: string;
+  description: string;
+  reviewed: boolean;
+}
+
+export interface EvidenceSummaryResponse {
+  id?: number | null;
+  evidence_level: string;
+  evidence_type: string;
+  description: string;
+  reviewed: boolean;
+}
+
+export interface EvidenceSummaryResponse {
+  id?: number | null;
+  evidence_level: string;
+  evidence_type: string;
+  description: string;
+  reviewed: boolean;
+}
+
 export interface EvidenceUpdate {
   description?: string | null;
   summary?: string | null;
@@ -104,39 +242,29 @@ export interface EvidenceUpdate {
   reviewer_notes?: string | null;
 }
 
-export interface GeneSummary {
-  id?: number | null;
-  gene_id?: string | null;
-  symbol?: string | null;
-  name?: string | null;
+export interface ExecuteTestRequest {
+  catalog_entry_id: string;
+  timeout_seconds?: number;
+  parameters?: AdvancedQueryParametersModel | null;
 }
 
-export interface VariantLinkSummary {
-  id?: number | null;
-  variant_id?: string | null;
-  clinvar_id?: string | null;
-  gene_symbol?: string | null;
-}
-
-export interface PhenotypeSummary {
-  id?: number | null;
-  hpo_id?: string | null;
-  name?: string | null;
-}
-
-export interface PublicationSummary {
-  id?: number | null;
-  title?: string | null;
-  pubmed_id?: string | null;
-  doi?: string | null;
-}
-
-export interface EvidenceSummaryResponse {
-  id?: number | null;
-  evidence_level: string;
-  evidence_type: string;
+export interface ExportEntityInfo {
+  type: string;
   description: string;
-  reviewed: boolean;
+}
+
+export interface ExportOptionsResponse {
+  entity_type: string;
+  export_formats: string[];
+  compression_formats: string[];
+  info: Record<string, unknown>;
+}
+
+export interface ExportableEntitiesResponse {
+  exportable_entities: ExportEntityInfo[];
+  supported_formats: string[];
+  supported_compression: string[];
+  usage: UsageInfo;
 }
 
 export interface GeneCreate {
@@ -150,6 +278,11 @@ export interface GeneCreate {
   ensembl_id?: string | null;
   ncbi_gene_id?: number | null;
   uniprot_id?: string | null;
+}
+
+export interface GenePhenotypeSummary {
+  phenotype_id: string;
+  name: string;
 }
 
 export interface GeneResponse {
@@ -169,8 +302,22 @@ export interface GeneResponse {
   updated_at: string;
   variant_count?: number;
   phenotype_count?: number;
-  variants?: Record<string, unknown>[] | null;
-  phenotypes?: Record<string, unknown>[] | null;
+  variants?: VariantSummaryResponse[] | null;
+  phenotypes?: GenePhenotypeSummary[] | null;
+}
+
+export interface GeneSummary {
+  id?: number | null;
+  gene_id?: string | null;
+  symbol?: string | null;
+  name?: string | null;
+}
+
+export interface GeneSummary {
+  id?: number | null;
+  gene_id?: string | null;
+  symbol?: string | null;
+  name?: string | null;
 }
 
 export interface GeneUpdate {
@@ -185,6 +332,50 @@ export interface GeneUpdate {
   uniprot_id?: string | null;
 }
 
+export interface HealthComponent {
+  status: string;
+  message?: string | null;
+  details?: Record<string, unknown> | null;
+}
+
+export interface HealthResponse {
+  status: string;
+  timestamp: string;
+  version: string;
+  uptime?: string | null;
+  components?: Record<string, HealthComponent> | null;
+}
+
+export interface OrchestratedSessionState {
+  session: DataDiscoverySessionResponse;
+  capabilities: SourceCapabilitiesDTO;
+  validation?: ValidationResultDTO;
+  view_context: ViewContextDTO;
+}
+
+export interface PaginatedResponse<T = any> {
+  items: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface PaginationParams {
+  page?: number;
+  per_page?: number;
+  sort_by?: string | null;
+  sort_order?: string;
+}
+
+export interface PhenotypeCategoryResult {
+  category: 'congenital' | 'developmental' | 'neurological' | 'cardiovascular' | 'musculoskeletal' | 'endocrine' | 'immunological' | 'oncological' | 'other';
+  total_results: number;
+  results: PhenotypeResponse[];
+}
+
 export interface PhenotypeCreate {
   hpo_id: string;
   hpo_term: string;
@@ -196,6 +387,12 @@ export interface PhenotypeCreate {
   is_root_term?: boolean;
   frequency_in_med13?: string | null;
   severity_score?: number | null;
+}
+
+export interface PhenotypeEvidenceResponse {
+  phenotype_id: number;
+  total_count: number;
+  evidence?: EvidenceSummaryResponse[];
 }
 
 export interface PhenotypeResponse {
@@ -219,6 +416,36 @@ export interface PhenotypeResponse {
   evidence?: EvidenceSummaryResponse[] | null;
 }
 
+export interface PhenotypeSearchResult {
+  query: string;
+  total_results: number;
+  results: PhenotypeResponse[];
+}
+
+export interface PhenotypeStatisticsResponse {
+  total_phenotypes: number;
+  root_terms: number;
+  phenotypes_with_evidence: number;
+}
+
+export interface PhenotypeSummary {
+  id?: number | null;
+  hpo_id?: string | null;
+  name?: string | null;
+}
+
+export interface PhenotypeSummary {
+  id?: number | null;
+  hpo_id?: string | null;
+  name?: string | null;
+}
+
+export interface PhenotypeSummary {
+  id?: number | null;
+  hpo_id?: string | null;
+  name?: string | null;
+}
+
 export interface PhenotypeUpdate {
   name?: string | null;
   definition?: string | null;
@@ -228,14 +455,6 @@ export interface PhenotypeUpdate {
   is_root_term?: boolean | null;
   frequency_in_med13?: string | null;
   severity_score?: number | null;
-}
-
-export interface AuthorInfo {
-  name: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  affiliation?: string | null;
-  orcid?: string | null;
 }
 
 export interface PublicationCreate {
@@ -286,7 +505,21 @@ export interface PublicationResponse {
   created_at: string;
   updated_at: string;
   evidence_count?: number;
-  evidence?: Record<string, unknown>[] | null;
+  evidence?: EvidenceResponse[] | null;
+}
+
+export interface PublicationSummary {
+  id?: number | null;
+  title?: string | null;
+  pubmed_id?: string | null;
+  doi?: string | null;
+}
+
+export interface PublicationSummary {
+  id?: number | null;
+  title?: string | null;
+  pubmed_id?: string | null;
+  doi?: string | null;
 }
 
 export interface PublicationUpdate {
@@ -309,6 +542,109 @@ export interface PublicationUpdate {
   open_access?: boolean | null;
 }
 
+export interface PubmedDownloadRequestModel {
+  job_id: string;
+  article_id: string;
+}
+
+export interface QueryParametersModel {
+  gene_symbol?: string | null;
+  search_term?: string | null;
+}
+
+export interface QueryTestResultResponse {
+  id: string;
+  catalog_entry_id: string;
+  session_id: string;
+  parameters: AdvancedQueryParametersModel;
+  status: 'pending' | 'success' | 'error' | 'timeout' | 'validation_failed';
+  response_data: Record<string, unknown> | null;
+  response_url: string | null;
+  error_message: string | null;
+  execution_time_ms: number | null;
+  data_quality_score: number | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface RunPubmedSearchRequestModel {
+  session_id?: string | null;
+  parameters: AdvancedQueryParametersModel;
+}
+
+export interface SourceCapabilitiesDTO {
+  supports_gene_search?: boolean;
+  supports_term_search?: boolean;
+  supported_parameters?: string[];
+  max_results_limit?: number;
+}
+
+export interface SourceCatalogEntry {
+  id: string;
+  name: string;
+  category: string;
+  subcategory: string | null;
+  description: string;
+  source_type: 'file_upload' | 'api' | 'database' | 'web_scraping' | 'pubmed';
+  param_type: 'gene' | 'term' | 'gene_and_term' | 'none' | 'api';
+  is_active: boolean;
+  requires_auth: boolean;
+  usage_count: number;
+  success_rate: number;
+  tags: string[];
+  capabilities: Record<string, unknown>;
+}
+
+export interface SourceCatalogResponse {
+  id: string;
+  name: string;
+  category: string;
+  subcategory: string | null;
+  description: string;
+  source_type: 'file_upload' | 'api' | 'database' | 'web_scraping' | 'pubmed';
+  param_type: 'gene' | 'term' | 'gene_and_term' | 'none' | 'api';
+  is_active: boolean;
+  requires_auth: boolean;
+  usage_count: number;
+  success_rate: number;
+  tags: string[];
+  capabilities: Record<string, unknown>;
+}
+
+export interface StorageOperationResponse {
+  id: string;
+  configuration_id: string;
+  key: string;
+  status: 'success' | 'failed' | 'pending';
+  created_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface UpdateParametersRequest {
+  parameters: AdvancedQueryParametersModel;
+}
+
+export interface UpdateSelectionRequest {
+  source_ids?: string[];
+}
+
+export interface UsageInfo {
+  endpoint: string;
+  description: string;
+}
+
+export interface ValidationIssueDTO {
+  code: string;
+  message: string;
+  severity?: string;
+  field?: string | null;
+}
+
+export interface ValidationResultDTO {
+  is_valid: boolean;
+  issues?: ValidationIssueDTO[];
+}
+
 export interface VariantCreate {
   gene_id: string;
   chromosome: string;
@@ -326,6 +662,20 @@ export interface VariantCreate {
   review_status?: string | null;
   allele_frequency?: number | null;
   gnomad_af?: number | null;
+}
+
+export interface VariantLinkSummary {
+  id?: number | null;
+  variant_id?: string | null;
+  clinvar_id?: string | null;
+  gene_symbol?: string | null;
+}
+
+export interface VariantLinkSummary {
+  id?: number | null;
+  variant_id?: string | null;
+  clinvar_id?: string | null;
+  gene_symbol?: string | null;
 }
 
 export interface VariantResponse {
@@ -354,6 +704,22 @@ export interface VariantResponse {
   evidence?: EvidenceSummaryResponse[] | null;
 }
 
+export interface VariantSummaryResponse {
+  variant_id: string;
+  clinvar_id?: string | null;
+  chromosome: string;
+  position: number;
+  clinical_significance?: string | null;
+}
+
+export interface VariantSummaryResponse {
+  variant_id: string;
+  clinvar_id?: string | null;
+  chromosome: string;
+  position: number;
+  clinical_significance?: string | null;
+}
+
 export interface VariantUpdate {
   clinvar_id?: string | null;
   hgvs_genomic?: string | null;
@@ -365,4 +731,11 @@ export interface VariantUpdate {
   review_status?: string | null;
   allele_frequency?: number | null;
   gnomad_af?: number | null;
+}
+
+export interface ViewContextDTO {
+  selected_count: number;
+  total_available: number;
+  can_run_search: boolean;
+  categories?: Record<string, number>;
 }

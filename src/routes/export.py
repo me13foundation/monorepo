@@ -17,7 +17,12 @@ from src.database.session import get_session
 from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,
 )
-from src.type_definitions.common import JSONObject
+from src.models.api.common import (
+    ExportableEntitiesResponse,
+    ExportEntityInfo,
+    ExportOptionsResponse,
+    UsageInfo,
+)
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -113,11 +118,11 @@ async def export_entity_data(
         raise HTTPException(status_code=500, detail=f"Export failed: {e!s}")
 
 
-@router.get("/{entity_type}/info")
+@router.get("/{entity_type}/info", response_model=ExportOptionsResponse)
 async def get_export_info(
     entity_type: str,
     service: "BulkExportService" = Depends(get_export_service),
-) -> JSONObject:
+) -> ExportOptionsResponse:
     """
     Get information about export options and data statistics for an entity type.
     """
@@ -130,12 +135,12 @@ async def get_export_info(
 
     try:
         info = service.get_export_info(entity_type)
-        return {
-            "entity_type": entity_type,
-            "export_formats": [fmt.value for fmt in ExportFormat],
-            "compression_formats": [comp.value for comp in CompressionFormat],
-            "info": info,
-        }
+        return ExportOptionsResponse(
+            entity_type=entity_type,
+            export_formats=[fmt.value for fmt in ExportFormat],
+            compression_formats=[comp.value for comp in CompressionFormat],
+            info=info,
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -143,34 +148,34 @@ async def get_export_info(
         )
 
 
-@router.get("/")
-async def list_exportable_entities() -> JSONObject:
+@router.get("/", response_model=ExportableEntitiesResponse)
+async def list_exportable_entities() -> ExportableEntitiesResponse:
     """
     List all entity types that can be exported.
     """
-    return {
-        "exportable_entities": [
-            {
-                "type": "genes",
-                "description": "Genetic entity data including symbols, names, and genomic locations",
-            },
-            {
-                "type": "variants",
-                "description": "Genetic variant data including ClinVar IDs, positions, and clinical significance",
-            },
-            {
-                "type": "phenotypes",
-                "description": "HPO phenotype data including terms, definitions, and categories",
-            },
-            {
-                "type": "evidence",
-                "description": "Evidence linking variants to phenotypes with confidence scores",
-            },
+    return ExportableEntitiesResponse(
+        exportable_entities=[
+            ExportEntityInfo(
+                type="genes",
+                description="Genetic entity data including symbols, names, and genomic locations",
+            ),
+            ExportEntityInfo(
+                type="variants",
+                description="Genetic variant data including ClinVar IDs, positions, and clinical significance",
+            ),
+            ExportEntityInfo(
+                type="phenotypes",
+                description="HPO phenotype data including terms, definitions, and categories",
+            ),
+            ExportEntityInfo(
+                type="evidence",
+                description="Evidence linking variants to phenotypes with confidence scores",
+            ),
         ],
-        "supported_formats": [fmt.value for fmt in ExportFormat],
-        "supported_compression": [comp.value for comp in CompressionFormat],
-        "usage": {
-            "endpoint": "GET /export/{entity_type}?format=json&compression=gzip",
-            "description": "Download entity data in specified format with optional compression",
-        },
-    }
+        supported_formats=[fmt.value for fmt in ExportFormat],
+        supported_compression=[comp.value for comp in CompressionFormat],
+        usage=UsageInfo(
+            endpoint="GET /export/{entity_type}?format=json&compression=gzip",
+            description="Download entity data in specified format with optional compression",
+        ),
+    )

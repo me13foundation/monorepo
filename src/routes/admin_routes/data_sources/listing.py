@@ -13,6 +13,7 @@ from src.domain.entities.user_data_source import SourceStatus, SourceType
 from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
 )
+from src.models.api.common import PaginatedResponse
 from src.routes.admin_routes.dependencies import get_source_service
 
 from .mappers import data_source_to_response
@@ -51,7 +52,7 @@ async def list_data_sources(
                 skip=skip,
                 limit=limit,
             )
-            total = len(data_sources)
+            total = source_repo.count_by_research_space(research_space_id)
         else:
             all_sources = service.get_active_sources(0, 1000)
             data_sources = all_sources
@@ -68,11 +69,12 @@ async def list_data_sources(
             end_idx = start_idx + limit
             data_sources = data_sources[start_idx:end_idx]
 
-        return DataSourceListResponse(
-            data_sources=[data_source_to_response(ds) for ds in data_sources],
+        return PaginatedResponse(
+            items=[data_source_to_response(ds) for ds in data_sources],
             total=total,
             page=page,
-            limit=limit,
+            per_page=limit,
+            total_pages=(total + limit - 1) // limit,
             has_next=(page * limit) < total,
             has_prev=page > 1,
         )

@@ -13,7 +13,6 @@ from src.infrastructure.security.password_hasher import PasswordHasher
 from src.main import create_app
 from src.middleware import jwt_auth as jwt_auth_module
 from src.models.database import (
-    Base,
     EvidenceModel,
     GeneModel,
     PhenotypeModel,
@@ -71,9 +70,6 @@ def _drop_permission_enum_if_supported() -> None:
 
 def _seed_curation_context() -> None:
     """Create the gene/variant/phenotype/evidence records needed by the test."""
-    _drop_permission_enum_if_supported()
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
     session = SessionLocal()
     try:
         _reset_tables(session)
@@ -185,7 +181,7 @@ async def _get_auth_headers(client: AsyncClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-async def test_curation_detail_endpoint_returns_clinical_context() -> None:
+async def test_curation_detail_endpoint_returns_clinical_context(test_engine) -> None:
     """Ensure curator detail endpoint returns phenotypes, evidence, and audit summary."""
     _seed_curation_context()
 

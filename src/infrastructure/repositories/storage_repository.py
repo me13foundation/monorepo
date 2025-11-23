@@ -159,8 +159,9 @@ class SqlAlchemyStorageOperationRepository(StorageOperationRepository):
         stmt = (
             select(StorageOperationModel)
             .where(
-                StorageOperationModel.operation_type == StorageOperationTypeEnum.STORE,
-                StorageOperationModel.status == StorageOperationStatusEnum.FAILED,
+                StorageOperationModel.operation_type
+                == StorageOperationTypeEnum.STORE.value,
+                StorageOperationModel.status == StorageOperationStatusEnum.FAILED.value,
             )
             .order_by(StorageOperationModel.created_at.desc())
             .limit(limit)

@@ -1,5 +1,10 @@
 """Helper functions that convert domain entities into API schemas."""
 
+# Import from DTOs now that they moved
+from src.application.services.data_discovery_service.dtos import (
+    AdvancedQueryParametersModel,
+    DataDiscoverySessionResponse,
+)
 from src.domain.entities.data_discovery_parameters import AdvancedQueryParameters
 from src.domain.entities.data_discovery_session import (
     DataDiscoverySession,
@@ -11,8 +16,6 @@ from src.domain.entities.discovery_search_job import DiscoverySearchJob
 from src.type_definitions.storage import StorageOperationRecord
 
 from .schemas import (
-    AdvancedQueryParametersModel,
-    DataDiscoverySessionResponse,
     DiscoveryPresetResponse,
     DiscoverySearchJobResponse,
     PubMedSortOption,
@@ -55,6 +58,13 @@ def session_to_response(session: DataDiscoverySession) -> DataDiscoverySessionRe
         updated_at=session.updated_at.isoformat(),
         last_activity_at=session.last_activity_at.isoformat(),
     )
+
+
+def data_discovery_session_to_response(
+    session: DataDiscoverySession,
+) -> DataDiscoverySessionResponse:
+    """Convert a DataDiscoverySession entity to an API response (Alias)."""
+    return session_to_response(session)
 
 
 def test_result_to_response(result: QueryTestResult) -> QueryTestResultResponse:
@@ -146,6 +156,7 @@ def storage_operation_to_response(
 
 __all__ = [
     "catalog_entry_to_response",
+    "data_discovery_session_to_response",
     "preset_to_response",
     "search_job_to_response",
     "session_to_response",

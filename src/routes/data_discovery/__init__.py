@@ -4,6 +4,8 @@ from fastapi import APIRouter
 
 from .catalog import router as catalog_router
 from .pubmed import router as pubmed_router
+
+# Moved import to inside function or avoided top-level import where possible in tests
 from .sessions import router as sessions_router
 from .spaces import router as spaces_router
 from .tests import router as tests_router

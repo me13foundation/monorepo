@@ -155,3 +155,50 @@ class PublicationSummary(BaseModel):
     title: str | None = Field(None, description="Publication title")
     pubmed_id: str | None = Field(None, description="PubMed identifier")
     doi: str | None = Field(None, description="DOI")
+
+
+class ExportEntityInfo(BaseModel):
+    """Information about an exportable entity type."""
+
+    type: str = Field(..., description="Entity type identifier")
+    description: str = Field(..., description="Human-readable description")
+
+
+class ExportOptionsResponse(BaseModel):
+    """Response containing export options and entity information."""
+
+    entity_type: str = Field(..., description="Entity type being described")
+    export_formats: list[str] = Field(..., description="Available export formats")
+    compression_formats: list[str] = Field(
+        ...,
+        description="Available compression formats",
+    )
+    info: JSONObject = Field(..., description="Entity-specific export information")
+
+
+class UsageInfo(BaseModel):
+    """Usage information for export endpoints."""
+
+    endpoint: str = Field(..., description="Example endpoint usage")
+    description: str = Field(..., description="Usage description")
+
+
+class ExportableEntitiesResponse(BaseModel):
+    """Response listing all exportable entity types."""
+
+    exportable_entities: list[ExportEntityInfo] = Field(
+        ...,
+        description="List of exportable entity types with descriptions",
+    )
+    supported_formats: list[str] = Field(
+        ...,
+        description="List of supported export formats",
+    )
+    supported_compression: list[str] = Field(
+        ...,
+        description="List of supported compression formats",
+    )
+    usage: UsageInfo = Field(
+        ...,
+        description="Usage information and examples",
+    )

@@ -213,10 +213,17 @@ class QueryExecutionMixin(SessionManagementMixin):
         )
         catalog_entry = self._catalog_repo.find_by_id(request.catalog_entry_id)
 
-        if not session or not catalog_entry:
+        if not session:
             logger.warning(
-                "Session %s or catalog entry %s not found",
+                "Session %s not found (owner_id: %s)",
                 request.session_id,
+                owner_id,
+            )
+            return None
+
+        if not catalog_entry:
+            logger.warning(
+                "Catalog entry %s not found",
                 request.catalog_entry_id,
             )
             return None

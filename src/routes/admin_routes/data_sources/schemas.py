@@ -14,6 +14,7 @@ from src.domain.entities.user_data_source import (
     SourceStatus,
     SourceType,
 )
+from src.models.api.common import PaginatedResponse
 
 
 class CreateDataSourceRequest(BaseModel):
@@ -69,15 +70,8 @@ class DataSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class DataSourceListResponse(BaseModel):
-    """Response model for data source listing."""
-
-    data_sources: list[DataSourceResponse]
-    total: int
-    page: int
-    limit: int
-    has_next: bool
-    has_prev: bool
+# Use standardized pagination response
+DataSourceListResponse = PaginatedResponse[DataSourceResponse]
 
 
 class ScheduleConfigurationRequest(BaseModel):

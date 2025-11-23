@@ -43,6 +43,8 @@ def _load_models(module_path: str) -> Sequence[type[BaseModel]]:
     module = importlib.import_module(module_path)
     models: list[type[BaseModel]] = []
     for _, obj in inspect.getmembers(module, inspect.isclass):
+        # Only include Pydantic BaseModel subclasses for now
+        # TypedDict support needs more work for generic types
         if issubclass(obj, BaseModel) and obj is not BaseModel:
             models.append(obj)
     return models
@@ -54,13 +56,19 @@ UNION_TYPES = (Union, types.UnionType)
 def _discover_default_modules(repo_root: Path) -> list[str]:
     base_dir = repo_root / "src/models/api"
     modules: list[str] = []
-    if not base_dir.exists():
-        return modules
-    for path in base_dir.rglob("*.py"):
-        if path.name == "__init__.py":
-            continue
-        rel = path.with_suffix("").relative_to(repo_root)
-        modules.append(".".join(rel.parts))
+    if base_dir.exists():
+        for path in base_dir.rglob("*.py"):
+            if path.name == "__init__.py":
+                continue
+            rel = path.with_suffix("").relative_to(repo_root)
+            modules.append(".".join(rel.parts))
+
+    # Manually add the data discovery schemas module
+    # This ensures our orchestration types are always included
+    discovery_schemas = "src.routes.data_discovery.schemas"
+    if discovery_schemas not in modules:
+        modules.append(discovery_schemas)
+
     return sorted(set(modules))
 
 
@@ -79,17 +87,22 @@ def _parse_args(default_modules: list[str]) -> tuple[list[str], argparse.Namespa
     return modules, args
 
 
-def _ts_type(annotation: Any) -> str:
-    origin = get_origin(annotation)
-    if origin is None:
-        if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-            return annotation.__name__
-        if inspect.isclass(annotation) and issubclass(annotation, Enum):
-            values = [repr(member.value) for member in annotation]
-            return " | ".join(values) if values else "string"
-        return PRIMITIVE_TYPE_MAP.get(annotation, "unknown")
+def _ts_type_from_string(annotation: str) -> str:
+    """Handle string type annotations."""
+    if annotation == "JSONObject":
+        return "Record<string, any>"
+    if annotation == "JSONValue":
+        return "any"
+    if annotation.startswith("list["):
+        inner_type = annotation[5:-1]  # Extract inner type from list[T]
+        return f"{inner_type}[]"
+    if annotation.startswith("dict["):
+        return "Record<string, any>"
+    return annotation
 
-    args = get_args(annotation)
+
+def _ts_type_from_origin(origin: Any, args: tuple[Any, ...]) -> str:
+    """Handle generic types with an origin."""
     if origin in (list, tuple, set, frozenset):
         inner = _ts_type(args[0]) if args else "unknown"
         return (
@@ -97,14 +110,14 @@ def _ts_type(annotation: Any) -> str:
             if origin is not tuple
             else "[" + ", ".join(_ts_type(arg) for arg in args) + "]"
         )
+
     if origin in (dict,):
         key_type = _ts_type(args[0]) if args else "string"
         value_type = _ts_type(args[1]) if len(args) > 1 else "unknown"
         if key_type != "string":
             key_type = "string"
         return f"Record<{key_type}, {value_type}>"
-    if origin is tuple(get_args(origin)) and hasattr(origin, "__origin__"):
-        return "unknown"
+
     if origin in UNION_TYPES:
         ts_parts = []
         include_null = False
@@ -115,7 +128,29 @@ def _ts_type(annotation: Any) -> str:
                 ts_parts.append(_ts_type(arg))
         union = " | ".join(sorted(set(ts_parts))) or "unknown"
         return f"{union} | null" if include_null else union
+
+    # Fallback for unknown origins
     return "unknown"
+
+
+def _ts_type(annotation: Any) -> str:
+    """Convert Python/Pydantic type to TypeScript type."""
+    origin = get_origin(annotation)
+    if origin is not None:
+        args = get_args(annotation)
+        return _ts_type_from_origin(origin, args)
+
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        return annotation.__name__
+
+    if inspect.isclass(annotation) and issubclass(annotation, Enum):
+        values = [repr(member.value) for member in annotation]
+        return " | ".join(values) if values else "string"
+
+    if isinstance(annotation, str):
+        return _ts_type_from_string(annotation)
+
+    return PRIMITIVE_TYPE_MAP.get(annotation, "unknown")
 
 
 def _render_field(name: str, field: FieldInfo) -> str:
@@ -125,11 +160,28 @@ def _render_field(name: str, field: FieldInfo) -> str:
 
 
 def _render_interface(model: type[BaseModel]) -> str:
+    # Special handling for known generic response types
+    if model.__name__ == "PaginatedResponse":
+        return _render_paginated_response_interface()
+
     lines = [f"export interface {model.__name__} {{"]
     for field_name, field in model.model_fields.items():
         lines.append(_render_field(field_name, field))
     lines.append("}")
     return "\n".join(lines)
+
+
+def _render_paginated_response_interface() -> str:
+    """Special handling for PaginatedResponse to preserve generic type information."""
+    return """export interface PaginatedResponse<T = any> {
+  items: T[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}"""
 
 
 def main() -> None:
@@ -155,6 +207,9 @@ def main() -> None:
         "/* prettier-ignore */",
         "",
     ]
+
+    # Sort models by name to ensure deterministic output
+    models.sort(key=lambda x: x.__name__)
 
     for model in models:
         contents.append(_render_interface(model))

@@ -7,9 +7,10 @@ interface FloatingActionBarProps {
   selectedCount: number
   onGenerate: () => void
   isGenerating?: boolean
+  disabled?: boolean
 }
 
-export function FloatingActionBar({ selectedCount, onGenerate, isGenerating = false }: FloatingActionBarProps) {
+export function FloatingActionBar({ selectedCount, onGenerate, isGenerating = false, disabled = false }: FloatingActionBarProps) {
   return (
     <div className="fixed inset-x-0 bottom-0 border-t border-border bg-background/80 p-4 backdrop-blur-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between">
@@ -29,7 +30,7 @@ export function FloatingActionBar({ selectedCount, onGenerate, isGenerating = fa
 
         <Button
           onClick={onGenerate}
-          disabled={selectedCount === 0 || isGenerating}
+          disabled={disabled || selectedCount === 0 || isGenerating}
           size="lg"
           className="flex items-center space-x-2 shadow-lg"
         >
