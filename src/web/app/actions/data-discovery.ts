@@ -61,7 +61,40 @@ export async function updateSourceSelection(
     console.error("[ServerAction] updateSourceSelection failed:", error)
 
     // Extract backend validation error message if available
-    const message = error?.response?.data?.detail || "Failed to update selection"
+    let message = "Failed to update selection"
+
+    if (error?.response?.data?.detail) {
+      const detail = error.response.data.detail
+
+      // Handle Pydantic validation errors (array of error objects)
+      if (Array.isArray(detail)) {
+        const errorMessages = detail.map((err: any) => {
+          if (typeof err === 'string') return err
+          if (err?.msg) {
+            const location = err.loc?.join('.') || ''
+            return location ? `${location}: ${err.msg}` : err.msg
+          }
+          return JSON.stringify(err)
+        })
+        message = errorMessages.join('; ') || message
+      }
+      // Handle single error object
+      else if (typeof detail === 'object') {
+        if (detail.msg) {
+          const location = detail.loc?.join('.') || ''
+          message = location ? `${location}: ${detail.msg}` : detail.msg
+        } else {
+          message = JSON.stringify(detail)
+        }
+      }
+      // Handle string error
+      else if (typeof detail === 'string') {
+        message = detail
+      }
+    } else if (error?.message) {
+      message = error.message
+    }
+
     return { success: false, error: message }
   }
 }

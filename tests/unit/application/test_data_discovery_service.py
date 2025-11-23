@@ -315,11 +315,11 @@ class TestDataDiscoveryService:
         assert result is None
         service._session_repo.save.assert_not_called()
 
-    def test_toggle_source_selection_invalid_parameters(
+    def test_toggle_source_selection_allows_missing_parameters(
         self,
         service: DataDiscoveryService,
     ) -> None:
-        """Selection toggle should require required parameters to be present."""
+        """Selection toggle should proceed even when required parameters are missing."""
         session_id = TEST_SESSION_ACTIVE.id
         session_without_params = create_test_data_discovery_session(
             id=session_id,
@@ -331,11 +331,17 @@ class TestDataDiscoveryService:
         service._session_repo.find_by_id.return_value = session_without_params
         source_requires_gene = TEST_SOURCE_CLINVAR.model_copy()
         service._catalog_repo.find_by_id.return_value = source_requires_gene
+        updated_session = create_test_data_discovery_session(
+            id=session_id,
+            selected_sources=[source_requires_gene.id],
+        )
+        service._session_repo.save.return_value = updated_session
 
         result = service.toggle_source_selection(session_id, source_requires_gene.id)
 
-        assert result is None
-        service._session_repo.save.assert_not_called()
+        assert result is not None
+        assert source_requires_gene.id in result.selected_sources
+        service._session_repo.save.assert_called_once()
 
     def test_toggle_source_selection_allows_paramless_sources(
         self,

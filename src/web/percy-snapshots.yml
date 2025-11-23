@@ -8,6 +8,5 @@ snapshots:
   - name: New Research Space
     url: /spaces/new
   - name: Data Discovery Workspace
-    url: /data-discovery
   - name: Settings
     url: /settings

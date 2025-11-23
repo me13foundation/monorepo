@@ -62,7 +62,7 @@ export function SpaceNavigation() {
       label: 'Data Sources',
       href: `${basePath}/data-sources`,
       icon: Database,
-      description: 'Manage activated data sources',
+      description: 'Manage data sources and discover new ones',
       prefetch: prefetchSpaceDetail,
     },
     {

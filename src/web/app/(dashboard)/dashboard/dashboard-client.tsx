@@ -3,12 +3,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useSession } from 'next-auth/react'
-import { Database, Users, Activity, BarChart3, Plus, FolderPlus, ExternalLink } from 'lucide-react'
+import { Database, Users, Activity, BarChart3, Plus, FolderPlus } from 'lucide-react'
 import { useDashboardStats, useRecentActivities } from '@/lib/queries/dashboard'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import type { ResearchSpaceListResponse } from '@/types/research-space'
 import { StatCard, DashboardSection, SectionGrid } from '@/components/ui/composition-patterns'
 import { getThemeVariant } from '@/lib/theme/variants'
@@ -42,18 +41,9 @@ function DashboardContent() {
               Welcome back, {session?.user?.full_name || session?.user?.email}
             </p>
             {currentSpaceId && (
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <p className="truncate text-xs text-muted-foreground sm:text-sm">
-                  Current space: {spaces.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
-                </p>
-                <Button variant="outline" size="sm" asChild className="w-fit">
-                  <Link href="/data-discovery">
-                    <Database className="mr-2 size-4" />
-                    Discover Data Sources
-                    <ExternalLink className="ml-2 size-3" />
-                  </Link>
-                </Button>
-              </div>
+              <p className="mt-2 truncate text-xs text-muted-foreground sm:text-sm">
+                Current space: {spaces.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
+              </p>
             )}
           </div>
           {/* Only show Create New Space button when no spaces exist */}

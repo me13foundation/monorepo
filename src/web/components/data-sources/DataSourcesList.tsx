@@ -130,12 +130,12 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setIsDiscoverDialogOpen(true)}>
             <Search className="mr-2 size-4" />
-            Discover Sources
+            Add from Library
           </Button>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 size-4" />
-          Create Data Source
-        </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="mr-2 size-4" />
+            Create Custom Source
+          </Button>
         </div>
       </div>
 
@@ -144,19 +144,19 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
           <CardContent className="pt-6">
             <div className="py-12 text-center">
               <Database className="mx-auto mb-4 size-12 text-muted-foreground" />
-              <h3 className="mb-2 text-lg font-semibold">No data sources</h3>
+              <h3 className="mb-2 text-lg font-semibold">No data sources added to this space yet</h3>
               <p className="mb-4 text-muted-foreground">
-                Get started by creating your first data source for this research space.
+                Choose from our library of pre-configured sources or create a custom integration.
               </p>
               <div className="flex justify-center gap-3">
                 <Button onClick={() => setIsDiscoverDialogOpen(true)}>
                   <Search className="mr-2 size-4" />
-                  Discover Sources
+                  Add from Library
                 </Button>
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
-                <Plus className="mr-2 size-4" />
-                Create Data Source
-              </Button>
+                  <Plus className="mr-2 size-4" />
+                  Create Custom Source
+                </Button>
               </div>
             </div>
           </CardContent>

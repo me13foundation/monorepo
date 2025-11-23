@@ -190,38 +190,10 @@ describe('DashboardPage', () => {
       jest.clearAllMocks()
     })
 
-    it('shows Data Sources button when space is selected', () => {
-      mockUseSpaceContext.mockReturnValue({
-        currentSpaceId: 'space-123',
-        setCurrentSpaceId: mockSetCurrentSpaceId,
-        isLoading: false,
-      })
-
-      mockUseResearchSpaces.mockReturnValue({
-        data: {
-          spaces: [
-            { id: 'space-123', name: 'Test Space', slug: 'test-space' },
-          ],
-        },
-        isLoading: false,
-      })
-
+    it('does not show data sources button on dashboard', () => {
       renderWithProviders(<DashboardClient />)
 
-      const dataSourcesLink = screen.getByRole('link', { name: /discover data sources/i })
-      expect(dataSourcesLink).toBeInTheDocument()
-      expect(dataSourcesLink).toHaveAttribute('href', '/data-discovery')
-    })
-
-    it('hides Data Sources button when no space is selected', () => {
-      mockUseSpaceContext.mockReturnValue({
-        currentSpaceId: null,
-        setCurrentSpaceId: mockSetCurrentSpaceId,
-        isLoading: false,
-      })
-
-      renderWithProviders(<DashboardClient />)
-
+      expect(screen.queryByRole('link', { name: /discover data sources/i })).not.toBeInTheDocument()
       expect(screen.queryByRole('link', { name: /data sources/i })).not.toBeInTheDocument()
     })
   })

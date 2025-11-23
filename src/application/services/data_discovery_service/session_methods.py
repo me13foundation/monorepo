@@ -164,12 +164,11 @@ class SessionManagementMixin(CatalogPermissionMixin):
         if catalog_entry.param_type != QueryParameterType.NONE:
             current_parameters = session.current_parameters
             if not current_parameters.can_run_query(catalog_entry.param_type):
-                logger.warning(
-                    "Session %s lacks required parameters for catalog entry %s",
-                    session_id,
+                logger.info(
+                    "Allowing selection without required parameters for catalog entry %s on session %s",
                     catalog_entry_id,
+                    session_id,
                 )
-                return None
 
         # Toggle selection
         updated_session = session.toggle_source_selection(catalog_entry_id)
@@ -237,12 +236,11 @@ class SessionManagementMixin(CatalogPermissionMixin):
             if catalog_entry.param_type != QueryParameterType.NONE:
                 current_parameters = session.current_parameters
                 if not current_parameters.can_run_query(catalog_entry.param_type):
-                    logger.warning(
-                        "Session %s lacks required parameters for catalog entry %s",
-                        session_id,
+                    logger.info(
+                        "Allowing selection without required parameters for catalog entry %s on session %s",
                         catalog_entry_id,
+                        session_id,
                     )
-                    continue
 
             valid_sources.append(catalog_entry_id)
 
