@@ -11,7 +11,11 @@ from src.domain.entities.data_discovery_parameters import (
     QueryParameterType,
     TestResultStatus,
 )
-from src.domain.entities.data_discovery_session import QueryTestResult
+from src.domain.entities.data_discovery_session import (
+    DataDiscoverySession,
+    QueryTestResult,
+    SourceCatalogEntry,
+)
 from src.domain.entities.user_data_source import SourceConfiguration, SourceType
 
 from .session_methods import SessionManagementMixin
@@ -205,27 +209,8 @@ class QueryExecutionMixin(SessionManagementMixin):
         request: AddSourceToSpaceRequest,
         owner_id: UUID | None = None,
     ) -> UUID | None:
-        # Get session and catalog entry
-        session = (
-            self._session_repo.find_owned_session(request.session_id, owner_id)
-            if owner_id
-            else self._session_repo.find_by_id(request.session_id)
-        )
-        catalog_entry = self._catalog_repo.find_by_id(request.catalog_entry_id)
-
-        if not session:
-            logger.warning(
-                "Session %s not found (owner_id: %s)",
-                request.session_id,
-                owner_id,
-            )
-            return None
-
-        if not catalog_entry:
-            logger.warning(
-                "Catalog entry %s not found",
-                request.catalog_entry_id,
-            )
+        session, catalog_entry = self._get_session_and_entry(request, owner_id)
+        if not session or not catalog_entry:
             return None
 
         if not self._can_execute_source(
@@ -244,15 +229,22 @@ class QueryExecutionMixin(SessionManagementMixin):
         if catalog_entry.source_template_id and self._template_repo:
             template = self._template_repo.find_by_id(catalog_entry.source_template_id)
 
-        # Determine the resulting source type
-        resolved_source_type = (
-            template.source_type if template else catalog_entry.source_type
+        resolved_source_type = self._normalize_source_type(
+            template.source_type if template else catalog_entry.source_type,
+            request.catalog_entry_id,
         )
 
         # Create UserDataSource
         configuration = SourceConfiguration.model_validate(request.source_config or {})
+        owner_id = session.owner_id or request.requested_by
+        if owner_id is None:
+            logger.warning(
+                "Unable to determine owner for add_to_space; session %s",
+                request.session_id,
+            )
+            return None
         create_request = CreateSourceRequest(
-            owner_id=session.owner_id,
+            owner_id=owner_id,
             name=f"{catalog_entry.name} (from Data Discovery)",
             source_type=resolved_source_type or SourceType.API,
             description=f"Added from Data Source Discovery: {catalog_entry.description}",
@@ -279,3 +271,55 @@ class QueryExecutionMixin(SessionManagementMixin):
                 request.research_space_id,
             )
             return data_source.id
+
+    def _normalize_source_type(
+        self,
+        value: SourceType | str | None,
+        catalog_entry_id: str,
+    ) -> SourceType:
+        if isinstance(value, SourceType):
+            return value
+        if isinstance(value, str):
+            try:
+                return SourceType(value.lower())
+            except ValueError:
+                logger.warning(
+                    "Unknown source_type %s for catalog entry %s; defaulting to api",
+                    value,
+                    catalog_entry_id,
+                )
+        else:
+            logger.warning(
+                "Missing source_type for catalog entry %s; defaulting to api",
+                catalog_entry_id,
+            )
+        return SourceType.API
+
+    def _get_session_and_entry(
+        self,
+        request: AddSourceToSpaceRequest,
+        owner_id: UUID | None,
+    ) -> tuple[DataDiscoverySession | None, SourceCatalogEntry | None]:
+        session = (
+            self._session_repo.find_owned_session(request.session_id, owner_id)
+            if owner_id
+            else self._session_repo.find_by_id(request.session_id)
+        )
+        catalog_entry = self._catalog_repo.find_by_id(request.catalog_entry_id)
+
+        if not session:
+            logger.warning(
+                "Session %s not found (owner_id: %s)",
+                request.session_id,
+                owner_id,
+            )
+            return None, None
+
+        if not catalog_entry:
+            logger.warning(
+                "Catalog entry %s not found",
+                request.catalog_entry_id,
+            )
+            return None, None
+
+        return session, catalog_entry

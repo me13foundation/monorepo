@@ -59,13 +59,13 @@ class DataSourceResponse(BaseModel):
     description: str | None
     source_type: SourceType
     status: SourceStatus
-    config: SourceConfiguration
+    config: SourceConfiguration = Field(validation_alias="configuration")
     template_id: UUID | None
     ingestion_schedule: IngestionSchedule | None
     quality_metrics: QualityMetrics | None
-    last_ingested_at: str | None
-    created_at: str
-    updated_at: str
+    last_ingested_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -88,7 +88,7 @@ export function useCreateDataSource() {
           dataSourceKeys.list(newDataSource),
           {
             ...previousDataSources,
-            data_sources: [optimisticDataSource, ...previousDataSources.data_sources],
+            items: [optimisticDataSource, ...previousDataSources.items],
             total: previousDataSources.total + 1,
           }
         )
@@ -144,7 +144,7 @@ export function useCreateDataSourceInSpace(spaceId: string) {
           dataSourceKeys.space(spaceId),
           {
             ...previousSpaceDataSources,
-            data_sources: [optimisticDataSource, ...previousSpaceDataSources.data_sources],
+            items: [optimisticDataSource, ...previousSpaceDataSources.items],
             total: previousSpaceDataSources.total + 1,
           }
         )

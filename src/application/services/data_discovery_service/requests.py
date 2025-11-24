@@ -53,5 +53,6 @@ class AddSourceToSpaceRequest(BaseModel):
     catalog_entry_id: str
     research_space_id: UUID
     source_config: JSONObject = Field(default_factory=dict)
+    requested_by: UUID | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)

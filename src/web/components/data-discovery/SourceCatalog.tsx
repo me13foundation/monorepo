@@ -16,22 +16,42 @@ interface SourceCatalogProps {
   entries: SourceCatalogEntry[]
   orchestratedState: OrchestratedSessionState
   spaceId: string
+  onSelectionChange?: (selected: Set<string>) => void
 }
 
-export function SourceCatalog({ entries, orchestratedState, spaceId }: SourceCatalogProps) {
+export function SourceCatalog({ entries, orchestratedState, spaceId, onSelectionChange }: SourceCatalogProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
     () => new Set(orchestratedState.session.selected_sources),
   )
+  const selectionKey = useMemo(
+    () => orchestratedState.session.selected_sources.join('|'),
+    [orchestratedState.session.selected_sources],
+  )
+  const areSetsEqual = (a: Set<string>, b: Set<string>): boolean => {
+    if (a.size !== b.size) {
+      return false
+    }
+    for (const value of a) {
+      if (!b.has(value)) {
+        return false
+      }
+    }
+    return true
+  }
   const issues = orchestratedState.validation?.issues || []
   const isValid = orchestratedState.validation?.is_valid
 
   useEffect(() => {
-    setSelectedIds(new Set(orchestratedState.session.selected_sources))
-  }, [orchestratedState.session.selected_sources])
+    const next = new Set(orchestratedState.session.selected_sources)
+    if (areSetsEqual(next, selectedIds)) {
+      return
+    }
+    setSelectedIds(next)
+    onSelectionChange?.(next)
+  }, [selectionKey, onSelectionChange, selectedIds, orchestratedState.session.selected_sources])
 
   const queryClient = useQueryClient()
   const setSelections = useSetSpaceDiscoverySelections(spaceId)
-  const isPending = setSelections.isPending
 
   const categories = useMemo(() => {
     const groups: Record<string, SourceCatalogEntry[]> = {}
@@ -43,7 +63,6 @@ export function SourceCatalog({ entries, orchestratedState, spaceId }: SourceCat
   }, [entries])
 
   const handleToggleSource = async (sourceId: string) => {
-    const previousSelection = new Set(selectedIds)
     const expectedSelection = new Set(selectedIds)
 
     if (expectedSelection.has(sourceId)) {
@@ -53,6 +72,7 @@ export function SourceCatalog({ entries, orchestratedState, spaceId }: SourceCat
     }
 
     setSelectedIds(expectedSelection)
+    onSelectionChange?.(expectedSelection)
 
     try {
       const updatedSession = await setSelections.mutateAsync({
@@ -62,6 +82,7 @@ export function SourceCatalog({ entries, orchestratedState, spaceId }: SourceCat
 
       const updatedSelection = new Set(updatedSession.selected_sources)
       setSelectedIds(updatedSelection)
+      onSelectionChange?.(updatedSelection)
 
       queryClient.setQueryData<DataDiscoverySession[] | undefined>(
         spaceDiscoveryKeys.sessions(spaceId),
@@ -83,7 +104,6 @@ export function SourceCatalog({ entries, orchestratedState, spaceId }: SourceCat
         )
       }
     } catch (error) {
-      setSelectedIds(previousSelection)
       const message = error instanceof Error ? error.message : 'Failed to update selection'
       toast.error(message)
     }
@@ -108,7 +128,7 @@ export function SourceCatalog({ entries, orchestratedState, spaceId }: SourceCat
                 return (
                   <div
                     key={source.id}
-                    onClick={() => !isPending && handleToggleSource(source.id)}
+                    onClick={() => handleToggleSource(source.id)}
                     className={`
                       flex cursor-pointer items-center justify-between rounded-md border p-3 transition-all
                       ${
@@ -116,7 +136,6 @@ export function SourceCatalog({ entries, orchestratedState, spaceId }: SourceCat
                           ? 'border-primary bg-primary/10 shadow-sm'
                           : 'border-border bg-card hover:bg-accent'
                       }
-                      ${isPending ? 'cursor-wait opacity-50' : ''}
                     `}
                   >
                     <div>

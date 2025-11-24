@@ -1,25 +1,25 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { DashboardSection } from '@/components/ui/composition-patterns'
-import { FloatingActionBar } from '@/components/data-discovery/FloatingActionBar'
-import { cn } from '@/lib/utils'
-import { OrchestratedSessionState, SourceCatalogEntry } from '@/types/generated'
+import { OrchestratedSessionState } from '@/types/generated'
 import {
   useSpaceSourceCatalog,
   useSpaceDiscoverySessions,
-  useCreateSpaceDiscoverySession
+  useCreateSpaceDiscoverySession,
+  useAddDiscoverySourceToSpace,
 } from '@/lib/queries/space-discovery'
-import { ValidationIssueDTO } from '@/types/generated'
+import { useQueryClient } from '@tanstack/react-query'
+import { dataSourceKeys } from '@/lib/query-keys/data-sources'
+import { toast } from 'sonner'
+import type { ValidationIssueDTO } from '@/types/generated'
+import { Button } from '@/components/ui/button'
+import type { AdvancedQueryParametersModel } from '@/types/generated'
+import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
 
 const SourceCatalog = dynamic(
   () => import('@/components/data-discovery/SourceCatalog').then((mod) => ({ default: mod.SourceCatalog })),
-  { ssr: false },
-)
-
-const ResultsView = dynamic(
-  () => import('@/components/data-discovery/ResultsView').then((mod) => ({ default: mod.ResultsView })),
   { ssr: false },
 )
 
@@ -29,23 +29,24 @@ interface DataDiscoveryContentProps {
   // Props passed from Server Component
   sessionState?: OrchestratedSessionState
   catalog?: SourceCatalogEntry[]
+  onComplete?: () => void
 }
 
 export function DataDiscoveryContent({
   spaceId,
   isModal = false,
+  onComplete,
 }: DataDiscoveryContentProps) {
-  // View state only (tabs/navigation)
-  const [activeView, setActiveView] = useState<'select' | 'results'>('select')
-  const [isGenerating, setIsGenerating] = useState(false)
   const [hasInitiatedCreate, setHasInitiatedCreate] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isAdding, setIsAdding] = useState(false)
 
-  // Fetch data using hooks
   const { data: catalog = [], isLoading: catalogLoading } = useSpaceSourceCatalog(spaceId)
   const { data: sessions = [], isLoading: sessionsLoading } = useSpaceDiscoverySessions(spaceId)
   const createSession = useCreateSpaceDiscoverySession(spaceId)
+  const addToSpace = useAddDiscoverySourceToSpace()
+  const queryClient = useQueryClient()
 
-  // Ensure active session exists
   useEffect(() => {
     if (!sessionsLoading && sessions.length === 0 && !createSession.isPending && !hasInitiatedCreate) {
       setHasInitiatedCreate(true)
@@ -55,46 +56,84 @@ export function DataDiscoveryContent({
 
   const activeSession = sessions[0]
 
-  // Derived state from active session
+  useEffect(() => {
+    const initialSelection = new Set(activeSession?.selected_sources ?? [])
+    setSelectedIds(initialSelection)
+  }, [activeSession?.selected_sources])
+
   const selectedSources = activeSession?.selected_sources || []
   const isValid = true // TODO: Implement validation logic based on session
   const validationIssues: ValidationIssueDTO[] = [] // TODO: Get from session validation
+  const catalogById = React.useMemo(() => {
+    const map = new Map<string, SourceCatalogEntry>()
+    catalog.forEach((entry) => map.set(entry.id, entry))
+    return map
+  }, [catalog])
 
-  const handleGenerateResults = () => {
-    setIsGenerating(true)
-    setActiveView('results')
-    // In a real implementation, this would trigger a job
-    setTimeout(() => setIsGenerating(false), 1000)
+  const buildSourceConfig = (catalogEntryId: string): Record<string, unknown> => {
+    const entry = catalogById.get(catalogEntryId)
+    if (!activeSession || !entry) {
+      return {}
+    }
+
+    if (entry.source_type === 'pubmed') {
+      const params: AdvancedQueryParametersModel | undefined = activeSession.current_parameters
+      const parts: string[] = []
+      if (params?.gene_symbol?.trim()) {
+        parts.push(params.gene_symbol.trim())
+      }
+      if (params?.search_term?.trim()) {
+        parts.push(params.search_term.trim())
+      }
+      const query = parts.join(' ').trim() || 'MED13'
+      return {
+        metadata: {
+        query,
+        max_results: params?.max_results ?? 100,
+        date_from: params?.date_from ?? null,
+        date_to: params?.date_to ?? null,
+        publication_types: params?.publication_types ?? [],
+        },
+      }
+    }
+
+    return {}
   }
 
-  // Pure UI components - no business logic
-  const ViewNavigation = () => (
-    <div className="mb-4 flex flex-wrap gap-2">
-      <button
-        onClick={() => setActiveView('select')}
-        className={cn(
-          'rounded-md px-4 py-2 font-medium transition-colors',
-          activeView === 'select'
-            ? 'bg-primary text-primary-foreground shadow'
-            : 'bg-muted text-muted-foreground hover:bg-muted/80',
-        )}
-      >
-        1. Select Data Sources
-      </button>
-      <button
-        onClick={() => setActiveView('results')}
-        className={cn(
-          'rounded-md px-4 py-2 font-medium transition-colors',
-          activeView === 'results'
-            ? 'bg-primary text-primary-foreground shadow'
-            : 'bg-muted text-muted-foreground hover:bg-muted/80',
-        )}
-        disabled={!isValid && selectedSources.length === 0}
-      >
-        2. Review & Test Sources
-      </button>
-    </div>
-  )
+  const handleAddSelectedToSpace = async () => {
+    if (!activeSession) return
+    if (selectedIds.size === 0) {
+      toast.error('Select at least one source to add.')
+      return
+    }
+    setIsAdding(true)
+    const idsToPromote = Array.from(selectedIds)
+    const results = await Promise.allSettled(
+      idsToPromote.map((catalogEntryId) =>
+        addToSpace.mutateAsync({
+          sessionId: activeSession.id,
+          catalogEntryId,
+          researchSpaceId: spaceId,
+          sourceConfig: buildSourceConfig(catalogEntryId),
+          requestedBy: activeSession.owner_id,
+        }),
+      ),
+    )
+
+    const failed = results.filter((result) => result.status === 'rejected')
+    if (failed.length === 0) {
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(spaceId) })
+      toast.success(
+        idsToPromote.length === 1
+          ? 'Source added to this space.'
+          : `${idsToPromote.length} sources added to this space.`,
+      )
+      onComplete?.()
+    } else {
+      toast.error('Some sources could not be added. Please retry.')
+    }
+    setIsAdding(false)
+  }
 
   const SelectView = () => {
     if (catalogLoading || sessionsLoading) {
@@ -132,27 +171,11 @@ export function DataDiscoveryContent({
         entries={catalog}
         orchestratedState={sessionState}
         spaceId={spaceId}
+        onSelectionChange={setSelectedIds}
       />
     )
   }
 
-  const ResultsViewComponent = () => (
-    // Placeholder for simplified results view
-    // In a full implementation, this would also be a dumb component receiving state
-    <div className="p-4">
-       <h3 className="text-lg font-medium">Results View (Placeholder)</h3>
-       <p>This view would display results for session test-session</p>
-    </div>
-  )
-
-  const Content = (
-    <>
-      <ViewNavigation />
-      {activeView === 'select' ? <SelectView /> : <ResultsViewComponent />}
-    </>
-  )
-
-  // Layout components - pure UI composition
   const ModalLayout = ({ children }: { children: React.ReactNode }) => (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-hidden">
@@ -160,42 +183,34 @@ export function DataDiscoveryContent({
           {children}
         </div>
       </div>
-      {activeView === 'select' && (
-        <div className="mt-4">
-          <FloatingActionBar
-            selectedCount={selectedSources.length}
-            onGenerate={handleGenerateResults}
-            isGenerating={isGenerating}
-            disabled={!isValid}
-          />
+      <div className="border-t bg-background p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-muted-foreground">
+            {selectedIds.size} source{selectedIds.size === 1 ? '' : 's'} selected
+          </div>
+          <Button
+            onClick={handleAddSelectedToSpace}
+            disabled={isAdding || selectedIds.size === 0 || addToSpace.isPending}
+          >
+            {isAdding || addToSpace.isPending ? 'Adding...' : 'Add selected to space'}
+          </Button>
         </div>
-      )}
+      </div>
     </div>
   )
 
   const StandardLayout = ({ children }: { children: React.ReactNode }) => (
     <div className="space-y-6">
       <DashboardSection
-        title={activeView === 'select' ? "Select Sources" : "Review Results"}
-        description="Configure your data discovery session"
+        title="Select Sources"
+        description="Pick sources to add directly to this research space"
       >
         {children}
       </DashboardSection>
-
-      {activeView === 'select' && (
-        <div className="mt-4">
-          <FloatingActionBar
-            selectedCount={selectedSources.length}
-            onGenerate={handleGenerateResults}
-            isGenerating={isGenerating}
-            disabled={!isValid}
-          />
-        </div>
-      )}
     </div>
   )
 
   const Layout = isModal ? ModalLayout : StandardLayout
 
-  return <Layout>{Content}</Layout>
+  return <Layout><SelectView /></Layout>
 }

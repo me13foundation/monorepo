@@ -20,6 +20,10 @@ export function DiscoverSourcesDialog({
   open,
   onOpenChange,
 }: DiscoverSourcesDialogProps) {
+  const handleComplete = () => {
+    onOpenChange(false)
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[90vh] max-w-7xl flex-col p-0">
@@ -30,7 +34,7 @@ export function DiscoverSourcesDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-hidden p-6">
-          <DataDiscoveryContent spaceId={spaceId} isModal={true} />
+          <DataDiscoveryContent spaceId={spaceId} isModal={true} onComplete={handleComplete} />
         </div>
       </DialogContent>
     </Dialog>

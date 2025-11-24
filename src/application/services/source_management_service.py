@@ -5,7 +5,7 @@ Orchestrates domain services and repositories to implement
 data source management use cases with proper business logic.
 """
 
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -142,7 +142,7 @@ class SourceManagementService:
 
         # Create the source entity
         source = UserDataSource(
-            id=UUID(),  # Will be set by repository
+            id=uuid4(),
             owner_id=request.owner_id,
             research_space_id=request.research_space_id,
             name=request.name,

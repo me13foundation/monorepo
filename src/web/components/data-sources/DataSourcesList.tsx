@@ -53,7 +53,7 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
     )
   }
 
-  const dataSources = data?.data_sources || []
+  const dataSources = data?.items || []
 
   const detailSource =
     dataSources.find((source) => source.id === detailSourceId) ?? null
