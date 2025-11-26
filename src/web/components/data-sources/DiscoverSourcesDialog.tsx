@@ -13,14 +13,17 @@ interface DiscoverSourcesDialogProps {
   spaceId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSourceAdded?: () => void | Promise<void>
 }
 
 export function DiscoverSourcesDialog({
   spaceId,
   open,
   onOpenChange,
+  onSourceAdded,
 }: DiscoverSourcesDialogProps) {
   const handleComplete = () => {
+    onSourceAdded?.()
     onOpenChange(false)
   }
 

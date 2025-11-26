@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title desc">
+<title id="title">MED13 Resource Library</title>
+<desc id="desc">Stylized double helix mark for the MED13 Resource Library</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#0a2f55"/>
+<stop offset="1" stop-color="#1e8fbf"/>
+</linearGradient>
+<linearGradient id="accent" x1="0" y1="1" x2="1" y2="0">
+<stop offset="0" stop-color="#8bf1ff"/>
+<stop offset="1" stop-color="#c6e8ff"/>
+</linearGradient>
+</defs>
+<rect width="240" height="240" rx="32" fill="url(#bg)"/>
+<g transform="translate(40 28)">
+<path d="M68 0c-18 18-18 36 0 54s18 36 0 54-18 36 0 54 18 36 0 54" fill="none" stroke="url(#accent)" stroke-width="8" stroke-linecap="round"/>
+<path d="M132 0c18 18 18 36 0 54s-18 36 0 54 18 36 0 54-18 36 0 54" fill="none" stroke="#e9f4ff" stroke-width="8" stroke-linecap="round"/>
+<g stroke-width="6" stroke-linecap="round">
+<line x1="80" y1="18" x2="120" y2="34" stroke="#c6e8ff"/>
+<line x1="80" y1="48" x2="120" y2="64" stroke="#8bf1ff"/>
+<line x1="80" y1="78" x2="120" y2="94" stroke="#c6e8ff"/>
+<line x1="80" y1="108" x2="120" y2="124" stroke="#8bf1ff"/>
+<line x1="80" y1="138" x2="120" y2="154" stroke="#c6e8ff"/>
+<line x1="80" y1="168" x2="120" y2="184" stroke="#8bf1ff"/>
+<line x1="80" y1="198" x2="120" y2="214" stroke="#c6e8ff"/>
+</g>
+</g>
+<text x="120" y="210" text-anchor="middle" font-family="Inter, 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="700" letter-spacing="1" fill="#e9f4ff">MED13</text>
+</svg>

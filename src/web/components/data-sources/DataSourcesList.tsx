@@ -23,7 +23,7 @@ interface DataSourcesListProps {
 }
 
 export function DataSourcesList({ spaceId }: DataSourcesListProps) {
-  const { data, isLoading, error } = useSpaceDataSources(spaceId)
+  const { data, isLoading, error, refetch } = useSpaceDataSources(spaceId)
   const [lastSummaries, setLastSummaries] = useState<Record<string, ManualIngestionSummary>>({})
   const [detailSourceId, setDetailSourceId] = useState<string | null>(null)
   const triggerIngestion = useTriggerDataSourceIngestion(spaceId)
@@ -293,6 +293,10 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
         spaceId={spaceId}
         open={isDiscoverDialogOpen}
         onOpenChange={setIsDiscoverDialogOpen}
+        onSourceAdded={async () => {
+          // Explicitly refetch the data sources list when a source is added
+          await refetch()
+        }}
       />
     </div>
   )

@@ -1,8 +1,13 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'
+const isDevelopment = process.env.NODE_ENV === 'development'
 const connectSources = ["'self'", API_BASE_URL]
 if (WS_BASE_URL) {
   connectSources.push(WS_BASE_URL)
+}
+// Allow Next.js HMR WebSocket in development
+if (isDevelopment) {
+  connectSources.push('ws://localhost:3000')
 }
 const cspDirectives = [
   "default-src 'self'",

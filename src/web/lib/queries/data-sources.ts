@@ -47,10 +47,12 @@ export function useSpaceDataSources(
   const { data: session } = useSession()
   const token = session?.user?.access_token
 
-  return useEntity({
+  return useQuery({
     queryKey: dataSourceKeys.space(spaceId || '', params),
-    fetcher: () => fetchDataSourcesBySpace(spaceId!, params, token),
+    queryFn: () => fetchDataSourcesBySpace(spaceId!, params, token),
     enabled: !!token && !!spaceId,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
   })
 }
 

@@ -122,17 +122,27 @@ export function DataDiscoveryContent({
 
     const failed = results.filter((result) => result.status === 'rejected')
     if (failed.length === 0) {
-      queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(spaceId) })
-      toast.success(
-        idsToPromote.length === 1
-          ? 'Source added to this space.'
-          : `${idsToPromote.length} sources added to this space.`,
-      )
-      onComplete?.()
+      // Invalidate and explicitly refetch queries to update the UI immediately
+      queryClient.invalidateQueries({
+        queryKey: dataSourceKeys.space(spaceId),
+      })
+      // Explicitly refetch to ensure immediate update - this will refetch all matching queries
+      queryClient.refetchQueries({
+        queryKey: dataSourceKeys.space(spaceId),
+        type: 'active',
+      }).then(() => {
+        setIsAdding(false)
+        toast.success(
+          idsToPromote.length === 1
+            ? 'Source added to this space.'
+            : `${idsToPromote.length} sources added to this space.`,
+        )
+        onComplete?.()
+      })
     } else {
+      setIsAdding(false)
       toast.error('Some sources could not be added. Please retry.')
     }
-    setIsAdding(false)
   }
 
   const SelectView = () => {
