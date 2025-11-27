@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import type { ResearchSpaceListResponse } from '@/types/research-space'
 import { StatCard, DashboardSection, SectionGrid } from '@/components/ui/composition-patterns'
 import { getThemeVariant } from '@/lib/theme/variants'
+import { ResearchSpaceCard } from '@/components/research-spaces/ResearchSpaceCard'
 
 export default function DashboardClient() {
   return <DashboardContent />
@@ -131,6 +132,23 @@ function DashboardContent() {
           />
         </div>
       </div>
+
+      {/* Research Spaces Section - Only show when spaces exist */}
+      {!spacesLoading && hasSpaces && (
+        <div className="mb-6 sm:mb-8">
+          <DashboardSection
+            title="Research Spaces"
+            description="Your research workspaces and teams"
+            className={theme.card}
+          >
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {spaces.map((space) => (
+                <ResearchSpaceCard key={space.id} space={space} />
+              ))}
+            </div>
+          </DashboardSection>
+        </div>
+      )}
 
       <SectionGrid>
         <DashboardSection

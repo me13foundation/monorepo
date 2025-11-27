@@ -83,7 +83,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
     if (confirm('Are you sure you want to delete this space? This action cannot be undone.')) {
       try {
         await deleteMutation.mutateAsync(spaceId)
-        router.push('/spaces')
+        router.push('/dashboard')
       } catch (error) {
         console.error('Failed to delete space:', error)
       }

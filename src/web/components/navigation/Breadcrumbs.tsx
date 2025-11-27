@@ -25,14 +25,18 @@ export function Breadcrumbs() {
   // Build breadcrumbs from path segments
   let currentPath = ''
   pathSegments.forEach((segment, index) => {
+    // Skip "spaces" segment - don't show "Research Spaces" in breadcrumbs
+    if (segment === 'spaces') {
+      currentPath += `/${segment}`
+      return
+    }
+
     currentPath += `/${segment}`
     const isLast = index === pathSegments.length - 1
 
     // Format label
     let label = segment
-    if (segment === 'spaces') {
-      label = 'Research Spaces'
-    } else if (segment === 'new') {
+    if (segment === 'new') {
       label = 'New'
     } else if (segment.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
       // UUID - could fetch name, but for now just show "Details"

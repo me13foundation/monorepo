@@ -3,8 +3,6 @@ snapshots:
     url: /
   - name: Dashboard Overview
     url: /dashboard
-  - name: Research Spaces Listing
-    url: /spaces
   - name: New Research Space
     url: /spaces/new
   - name: Data Discovery Workspace

@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query'
 import { authOptions } from '@/lib/auth'
 import { fetchDashboardStats, fetchRecentActivities } from '@/lib/api'
+import { fetchResearchSpaces } from '@/lib/api/research-spaces'
+import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
 import DashboardClient from './dashboard-client'
 import { dashboardKeys } from '@/lib/query-keys/dashboard'
 
@@ -29,12 +31,17 @@ export default async function DashboardPage() {
       queryKey: dashboardKeys.activities(RECENT_ACTIVITY_LIMIT, token),
       queryFn: () => fetchRecentActivities(RECENT_ACTIVITY_LIMIT, token),
     }),
+    queryClient.prefetchQuery({
+      queryKey: researchSpaceKeys.list(),
+      queryFn: () => fetchResearchSpaces(undefined, token),
+    }),
   ])
 
   // Log prefetch failures (client will retry)
   prefetchResults.forEach((result, index) => {
     if (result.status === 'rejected') {
-      const queryName = index === 0 ? 'dashboard stats' : 'recent activities'
+      const queryNames = ['dashboard stats', 'recent activities', 'research spaces']
+      const queryName = queryNames[index] || 'unknown'
       console.error(`[Server Prefetch] Failed to prefetch ${queryName}:`, result.reason)
       // Don't throw - let client retry
     }

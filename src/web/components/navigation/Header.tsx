@@ -3,8 +3,8 @@
 import { SpaceSelector } from '@/components/research-spaces/SpaceSelector'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { UserMenu } from './UserMenu'
-import { LayoutDashboard } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 
 export function Header() {
@@ -23,7 +23,14 @@ export function Header() {
               onFocus={prefetchDashboard}
               prefetch={true}
             >
-              <LayoutDashboard className="size-5 sm:size-6" />
+              <Image
+                src="/logo.svg"
+                alt="MED13 Logo"
+                width={32}
+                height={32}
+                className="size-8 sm:size-10"
+                priority
+              />
               <span className="text-lg font-bold sm:text-xl">MED13 Admin</span>
             </Link>
             <div className="min-w-0 max-w-xs flex-1">

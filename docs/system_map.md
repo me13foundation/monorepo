@@ -11,7 +11,7 @@
 │
 └── 🏠 DASHBOARD (Protected - Requires Authentication)
     │
-    ├── 🏡 /dashboard (Main Dashboard)
+    ├── 🏡 /dashboard (Main Dashboard - Shows Research Spaces)
     │
     ├── ⚙️ /settings (User Settings)
     │
@@ -22,8 +22,6 @@
     │       └── /[templateId] (Template Details)
     │
     └── 🏢 RESEARCH SPACES
-        │
-        ├── 📋 /spaces (Research Spaces Overview)
         │
         ├── ➕ /spaces/new (Create New Space)
         │
@@ -100,12 +98,13 @@
 
 2. Dashboard Navigation
    ├── Header: MED13 Admin + Space Selector + User Menu
+   ├── Dashboard Content: Displays all research spaces in a grid layout
    ├── Space Navigation: Overview | Data Sources | Data Curation | Knowledge Graph | ⋮ (Members, Settings)
    │   └── Data Sources: Comprehensive hub for all data source activities
    │       ├── View & manage existing data sources
    │       ├── "Add from Library" - Browse & test pre-configured sources (PubMed, etc.)
    │       └── "Create Custom Source" - Add manual integrations (API, Database, File, Web Scraping)
-   └── Breadcrumbs: Dynamic based on current path
+   └── Breadcrumbs: Dynamic based on current path (excludes "Research Spaces" segment)
 
 3. Space Context
    ├── All navigation adapts based on selected research space
