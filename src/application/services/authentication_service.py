@@ -5,6 +5,7 @@ Handles user authentication, session management, and security operations.
 """
 
 import logging
+import os
 from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
@@ -44,6 +45,17 @@ class AuthenticationService:
 
     Implements secure authentication with comprehensive security measures.
     """
+
+    # Session expiration configuration (configurable via environment variables)
+    ACCESS_TOKEN_EXPIRY_MINUTES = int(
+        os.getenv("MED13_ACCESS_TOKEN_EXPIRY_MINUTES", "60"),
+    )  # Default: 60 minutes (1 hour)
+    REFRESH_TOKEN_EXPIRY_DAYS = int(
+        os.getenv("MED13_REFRESH_TOKEN_EXPIRY_DAYS", "7"),
+    )  # Default: 7 days
+    SLIDING_EXPIRATION_ENABLED = (
+        os.getenv("MED13_SLIDING_SESSION_EXPIRATION", "true").lower() == "true"
+    )  # Default: enabled
 
     def __init__(
         self,
@@ -177,11 +189,15 @@ class AuthenticationService:
             )
             new_refresh_token = self.jwt_provider.create_refresh_token(user.id)
 
-            # Update session
+            # Update session with new tokens and expiration times
             session.session_token = new_access_token
             session.refresh_token = new_refresh_token
-            session.expires_at = datetime.now(UTC) + timedelta(minutes=15)
-            session.refresh_expires_at = datetime.now(UTC) + timedelta(days=7)
+            session.expires_at = datetime.now(UTC) + timedelta(
+                minutes=self.ACCESS_TOKEN_EXPIRY_MINUTES,
+            )
+            session.refresh_expires_at = datetime.now(UTC) + timedelta(
+                days=self.REFRESH_TOKEN_EXPIRY_DAYS,
+            )
             session.update_activity()
 
             await self.session_repository.update(session)
@@ -207,6 +223,96 @@ class AuthenticationService:
         session = await self.session_repository.get_by_access_token(access_token)
         if session:
             await self.session_repository.revoke_session(session.id)
+
+    def _extend_session_if_needed(self, session: UserSession) -> None:
+        """
+        Extend session expiration if sliding expiration is enabled and needed.
+
+        Args:
+            session: Active session to potentially extend
+        """
+        if not self.SLIDING_EXPIRATION_ENABLED:
+            return
+
+        now = datetime.now(UTC)
+        time_until_expiry = session.time_until_expiry()
+
+        # Extend session if it expires within 20% of its lifetime
+        # This ensures users don't get logged out during active use
+        expiry_threshold_minutes = max(
+            self.ACCESS_TOKEN_EXPIRY_MINUTES * 0.2,
+            5,  # Minimum 5 minutes threshold
+        )
+        expiry_threshold = timedelta(minutes=expiry_threshold_minutes)
+
+        if time_until_expiry < expiry_threshold:
+            logger = logging.getLogger(__name__)
+            logger.debug(
+                "[validate_token] Extending session expiration "
+                "(sliding expiration). Current expiry in: %s, "
+                "extending to %d minutes",
+                time_until_expiry,
+                self.ACCESS_TOKEN_EXPIRY_MINUTES,
+            )
+            # Extend access token expiration to full duration
+            session.expires_at = now + timedelta(
+                minutes=self.ACCESS_TOKEN_EXPIRY_MINUTES,
+            )
+
+            # Also extend refresh token if it's close to expiring
+            # (within 1 day or 10% of its lifetime, whichever is smaller)
+            time_until_refresh_expiry = session.time_until_refresh_expiry()
+            refresh_threshold = min(
+                timedelta(days=1),
+                timedelta(days=self.REFRESH_TOKEN_EXPIRY_DAYS * 0.1),
+            )
+            if time_until_refresh_expiry < refresh_threshold:
+                logger.debug(
+                    "[validate_token] Also extending refresh token expiration",
+                )
+                session.refresh_expires_at = now + timedelta(
+                    days=self.REFRESH_TOKEN_EXPIRY_DAYS,
+                )
+
+    async def _update_session_activity(self, session: UserSession) -> None:
+        """
+        Update session activity and extend if needed.
+
+        Args:
+            session: Active session to update
+        """
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            "[validate_token] Session found: id=%s, status=%s, "
+            "expires_at=%s (tzinfo=%s), "
+            "refresh_expires_at=%s (tzinfo=%s)",
+            session.id,
+            session.status,
+            session.expires_at,
+            session.expires_at.tzinfo,
+            session.refresh_expires_at,
+            session.refresh_expires_at.tzinfo,
+        )
+
+        try:
+            is_active_result = session.is_active()
+            logger.debug(
+                "[validate_token] Session is_active() result: %s",
+                is_active_result,
+            )
+
+            if is_active_result:
+                # Update activity timestamp
+                session.update_activity()
+
+                # Extend session if needed (sliding expiration)
+                self._extend_session_if_needed(session)
+
+                await self.session_repository.update(session)
+                logger.debug("[validate_token] Session activity updated")
+        except Exception:
+            logger.exception("[validate_token] Error checking session.is_active()")
+            raise
 
     async def validate_token(self, token: str) -> User:
         """
@@ -272,34 +378,7 @@ class AuthenticationService:
             session = await self.session_repository.get_by_access_token(token)
 
             if session:
-                logger.debug(
-                    "[validate_token] Session found: id=%s, status=%s, "
-                    "expires_at=%s (tzinfo=%s), "
-                    "refresh_expires_at=%s (tzinfo=%s)",
-                    session.id,
-                    session.status,
-                    session.expires_at,
-                    session.expires_at.tzinfo,
-                    session.refresh_expires_at,
-                    session.refresh_expires_at.tzinfo,
-                )
-
-                try:
-                    is_active_result = session.is_active()
-                    logger.debug(
-                        "[validate_token] Session is_active() result: %s",
-                        is_active_result,
-                    )
-
-                    if is_active_result:
-                        session.update_activity()
-                        await self.session_repository.update(session)
-                        logger.debug("[validate_token] Session activity updated")
-                except Exception:
-                    logger.exception(
-                        "[validate_token] Error checking session.is_active()",
-                    )
-                    raise
+                await self._update_session_activity(session)
             else:
                 logger.debug("[validate_token] No session found for token")
 
@@ -357,6 +436,15 @@ class AuthenticationService:
         """
         return await self.session_repository.revoke_all_user_sessions(user_id)
 
+    async def revoke_expired_sessions(self) -> int:
+        """
+        Revoke all expired sessions (mark as EXPIRED).
+
+        Returns:
+            Number of sessions revoked
+        """
+        return await self.session_repository.revoke_expired_sessions()
+
     async def cleanup_expired_sessions(self) -> int:
         """
         Clean up expired sessions (maintenance operation).
@@ -406,8 +494,14 @@ class AuthenticationService:
             refresh_token=refresh_token,
             ip_address=ip_address,
             user_agent=user_agent,
-            expires_at=datetime.now(UTC) + timedelta(minutes=15),
-            refresh_expires_at=datetime.now(UTC) + timedelta(days=7),
+            expires_at=datetime.now(UTC)
+            + timedelta(
+                minutes=self.ACCESS_TOKEN_EXPIRY_MINUTES,
+            ),
+            refresh_expires_at=datetime.now(UTC)
+            + timedelta(
+                days=self.REFRESH_TOKEN_EXPIRY_DAYS,
+            ),
         )
 
         # Generate device fingerprint

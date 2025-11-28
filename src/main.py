@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.background.ingestion_scheduler import run_ingestion_scheduler_loop
+from src.background.session_cleanup import run_session_cleanup_loop
 from src.database.seed import (
     ensure_default_research_space_seeded,
     ensure_source_catalog_seeded,
@@ -57,12 +58,17 @@ INGESTION_SCHEDULER_INTERVAL_SECONDS = int(
     os.getenv("MED13_INGESTION_SCHEDULER_INTERVAL_SECONDS", "300"),
 )
 
+SESSION_CLEANUP_INTERVAL_SECONDS = int(
+    os.getenv("MED13_SESSION_CLEANUP_INTERVAL_SECONDS", "3600"),
+)  # Default: 1 hour
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan context manager."""
     legacy_session = None
     scheduler_task: asyncio.Task[None] | None = None
+    session_cleanup_task: asyncio.Task[None] | None = None
     try:
         if not _skip_startup_tasks():
             legacy_session = next(get_session())
@@ -76,6 +82,11 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
                     run_ingestion_scheduler_loop(INGESTION_SCHEDULER_INTERVAL_SECONDS),
                     name="ingestion-scheduler-loop",
                 )
+            # Start session cleanup task
+            session_cleanup_task = asyncio.create_task(
+                run_session_cleanup_loop(SESSION_CLEANUP_INTERVAL_SECONDS),
+                name="session-cleanup-loop",
+            )
         yield
     except Exception:
         if legacy_session is not None:
@@ -86,6 +97,10 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
             scheduler_task.cancel()
             with suppress(asyncio.CancelledError):
                 await scheduler_task
+        if session_cleanup_task is not None:
+            session_cleanup_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await session_cleanup_task
         if legacy_session is not None:
             legacy_session.close()
         await container.engine.dispose()
