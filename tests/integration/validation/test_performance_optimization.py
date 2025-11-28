@@ -150,8 +150,9 @@ class TestParallelProcessingOptimization:
             assert abs(seq.score - par.score) < 0.01  # Allow small differences
 
         # Parallel should complete reasonably (may not be faster due to Python GIL and overhead)
-        # Just ensure it doesn't take excessively long (less than 10x sequential time)
-        assert parallel_time < sequential_time * 10
+        # Just ensure it doesn't take excessively long relative to a sane baseline
+        baseline = max(sequential_time, 0.01)
+        assert parallel_time < baseline * 10
 
     @pytest.mark.asyncio
     async def test_adaptive_parallelism(self):

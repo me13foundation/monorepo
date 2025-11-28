@@ -7,18 +7,34 @@ across unit, integration, and end-to-end tests.
 
 import os
 from collections.abc import Generator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
-from src.database.url_resolver import to_async_database_url
+from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
+from src.database.url_resolver import (
+    resolve_async_database_url,
+    to_async_database_url,
+)
 from src.models.database import storage as _storage_models  # noqa: F401
 from src.models.database.base import Base
 
-# Test database configuration
-TEST_DATABASE_URL = "sqlite:///./test_med13.db"
+# Test database configuration (absolute path to avoid divergent relative paths)
+TEST_DB_PATH = Path.cwd() / "test_med13.db"
+TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
+
+# Set core env vars early so imports (e.g., SessionLocal) bind to the test DB.
+os.environ.setdefault("DATABASE_URL", TEST_DATABASE_URL)
+os.environ.setdefault("ASYNC_DATABASE_URL", to_async_database_url(TEST_DATABASE_URL))
+os.environ.setdefault("TESTING", "true")
+os.environ.setdefault(
+    "MED13_DEV_JWT_SECRET",
+    "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz",
+)
 
 
 # Configure pytest-asyncio to use auto mode
@@ -63,6 +79,85 @@ def setup_test_environment():
     os.environ["DATABASE_URL"] = TEST_DATABASE_URL
     os.environ["ASYNC_DATABASE_URL"] = to_async_database_url(TEST_DATABASE_URL)
     os.environ["TESTING"] = "true"
+    os.environ[
+        "MED13_DEV_JWT_SECRET"
+    ] = "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz"
+
+    # Ensure the global dependency container uses the test JWT secret
+    from src.infrastructure.dependency_injection import container as container_module
+    from src.infrastructure.security.jwt_provider import JWTProvider
+
+    test_secret = os.environ["MED13_DEV_JWT_SECRET"]
+    container_module.container.jwt_secret_key = test_secret
+    container_module.container.jwt_provider = JWTProvider(
+        secret_key=test_secret,
+        algorithm=container_module.container.jwt_algorithm,
+    )
+    resolved_db_url = resolve_async_database_url()
+    engine_kwargs: dict[str, object] = {"echo": False, "pool_pre_ping": True}
+    if resolved_db_url.startswith("sqlite"):
+        engine_kwargs["connect_args"] = build_sqlite_connect_args(
+            include_thread_check=False,
+        )
+        engine_kwargs["poolclass"] = NullPool
+
+    async_engine = create_async_engine(resolved_db_url, **engine_kwargs)
+    if resolved_db_url.startswith("sqlite"):
+        configure_sqlite_engine(async_engine.sync_engine)
+
+    # Rewire container to the test async engine
+    container_module.container.database_url = resolved_db_url
+    container_module.container.engine = async_engine
+    container_module.container.async_session_factory = async_sessionmaker(
+        async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
+    container_module.container._authentication_service = None
+    container_module.container._authentication_service_loop = None
+    container_module.container._user_repository = None
+    container_module.container._session_repository = None
+
+    # Rewire synchronous SessionLocal/engine to the test database so imports in
+    # tests use the correct DB.
+    import sys
+
+    from src.database import session as session_module
+
+    sync_db_url = os.environ["DATABASE_URL"]
+    sync_engine_kwargs: dict[str, object] = {"future": True, "pool_pre_ping": True}
+    if sync_db_url.startswith("sqlite"):
+        sync_engine_kwargs["connect_args"] = build_sqlite_connect_args()
+        sync_engine_kwargs["poolclass"] = NullPool
+
+    sync_engine = create_engine(sync_db_url, **sync_engine_kwargs)
+    if sync_db_url.startswith("sqlite"):
+        configure_sqlite_engine(sync_engine)
+
+    session_module.DATABASE_URL = sync_db_url
+    session_module.engine = sync_engine
+    session_module.SessionLocal = sessionmaker(
+        bind=sync_engine,
+        autoflush=False,
+        autocommit=False,
+        expire_on_commit=False,
+        class_=Session,
+    )
+    # Ensure schema exists for the sync engine used in tests
+    Base.metadata.create_all(bind=sync_engine)
+
+    # Propagate the updated SessionLocal/engine to test modules that import them.
+    for module_name in (
+        "tests.e2e.test_curation_detail_endpoint",
+        "tests.e2e.test_curation_workflow",
+        "tests.integration.test_space_discovery_isolation",
+    ):
+        if module_name not in sys.modules:
+            __import__(module_name)
+        module = sys.modules.get(module_name)
+        if module:
+            module.SessionLocal = session_module.SessionLocal
+            module.engine = session_module.engine
 
     yield
 

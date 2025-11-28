@@ -196,3 +196,24 @@ def get_pending_invitations(
         skip=skip,
         limit=limit,
     )
+
+
+@research_spaces_router.get(
+    "/{space_id}/membership/me",
+    response_model=MembershipResponse,
+    summary="Get current user's membership for a space",
+    description="Returns the active membership for the authenticated user in the specified research space.",
+)
+def get_my_membership(
+    space_id: UUID,
+    current_user: User = Depends(get_current_active_user),
+    service: MembershipManagementService = Depends(get_membership_service),
+) -> MembershipResponse:
+    """Get the current user's membership for a space."""
+    membership = service.get_membership_for_user(space_id, current_user.id)
+    if membership is None:
+        raise HTTPException(
+            status_code=HTTP_404_NOT_FOUND,
+            detail="Membership not found or inactive",
+        )
+    return MembershipResponse.from_entity(membership)

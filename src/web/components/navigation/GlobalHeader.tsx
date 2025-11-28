@@ -1,0 +1,111 @@
+"use client"
+
+import * as React from "react"
+import { usePathname } from "next/navigation"
+import Link from "next/link"
+import { Search, Bell, Plus, ChevronRight } from "lucide-react"
+
+import { SidebarTrigger } from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { buildBreadcrumbs } from "@/lib/navigation-config"
+import type { ResearchSpace } from "@/types/research-space"
+
+interface GlobalHeaderProps {
+  /** Current research space (if in space context) */
+  currentSpace?: ResearchSpace | null
+}
+
+export function GlobalHeader({ currentSpace }: GlobalHeaderProps) {
+  const pathname = usePathname()
+  const breadcrumbs = buildBreadcrumbs(pathname, currentSpace)
+
+  // Determine primary action based on context
+  const primaryAction = React.useMemo(() => {
+    if (pathname.startsWith("/spaces/") && currentSpace) {
+      return {
+        label: "Data Sources",
+        href: `/spaces/${currentSpace.id}/data-sources`,
+      }
+    }
+    return {
+      label: "New Space",
+      href: "/spaces/new",
+    }
+  }, [pathname, currentSpace])
+
+  return (
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+      {/* Sidebar toggle and breadcrumbs */}
+      <div className="flex flex-1 items-center gap-2">
+        <SidebarTrigger className="-ml-1" />
+        <Separator orientation="vertical" className="mr-2 h-4" />
+
+        {/* Breadcrumbs */}
+        <nav aria-label="Breadcrumb" className="flex items-center">
+          <ol className="flex items-center gap-1.5 text-sm">
+            {breadcrumbs.map((item, index) => (
+              <React.Fragment key={item.label}>
+                {index > 0 && (
+                  <li aria-hidden="true">
+                    <ChevronRight className="size-3.5 text-muted-foreground" />
+                  </li>
+                )}
+                <li>
+                  {item.href && !item.isCurrent ? (
+                    <Link
+                      href={item.href}
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <span
+                      className={
+                        item.isCurrent
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground"
+                      }
+                      aria-current={item.isCurrent ? "page" : undefined}
+                    >
+                      {item.label}
+                    </span>
+                  )}
+                </li>
+              </React.Fragment>
+            ))}
+          </ol>
+        </nav>
+      </div>
+
+      {/* Center: Search (future: Command palette trigger) */}
+      <div className="hidden max-w-md flex-1 justify-center md:flex">
+        <Button
+          variant="outline"
+          className="relative h-9 w-full justify-start text-sm text-muted-foreground sm:pr-12"
+        >
+          <Search className="mr-2 size-4" />
+          <span>Search...</span>
+          <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-6 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-xs font-medium opacity-100 sm:flex">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        </Button>
+      </div>
+
+      {/* Right: Actions */}
+      <div className="flex flex-1 items-center justify-end gap-2">
+        <Button variant="ghost" size="icon" className="size-9">
+          <Bell className="size-4" />
+          <span className="sr-only">Notifications</span>
+        </Button>
+
+        <Button asChild size="sm" className="gap-1.5">
+          <Link href={primaryAction.href}>
+            <Plus className="size-4" />
+            <span className="hidden sm:inline">{primaryAction.label}</span>
+          </Link>
+        </Button>
+      </div>
+    </header>
+  )
+}

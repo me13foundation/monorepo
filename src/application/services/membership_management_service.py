@@ -203,6 +203,43 @@ class MembershipManagementService:
         """
         return self._membership_repository.find_by_user(user_id, skip, limit)
 
+    def get_membership_for_user(
+        self,
+        space_id: UUID,
+        user_id: UUID,
+    ) -> ResearchSpaceMembership | None:
+        """
+        Get a specific user's membership for a space.
+
+        Args:
+            space_id: The research space ID
+            user_id: The user ID
+
+        Returns:
+            The active ResearchSpaceMembership if found and active, None otherwise
+        """
+        membership = self._membership_repository.find_by_space_and_user(
+            space_id,
+            user_id,
+        )
+        if membership is not None and membership.is_active:
+            return membership
+
+        # Treat owner as implicit membership to keep role resolution consistent
+        space = self._space_repository.find_by_id(space_id)
+        if space and space.owner_id == user_id:
+            return ResearchSpaceMembership(
+                space_id=space_id,
+                user_id=user_id,
+                role=MembershipRole.OWNER,
+                invited_by=None,
+                invited_at=None,
+                joined_at=datetime.now(UTC),
+                is_active=True,
+            )
+
+        return None
+
     def get_pending_invitations(
         self,
         user_id: UUID,

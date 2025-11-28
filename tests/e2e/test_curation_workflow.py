@@ -2,7 +2,7 @@ import os
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import delete, text
 
 from src.database.session import SessionLocal, engine
 from src.domain.entities.user import UserRole, UserStatus
@@ -26,11 +26,13 @@ async def _reset_container_services() -> None:
     container._authorization_service_loop = None
     container._user_management_service = None
     container._user_management_service_loop = None
+    container._user_repository = None
+    container._session_repository = None
     await container.engine.dispose()
     jwt_auth_module.SKIP_JWT_VALIDATION = True
 
 
-def _create_admin_user(
+async def _create_admin_user(
     email: str = "admin-e2e@med13.org",
     password: str | None = None,
 ) -> tuple[str, str]:
@@ -51,11 +53,28 @@ def _create_admin_user(
         session.commit()
     finally:
         session.close()
+
+    async with container_module.container.async_session_factory() as async_session:
+        await async_session.execute(
+            delete(UserModel).where(UserModel.email == email),
+        )
+        await async_session.execute(
+            UserModel.__table__.insert().values(
+                email=email,
+                username="admin-e2e",
+                full_name="E2E Admin",
+                hashed_password=PasswordHasher().hash_password(resolved_password),
+                role=UserRole.ADMIN,
+                status=UserStatus.ACTIVE,
+                email_verified=True,
+            ),
+        )
+        await async_session.commit()
     return email, resolved_password
 
 
 async def _get_auth_headers(client: AsyncClient) -> dict[str, str]:
-    email, password = _create_admin_user()
+    email, password = await _create_admin_user()
     resp = await client.post(
         "/auth/login",
         json={"email": email, "password": password},

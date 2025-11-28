@@ -4,7 +4,7 @@ import os
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import delete, text
 
 from src.database.session import SessionLocal, engine
 from src.domain.entities.user import UserRole, UserStatus
@@ -41,22 +41,40 @@ async def _reset_container_services() -> None:
     container._authorization_service_loop = None
     container._user_management_service = None
     container._user_management_service_loop = None
+    container._user_repository = None
+    container._session_repository = None
     await container.engine.dispose()
     jwt_auth_module.SKIP_JWT_VALIDATION = True
 
 
-def _reset_tables(session: SessionLocal) -> None:
+async def _reset_tables() -> None:
     """Clear tables touched by this test to avoid cross-test leakage."""
-    for model in (
-        AuditLog,
-        ReviewRecord,
-        EvidenceModel,
-        PhenotypeModel,
-        VariantModel,
-        GeneModel,
-    ):
-        session.query(model).delete()
-    session.commit()
+    session = SessionLocal()
+    try:
+        for model in (
+            AuditLog,
+            ReviewRecord,
+            EvidenceModel,
+            PhenotypeModel,
+            VariantModel,
+            GeneModel,
+        ):
+            session.query(model).delete()
+        session.commit()
+    finally:
+        session.close()
+
+    async with container_module.container.async_session_factory() as async_session:
+        for model in (
+            AuditLog,
+            ReviewRecord,
+            EvidenceModel,
+            PhenotypeModel,
+            VariantModel,
+            GeneModel,
+        ):
+            await async_session.execute(delete(model))
+        await async_session.commit()
 
 
 def _drop_permission_enum_if_supported() -> None:
@@ -68,11 +86,12 @@ def _drop_permission_enum_if_supported() -> None:
         )
 
 
-def _seed_curation_context() -> None:
+async def _seed_curation_context() -> None:
     """Create the gene/variant/phenotype/evidence records needed by the test."""
+    await _reset_tables()
+
     session = SessionLocal()
     try:
-        _reset_tables(session)
         gene_data = create_test_gene(gene_id="GENE-E2E", symbol="MED13E2E")
         gene = GeneModel(
             gene_id=gene_data.gene_id,
@@ -169,9 +188,95 @@ def _seed_curation_context() -> None:
     finally:
         session.close()
 
+    async with container_module.container.async_session_factory() as async_session:
+        await async_session.execute(delete(AuditLog))
+        await async_session.execute(delete(ReviewRecord))
+        await async_session.execute(delete(EvidenceModel))
+        await async_session.execute(delete(PhenotypeModel))
+        await async_session.execute(delete(VariantModel))
+        await async_session.execute(delete(GeneModel))
+        await async_session.execute(
+            GeneModel.__table__.insert().values(
+                gene_id=gene.gene_id,
+                symbol=gene.symbol,
+                name=gene.name,
+                description=gene.description,
+                gene_type=gene.gene_type,
+                chromosome=gene.chromosome,
+                start_position=gene.start_position,
+                end_position=gene.end_position,
+                ensembl_id=gene.ensembl_id,
+                ncbi_gene_id=gene.ncbi_gene_id,
+                uniprot_id=gene.uniprot_id,
+            ),
+        )
+        await async_session.execute(
+            VariantModel.__table__.insert().values(
+                gene_id=variant.gene_id,
+                variant_id=variant.variant_id,
+                clinvar_id=variant.clinvar_id,
+                chromosome=variant.chromosome,
+                position=variant.position,
+                reference_allele=variant.reference_allele,
+                alternate_allele=variant.alternate_allele,
+                hgvs_genomic=variant.hgvs_genomic,
+                hgvs_protein=variant.hgvs_protein,
+                hgvs_cdna=variant.hgvs_cdna,
+                variant_type=variant.variant_type,
+                clinical_significance=variant.clinical_significance,
+                condition=variant.condition,
+                review_status=variant.review_status,
+                allele_frequency=variant.allele_frequency,
+                gnomad_af=variant.gnomad_af,
+            ),
+        )
+        await async_session.execute(
+            PhenotypeModel.__table__.insert().values(
+                hpo_id=phenotype.hpo_id,
+                hpo_term=phenotype.hpo_term,
+                name=phenotype.name,
+                definition=phenotype.definition,
+                synonyms=phenotype.synonyms,
+                category=phenotype.category,
+                frequency_in_med13=phenotype.frequency_in_med13,
+            ),
+        )
+        await async_session.execute(
+            EvidenceModel.__table__.insert().values(
+                variant_id=evidence.variant_id,
+                phenotype_id=evidence.phenotype_id,
+                evidence_level=evidence.evidence_level,
+                evidence_type=evidence.evidence_type,
+                description=evidence.description,
+                summary=evidence.summary,
+                confidence_score=evidence.confidence_score,
+                reviewed=evidence.reviewed,
+            ),
+        )
+        await async_session.execute(
+            ReviewRecord.__table__.insert().values(
+                entity_type=review_record.entity_type,
+                entity_id=review_record.entity_id,
+                status=review_record.status,
+                priority=review_record.priority,
+                quality_score=review_record.quality_score,
+                issues=review_record.issues,
+            ),
+        )
+        await async_session.execute(
+            AuditLog.__table__.insert().values(
+                action=audit_log.action,
+                entity_type=audit_log.entity_type,
+                entity_id=audit_log.entity_id,
+                user=audit_log.user,
+                details=audit_log.details,
+            ),
+        )
+        await async_session.commit()
+
 
 async def _get_auth_headers(client: AsyncClient) -> dict[str, str]:
-    email, password = _create_admin_user()
+    email, password = await _create_admin_user()
     resp = await client.post(
         "/auth/login",
         json={"email": email, "password": password},
@@ -183,7 +288,7 @@ async def _get_auth_headers(client: AsyncClient) -> dict[str, str]:
 
 async def test_curation_detail_endpoint_returns_clinical_context(test_engine) -> None:
     """Ensure curator detail endpoint returns phenotypes, evidence, and audit summary."""
-    _seed_curation_context()
+    await _seed_curation_context()
 
     await _reset_container_services()
     jwt_auth_module.SKIP_JWT_VALIDATION = True
@@ -223,7 +328,7 @@ async def test_curation_detail_endpoint_returns_clinical_context(test_engine) ->
     assert any("Status" in action for action in audit["pending_actions"])
 
 
-def _create_admin_user(
+async def _create_admin_user(
     email: str = "admin-e2e@med13.org",
     password: str | None = None,
 ) -> tuple[str, str]:
@@ -244,4 +349,22 @@ def _create_admin_user(
         session.commit()
     finally:
         session.close()
+
+    # Mirror the admin record into the async database used by the auth service
+    async with container_module.container.async_session_factory() as async_session:
+        await async_session.execute(
+            delete(UserModel).where(UserModel.email == email),
+        )
+        await async_session.execute(
+            UserModel.__table__.insert().values(
+                email=email,
+                username="admin-e2e",
+                full_name="E2E Admin",
+                hashed_password=PasswordHasher().hash_password(resolved_password),
+                role=UserRole.ADMIN,
+                status=UserStatus.ACTIVE,
+                email_verified=True,
+            ),
+        )
+        await async_session.commit()
     return email, resolved_password

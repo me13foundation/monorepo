@@ -17,6 +17,7 @@ from src.middleware import jwt_auth as jwt_auth_module
 from src.models.database import Base
 from src.models.database.data_discovery import (
     DataDiscoverySessionModel,
+    DiscoverySearchJobModel,
     QueryTestResultModel,
 )
 from src.models.database.research_space import (
@@ -58,6 +59,7 @@ def test_data_discovery_rejects_foreign_session_access() -> None:
     Base.metadata.create_all(bind=engine)
     session = SessionLocal()
     session.query(QueryTestResultModel).delete()
+    session.query(DiscoverySearchJobModel).delete()
     session.query(DataDiscoverySessionModel).delete()
     session.commit()
 
