@@ -43,6 +43,14 @@ repos:
         always_run: true
         stages: [pre-commit]
 
+      - id: no-any-types
+        name: Prevent Any/any types
+        entry: scripts/check_no_any.py
+        language: python
+        language_version: python3.12
+        types_or: [python, javascript, jsx, ts, tsx]
+        pass_filenames: true
+
 # Note: Advanced type checking, security scanning, and safety checks
 # are run via Makefile commands (make type-check, make security-audit)
 # to avoid pre-commit environment conflicts

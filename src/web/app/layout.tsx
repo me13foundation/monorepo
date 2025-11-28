@@ -57,6 +57,7 @@ export default async function RootLayout({
   const token = session?.user?.access_token
   let initialSpaces: ResearchSpaceListResponse['spaces'] = []
   let initialSpaceId: string | null = null
+  let initialSpaceTotal = 0
 
   if (token) {
     try {
@@ -68,6 +69,7 @@ export default async function RootLayout({
         researchSpaceKeys.list(),
       )
       initialSpaces = prefetched?.spaces ?? []
+      initialSpaceTotal = prefetched?.total ?? initialSpaces.length
       initialSpaceId = prefetched?.spaces?.[0]?.id ?? null
     } catch (error) {
       console.error('Failed to prefetch research spaces', error)
@@ -81,7 +83,11 @@ export default async function RootLayout({
       <body className={`${inter.variable} ${nunitoSans.variable} ${playfairDisplay.variable} ${inter.className}`} suppressHydrationWarning>
         <SessionProvider session={session}>
           <QueryProvider initialState={dehydratedState}>
-            <SpaceContextProvider initialSpaces={initialSpaces} initialSpaceId={initialSpaceId}>
+            <SpaceContextProvider
+              initialSpaces={initialSpaces}
+              initialSpaceId={initialSpaceId}
+              initialTotal={initialSpaceTotal}
+            >
               <ThemeProvider
                 attribute="class"
                 defaultTheme="light"

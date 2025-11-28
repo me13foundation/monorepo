@@ -12,15 +12,28 @@ import { useResearchSpaces, useSpaceMembership } from "@/lib/queries/research-sp
 import { extractSpaceIdFromPath } from "@/types/navigation"
 import type { SidebarUserInfo } from "@/types/navigation"
 import { UserRole } from "@/types/auth"
-import { MembershipRole } from "@/types/research-space"
+import { MembershipRole, type ResearchSpace } from "@/types/research-space"
 
 interface SidebarWrapperProps {
   children: React.ReactNode
+  initialSpaces?: ResearchSpace[]
+  initialTotal?: number
 }
 
-export function SidebarWrapper({ children }: SidebarWrapperProps) {
+export function SidebarWrapper({ children, initialSpaces, initialTotal }: SidebarWrapperProps) {
   const { data: session, status } = useSession()
-  const { data: spacesData, isLoading: spacesLoading } = useResearchSpaces()
+  const hasInitialSpaces = Boolean(initialSpaces && initialSpaces.length > 0)
+  const { data: spacesData, isLoading: spacesLoading } = useResearchSpaces(undefined, {
+    enabled: !hasInitialSpaces,
+    initialData: hasInitialSpaces
+      ? {
+          spaces: initialSpaces ?? [],
+          total: initialTotal ?? initialSpaces?.length ?? 0,
+          skip: 0,
+          limit: initialSpaces?.length ?? 0,
+        }
+      : undefined,
+  })
   const pathname = usePathname()
 
   // Extract current space from URL if we're in a space context

@@ -16,7 +16,7 @@ import types
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Union, get_args, get_origin
+from typing import TYPE_CHECKING, Union, get_args, get_origin
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ from pydantic import BaseModel
 
 OUTPUT_PATH = Path("src/web/types/generated.ts")
 
-PRIMITIVE_TYPE_MAP: dict[type[Any], str] = {
+PRIMITIVE_TYPE_MAP: dict[type[object], str] = {
     str: "string",
     int: "number",
     float: "number",
@@ -101,7 +101,7 @@ def _ts_type_from_string(annotation: str) -> str:
     return annotation
 
 
-def _ts_type_from_origin(origin: Any, args: tuple[Any, ...]) -> str:
+def _ts_type_from_origin(origin: object, args: tuple[object, ...]) -> str:
     """Handle generic types with an origin."""
     if origin in (list, tuple, set, frozenset):
         inner = _ts_type(args[0]) if args else "unknown"
@@ -133,7 +133,7 @@ def _ts_type_from_origin(origin: Any, args: tuple[Any, ...]) -> str:
     return "unknown"
 
 
-def _ts_type(annotation: Any) -> str:
+def _ts_type(annotation: object) -> str:
     """Convert Python/Pydantic type to TypeScript type."""
     origin = get_origin(annotation)
     if origin is not None:

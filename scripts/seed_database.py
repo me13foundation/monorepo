@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -23,9 +23,6 @@ from src.models.database.review import ReviewRecord
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
-else:
-    Session = Any  # type: ignore[assignment]
-
 
 logger = logging.getLogger(__name__)
 

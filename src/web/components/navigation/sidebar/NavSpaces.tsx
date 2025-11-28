@@ -113,22 +113,26 @@ export function NavSpaces({ spaces, maxVisible = 5 }: NavSpacesProps) {
  */
 function SpaceIcon({ name }: { name: string }) {
   // Generate consistent color based on name
-  const colors = [
-    "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-    "bg-green-500/10 text-green-600 dark:text-green-400",
-    "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-    "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    "bg-rose-500/10 text-rose-600 dark:text-rose-400",
-    "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+  const paletteClasses = [
+    // Soft teal - primary brand color
+    "bg-brand-primary/15 text-brand-primary",
+    // Coral-peach - secondary warmth
+    "bg-brand-secondary/20 text-brand-secondary",
+    // Sunlight yellow accent with foreground text for contrast
+    "bg-brand-accent/20 text-foreground",
   ]
 
-  const colorIndex = name.charCodeAt(0) % colors.length
-  const colorClass = colors[colorIndex]
+  const safeName = name?.trim() || "?"
+  const colorIndex = safeName.charCodeAt(0) % paletteClasses.length
+  const colorClass = paletteClasses[colorIndex]
 
   return (
-    <div className={`flex size-7 items-center justify-center rounded-md ${colorClass}`}>
+    <div
+      data-testid="space-icon"
+      className={`flex size-7 items-center justify-center rounded-md border border-sidebar-border/60 ${colorClass}`}
+    >
       <span className="text-sm font-semibold">
-        {name.charAt(0).toUpperCase()}
+        {safeName.charAt(0).toUpperCase()}
       </span>
     </div>
   )

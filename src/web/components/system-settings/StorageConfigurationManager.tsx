@@ -352,17 +352,17 @@ function StorageOverviewSection({
         <div className="grid gap-4 md:grid-cols-3">
           <div>
             <p className="text-xs text-muted-foreground">Enabled configurations</p>
-            <p className="text-2xl font-semibold">
+            <p className="font-heading text-2xl font-semibold">
               {overview.totals.enabled_configurations} / {overview.totals.total_configurations}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Files managed</p>
-            <p className="text-2xl font-semibold">{overview.totals.total_files.toLocaleString()}</p>
+            <p className="font-heading text-2xl font-semibold">{overview.totals.total_files.toLocaleString()}</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Storage consumed</p>
-            <p className="text-2xl font-semibold">
+            <p className="font-heading text-2xl font-semibold">
               {formatBytes(overview.totals.total_size_bytes)}
             </p>
           </div>
@@ -688,7 +688,7 @@ export function StorageConfigurationManager() {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Storage Platform</h2>
+          <h2 className="font-heading text-lg font-semibold">Storage Platform</h2>
           <p className="text-sm text-muted-foreground">
             Manage where PDFs, exports, and raw source files are stored.
           </p>

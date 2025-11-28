@@ -30,6 +30,8 @@ jest.mock('@/components/navigation/UserMenu', () => ({
 }))
 
 import { useSession } from 'next-auth/react'
+import type { Session } from 'next-auth'
+import type { SessionContextValue } from 'next-auth/react'
 
 describe('Header Component', () => {
   const renderWithClient = (ui: React.ReactElement) =>
@@ -44,22 +46,42 @@ describe('Header Component', () => {
   const mockUseSpaceContext = useSpaceContext as jest.MockedFunction<typeof useSpaceContext>
 
   const mockSignOut = jest.fn()
-  const mockSession = {
-    user: {
-      id: 'user-1',
-      email: 'test@example.com',
-      role: 'admin',
-    },
+  const baseUser = {
+    id: 'user-1',
+    email: 'test@example.com',
+    username: 'test-user',
+    full_name: 'Test User',
+    role: 'admin',
+    email_verified: true,
+    access_token: 'token-part1.token-part2.token-part3',
+    expires_at: Date.now() + 3600_000,
   }
+
+  const mockSession: Session = {
+    user: baseUser,
+    expires: new Date(Date.now() + 3600_000).toISOString(),
+  }
+
+  const buildSessionValue = (
+    sessionData: Session | null,
+    status: SessionContextValue['status'],
+  ): SessionContextValue =>
+    status === 'authenticated'
+      ? {
+          data: sessionData as Session,
+          status: 'authenticated',
+          update: jest.fn(async () => sessionData as Session),
+        }
+      : {
+          data: null,
+          status,
+          update: jest.fn(async () => null),
+        }
 
   beforeEach(() => {
     jest.clearAllMocks()
 
-    mockUseSession.mockReturnValue({
-      data: mockSession,
-      status: 'authenticated',
-      update: jest.fn(),
-    } as any)
+    mockUseSession.mockReturnValue(buildSessionValue(mockSession, 'authenticated'))
 
     mockUseSignOut.mockReturnValue({
       signOut: mockSignOut,
@@ -152,11 +174,7 @@ describe('Header Component', () => {
 
   describe('User Session Handling', () => {
     it('handles missing session gracefully', () => {
-      mockUseSession.mockReturnValue({
-        data: null,
-        status: 'unauthenticated',
-        update: jest.fn(),
-      } as any)
+      mockUseSession.mockReturnValue(buildSessionValue(null, 'unauthenticated'))
 
       renderWithClient(<Header />)
 
@@ -165,17 +183,18 @@ describe('Header Component', () => {
     })
 
     it('handles different user roles', () => {
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: 'user-2',
-            email: 'researcher@example.com',
-            role: 'researcher',
-          },
+      const researcherSession: Session = {
+        user: {
+          ...baseUser,
+          id: 'user-2',
+          email: 'researcher@example.com',
+          username: 'researcher',
+          full_name: 'Researcher',
+          role: 'researcher',
         },
-        status: 'authenticated',
-        update: jest.fn(),
-      } as any)
+        expires: mockSession.expires,
+      }
+      mockUseSession.mockReturnValue(buildSessionValue(researcherSession, 'authenticated'))
 
       renderWithClient(<Header />)
 

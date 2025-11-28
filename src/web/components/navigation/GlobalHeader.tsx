@@ -82,7 +82,11 @@ export function GlobalHeader({ currentSpace }: GlobalHeaderProps) {
       <div className="hidden max-w-md flex-1 justify-center md:flex">
         <Button
           variant="outline"
+          type="button"
+          aria-disabled
+          disabled
           className="relative h-9 w-full justify-start text-sm text-muted-foreground sm:pr-12"
+          title="Command palette coming soon"
         >
           <Search className="mr-2 size-4" />
           <span>Search...</span>

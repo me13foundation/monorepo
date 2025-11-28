@@ -3,16 +3,40 @@
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { ResearchSpaceCard } from './ResearchSpaceCard'
 import { Button } from '@/components/ui/button'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus, Loader2, Sparkles, FolderKanban } from 'lucide-react'
 import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { ResearchSpace } from '@/types/research-space'
+import type { ResearchSpaceListResponse } from '@/types/research-space'
 
-export function ResearchSpacesList() {
+interface ResearchSpacesListProps {
+  initialSpaces?: ResearchSpace[]
+  initialTotal?: number
+}
+
+export function ResearchSpacesList({ initialSpaces, initialTotal }: ResearchSpacesListProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const { data, isLoading, error } = useResearchSpaces()
+  const hasInitial = Boolean(initialSpaces && initialSpaces.length > 0)
+  const initialData: ResearchSpaceListResponse | undefined = hasInitial
+    ? {
+        spaces: initialSpaces ?? [],
+        total: initialTotal ?? initialSpaces?.length ?? 0,
+        skip: 0,
+        limit: initialSpaces?.length ?? 0,
+      }
+    : undefined
 
-  const filteredSpaces = data?.spaces.filter((space) => {
+  const { data, isLoading, error } = useResearchSpaces(undefined, {
+    enabled: !hasInitial,
+    initialData,
+  })
+
+  const resolvedSpaces = data?.spaces ?? initialSpaces ?? []
+  const resolvedTotal = data?.total ?? initialTotal ?? resolvedSpaces.length
+
+  const filteredSpaces = resolvedSpaces.filter((space) => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return (
@@ -24,8 +48,31 @@ export function ResearchSpacesList() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-heading text-3xl font-bold tracking-tight">Research Spaces</h1>
+            <p className="mt-1 text-muted-foreground">
+              Manage your research workspaces and teams
+            </p>
+          </div>
+          <Button asChild disabled>
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin" />
+              Loading...
+            </span>
+          </Button>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div key={idx} className="rounded-lg border p-4">
+              <Skeleton className="mb-3 h-6 w-2/3" />
+              <Skeleton className="mb-2 h-4 w-full" />
+              <Skeleton className="mb-2 h-4 w-5/6" />
+              <Skeleton className="h-8 w-24" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -35,7 +82,7 @@ export function ResearchSpacesList() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Research Spaces</h1>
+            <h1 className="font-heading text-3xl font-bold tracking-tight">Research Spaces</h1>
             <p className="mt-1 text-muted-foreground">
               Manage your research workspaces and teams
             </p>
@@ -47,16 +94,29 @@ export function ResearchSpacesList() {
             </Link>
           </Button>
         </div>
-        <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
-          <p className="mb-4 text-sm text-destructive">
-            Failed to load research spaces: {error.message}
-          </p>
-          <Button asChild>
-            <Link href="/spaces/new">
-              <Plus className="mr-2 size-4" />
-              Create Your First Space
-            </Link>
-          </Button>
+        <div className="rounded-xl border border-destructive/30 bg-gradient-to-br from-destructive/10 via-background to-background p-6 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+              <Sparkles className="size-5" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-destructive">
+                We couldn&apos;t load your research spaces. Please retry or create a new
+                one to get started.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" onClick={() => window.location.reload()}>
+                  Retry
+                </Button>
+                <Button asChild>
+                  <Link href="/spaces/new">
+                    <Plus className="mr-2 size-4" />
+                    Create Space
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -66,7 +126,7 @@ export function ResearchSpacesList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Research Spaces</h1>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">Research Spaces</h1>
           <p className="mt-1 text-muted-foreground">
             Manage your research workspaces and teams
           </p>
@@ -91,20 +151,31 @@ export function ResearchSpacesList() {
       </div>
 
       {filteredSpaces && filteredSpaces.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
-          <p className="mb-4 text-muted-foreground">
-            {searchQuery
-              ? 'No spaces match your search.'
-              : 'No research spaces found.'}
+        <div className="rounded-xl border border-dashed border-brand-primary/40 bg-gradient-to-r from-brand-primary/5 via-brand-secondary/5 to-background p-12 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-white/80 text-brand-primary shadow-brand-sm">
+            <FolderKanban className="size-5" />
+          </div>
+          <p className="mb-2 font-heading text-lg font-semibold">
+            {searchQuery ? 'No spaces match your search' : 'No research spaces yet'}
           </p>
-          {!searchQuery && (
+          <p className="mb-6 text-sm text-muted-foreground">
+            {searchQuery
+              ? 'Try a different keyword or clear your search.'
+              : 'Create a space to organize MED13 research and invite your team.'}
+          </p>
+          <div className="flex justify-center gap-3">
+            {searchQuery ? (
+              <Button variant="outline" onClick={() => setSearchQuery('')}>
+                Clear search
+              </Button>
+            ) : null}
             <Button asChild>
               <Link href="/spaces/new">
                 <Plus className="mr-2 size-4" />
                 Create your first space
               </Link>
             </Button>
-          )}
+          </div>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -114,9 +185,9 @@ export function ResearchSpacesList() {
         </div>
       )}
 
-      {data && data.total > data.spaces.length && (
+      {resolvedTotal > resolvedSpaces.length && (
         <div className="text-center text-sm text-muted-foreground">
-          Showing {data.spaces.length} of {data.total} spaces
+          Showing {resolvedSpaces.length} of {resolvedTotal} spaces
         </div>
       )}
     </div>

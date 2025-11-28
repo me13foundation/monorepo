@@ -34,6 +34,9 @@ jest.mock('next/link', () => {
 })
 
 import { useSession } from 'next-auth/react'
+import type { Session } from 'next-auth'
+import type { SessionContextValue } from 'next-auth/react'
+import type { UseThemeProps } from 'next-themes'
 
 describe('UserMenu Component', () => {
   const mockUseSession = useSession as jest.MockedFunction<typeof useSession>
@@ -43,34 +46,57 @@ describe('UserMenu Component', () => {
   const mockSignOut = jest.fn()
   const mockSetTheme = jest.fn()
 
-  const mockSession = {
-    user: {
-      id: 'user-1',
-      email: 'test@example.com',
-      full_name: 'Test User',
-      role: 'admin',
-    },
+  const baseUser = {
+    id: 'user-1',
+    email: 'test@example.com',
+    username: 'test-user',
+    full_name: 'Test User',
+    role: 'admin',
+    email_verified: true,
+    access_token: 'token.part.two',
+    expires_at: Date.now() + 3600_000,
   }
+
+  const mockSession: Session = {
+    user: baseUser,
+    expires: new Date(Date.now() + 3600_000).toISOString(),
+  }
+
+  const buildSessionValue = (
+    sessionData: Session | null,
+    status: SessionContextValue['status'],
+  ): SessionContextValue =>
+    status === 'authenticated'
+      ? {
+          data: sessionData as Session,
+          status: 'authenticated',
+          update: jest.fn(async () => sessionData as Session),
+        }
+      : {
+          data: null,
+          status,
+          update: jest.fn(async () => null),
+        }
+
+  const buildThemeValue = (theme: 'light' | 'dark'): UseThemeProps => ({
+    theme,
+    setTheme: mockSetTheme,
+    themes: ['light', 'dark', 'system'],
+    systemTheme: theme,
+    resolvedTheme: theme,
+  })
 
   beforeEach(() => {
     jest.clearAllMocks()
 
-    mockUseSession.mockReturnValue({
-      data: mockSession,
-      status: 'authenticated',
-      update: jest.fn(),
-    } as any)
+    mockUseSession.mockReturnValue(buildSessionValue(mockSession, 'authenticated'))
 
     mockUseSignOut.mockReturnValue({
       signOut: mockSignOut,
       isSigningOut: false,
     })
 
-    mockUseTheme.mockReturnValue({
-      theme: 'light',
-      setTheme: mockSetTheme,
-      themes: ['light', 'dark', 'system'],
-    } as any)
+    mockUseTheme.mockReturnValue(buildThemeValue('light'))
   })
 
   describe('Rendering', () => {
@@ -142,17 +168,18 @@ describe('UserMenu Component', () => {
 
     it('handles missing full_name gracefully', async () => {
       const user = userEvent.setup()
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: 'user-2',
-            email: 'test2@example.com',
-            role: 'researcher',
-          },
+      const researcherSession: Session = {
+        user: {
+          ...baseUser,
+          id: 'user-2',
+          email: 'test2@example.com',
+          username: 'researcher',
+          role: 'researcher',
+          full_name: 'Researcher',
         },
-        status: 'authenticated',
-        update: jest.fn(),
-      } as any)
+        expires: mockSession.expires,
+      }
+      mockUseSession.mockReturnValue(buildSessionValue(researcherSession, 'authenticated'))
 
       render(<UserMenu />)
 
@@ -199,18 +226,18 @@ describe('UserMenu Component', () => {
 
     it('hides System Settings link for non-admin users', async () => {
       const user = userEvent.setup()
-      mockUseSession.mockReturnValue({
-        data: {
-          user: {
-            id: 'user-3',
-            email: 'researcher@example.com',
-            role: 'researcher',
-            full_name: 'Researcher User',
-          },
+      const restrictedSession: Session = {
+        user: {
+          ...baseUser,
+          id: 'user-3',
+          email: 'researcher@example.com',
+          username: 'researcher-user',
+          role: 'researcher',
+          full_name: 'Researcher User',
         },
-        status: 'authenticated',
-        update: jest.fn(),
-      } as any)
+        expires: mockSession.expires,
+      }
+      mockUseSession.mockReturnValue(buildSessionValue(restrictedSession, 'authenticated'))
 
       render(<UserMenu />)
 
@@ -251,11 +278,7 @@ describe('UserMenu Component', () => {
   describe('Theme Toggle', () => {
     it('shows Dark mode option when theme is light', async () => {
       const user = userEvent.setup()
-      mockUseTheme.mockReturnValue({
-        theme: 'light',
-        setTheme: mockSetTheme,
-        themes: ['light', 'dark', 'system'],
-      } as any)
+      mockUseTheme.mockReturnValue(buildThemeValue('light'))
 
       render(<UserMenu />)
 
@@ -269,11 +292,7 @@ describe('UserMenu Component', () => {
 
     it('shows Light mode option when theme is dark', async () => {
       const user = userEvent.setup()
-      mockUseTheme.mockReturnValue({
-        theme: 'dark',
-        setTheme: mockSetTheme,
-        themes: ['light', 'dark', 'system'],
-      } as any)
+      mockUseTheme.mockReturnValue(buildThemeValue('dark'))
 
       render(<UserMenu />)
 

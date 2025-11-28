@@ -74,7 +74,7 @@ export function SpaceMembersList({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Members</h2>
+          <h2 className="font-heading text-2xl font-bold tracking-tight">Members</h2>
           <p className="text-sm text-muted-foreground">
             {memberships.length} member{memberships.length !== 1 ? 's' : ''}
           </p>

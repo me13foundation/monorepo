@@ -30,6 +30,7 @@ interface SpaceContextProviderProps {
   children: ReactNode
   initialSpaces?: ResearchSpace[]
   initialSpaceId?: string | null
+  initialTotal?: number
 }
 
 export function useSpaceContext() {
@@ -44,11 +45,25 @@ export function SpaceContextProvider({
   children,
   initialSpaces = [],
   initialSpaceId = null,
+  initialTotal,
 }: SpaceContextProviderProps) {
   const pathname = usePathname()
   const onAuthPage = isAuthPage(pathname)
 
-  const { data, isLoading: queryLoading } = useResearchSpaces()
+  const hasInitialSpaces = initialSpaces.length > 0
+  const initialData = hasInitialSpaces
+    ? {
+        spaces: initialSpaces,
+        total: initialTotal ?? initialSpaces.length,
+        skip: 0,
+        limit: initialSpaces.length,
+      }
+    : undefined
+
+  const { data, isLoading: queryLoading } = useResearchSpaces(undefined, {
+    enabled: !hasInitialSpaces && !onAuthPage,
+    initialData,
+  })
 
   const spaces = useMemo<ResearchSpace[]>(() => {
     if (onAuthPage) {
