@@ -2,6 +2,10 @@
 /* eslint-disable */
 /* prettier-ignore */
 
+export type JSONValue = string | number | boolean | null | JSONArray | JSONObject;
+export type JSONObject = { [key: string]: JSONValue };
+export type JSONArray = JSONValue[];
+
 export interface ActivityFeedItem {
   message: string;
   category: string;
@@ -178,46 +182,6 @@ export interface EvidenceResponse {
   publication?: PublicationSummary | null;
 }
 
-export interface EvidenceResponse {
-  id: number;
-  variant_id: string;
-  phenotype_id: string;
-  publication_id?: string | null;
-  description: string;
-  summary?: string | null;
-  evidence_level: 'definitive' | 'strong' | 'moderate' | 'supporting' | 'weak' | 'disproven';
-  evidence_type: 'clinical_report' | 'functional_study' | 'animal_model' | 'biochemical' | 'computational' | 'literature_review' | 'expert_opinion';
-  confidence_score: number;
-  quality_score?: number | null;
-  sample_size?: number | null;
-  study_type?: string | null;
-  statistical_significance?: string | null;
-  reviewed: boolean;
-  review_date?: string | null;
-  reviewer_notes?: string | null;
-  created_at: string;
-  updated_at: string;
-  variant?: VariantLinkSummary | null;
-  phenotype?: PhenotypeSummary | null;
-  publication?: PublicationSummary | null;
-}
-
-export interface EvidenceSummaryResponse {
-  id?: number | null;
-  evidence_level: string;
-  evidence_type: string;
-  description: string;
-  reviewed: boolean;
-}
-
-export interface EvidenceSummaryResponse {
-  id?: number | null;
-  evidence_level: string;
-  evidence_type: string;
-  description: string;
-  reviewed: boolean;
-}
-
 export interface EvidenceSummaryResponse {
   id?: number | null;
   evidence_level: string;
@@ -313,13 +277,6 @@ export interface GeneSummary {
   name?: string | null;
 }
 
-export interface GeneSummary {
-  id?: number | null;
-  gene_id?: string | null;
-  symbol?: string | null;
-  name?: string | null;
-}
-
 export interface GeneUpdate {
   name?: string | null;
   description?: string | null;
@@ -353,7 +310,7 @@ export interface OrchestratedSessionState {
   view_context: ViewContextDTO;
 }
 
-export interface PaginatedResponse<T = any> {
+export interface PaginatedResponse<T = unknown> {
   items: T[];
   total: number;
   page: number;
@@ -434,18 +391,6 @@ export interface PhenotypeSummary {
   name?: string | null;
 }
 
-export interface PhenotypeSummary {
-  id?: number | null;
-  hpo_id?: string | null;
-  name?: string | null;
-}
-
-export interface PhenotypeSummary {
-  id?: number | null;
-  hpo_id?: string | null;
-  name?: string | null;
-}
-
 export interface PhenotypeUpdate {
   name?: string | null;
   definition?: string | null;
@@ -506,13 +451,6 @@ export interface PublicationResponse {
   updated_at: string;
   evidence_count?: number;
   evidence?: EvidenceResponse[] | null;
-}
-
-export interface PublicationSummary {
-  id?: number | null;
-  title?: string | null;
-  pubmed_id?: string | null;
-  doi?: string | null;
 }
 
 export interface PublicationSummary {
@@ -671,13 +609,6 @@ export interface VariantLinkSummary {
   gene_symbol?: string | null;
 }
 
-export interface VariantLinkSummary {
-  id?: number | null;
-  variant_id?: string | null;
-  clinvar_id?: string | null;
-  gene_symbol?: string | null;
-}
-
 export interface VariantResponse {
   id: number;
   variant_id: string;
@@ -702,14 +633,6 @@ export interface VariantResponse {
   evidence_count?: number;
   gene?: GeneSummary | null;
   evidence?: EvidenceSummaryResponse[] | null;
-}
-
-export interface VariantSummaryResponse {
-  variant_id: string;
-  clinvar_id?: string | null;
-  chromosome: string;
-  position: number;
-  clinical_significance?: string | null;
 }
 
 export interface VariantSummaryResponse {

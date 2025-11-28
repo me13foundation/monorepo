@@ -43,7 +43,7 @@ def service(mock_session_repo, mock_catalog_repo):
     return SessionOrchestrationService(mock_session_repo, mock_catalog_repo)
 
 
-def create_mock_session(selected_sources=None):
+def create_mock_session(selected_sources=None, owner_id=None):
     # Create a real AdvancedQueryParameters object instead of a Mock
     params = AdvancedQueryParameters(
         gene_symbol=None,
@@ -67,7 +67,7 @@ def create_mock_session(selected_sources=None):
 
     mock = Mock()
     mock.id = uuid4()
-    mock.owner_id = uuid4()
+    mock.owner_id = owner_id or uuid4()
     mock.research_space_id = None
     mock.name = "Test Session"
     mock.current_parameters = params
@@ -116,11 +116,12 @@ class TestSessionOrchestrationService:
         mock_session = create_mock_session(selected_sources=[source_id])
         mock_source = create_mock_source(source_id)
 
-        mock_session_repo.find_by_id.return_value = mock_session
+        mock_session_repo.find_owned_session.return_value = mock_session
         mock_catalog_repo.find_by_id.return_value = mock_source
+        owner_id = mock_session.owner_id
 
         # Execute
-        result = service.get_orchestrated_state(session_id)
+        result = service.get_orchestrated_state(session_id, owner_id)
 
         # Verify
         assert isinstance(result, OrchestratedSessionState)
@@ -137,10 +138,11 @@ class TestSessionOrchestrationService:
         # Setup
         session_id = uuid4()
         mock_session = create_mock_session()
-        mock_session_repo.find_by_id.return_value = mock_session
+        mock_session_repo.find_owned_session.return_value = mock_session
         mock_catalog_repo.find_by_id.side_effect = lambda source_id: create_mock_source(
             source_id,
         )
+        owner_id = mock_session.owner_id
 
         new_sources = ["clinvar", "uniprot"]
 
@@ -153,7 +155,7 @@ class TestSessionOrchestrationService:
         mock_session.with_selected_sources.side_effect = update_sources
 
         # Execute
-        service.update_selection(session_id, new_sources)
+        service.update_selection(session_id, new_sources, owner_id)
 
         # Verify
         mock_session_repo.save.assert_called_once()
@@ -163,10 +165,11 @@ class TestSessionOrchestrationService:
         # Setup
         session_id = uuid4()
         mock_session = create_mock_session(selected_sources=[])
-        mock_session_repo.find_by_id.return_value = mock_session
+        mock_session_repo.find_owned_session.return_value = mock_session
+        owner_id = mock_session.owner_id
 
         # Execute
-        result = service.get_orchestrated_state(session_id)
+        result = service.get_orchestrated_state(session_id, owner_id)
 
         # Verify
         assert (

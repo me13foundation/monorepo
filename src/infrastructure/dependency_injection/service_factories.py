@@ -12,6 +12,7 @@ from src.application.curation.repositories.review_repository import (
 from src.application.curation.services.curation_service import CurationService
 from src.application.export.export_service import BulkExportService
 from src.application.search.search_service import UnifiedSearchService
+from src.application.services.dashboard_service import DashboardService
 from src.application.services.data_discovery_service import DataDiscoveryService
 from src.application.services.data_source_activation_service import (
     DataSourceActivationService,
@@ -224,6 +225,15 @@ class ApplicationServiceFactoryMixin:
             variant_service=self.create_variant_application_service(session),
             phenotype_service=self.create_phenotype_application_service(session),
             evidence_service=self.create_evidence_application_service(session),
+        )
+
+    def create_dashboard_service(self, session: Session) -> DashboardService:
+        return DashboardService(
+            gene_repository=SqlAlchemyGeneRepository(session),
+            variant_repository=SqlAlchemyVariantRepository(session),
+            phenotype_repository=SqlAlchemyPhenotypeRepository(session),
+            evidence_repository=SqlAlchemyEvidenceRepository(session),
+            publication_repository=SqlAlchemyPublicationRepository(session),
         )
 
     def create_source_management_service(

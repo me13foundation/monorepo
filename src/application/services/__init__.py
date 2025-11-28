@@ -5,6 +5,7 @@ These services coordinate domain services and repositories to implement
 application use cases while maintaining proper separation of concerns.
 """
 
+from .dashboard_service import DashboardService
 from .data_source_activation_service import (
     DataSourceActivationService,
     DataSourceAvailabilitySummary,
@@ -54,6 +55,7 @@ __all__ = [
     "DataSourceAuthorizationService",
     "DataSourceAvailabilitySummary",
     "DataSourcePermission",
+    "DashboardService",
     "EvidenceApplicationService",
     "GeneApplicationService",
     "PhenotypeApplicationService",

@@ -205,7 +205,7 @@ async def get_orchestrated_state(
 ) -> OrchestratedSessionState:
     """Get the orchestrated state (ViewModel) for a session."""
     try:
-        return orchestrator.get_orchestrated_state(session_id)
+        return orchestrator.get_orchestrated_state(session_id, current_user.id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as exc:
@@ -231,7 +231,11 @@ async def update_source_selection(
 ) -> OrchestratedSessionState:
     """Update selection and return new state."""
     try:
-        return orchestrator.update_selection(session_id, request.source_ids)
+        return orchestrator.update_selection(
+            session_id,
+            request.source_ids,
+            current_user.id,
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as exc:

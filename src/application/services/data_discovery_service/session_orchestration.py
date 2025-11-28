@@ -48,19 +48,24 @@ class SessionOrchestrationService:
         self._session_repo = session_repo
         self._catalog_repo = catalog_repo
 
-    def get_orchestrated_state(self, session_id: UUID) -> OrchestratedSessionState:
+    def get_orchestrated_state(
+        self,
+        session_id: UUID,
+        owner_id: UUID,
+    ) -> OrchestratedSessionState:
         """
         Get the complete orchestrated state for a session.
 
         Args:
             session_id: The ID of the session to retrieve
+            owner_id: The user requesting the session state
 
         Returns:
             OrchestratedSessionState: The complete state ready for UI rendering
         """
-        session = self._session_repo.find_by_id(session_id)
+        session = self._session_repo.find_owned_session(session_id, owner_id)
         if not session:
-            msg = f"Session {session_id} not found"
+            msg = f"Session {session_id} not found or not authorized"
             raise ValueError(msg)
 
         # Fetch all selected sources to calculate capabilities
@@ -98,6 +103,7 @@ class SessionOrchestrationService:
         self,
         session_id: UUID,
         source_ids: list[str],
+        owner_id: UUID,
     ) -> OrchestratedSessionState:
         """
         Update the session's source selection and return the new state.
@@ -105,13 +111,14 @@ class SessionOrchestrationService:
         Args:
             session_id: The ID of the session
             source_ids: The new list of selected source IDs
+            owner_id: The user updating the session
 
         Returns:
             OrchestratedSessionState: The new state after the update
         """
-        session = self._session_repo.find_by_id(session_id)
+        session = self._session_repo.find_owned_session(session_id, owner_id)
         if not session:
-            msg = f"Session {session_id} not found"
+            msg = f"Session {session_id} not found or not authorized"
             raise ValueError(msg)
 
         # Update the session
@@ -125,7 +132,7 @@ class SessionOrchestrationService:
         self._session_repo.save(session)
 
         # Return the new state immediately
-        return self.get_orchestrated_state(session_id)
+        return self.get_orchestrated_state(session_id, owner_id)
 
     def _derive_capabilities(
         self,
