@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import DashboardClient from '@/app/(dashboard)/dashboard/dashboard-client'
+import { SpaceStatus } from '@/types/research-space'
 
 // Mock NextAuth session
 const mockSession = {
@@ -39,7 +39,18 @@ jest.mock('@/components/space-context-provider', () => ({
 // Mock research spaces query
 jest.mock('@/lib/queries/research-spaces', () => ({
   useResearchSpaces: () => ({
-    data: { spaces: [] },
+    data: {
+      spaces: [
+        {
+          id: 'space-1',
+          name: 'Space One',
+          slug: 'space-one',
+          description: 'Space description',
+          status: SpaceStatus.ACTIVE,
+          tags: [],
+        },
+      ],
+    },
     isLoading: false,
   }),
 }))
@@ -64,35 +75,16 @@ describe('Theme Integration', () => {
     })
   })
 
-  // Note: Theme toggle is now in Header component, tested separately
-
   it('dashboard maintains functionality with theme system', () => {
     render(<DashboardClient />)
 
     // Verify all dashboard elements are present
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('MED13 Admin Dashboard')
-    expect(screen.getByText('Data Sources')).toBeInTheDocument()
-    expect(screen.getByText('Recent Data Sources')).toBeInTheDocument()
-    expect(screen.getByText('System Activity')).toBeInTheDocument()
-    // Note: Action buttons are now in Header component
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Admin Console')
+    expect(screen.getByText(/Select a research space/i)).toBeInTheDocument()
+    expect(screen.getAllByText(/Research Spaces/i).length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /System Settings/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Create Space/i })).toBeInTheDocument()
   })
 
   // Note: Theme toggle accessibility is tested in Header component tests
 })
-// Mock React Query dashboard hooks to avoid QueryClient in tests
-jest.mock('@/lib/queries/dashboard', () => ({
-  useDashboardStats: () => ({
-    data: {
-      pending_count: 1,
-      approved_count: 9,
-      rejected_count: 0,
-      total_items: 10,
-      entity_counts: { genes: 2, variants: 5, phenotypes: 2, evidence: 1, publications: 0 },
-    },
-    isLoading: false,
-  }),
-  useRecentActivities: () => ({
-    data: { activities: [], total: 0 },
-    isLoading: false,
-  }),
-}))

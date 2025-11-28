@@ -98,7 +98,7 @@ define run_with_postgres_env
 	@/bin/bash -lc 'set -a; source "$(POSTGRES_ENV_FILE)"; set +a; $(1)'
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-coverage web-visual-test
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
 
 # Default target
 help: ## Show this help message
@@ -691,6 +691,14 @@ web-type-check: ## Type check Next.js code
 web-test: ## Run Next.js tests
 	cd src/web && npm run test
 
+web-test-architecture: ## Run Next.js architecture validation tests (Server-Side Orchestration)
+	cd src/web && npm test -- __tests__/architecture
+
+web-test-integration: ## Run Next.js integration tests (frontend-backend)
+	cd src/web && npm test -- __tests__/integration
+
+web-test-all: web-test-architecture web-test-integration web-test ## Run all Next.js tests (architecture, integration, and unit tests)
+
 web-test-coverage: ## Run Next.js tests with coverage report
 	cd src/web && npm run test:coverage
 
@@ -718,7 +726,7 @@ REPORT_DIR := reports
 TIMESTAMP := $(shell date +%Y%m%d_%H%M%S)
 QA_REPORT := $(REPORT_DIR)/qa_report_$(TIMESTAMP).txt
 
-all: venv-check check-env format lint-strict type-check-strict validate-architecture validate-dependencies-warn web-build web-lint web-type-check web-test test security-audit ## Run complete quality assurance suite (fails on first error)
+all: venv-check check-env format lint-strict type-check-strict validate-architecture validate-dependencies-warn web-build web-lint web-type-check web-test-all test security-audit ## Run complete quality assurance suite (fails on first error)
 	@echo ""
 	@echo "✅ All quality checks passed!"
 
@@ -730,7 +738,7 @@ all-report: ## Run complete QA suite with report generation (fails on first erro
 	@echo "=========================================" >> $(QA_REPORT)
 	@echo "" >> $(QA_REPORT)
 	@echo "Running quality assurance suite..." | tee -a $(QA_REPORT)
-	@bash -c 'set -o pipefail; $(MAKE) venv-check check-env format lint-strict type-check-strict web-build web-lint web-type-check web-test test security-audit 2>&1 | tee -a $(QA_REPORT)' || \
+	@bash -c 'set -o pipefail; $(MAKE) venv-check check-env format lint-strict type-check-strict web-build web-lint web-type-check web-test-all test security-audit 2>&1 | tee -a $(QA_REPORT)' || \
 		(echo "" >> $(QA_REPORT); \
 		 echo "❌ QA Suite FAILED at: $(shell date)" >> $(QA_REPORT); \
 		 echo ""; \

@@ -41,6 +41,7 @@ const customJestConfig = {
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
     '<rootDir>/tests/e2e/',
+    '<rootDir>/__tests__/.*/helpers\\.ts$',
   ],
   modulePathIgnorePatterns: [
     '<rootDir>/.next/standalone',

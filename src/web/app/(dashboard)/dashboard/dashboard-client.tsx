@@ -1,17 +1,17 @@
 'use client'
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useSession } from 'next-auth/react'
-import { Database, Users, Activity, BarChart3, Plus, FolderPlus } from 'lucide-react'
-import { useDashboardStats, useRecentActivities } from '@/lib/queries/dashboard'
+import { Plus, FolderPlus, Settings } from 'lucide-react'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { useRouter } from 'next/navigation'
 import type { ResearchSpaceListResponse } from '@/types/research-space'
-import { StatCard, DashboardSection, SectionGrid } from '@/components/ui/composition-patterns'
+import { DashboardSection, PageHero } from '@/components/ui/composition-patterns'
 import { getThemeVariant } from '@/lib/theme/variants'
 import { ResearchSpaceCard } from '@/components/research-spaces/ResearchSpaceCard'
+import { UserRole } from '@/types/auth'
 
 export default function DashboardClient() {
   return <DashboardContent />
@@ -19,8 +19,6 @@ export default function DashboardClient() {
 
 function DashboardContent() {
   const { data: session } = useSession()
-  const { data: stats, isLoading: statsLoading } = useDashboardStats()
-  const { data: recent, isLoading: recentLoading } = useRecentActivities(5)
   const { currentSpaceId } = useSpaceContext()
   const { data, isLoading: spacesLoading } = useResearchSpaces()
   const router = useRouter()
@@ -29,159 +27,97 @@ function DashboardContent() {
   const spacesResponse = data as ResearchSpaceListResponse | undefined
   const spaces = spacesResponse?.spaces ?? []
   const hasSpaces = spaces.length > 0
+  const canCreateSpace = session?.user?.role === UserRole.ADMIN
+  const canAccessSystemSettings = session?.user?.role === UserRole.ADMIN
+  const currentSpaceName = currentSpaceId
+    ? spaces.find((space) => space.id === currentSpaceId)?.name || currentSpaceId
+    : null
 
   return (
-    <div>
-      <div className="mb-6 sm:mb-8">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0 flex-1">
-            <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl lg:text-4xl">
-              MED13 Admin Dashboard
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-              Welcome back, {session?.user?.full_name || session?.user?.email}
-            </p>
-            {currentSpaceId && (
-              <p className="mt-2 truncate text-xs text-muted-foreground sm:text-sm">
-                Current space: {spaces.find((s) => s.id === currentSpaceId)?.name || currentSpaceId}
-              </p>
+    <div className="space-y-6 sm:space-y-8">
+      <PageHero
+        eyebrow="Admin"
+        title="Admin Console"
+        description="Select a research space to manage project-level data. Use system settings for platform-wide controls."
+        variant="research"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {canAccessSystemSettings && (
+              <Button
+                variant="outline"
+                onClick={() => router.push('/system-settings')}
+                className="flex items-center gap-2"
+              >
+                <Settings className="size-4" />
+                <span>System Settings</span>
+              </Button>
+            )}
+            {canCreateSpace && (
+              <Button onClick={() => router.push('/spaces/new')} className="flex items-center gap-2">
+                <Plus className="size-5" />
+                <span>Create Space</span>
+              </Button>
             )}
           </div>
-          {/* Only show Create New Space button when no spaces exist */}
-          {!spacesLoading && !hasSpaces && (
-            <Button
-              onClick={() => router.push('/spaces/new')}
-              size="lg"
-              className="flex w-full items-center gap-2 sm:w-auto"
-            >
-              <Plus className="size-5" />
-              <span className="hidden sm:inline">Create New Space</span>
-              <span className="sm:hidden">New Space</span>
-            </Button>
-          )}
-        </div>
-      </div>
+        }
+      />
 
-      {/* Empty State - Show when no spaces exist */}
-      {!spacesLoading && !hasSpaces && (
-        <Card className="mb-6 border-dashed sm:mb-8">
-          <CardContent className="flex flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
-            <div className="mb-4 rounded-full bg-muted p-3 sm:p-4">
-              <FolderPlus className="size-6 text-muted-foreground sm:size-8" />
+      {currentSpaceName && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Current space</p>
+              <p className="font-medium text-foreground">{currentSpaceName}</p>
             </div>
-            <h3 className="mb-2 text-lg font-semibold sm:text-xl">No Research Spaces Yet</h3>
-            <p className="mb-6 max-w-md text-center text-sm text-muted-foreground sm:text-base">
-              Get started by creating your first research space. Research spaces help you organize
-              data sources and collaborate with your team.
-            </p>
-            <Button
-              onClick={() => router.push('/spaces/new')}
-              size="lg"
-              className="flex w-full items-center gap-2 sm:w-auto"
-            >
-              <Plus className="size-5" />
-              Create Your First Space
+            <Button variant="secondary" onClick={() => router.push(`/spaces/${currentSpaceId}`)}>
+              Open space
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Stats & Activity */}
-      <div className={`mb-6 rounded-xl border border-border bg-gradient-to-br sm:mb-8 ${theme.hero} p-1`}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
-          <StatCard
-            title="Data Sources"
-            value={stats?.entity_counts?.['evidence'] ?? 0}
-            description={`Approved ${stats?.approved_count ?? 0} • Pending ${stats?.pending_count ?? 0}`}
-            icon={<Database className="size-4 text-muted-foreground" />}
-            isLoading={statsLoading}
-          />
-          <StatCard
-            title="Total Records"
-            value={stats?.total_items ?? 0}
-            description="Total records across entities"
-            icon={<BarChart3 className="size-4 text-muted-foreground" />}
-            isLoading={statsLoading}
-          />
-          <StatCard
-            title="Genes Tracked"
-            value={stats?.entity_counts?.['genes'] ?? 0}
-            description="Entities in knowledge base"
-            icon={<Users className="size-4 text-muted-foreground" />}
-            isLoading={statsLoading}
-          />
-          <StatCard
-            title="System Health"
-            value={
-              statsLoading
-                ? '—'
-                : `${Math.max(
-                    80,
-                    Math.min(
-                      100,
-                      Math.round(
-                        ((stats?.approved_count ?? 0) / Math.max(1, stats?.total_items ?? 1)) *
-                          100,
-                      ),
-                    ),
-                  )}%`
-            }
-            description="Approximate approval rate"
-            icon={<Activity className="size-4 text-muted-foreground" />}
-            isLoading={statsLoading}
-          />
-        </div>
-      </div>
-
-      {/* Research Spaces Section - Only show when spaces exist */}
-      {!spacesLoading && hasSpaces && (
-        <div className="mb-6 sm:mb-8">
-          <DashboardSection
-            title="Research Spaces"
-            description="Your research workspaces and teams"
-            className={theme.card}
-          >
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {spaces.map((space) => (
-                <ResearchSpaceCard key={space.id} space={space} />
-              ))}
-            </div>
-          </DashboardSection>
-        </div>
-      )}
-
-      <SectionGrid>
-        <DashboardSection
-          title="Recent Data Sources"
-          description="Latest data source configurations and status"
-          className={theme.card}
-        >
-          <div className="space-y-4 text-sm text-muted-foreground">
-            Connect data sources in the Sources section to see recent activity.
+      <DashboardSection
+        title="Research Spaces"
+        description="Spaces you can access. Open a space to see project-specific stats, data sources, and activity."
+        className={theme.card}
+      >
+        {spacesLoading ? (
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div className="h-4 w-32 rounded bg-muted" />
+            <div className="h-4 w-48 rounded bg-muted" />
+            <div className="h-4 w-24 rounded bg-muted" />
           </div>
-        </DashboardSection>
-        <DashboardSection
-          title="System Activity"
-          description="Recent system events and ingestion jobs"
-          className={theme.card}
-        >
-          <div className="space-y-4">
-            {recentLoading && <div className="text-sm text-muted-foreground">Loading…</div>}
-            {!recentLoading && recent?.activities?.map((a, index) => (
-              <div key={index} className="flex items-start space-x-3">
-                <div className={`mt-2 size-2 rounded-full ${
-                  a.category === 'success' ? 'bg-green-500' :
-                  a.category === 'danger' ? 'bg-red-500' : 'bg-blue-500'
-                }`} />
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{a.title}</p>
-                  <p className="text-xs text-gray-500">{new Date(a.timestamp).toLocaleString()}</p>
-                </div>
-              </div>
+        ) : hasSpaces ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {spaces.map((space) => (
+              <ResearchSpaceCard
+                key={space.id}
+                space={space}
+                onSettings={() => router.push(`/spaces/${space.id}/settings`)}
+              />
             ))}
           </div>
-        </DashboardSection>
-      </SectionGrid>
+        ) : (
+          <Card className="border-dashed">
+            <CardContent className="flex flex-col items-center justify-center px-4 py-10 text-center sm:px-8">
+              <div className="mb-4 rounded-full bg-muted p-3 sm:p-4">
+                <FolderPlus className="size-6 text-muted-foreground sm:size-8" />
+              </div>
+              <p className="mb-2 text-lg font-semibold">No research spaces yet</p>
+              <p className="mb-6 max-w-md text-sm text-muted-foreground">
+                Create a space to organize MED13 research work. Data sources, records, and activity
+                will live inside each space.
+              </p>
+              {canCreateSpace && (
+                <Button onClick={() => router.push('/spaces/new')} className="flex items-center gap-2">
+                  <Plus className="size-5" />
+                  Create your first space
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
+      </DashboardSection>
     </div>
   )
 }

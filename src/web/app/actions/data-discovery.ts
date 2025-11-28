@@ -29,7 +29,9 @@ export async function fetchSessionState(sessionId: string): Promise<Orchestrated
     )
     return response.data
   } catch (error) {
-    console.error("[ServerAction] fetchSessionState failed:", error)
+    if (process.env.NODE_ENV !== "test") {
+      console.error("[ServerAction] fetchSessionState failed:", error)
+    }
     throw new Error("Failed to load session state")
   }
 }
@@ -59,7 +61,9 @@ export async function updateSourceSelection(
 
     return { success: true, state: response.data }
   } catch (error: unknown) {
-    console.error("[ServerAction] updateSourceSelection failed:", error)
+    if (process.env.NODE_ENV !== "test") {
+      console.error("[ServerAction] updateSourceSelection failed:", error)
+    }
 
     // Extract backend validation error message if available
     let message = "Failed to update selection"

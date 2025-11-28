@@ -42,6 +42,8 @@ export function ResearchSpaceCard({
   onManage,
   onSettings,
 }: ResearchSpaceCardProps) {
+  const tags = space.tags ?? []
+
   return (
     <Card className="transition-shadow hover:shadow-lg">
       <CardHeader>
@@ -81,16 +83,16 @@ export function ResearchSpaceCard({
               <span>{memberCount} member{memberCount !== 1 ? 's' : ''}</span>
             </div>
           )}
-          {space.tags.length > 0 && (
+          {tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
-              {space.tags.slice(0, 3).map((tag) => (
+              {tags.slice(0, 3).map((tag) => (
                 <Badge key={tag} variant="outline" className="text-xs">
                   {tag}
                 </Badge>
               ))}
-              {space.tags.length > 3 && (
+              {tags.length > 3 && (
                 <Badge variant="outline" className="text-xs">
-                  +{space.tags.length - 3}
+                  +{tags.length - 3}
                 </Badge>
               )}
             </div>
