@@ -45,15 +45,15 @@ export function WorkspaceDropdown({
             size="lg"
             onClick={() => setModalOpen(true)}
             aria-label={displayLabel}
-            className="border border-transparent bg-brand-primary/5 text-foreground transition-colors hover:border-brand-primary/40 hover:bg-brand-primary/10 data-[state=open]:border-brand-primary/50 data-[state=open]:bg-brand-primary/15 data-[state=open]:text-foreground group-data-[collapsible=icon]:!w-12 group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!gap-0 group-data-[collapsible=icon]:!p-0"
+            className="bg-brand-primary/5 text-foreground transition-colors hover:bg-brand-primary/10 data-[state=open]:bg-brand-primary/15 data-[state=open]:text-foreground group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!gap-0"
           >
-            <div className="flex aspect-square size-10 items-center justify-center rounded-lg border border-brand-primary/20 bg-white text-brand-primary shadow-sm transition-colors dark:border-brand-primary/30 dark:bg-zinc-800">
+            <div className="flex aspect-square size-12 items-center justify-center rounded-md border border-brand-primary/20 bg-white text-brand-primary shadow-sm transition-colors dark:border-brand-primary/30 dark:bg-zinc-800">
               <Image
                 src={logo.src}
                 alt={logo.alt}
                 width={logo.width}
                 height={logo.height}
-                className="size-6"
+                className="size-8"
               />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
