@@ -43,14 +43,17 @@ export function useDataSources(params: DataSourceListParams = {}) {
 export function useSpaceDataSources(
   spaceId: string | null,
   params: Omit<DataSourceListParams, 'research_space_id'> = {},
+  options?: { enabled?: boolean },
 ) {
   const { data: session } = useSession()
   const token = session?.user?.access_token
+  const computedEnabled = !!token && !!spaceId
+  const enabled = options?.enabled ?? computedEnabled
 
   return useQuery({
     queryKey: dataSourceKeys.space(spaceId || '', params),
     queryFn: () => fetchDataSourcesBySpace(spaceId!, params, token),
-    enabled: !!token && !!spaceId,
+    enabled,
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
   })

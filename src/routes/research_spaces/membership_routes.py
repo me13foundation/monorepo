@@ -12,7 +12,7 @@ from src.application.services.membership_management_service import (
     UpdateMemberRoleRequest,
 )
 from src.domain.entities.research_space_membership import MembershipRole
-from src.domain.entities.user import User
+from src.domain.entities.user import User, UserRole
 from src.routes.auth import get_current_active_user
 from src.routes.research_spaces.dependencies import get_membership_service
 from src.routes.research_spaces.schemas import (
@@ -210,6 +210,29 @@ def get_my_membership(
     service: MembershipManagementService = Depends(get_membership_service),
 ) -> MembershipResponse:
     """Get the current user's membership for a space."""
+    # Platform admins have implicit admin membership for support tasks
+    if current_user.role == UserRole.ADMIN:
+        return MembershipResponse(
+            id=UUID(int=0),
+            space_id=space_id,
+            user_id=current_user.id,
+            role=MembershipRole.ADMIN.value,
+            invited_by=None,
+            invited_at=None,
+            joined_at=None,
+            is_active=True,
+            created_at=(
+                current_user.created_at.isoformat()
+                if hasattr(current_user, "created_at") and current_user.created_at
+                else ""
+            ),
+            updated_at=(
+                current_user.updated_at.isoformat()
+                if hasattr(current_user, "updated_at") and current_user.updated_at
+                else ""
+            ),
+        )
+
     membership = service.get_membership_for_user(space_id, current_user.id)
     if membership is None:
         raise HTTPException(

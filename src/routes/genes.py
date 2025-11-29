@@ -179,16 +179,18 @@ async def create_gene(
             )
 
         created_gene = service.create_gene(
-            symbol=gene.symbol,
-            name=gene.name,
-            description=gene.description,
-            gene_type=gene.gene_type.value,
-            chromosome=gene.chromosome,
-            start_position=gene.start_position,
-            end_position=gene.end_position,
-            ensembl_id=gene.ensembl_id,
-            ncbi_gene_id=gene.ncbi_gene_id,
-            uniprot_id=gene.uniprot_id,
+            {
+                "symbol": gene.symbol,
+                "name": gene.name,
+                "description": gene.description,
+                "gene_type": gene.gene_type.value,
+                "chromosome": gene.chromosome,
+                "start_position": gene.start_position,
+                "end_position": gene.end_position,
+                "ensembl_id": gene.ensembl_id,
+                "ncbi_gene_id": gene.ncbi_gene_id,
+                "uniprot_id": gene.uniprot_id,
+            },
         )
 
         return serialize_gene(created_gene)

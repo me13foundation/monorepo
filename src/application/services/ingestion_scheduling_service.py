@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Awaitable, Callable, Mapping  # noqa: UP035
 from uuid import UUID, uuid4
 
 from src.application.services.pubmed_discovery_service import (
@@ -17,17 +17,7 @@ from src.application.services.pubmed_discovery_service import (
     PubMedDiscoveryService,
     PubmedDownloadRequest,
 )
-from src.domain.entities.ingestion_job import (
-    IngestionError,
-    IngestionJob,
-    IngestionTrigger,
-    JobMetrics,
-)
-from src.domain.entities.user_data_source import (
-    ScheduleFrequency,
-    SourceType,
-    UserDataSource,
-)
+from src.domain.entities import ingestion_job, user_data_source
 from src.domain.services.storage_providers import StorageOperationError
 from src.models.value_objects.provenance import (
     DataSource as ProvenanceSource,
@@ -38,18 +28,14 @@ from src.models.value_objects.provenance import (
 from src.type_definitions.storage import StorageOperationRecord, StorageUseCase
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Mapping
-
     from src.application.services.ports.scheduler_port import (
         ScheduledJob,
         SchedulerPort,
     )
-    from src.domain.repositories.ingestion_job_repository import (
-        IngestionJobRepository,
-    )
-    from src.domain.repositories.storage_repository import StorageOperationRepository
-    from src.domain.repositories.user_data_source_repository import (
-        UserDataSourceRepository,
+    from src.domain.repositories import (
+        ingestion_job_repository,
+        storage_repository,
+        user_data_source_repository,
     )
     from src.domain.services.pubmed_ingestion import PubMedIngestionSummary
 
@@ -62,13 +48,18 @@ class IngestionSchedulingService:
     def __init__(  # noqa: PLR0913 - scheduler wiring requires explicit dependencies
         self,
         scheduler: SchedulerPort,
-        source_repository: UserDataSourceRepository,
-        job_repository: IngestionJobRepository,
+        source_repository: user_data_source_repository.UserDataSourceRepository,
+        job_repository: ingestion_job_repository.IngestionJobRepository,
         ingestion_services: Mapping[
-            SourceType,
-            Callable[[UserDataSource], Awaitable[PubMedIngestionSummary]],
+            user_data_source.SourceType,
+            Callable[
+                [user_data_source.UserDataSource],
+                Awaitable[PubMedIngestionSummary],
+            ],
         ],
-        storage_operation_repository: StorageOperationRepository | None = None,
+        storage_operation_repository: (
+            storage_repository.StorageOperationRepository | None
+        ) = None,
         pubmed_discovery_service: PubMedDiscoveryService | None = None,
         retry_batch_size: int = 25,
     ) -> None:
@@ -126,13 +117,16 @@ class IngestionSchedulingService:
 
     async def _execute_job(self, scheduled_job: ScheduledJob) -> None:
         source = self._get_source(scheduled_job.source_id)
-        if source.ingestion_schedule.frequency == ScheduleFrequency.MANUAL:
+        if (
+            source.ingestion_schedule.frequency
+            == user_data_source.ScheduleFrequency.MANUAL
+        ):
             return
         await self._run_ingestion_for_source(source)
 
     async def _run_ingestion_for_source(
         self,
-        source: UserDataSource,
+        source: user_data_source.UserDataSource,
     ) -> PubMedIngestionSummary:
         service = self._ingestion_services.get(source.source_type)
         if service is None:
@@ -143,7 +137,7 @@ class IngestionSchedulingService:
         running = self._job_repository.save(job.start_execution())
         try:
             summary = await service(source)
-            metrics = JobMetrics(
+            metrics = ingestion_job.JobMetrics(
                 records_processed=summary.created_publications
                 + summary.updated_publications,
                 records_failed=0,
@@ -155,7 +149,7 @@ class IngestionSchedulingService:
             )
             completed = running.complete_successfully(metrics)
         except Exception as exc:  # pragma: no cover - defensive
-            error = IngestionError(
+            error = ingestion_job.IngestionError(
                 error_type="scheduler_failure",
                 error_message=str(exc),
                 record_id=None,
@@ -171,11 +165,14 @@ class IngestionSchedulingService:
             self._update_schedule_after_run(updated_source)
             return summary
 
-    def _create_ingestion_job(self, source: UserDataSource) -> IngestionJob:
-        return IngestionJob(
+    def _create_ingestion_job(
+        self,
+        source: user_data_source.UserDataSource,
+    ) -> ingestion_job.IngestionJob:
+        return ingestion_job.IngestionJob(
             id=uuid4(),
             source_id=source.id,
-            trigger=IngestionTrigger.SCHEDULED,
+            trigger=ingestion_job.IngestionTrigger.SCHEDULED,
             triggered_by=None,
             started_at=None,
             completed_at=None,
@@ -191,14 +188,17 @@ class IngestionSchedulingService:
             source_config_snapshot=source.configuration.model_dump(),
         )
 
-    def _get_source(self, source_id: UUID) -> UserDataSource:
+    def _get_source(self, source_id: UUID) -> user_data_source.UserDataSource:
         source = self._source_repository.find_by_id(source_id)
         if source is None:
             msg = f"Data source {source_id} not found"
             raise ValueError(msg)
         return source
 
-    def _update_schedule_after_run(self, source: UserDataSource) -> None:
+    def _update_schedule_after_run(
+        self,
+        source: user_data_source.UserDataSource,
+    ) -> None:
         schedule = source.ingestion_schedule
         updates: dict[str, datetime | None] = {"last_run_at": datetime.now(UTC)}
         job_id = schedule.backend_job_id

@@ -14,10 +14,12 @@ from typing import TypeGuard, TypeVar
 
 from src.type_definitions.common import RawRecord  # noqa: TC001
 
-from ..normalizers.gene_normalizer import GeneNormalizer
-from ..normalizers.phenotype_normalizer import PhenotypeNormalizer
-from ..normalizers.publication_normalizer import PublicationNormalizer
-from ..normalizers.variant_normalizer import VariantNormalizer
+from ..normalizers import (
+    gene_normalizer,
+    phenotype_normalizer,
+    publication_normalizer,
+    variant_normalizer,
+)
 from ..parsers.clinvar_parser import ClinVarParser, ClinVarVariant
 from ..parsers.hpo_parser import HPOParser, HPOTerm
 from ..parsers.pubmed_parser import PubMedParser, PubMedPublication
@@ -116,10 +118,10 @@ class ETLTransformer:
             "uniprot": _build_parser_executor(UniProtParser(), UniProtProtein),
         }
 
-        self.gene_normalizer = GeneNormalizer()
-        self.variant_normalizer = VariantNormalizer()
-        self.phenotype_normalizer = PhenotypeNormalizer()
-        self.publication_normalizer = PublicationNormalizer()
+        self.gene_normalizer = gene_normalizer.GeneNormalizer()
+        self.variant_normalizer = variant_normalizer.VariantNormalizer()
+        self.phenotype_normalizer = phenotype_normalizer.PhenotypeNormalizer()
+        self.publication_normalizer = publication_normalizer.PublicationNormalizer()
 
         self._parsing_stage = ParsingStageRunner(self.parsers)
         self._normalization_stage = NormalizationStageRunner(

@@ -9,17 +9,15 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from src.application.services.audit_service import AuditTrailService
-from src.application.services.discovery_configuration_requests import (
-    CreatePubmedPresetRequest,
-)
-from src.application.services.discovery_configuration_service import (
+from src.application.services import (
+    AuditTrailService,
     DiscoveryConfigurationService,
-)
-from src.application.services.pubmed_discovery_service import (
     PubMedDiscoveryService,
     PubmedDownloadRequest,
     RunPubmedSearchRequest,
+)
+from src.application.services.discovery_configuration_requests import (
+    CreatePubmedPresetRequest,
 )
 from src.database.session import get_session
 from src.domain.entities.user import User

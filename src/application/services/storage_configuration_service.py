@@ -16,15 +16,7 @@ from src.domain.entities.storage_configuration import (
     StorageConfiguration,
     StorageHealthSnapshot,
 )
-from src.domain.services.storage_metrics import (
-    NoOpStorageMetricsRecorder,
-    StorageMetricsRecorder,
-)
-from src.domain.services.storage_providers import (
-    StoragePluginRegistry,
-    StorageProviderPlugin,
-    default_storage_registry,
-)
+from src.domain.services import storage_metrics, storage_providers
 from src.type_definitions.storage import (
     StorageConfigurationModel,
     StorageHealthReport,
@@ -38,15 +30,14 @@ from src.type_definitions.storage import (
     StorageUseCase,
 )
 
-from . import storage_configuration_workflows as config_workflows
-from .storage_configuration_validator import StorageConfigurationValidator
-from .storage_operation_recorder import (
-    record_store_operation as execute_store_operation,
+from . import (
+    storage_configuration_validator,
+    storage_operation_recorder,
+    storage_overview_builder,
 )
-from .storage_operation_recorder import (
-    record_test_metric,
+from . import (
+    storage_configuration_workflows as config_workflows,
 )
-from .storage_overview_builder import build_storage_overview
 
 if TYPE_CHECKING:
     from uuid import UUID
@@ -71,17 +62,25 @@ class StorageConfigurationService:
         self,
         configuration_repository: StorageConfigurationRepository,
         operation_repository: StorageOperationRepository,
-        plugin_registry: StoragePluginRegistry | None = None,
-        validator: StorageConfigurationValidator | None = None,
+        plugin_registry: storage_providers.StoragePluginRegistry | None = None,
+        validator: (
+            storage_configuration_validator.StorageConfigurationValidator | None
+        ) = None,
         system_status_service: SystemStatusService | None = None,
-        metrics_recorder: StorageMetricsRecorder | None = None,
+        metrics_recorder: storage_metrics.StorageMetricsRecorder | None = None,
     ):
         self._configuration_repository = configuration_repository
         self._operation_repository = operation_repository
-        self._plugin_registry = plugin_registry or default_storage_registry
-        self._validator = validator or StorageConfigurationValidator()
+        self._plugin_registry = (
+            plugin_registry or storage_providers.default_storage_registry
+        )
+        self._validator = (
+            validator or storage_configuration_validator.StorageConfigurationValidator()
+        )
         self._system_status_service = system_status_service
-        self._metrics_recorder = metrics_recorder or NoOpStorageMetricsRecorder()
+        self._metrics_recorder = (
+            metrics_recorder or storage_metrics.NoOpStorageMetricsRecorder()
+        )
 
     async def create_configuration(
         self,
@@ -212,7 +211,7 @@ class StorageConfigurationService:
             "latency_ms": result.latency_ms,
             "message": result.message,
         }
-        record_test_metric(
+        storage_operation_recorder.record_test_metric(
             configuration=configuration,
             recorder=self._metrics_recorder,
             status=(
@@ -238,7 +237,7 @@ class StorageConfigurationService:
         """Store a file using the provider and record the operation."""
 
         plugin = self._require_plugin(configuration.provider)
-        return await execute_store_operation(
+        return await storage_operation_recorder.record_store_operation(
             configuration=configuration,
             plugin=plugin,
             operation_repository=self._operation_repository,
@@ -301,7 +300,7 @@ class StorageConfigurationService:
         configurations = self._configuration_repository.list_configurations(
             include_disabled=True,
         )
-        return build_storage_overview(
+        return storage_overview_builder.build_storage_overview(
             configurations=configurations,
             operation_repository=self._operation_repository,
             serializer=self._to_model,
@@ -310,7 +309,7 @@ class StorageConfigurationService:
     def _require_plugin(
         self,
         provider: StorageProviderName,
-    ) -> StorageProviderPlugin:
+    ) -> storage_providers.StorageProviderPlugin:
         plugin = self._plugin_registry.get(provider)
         if plugin is None:
             msg = f"No storage provider plugin registered for {provider.value}"

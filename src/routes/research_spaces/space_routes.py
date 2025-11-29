@@ -168,7 +168,7 @@ def update_space(
             tags=request.tags,
             status=status_enum,
         )
-        space = service.update_space(space_id, update_request, current_user.id)
+        space = service.update_space(space_id, update_request, current_user)
         if not space:
             raise HTTPException(
                 status_code=HTTP_404_NOT_FOUND,

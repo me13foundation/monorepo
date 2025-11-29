@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -44,6 +44,17 @@ SEVERITY_SCORE_MIN = 1
 SEVERITY_SCORE_MAX = 5
 
 
+class LongitudinalObservation(BaseModel):
+    """A point-in-time observation of a phenotype for Natural History."""
+
+    date_observed: date
+    age_at_onset_months: int | None = None
+    severity_score: int = Field(ge=SEVERITY_SCORE_MIN, le=SEVERITY_SCORE_MAX)
+    source: str  # e.g. "Parent Report", "Clinician", "Simons Searchlight"
+
+    model_config = ConfigDict(frozen=True)
+
+
 class Phenotype(BaseModel):
     identifier: PhenotypeIdentifier
     name: str
@@ -57,6 +68,12 @@ class Phenotype(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     id: int | None = None
+
+    # Natural History & AI Fields
+    observations: list[LongitudinalObservation] = Field(default_factory=list)
+    digital_biomarkers: list[str] = Field(
+        default_factory=list,
+    )  # IDs/Links to biomarker data
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -123,8 +140,12 @@ class Phenotype(BaseModel):
         self.parent_hpo_id = parent_hpo_id
         self._touch()
 
+    def add_observation(self, observation: LongitudinalObservation) -> None:
+        self.observations.append(observation)
+        self._touch()
+
     def _touch(self) -> None:
         self.updated_at = datetime.now(UTC)
 
 
-__all__ = ["Phenotype", "PhenotypeCategory"]
+__all__ = ["LongitudinalObservation", "Phenotype", "PhenotypeCategory"]

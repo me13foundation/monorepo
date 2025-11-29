@@ -31,21 +31,10 @@ from src.application.dto.auth_responses import (
     UserPublic,
     ValidationErrorResponse,
 )
-from src.application.services.authentication_service import (
-    AccountInactiveError,
-    AccountLockedError,
-    AuthenticationError,
-    AuthenticationService,
-    InvalidCredentialsError,
-)
-from src.application.services.authorization_service import (
-    AuthorizationError,
-    AuthorizationService,
-)
-from src.application.services.user_management_service import (
-    UserAlreadyExistsError,
-    UserManagementError,
-    UserManagementService,
+from src.application.services import (
+    authentication_service,
+    authorization_service,
+    user_management_service,
 )
 from src.domain.entities.user import User, UserRole, UserStatus
 from src.domain.value_objects.permission import Permission
@@ -107,7 +96,7 @@ async def list_routes() -> RouteListResponse:
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(security),
-    auth_service: AuthenticationService = Depends(
+    auth_service: authentication_service.AuthenticationService = Depends(
         get_authentication_service_dependency,
     ),
 ) -> User:
@@ -149,7 +138,7 @@ async def get_current_user(
     try:
         user = await auth_service.validate_token(credentials.credentials)
         return user
-    except AuthenticationError as e:
+    except authentication_service.AuthenticationError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(e),
@@ -171,14 +160,16 @@ async def get_current_active_user(
 async def require_permission(
     permission: str,
     current_user: User = Depends(get_current_active_user),
-    authz_service: AuthorizationService = Depends(container.get_authorization_service),
+    authz_service: authorization_service.AuthorizationService = Depends(
+        container.get_authorization_service,
+    ),
 ) -> User:
     try:
         # Convert string to Permission enum
         perm_enum = Permission(permission)
         await authz_service.require_permission(current_user.id, perm_enum)
         return current_user
-    except (ValueError, AuthorizationError):
+    except (ValueError, authorization_service.AuthorizationError):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Permission denied: {permission}",
@@ -213,7 +204,7 @@ async def require_role(
 async def login(
     request: LoginRequest,
     http_request: Request,
-    auth_service: AuthenticationService = Depends(
+    auth_service: authentication_service.AuthenticationService = Depends(
         get_authentication_service_dependency,
     ),
 ) -> LoginResponse:
@@ -229,23 +220,23 @@ async def login(
             user_agent=user_agent,
         )
         return response
-    except InvalidCredentialsError:
+    except authentication_service.InvalidCredentialsError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except AccountLockedError as e:
+    except authentication_service.AccountLockedError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e),
         )
-    except AccountInactiveError as e:
+    except authentication_service.AccountInactiveError as e:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=str(e),
         )
-    except AuthenticationError as e:
+    except authentication_service.AuthenticationError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Authentication failed: {e!s}",
@@ -260,12 +251,14 @@ async def login(
 )
 async def refresh_token(
     refresh_token: str,
-    auth_service: AuthenticationService = Depends(container.get_authentication_service),
+    auth_service: authentication_service.AuthenticationService = Depends(
+        container.get_authentication_service,
+    ),
 ) -> TokenRefreshResponse:
     try:
         response = await auth_service.refresh_token(refresh_token)
         return response
-    except AuthenticationError:
+    except authentication_service.AuthenticationError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid refresh token",
@@ -280,12 +273,14 @@ async def refresh_token(
 )
 async def logout(
     current_user: User = Depends(get_current_user),
-    auth_service: AuthenticationService = Depends(container.get_authentication_service),
+    auth_service: authentication_service.AuthenticationService = Depends(
+        container.get_authentication_service,
+    ),
 ) -> GenericSuccessResponse:
     try:
         # TODO: Get token from request and revoke it via service
         return GenericSuccessResponse(message="Logged out successfully")
-    except AuthenticationError:
+    except authentication_service.AuthenticationError:
         # Even if logout fails, we return success for security
         return GenericSuccessResponse(message="Logged out successfully")
 
@@ -327,11 +322,11 @@ async def register_user(
         return GenericSuccessResponse(
             message="User registered successfully. Please check your email for verification instructions.",
         )
-    except UserAlreadyExistsError as e:
+    except user_management_service.UserAlreadyExistsError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except UserManagementError as e:
+    except user_management_service.UserManagementError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Registration failed: {e!s}",
@@ -364,7 +359,7 @@ async def get_current_user_profile(
 async def update_user_profile(
     request: UpdateProfileRequest,
     current_user: User = Depends(get_current_active_user),
-    user_service: UserManagementService = Depends(
+    user_service: user_management_service.UserManagementService = Depends(
         container.get_user_management_service,
     ),
 ) -> UserProfileResponse:
@@ -381,7 +376,7 @@ async def update_user_profile(
         )
 
         return UserProfileResponse(user=UserPublic.from_user(updated_user))
-    except UserManagementError as e:
+    except user_management_service.UserManagementError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
@@ -394,7 +389,7 @@ async def update_user_profile(
 async def change_password(
     request: ChangePasswordRequest,
     current_user: User = Depends(get_current_active_user),
-    user_service: UserManagementService = Depends(
+    user_service: user_management_service.UserManagementService = Depends(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
@@ -410,7 +405,7 @@ async def change_password(
         return GenericSuccessResponse(message="Password changed successfully")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except UserManagementError as e:
+    except user_management_service.UserManagementError as e:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
 
 
@@ -423,7 +418,7 @@ async def change_password(
 async def forgot_password(
     request: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
-    user_service: UserManagementService = Depends(
+    user_service: user_management_service.UserManagementService = Depends(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
@@ -435,7 +430,7 @@ async def forgot_password(
         return GenericSuccessResponse(
             message=f"Password reset email sent to {masked_email}",
         )
-    except UserManagementError:
+    except user_management_service.UserManagementError:
         # Don't reveal if email exists or not for security
         return GenericSuccessResponse(
             message="If the email exists, a password reset link has been sent.",
@@ -450,7 +445,7 @@ async def forgot_password(
 )
 async def reset_password(
     request: ResetPasswordRequest,
-    user_service: UserManagementService = Depends(
+    user_service: user_management_service.UserManagementService = Depends(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
@@ -463,7 +458,7 @@ async def reset_password(
         return GenericSuccessResponse(message="Password reset successfully")
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except UserManagementError:
+    except user_management_service.UserManagementError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired reset token",
@@ -478,14 +473,14 @@ async def reset_password(
 )
 async def verify_email(
     token: str,
-    user_service: UserManagementService = Depends(
+    user_service: user_management_service.UserManagementService = Depends(
         container.get_user_management_service,
     ),
 ) -> GenericSuccessResponse:
     try:
         await user_service.verify_email(token)
         return GenericSuccessResponse(message="Email verified successfully")
-    except UserManagementError:
+    except user_management_service.UserManagementError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification token",

@@ -1,69 +1,83 @@
 # MED13 Resource Library - SQLAlchemy Database Models
 # Strongly typed database entities with relationships and constraints
 
-from .audit import AuditLog
-from .base import Base
-
-# Data Discovery models
-from .data_discovery import (
-    DataDiscoverySessionModel,
-    QueryTestResultModel,
-    SourceCatalogEntryModel,
-)
-from .data_source_activation import (
-    ActivationScopeEnum,
-    DataSourceActivationModel,
-)
-from .evidence import EvidenceLevel, EvidenceModel, EvidenceType
-from .gene import GeneModel, GeneType
-from .ingestion_job import (
-    IngestionJobModel,
-)
-from .ingestion_job import (
-    IngestionStatusEnum as IngestionStatus,
-)
-from .ingestion_job import (
-    IngestionTriggerEnum as IngestionTrigger,
-)
-from .phenotype import PhenotypeCategory, PhenotypeModel
-from .publication import PublicationModel, PublicationType
-from .research_space import (
-    MembershipRoleEnum,
-    ResearchSpaceMembershipModel,
-    ResearchSpaceModel,
-    SpaceStatusEnum,
-)
-from .review import ReviewRecord
-from .source_template import (
-    SourceTemplateModel,
-    SourceTypeEnum,
-)
-from .source_template import (
-    TemplateCategoryEnum as TemplateCategory,
-)
-from .storage import (
-    StorageConfigurationModel,
-    StorageHealthSnapshotModel,
-    StorageHealthStatusEnum,
-    StorageOperationModel,
-    StorageOperationStatusEnum,
-    StorageOperationTypeEnum,
-    StorageProviderEnum,
-)
-from .system_status import SystemStatusModel
-from .user import UserModel
-from .user_data_source import (
-    SourceStatusEnum as SourceStatus,
-)
-from .user_data_source import (
-    SourceTypeEnum as SourceType,
+from . import (
+    audit,
+    base,
+    data_discovery,
+    data_source_activation,
+    evidence,
+    gene,
+    ingestion_job,
+    phenotype,
+    publication,
+    research_space,
+    review,
+    source_template,
+    storage,
+    system_status,
+    user,
+    user_data_source,
+    variant,
 )
 
-# Data Sources module models
-from .user_data_source import (
-    UserDataSourceModel,
-)
-from .variant import ClinicalSignificance, VariantModel, VariantType
+AuditLog = audit.AuditLog
+Base = base.Base
+
+DataDiscoverySessionModel = data_discovery.DataDiscoverySessionModel
+QueryTestResultModel = data_discovery.QueryTestResultModel
+SourceCatalogEntryModel = data_discovery.SourceCatalogEntryModel
+
+ActivationScopeEnum = data_source_activation.ActivationScopeEnum
+DataSourceActivationModel = data_source_activation.DataSourceActivationModel
+
+EvidenceLevel = evidence.EvidenceLevel
+EvidenceModel = evidence.EvidenceModel
+EvidenceType = evidence.EvidenceType
+
+GeneModel = gene.GeneModel
+GeneType = gene.GeneType
+
+IngestionJobModel = ingestion_job.IngestionJobModel
+IngestionStatus = ingestion_job.IngestionStatusEnum
+IngestionTrigger = ingestion_job.IngestionTriggerEnum
+
+PhenotypeCategory = phenotype.PhenotypeCategory
+PhenotypeModel = phenotype.PhenotypeModel
+
+PublicationModel = publication.PublicationModel
+PublicationType = publication.PublicationType
+
+MembershipRoleEnum = research_space.MembershipRoleEnum
+ResearchSpaceMembershipModel = research_space.ResearchSpaceMembershipModel
+ResearchSpaceModel = research_space.ResearchSpaceModel
+SpaceStatusEnum = research_space.SpaceStatusEnum
+
+ReviewRecord = review.ReviewRecord
+
+SourceTemplateModel = source_template.SourceTemplateModel
+SourceTypeEnum = source_template.SourceTypeEnum
+TemplateCategory = source_template.TemplateCategoryEnum
+
+StorageConfigurationModel = storage.StorageConfigurationModel
+StorageHealthSnapshotModel = storage.StorageHealthSnapshotModel
+StorageHealthStatusEnum = storage.StorageHealthStatusEnum
+StorageOperationModel = storage.StorageOperationModel
+StorageOperationStatusEnum = storage.StorageOperationStatusEnum
+StorageOperationTypeEnum = storage.StorageOperationTypeEnum
+StorageProviderEnum = storage.StorageProviderEnum
+
+SystemStatusModel = system_status.SystemStatusModel
+
+UserModel = user.UserModel
+
+SourceStatus = user_data_source.SourceStatusEnum
+SourceType = user_data_source.SourceTypeEnum
+UserDataSourceModel = user_data_source.UserDataSourceModel
+
+ClinicalSignificance = variant.ClinicalSignificance
+VariantModel = variant.VariantModel
+VariantType = variant.VariantType
 
 __all__ = [
     "AuditLog",

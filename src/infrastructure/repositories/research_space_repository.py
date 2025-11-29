@@ -45,8 +45,26 @@ class SqlAlchemyResearchSpaceRepository(ResearchSpaceRepositoryInterface):
 
     def save(self, space: ResearchSpace) -> ResearchSpace:
         """Save a research space to the repository."""
-        model = ResearchSpaceMapper.to_model(space)
-        self.session.add(model)
+        existing_model: ResearchSpaceModel | None = self.session.get(
+            ResearchSpaceModel,
+            space.id,
+        )
+
+        if existing_model is None:
+            model = ResearchSpaceMapper.to_model(space)
+            self.session.add(model)
+        else:
+            # Update existing row in place to avoid duplicate primary keys
+            existing_model.slug = space.slug
+            existing_model.name = space.name
+            existing_model.description = space.description
+            existing_model.owner_id = str(space.owner_id)
+            existing_model.status = space.status.value
+            existing_model.settings = space.settings
+            existing_model.tags = space.tags
+            existing_model.updated_at = space.updated_at
+            model = existing_model
+
         self.session.commit()
         self.session.refresh(model)
         domain_space = ResearchSpaceMapper.to_domain(model)

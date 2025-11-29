@@ -1,21 +1,56 @@
 """API route definitions for the MED13 Resource Library."""
 
-from .evidence import router as evidence_router
-from .export import router as export_router
-from .genes import router as genes_router
-from .health import router as health_router
-from .phenotypes import router as phenotypes_router
-from .resources import router as resources_router
-from .search import router as search_router
-from .variants import router as variants_router
+from . import (
+    admin,
+    auth,
+    curation,
+    dashboard,
+    data_discovery,
+    evidence,
+    export,
+    genes,
+    health,
+    phenotypes,
+    research_space_discovery,
+    research_spaces,
+    resources,
+    search,
+    users,
+    variants,
+)
+
+admin_router = admin.router
+auth_router = auth.auth_router
+curation_router = curation.router
+dashboard_router = dashboard.router
+data_discovery_router = data_discovery.router
+evidence_router = evidence.router
+export_router = export.router
+genes_router = genes.router
+health_router = health.router
+phenotypes_router = phenotypes.router
+research_space_discovery_router = research_space_discovery.router
+research_spaces_router = research_spaces.research_spaces_router
+resources_router = resources.router
+search_router = search.router
+users_router = users.users_router
+variants_router = variants.router
 
 __all__ = [
+    "admin_router",
+    "auth_router",
+    "curation_router",
+    "dashboard_router",
+    "data_discovery_router",
     "evidence_router",
     "export_router",
     "genes_router",
     "health_router",
     "phenotypes_router",
+    "research_space_discovery_router",
+    "research_spaces_router",
     "resources_router",
     "search_router",
+    "users_router",
     "variants_router",
 ]

@@ -35,45 +35,51 @@ export function GlobalHeader({ currentSpace }: GlobalHeaderProps) {
   }, [pathname, currentSpace])
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-4">
+    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 sm:px-4">
       {/* Sidebar toggle and breadcrumbs */}
-      <div className="flex flex-1 items-center gap-2">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 h-4" />
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
+        <SidebarTrigger className="-ml-1 shrink-0" />
+        <Separator orientation="vertical" className="mr-1 h-4 shrink-0 sm:mr-2" />
 
         {/* Breadcrumbs */}
-        <nav aria-label="Breadcrumb" className="flex items-center">
-          <ol className="flex items-center gap-1.5 text-sm">
-            {breadcrumbs.map((item, index) => (
-              <React.Fragment key={item.label}>
-                {index > 0 && (
-                  <li aria-hidden="true">
-                    <ChevronRight className="size-3.5 text-muted-foreground" />
-                  </li>
-                )}
-                <li>
-                  {item.href && !item.isCurrent ? (
-                    <Link
-                      href={item.href}
-                      className="text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span
-                      className={
-                        item.isCurrent
-                          ? "font-medium text-foreground"
-                          : "text-muted-foreground"
-                      }
-                      aria-current={item.isCurrent ? "page" : undefined}
-                    >
-                      {item.label}
-                    </span>
+        <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center">
+          <ol className="flex min-w-0 items-center gap-1 text-sm sm:gap-1.5">
+            {breadcrumbs.map((item, index) => {
+              // Hide intermediate breadcrumbs on mobile, show only first and last
+              const isIntermediate = index > 0 && index < breadcrumbs.length - 1
+              const shouldHideOnMobile = isIntermediate && breadcrumbs.length > 2
+
+              return (
+                <React.Fragment key={item.label}>
+                  {index > 0 && (
+                    <li aria-hidden="true" className="shrink-0">
+                      <ChevronRight className="size-3.5 text-muted-foreground" />
+                    </li>
                   )}
-                </li>
-              </React.Fragment>
-            ))}
+                  <li className={shouldHideOnMobile ? "hidden sm:block" : "min-w-0"}>
+                    {item.href && !item.isCurrent ? (
+                      <Link
+                        href={item.href}
+                        className="truncate text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <span
+                        className={
+                          item.isCurrent
+                            ? "truncate font-medium text-foreground"
+                            : "truncate text-muted-foreground"
+                        }
+                        aria-current={item.isCurrent ? "page" : undefined}
+                      >
+                        {item.label}
+                      </span>
+                    )}
+                  </li>
+                </React.Fragment>
+              )
+            })}
           </ol>
         </nav>
       </div>
@@ -97,8 +103,8 @@ export function GlobalHeader({ currentSpace }: GlobalHeaderProps) {
       </div>
 
       {/* Right: Actions */}
-      <div className="flex flex-1 items-center justify-end gap-2">
-        <Button variant="ghost" size="icon" className="size-9">
+      <div className="flex shrink-0 items-center justify-end gap-1.5 sm:gap-2">
+        <Button variant="ghost" size="icon" className="size-8 sm:size-9">
           <Bell className="size-4" />
           <span className="sr-only">Notifications</span>
         </Button>

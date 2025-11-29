@@ -13,19 +13,10 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict
 
-from src.application.services.pubmed_query_builder import (  # noqa: TC001
-    PubMedQueryBuilder,
-)
-from src.application.services.storage_operation_coordinator import (
-    StorageOperationCoordinator,  # noqa: TC001
-)
-from src.domain.entities.data_discovery_parameters import (
-    AdvancedQueryParameters,  # noqa: TC001
-)
-from src.domain.entities.discovery_preset import DiscoveryProvider  # noqa: TC001
-from src.domain.entities.discovery_search_job import (
-    DiscoverySearchJob,  # noqa: TC001
-    DiscoverySearchStatus,
+from src.domain.entities import (
+    data_discovery_parameters,
+    discovery_preset,
+    discovery_search_job,
 )
 from src.domain.repositories.data_discovery_repository import (
     DiscoverySearchJobRepository,  # noqa: TC001
@@ -37,6 +28,10 @@ from src.domain.services.pubmed_search import (
 from src.type_definitions.storage import StorageOperationRecord, StorageUseCase
 
 if TYPE_CHECKING:
+    from src.application.services.pubmed_query_builder import PubMedQueryBuilder
+    from src.application.services.storage_operation_coordinator import (
+        StorageOperationCoordinator,
+    )
     from src.type_definitions.common import JSONObject
 
 logger = logging.getLogger(__name__)
@@ -55,7 +50,7 @@ class RunPubmedSearchRequest(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     session_id: UUID | None = None
-    parameters: AdvancedQueryParameters
+    parameters: data_discovery_parameters.AdvancedQueryParameters
 
 
 class PubmedDownloadRequest(BaseModel):
@@ -86,18 +81,18 @@ class PubMedDiscoveryService:
         self,
         owner_id: UUID,
         request: RunPubmedSearchRequest,
-    ) -> DiscoverySearchJob:
+    ) -> discovery_search_job.DiscoverySearchJob:
         """Validate parameters, persist a job, and execute the search."""
 
         self._query_builder.validate(request.parameters)
         query_preview = self._query_builder.build_query(request.parameters)
         now = datetime.now(UTC)
-        job = DiscoverySearchJob(
+        job = discovery_search_job.DiscoverySearchJob(
             id=uuid4(),
             owner_id=owner_id,
             session_id=request.session_id,
-            provider=DiscoveryProvider.PUBMED,
-            status=DiscoverySearchStatus.QUEUED,
+            provider=discovery_preset.DiscoveryProvider.PUBMED,
+            status=discovery_search_job.DiscoverySearchStatus.QUEUED,
             query_preview=query_preview,
             parameters=request.parameters,
             total_results=0,
@@ -109,7 +104,7 @@ class PubMedDiscoveryService:
 
         running_job = job.model_copy(
             update={
-                "status": DiscoverySearchStatus.RUNNING,
+                "status": discovery_search_job.DiscoverySearchStatus.RUNNING,
                 "updated_at": datetime.now(UTC),
             },
         )
@@ -120,7 +115,7 @@ class PubMedDiscoveryService:
         except Exception as exc:  # pragma: no cover - defensive logging upstream
             failed_job = running_job.model_copy(
                 update={
-                    "status": DiscoverySearchStatus.FAILED,
+                    "status": discovery_search_job.DiscoverySearchStatus.FAILED,
                     "error_message": str(exc),
                     "updated_at": datetime.now(UTC),
                 },
@@ -144,7 +139,7 @@ class PubMedDiscoveryService:
             }
             completed = running_job.model_copy(
                 update={
-                    "status": DiscoverySearchStatus.COMPLETED,
+                    "status": discovery_search_job.DiscoverySearchStatus.COMPLETED,
                     "total_results": payload.total_count,
                     "result_metadata": metadata,
                     "completed_at": datetime.now(UTC),
@@ -168,7 +163,7 @@ class PubMedDiscoveryService:
         self,
         owner_id: UUID,
         job_id: UUID,
-    ) -> DiscoverySearchJob | None:
+    ) -> discovery_search_job.DiscoverySearchJob | None:
         """Return a search job if it belongs to the requesting owner."""
 
         job = self._job_repository.get(job_id)
@@ -187,7 +182,7 @@ class PubMedDiscoveryService:
         if job is None:
             msg = "Search job not found"
             raise ValueError(msg)
-        if job.status != DiscoverySearchStatus.COMPLETED:
+        if job.status != discovery_search_job.DiscoverySearchStatus.COMPLETED:
             msg = "Search job is not completed"
             raise ValueError(msg)
 
@@ -264,7 +259,7 @@ class PubMedDiscoveryService:
     @staticmethod
     def _build_pdf_metadata(
         *,
-        job: DiscoverySearchJob,
+        job: discovery_search_job.DiscoverySearchJob,
         owner_id: UUID,
         article_id: str,
     ) -> JSONObject:

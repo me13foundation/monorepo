@@ -4,7 +4,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
@@ -63,57 +63,62 @@ class VariantSearchResponse(BaseModel):
     filters: QueryFilters | None
 
 
+class VariantListParams(BaseModel):
+    page: int = Field(1, ge=1, description="Page number")
+    per_page: int = Field(20, ge=1, le=100, description="Items per page")
+    search: str | None = Field(None, description="Search by variant ID or HGVS")
+    sort_by: str = Field("variant_id", description="Sort field")
+    sort_order: str = Field("asc", pattern="^(asc|desc)$", description="Sort order")
+    gene_id: str | None = Field(None, description="Filter by gene ID")
+    clinical_significance: str | None = Field(
+        None,
+        description="Filter by clinical significance",
+    )
+    variant_type: str | None = Field(None, description="Filter by variant type")
+
+    model_config = {"extra": "ignore"}
+
+
 @router.get(
     "/",
     summary="List variants",
     response_model=PaginatedResponse[VariantResponse],
 )
 async def get_variants(
-    page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    search: str | None = Query(None, description="Search by variant ID or HGVS"),
-    sort_by: str = Query("variant_id", description="Sort field"),
-    sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
-    gene_id: str | None = Query(None, description="Filter by gene ID"),
-    clinical_significance: str
-    | None = Query(
-        None,
-        description="Filter by clinical significance",
-    ),
-    variant_type: str | None = Query(None, description="Filter by variant type"),
+    params: VariantListParams = Depends(),
     service: "VariantApplicationService" = Depends(get_variant_service),
 ) -> PaginatedResponse[VariantResponse]:
     try:
         # Build filters dictionary
         filters_payload: QueryFilters = {}
-        if gene_id:
-            filters_payload["gene_id"] = gene_id
-        if clinical_significance:
-            filters_payload["clinical_significance"] = clinical_significance
-        if variant_type:
-            filters_payload["variant_type"] = variant_type
+        if params.gene_id:
+            filters_payload["gene_id"] = params.gene_id
+        if params.clinical_significance:
+            filters_payload["clinical_significance"] = params.clinical_significance
+        if params.variant_type:
+            filters_payload["variant_type"] = params.variant_type
 
         filters_arg = filters_payload or None
 
         variants, total = service.list_variants(
-            page=page,
-            per_page=per_page,
-            sort_by=sort_by,
-            sort_order=sort_order,
+            page=params.page,
+            per_page=params.per_page,
+            sort_by=params.sort_by,
+            sort_order=params.sort_order,
             filters=filters_arg,
         )
 
         variant_responses = [serialize_variant(variant) for variant in variants]
 
-        total_pages = (total + per_page - 1) // per_page
+        total_pages = (total + params.per_page - 1) // params.per_page
         return PaginatedResponse(
             items=variant_responses,
             total=total,
-            page=page,
-            per_page=per_page,
+            page=params.page,
+            per_page=params.per_page,
             total_pages=total_pages,
-            has_next=page < total_pages,
-            has_prev=page > 1,
+            has_next=params.page < total_pages,
+            has_prev=params.page > 1,
         )
     except Exception as e:
         raise HTTPException(

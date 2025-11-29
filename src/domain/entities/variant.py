@@ -13,6 +13,7 @@ from pydantic import (
 )
 
 from src.domain.value_objects.identifiers import GeneIdentifier, VariantIdentifier
+from src.domain.value_objects.protein_structure import ProteinDomain  # noqa: TC001
 
 
 class VariantType:
@@ -61,6 +62,29 @@ class ClinicalSignificance:
         return normalized
 
 
+class InSilicoScores(BaseModel):
+    """Computational predictions of variant pathogenicity."""
+
+    cadd_phred: float | None = None
+    revel_score: float | None = None
+    primateai_score: float | None = None
+    splice_ai_score: float | None = None
+    alpha_missense_score: float | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ProteinStructuralAnnotation(BaseModel):
+    """Structural impact annotations for a variant."""
+
+    affected_domains: list[ProteinDomain] = Field(default_factory=list)
+    distance_to_interface: float | None = None  # Angstroms
+    predicted_stability_change: float | None = None  # DeltaDeltaG
+    alphafold_confidence: float | None = None  # pLDDT score at variant position
+
+    model_config = ConfigDict(frozen=True)
+
+
 CHROMOSOME_PATTERN = re.compile(r"^(chr)?[0-9XYM]+$", re.IGNORECASE)
 
 
@@ -94,6 +118,13 @@ class Variant(BaseModel):
     clinical_significance: str = Field(
         default=ClinicalSignificance.NOT_PROVIDED,
     )
+
+    # Mechanism & AI Fields
+    structural_annotation: ProteinStructuralAnnotation | None = None
+    in_silico_scores: InSilicoScores | None = None
+    predicted_mechanism: str | None = None  # e.g. "LoF", "GainOfFunction"
+    mechanism_confidence: float | None = None
+
     gene_identifier: GeneIdentifier | None = None
     gene_database_id: int | None = None
     hgvs_genomic: str | None = None
@@ -306,6 +337,8 @@ class Variant(BaseModel):
 __all__ = [
     "ClinicalSignificance",
     "EvidenceSummary",
+    "InSilicoScores",
+    "ProteinStructuralAnnotation",
     "Variant",
     "VariantSummary",
     "VariantType",

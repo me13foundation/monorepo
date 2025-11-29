@@ -38,11 +38,15 @@ export function SidebarWrapper({ children, initialSpaces, initialTotal }: Sideba
 
   // Extract current space from URL if we're in a space context
   const spaceIdFromUrl = extractSpaceIdFromPath(pathname)
+  const isValidSpaceId = Boolean(spaceIdFromUrl && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spaceIdFromUrl))
   const spaces = spacesData?.spaces ?? []
   const currentSpace = spaceIdFromUrl
     ? spaces.find((s) => s.id === spaceIdFromUrl) ?? null
     : null
-  const { data: membership } = useSpaceMembership(spaceIdFromUrl ?? null, session?.user?.id ?? null)
+  const { data: membership } = useSpaceMembership(
+    isValidSpaceId ? spaceIdFromUrl : null,
+    session?.user?.id ?? null
+  )
 
   // Build user info for sidebar
   const userInfo: SidebarUserInfo | null = React.useMemo(() => {

@@ -12,6 +12,15 @@ Validates that components follow the Server-Side Orchestration pattern:
 - ✅ No client-side data fetching in components
 - ✅ Business logic stays in Python Domain Services
 
+### `single-responsibility.test.ts`
+Validates that components follow the Single Responsibility Principle:
+- ✅ Component size limits (max 300 lines)
+- ✅ Prop complexity limits (max 10 props)
+- ✅ Import count limits (max 15 imports)
+- ✅ Hook usage limits (max 8 hooks)
+- ✅ Handler count limits (max 10 handlers)
+- ✅ Detects components that may be doing too much
+
 ### `helpers.ts`
 Test utilities for architectural validation:
 - Component pattern validation
@@ -26,6 +35,7 @@ npm test -- __tests__/architecture
 
 # Run specific test file
 npm test -- server-side-orchestration.test.tsx
+npm test -- single-responsibility.test.ts
 
 # Run with coverage
 npm test -- --coverage __tests__/architecture
@@ -43,6 +53,7 @@ See `../integration/` for:
 2. **Dumb Components**: Components receive data as props, don't fetch data
 3. **Backend as Source of Truth**: All business logic in Python Domain Services
 4. **Type Safety**: Full type synchronization between frontend and backend
+5. **Single Responsibility Principle**: Components should be focused and not exceed size/complexity thresholds
 
 ## Adding New Tests
 

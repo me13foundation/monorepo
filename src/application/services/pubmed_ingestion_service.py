@@ -8,13 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from src.domain.entities.data_source_configs import PubMedQueryConfig
-from src.domain.entities.publication import Publication  # noqa: TCH001
-from src.domain.entities.user_data_source import (
-    SourceConfiguration,
-    SourceType,
-    UserDataSource,
-)
+from src.domain.entities import data_source_configs, publication, user_data_source
 from src.domain.services.pubmed_ingestion import PubMedGateway, PubMedIngestionSummary
 from src.domain.transform.transformers.pubmed_record_transformer import (
     PubMedRecordTransformer,
@@ -50,7 +44,10 @@ class PubMedIngestionService:
         self._transformer = transformer or PubMedRecordTransformer()
         self._storage_service = storage_service
 
-    async def ingest(self, source: UserDataSource) -> PubMedIngestionSummary:
+    async def ingest(
+        self,
+        source: user_data_source.UserDataSource,
+    ) -> PubMedIngestionSummary:
         """Execute ingestion for a PubMed data source."""
         self._assert_source_type(source)
         config = self._build_config(source.configuration)
@@ -75,7 +72,7 @@ class PubMedIngestionService:
     async def _persist_raw_records(
         self,
         records: Iterable[RawRecord],
-        source: UserDataSource,
+        source: user_data_source.UserDataSource,
     ) -> None:
         """Persist raw records to storage if backend is available."""
         if not self._storage_service:
@@ -113,8 +110,11 @@ class PubMedIngestionService:
             if tmp_path.exists():
                 tmp_path.unlink()
 
-    def _transform_records(self, records: Iterable[RawRecord]) -> list[Publication]:
-        transformed: list[Publication] = []
+    def _transform_records(
+        self,
+        records: Iterable[RawRecord],
+    ) -> list[publication.Publication]:
+        transformed: list[publication.Publication] = []
         for record in records:
             try:
                 publication = self._transformer.to_publication(record)
@@ -125,25 +125,27 @@ class PubMedIngestionService:
 
     def _persist_publications(
         self,
-        publications: Iterable[Publication],
+        publications: Iterable[publication.Publication],
     ) -> tuple[int, int]:
         created = 0
         updated = 0
-        for publication in publications:
-            pmid = publication.identifier.pubmed_id
+        for publication_record in publications:
+            pmid = publication_record.identifier.pubmed_id
             if pmid and (existing := self._publication_repository.find_by_pmid(pmid)):
                 if existing.id is None:
                     continue
-                updates = self._build_update_payload(publication)
+                updates = self._build_update_payload(publication_record)
                 self._publication_repository.update_publication(existing.id, updates)
                 updated += 1
             else:
-                self._publication_repository.create(publication)
+                self._publication_repository.create(publication_record)
                 created += 1
         return created, updated
 
     @staticmethod
-    def _build_update_payload(publication: Publication) -> PublicationUpdate:
+    def _build_update_payload(
+        publication: publication.Publication,
+    ) -> PublicationUpdate:
         return {
             "title": publication.title,
             "authors": list(publication.authors),
@@ -155,13 +157,15 @@ class PubMedIngestionService:
         }
 
     @staticmethod
-    def _build_config(configuration: SourceConfiguration) -> PubMedQueryConfig:
+    def _build_config(
+        configuration: user_data_source.SourceConfiguration,
+    ) -> data_source_configs.PubMedQueryConfig:
         metadata: SourceMetadata = dict(configuration.metadata or {})
-        return PubMedQueryConfig.model_validate(metadata)
+        return data_source_configs.PubMedQueryConfig.model_validate(metadata)
 
     @staticmethod
-    def _assert_source_type(source: UserDataSource) -> None:
-        if source.source_type != SourceType.PUBMED:
+    def _assert_source_type(source: user_data_source.UserDataSource) -> None:
+        if source.source_type != user_data_source.SourceType.PUBMED:
             message = (
                 f"PubMed ingestion can only be executed for PubMed sources "
                 f"(got {source.source_type.value})"

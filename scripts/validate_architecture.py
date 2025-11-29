@@ -11,14 +11,19 @@ Validates codebase against architectural standards defined in:
 
 This script checks for:
 1. Type safety violations (Any, cast usage)
-2. Clean Architecture layer violations
-3. Single Responsibility Principle violations
-4. Monolithic code patterns
-5. Import dependency violations
+2. JSON type usage (dict[str, Any] -> JSONObject/JSONValue)
+3. Update type usage (plain dict -> TypedDict classes)
+4. Test fixture usage (plain dicts -> typed fixtures)
+5. API response types (routes -> ApiResponse/PaginatedResponse)
+6. Clean Architecture layer violations
+7. Single Responsibility Principle violations
+8. Monolithic code patterns
+9. Import dependency violations
 """
 
 import ast
 import json
+import logging
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,6 +31,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+logger = logging.getLogger(__name__)
 
 from typing import TYPE_CHECKING
 
@@ -87,6 +94,12 @@ WARNING_FILE_SIZE = 500  # Files approaching limit
 # Complexity thresholds
 MAX_FUNCTION_COMPLEXITY = 50  # Cyclomatic complexity
 MAX_CLASS_METHODS = 30  # Methods per class
+
+# Single Responsibility Principle thresholds
+MAX_IMPORTS_PER_FILE = 20  # Too many imports = too many responsibilities
+MAX_FUNCTION_PARAMETERS = 7  # Functions with many params often do too much
+WARNING_IMPORTS_PER_FILE = 15  # Files approaching limit
+
 ARCHITECTURE_OVERRIDES_FILE = "architecture_overrides.json"
 
 
@@ -245,6 +258,41 @@ class ArchitectureOverrides:
         return overrides
 
 
+def _ast_to_string(node: ast.AST) -> str:
+    """Convert AST node to string representation."""
+    if hasattr(ast, "unparse"):
+        try:
+            return ast.unparse(node)
+        except Exception:  # pragma: no cover - fallback
+            logger.debug(
+                "AST unparse failed; falling back to manual conversion",
+                exc_info=True,
+            )
+
+    # Fallback for Python < 3.9 or when unparse fails
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Constant):
+        return str(node.value)
+    if isinstance(node, ast.Subscript):
+        value_str = _ast_to_string(node.value)
+        if hasattr(node, "slice"):
+            if isinstance(node.slice, ast.Index):  # Python < 3.9
+                slice_str = _ast_to_string(node.slice.value)
+            else:
+                slice_str = _ast_to_string(node.slice)
+        else:
+            slice_str = ""
+        return f"{value_str}[{slice_str}]"
+    if isinstance(node, ast.Attribute):
+        return f"{_ast_to_string(node.value)}.{node.attr}"
+    if isinstance(node, ast.Call):
+        func_str = _ast_to_string(node.func)
+        return f"{func_str}(...)"
+    # For complex nodes, return a simplified representation
+    return str(type(node).__name__)
+
+
 class ArchitectureValidator:
     """Validates codebase against architectural standards."""
 
@@ -273,8 +321,8 @@ class ArchitectureValidator:
             return python_files
 
         for py_file in src_path.rglob("*.py"):
-            # Skip __pycache__ and test files
-            if "__pycache__" in str(py_file) or "test_" in py_file.name:
+            # Skip __pycache__ but include test files for fixture validation
+            if "__pycache__" in str(py_file):
                 continue
             python_files.append(py_file)
 
@@ -295,11 +343,27 @@ class ArchitectureValidator:
             # Check for type safety violations
             self._check_type_safety(tree, relative_path, content)
 
+            # Check for type_examples.md pattern compliance
+            self._check_json_type_usage(tree, relative_path, content)
+            self._check_update_type_usage(tree, relative_path, content)
+
+            # Check test files for typed fixture usage
+            if "test_" in relative_path or "/tests/" in relative_path:
+                self._check_test_fixture_usage(tree, relative_path, content)
+
+            # Check route files for API response types
+            if "/routes/" in relative_path:
+                self._check_api_response_types(tree, relative_path, content)
+
             # Check for layer violations
             self._check_layer_violations(tree, relative_path)
 
             # Check for complexity violations
             self._check_complexity(tree, relative_path)
+
+            # Check for SRP violations (import count, parameter count)
+            self._check_import_count(tree, relative_path)
+            self._check_function_parameters(tree, relative_path)
 
         except SyntaxError as e:
             self.result.violations.append(
@@ -357,13 +421,13 @@ class ArchitectureValidator:
 
     def _check_type_safety(
         self,
-        tree: ast.AST,
+        _tree: ast.AST,
         file_path: str,
         content: str,
     ) -> None:
         """Check for type safety violations (Any, cast)."""
         # Check for Any usage
-        for node in ast.walk(tree):
+        for node in ast.walk(_tree):
             if (
                 isinstance(node, ast.ImportFrom)
                 and node.module == "typing"
@@ -541,6 +605,303 @@ class ArchitectureValidator:
                 complexity += len(child.values) - 1
 
         return complexity
+
+    def _check_import_count(self, tree: ast.AST, file_path: str) -> None:
+        """Check if file has too many imports (indicates multiple responsibilities)."""
+        imports = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+        ]
+
+        if len(imports) > MAX_IMPORTS_PER_FILE:
+            self.result.violations.append(
+                Violation(
+                    file_path=file_path,
+                    line_number=0,
+                    violation_type="import_count",
+                    message=(
+                        f"File has too many imports ({len(imports)} > {MAX_IMPORTS_PER_FILE}). "
+                        "May indicate multiple responsibilities. "
+                        "Consider splitting into smaller, focused modules."
+                    ),
+                    severity="error",
+                ),
+            )
+        elif len(imports) > WARNING_IMPORTS_PER_FILE:
+            self.result.violations.append(
+                Violation(
+                    file_path=file_path,
+                    line_number=0,
+                    violation_type="import_count",
+                    message=(
+                        f"File has many imports ({len(imports)} > {WARNING_IMPORTS_PER_FILE}). "
+                        "Consider reviewing if the file has multiple responsibilities."
+                    ),
+                    severity="warning",
+                ),
+            )
+
+    def _check_function_parameters(self, tree: ast.AST, file_path: str) -> None:
+        """Check if functions have too many parameters."""
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                # Count parameters (including self/cls for methods)
+                # Note: Methods will have self/cls, so effective param count is len - 1
+                param_count = len(node.args.args)
+
+                # Check if it's a method (has self/cls as first param)
+                is_method = (
+                    param_count > 0
+                    and isinstance(node.args.args[0].arg, str)
+                    and node.args.args[0].arg in ("self", "cls")
+                )
+
+                # Effective parameter count (excluding self/cls for methods)
+                effective_params = param_count - 1 if is_method else param_count
+
+                if effective_params > MAX_FUNCTION_PARAMETERS:
+                    self.result.violations.append(
+                        Violation(
+                            file_path=file_path,
+                            line_number=node.lineno,
+                            violation_type="parameter_count",
+                            message=(
+                                f"Function '{node.name}' has too many parameters "
+                                f"({effective_params} > {MAX_FUNCTION_PARAMETERS}). "
+                                "Consider using a parameter object or splitting responsibilities."
+                            ),
+                            severity="warning",
+                        ),
+                    )
+
+    def _check_json_type_usage(
+        self,
+        _tree: ast.AST,
+        file_path: str,
+        content: str,
+    ) -> None:
+        """Check for dict[str, Any] usage and suggest JSONObject/JSONValue."""
+        lines = content.splitlines()
+
+        for i, line in enumerate(lines, start=1):
+            # Skip comments and strings
+            if "#" in line or '"' in line or "'" in line:
+                # Check if it's a comment-only line
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                # Check if Any is inside a string
+                if '"' in line or "'" in line:
+                    continue
+
+            # Check for dict[str, Any] or Dict[str, Any] patterns
+            if (
+                "dict[str, Any]" in line or "Dict[str, Any]" in line
+            ) and file_path not in ALLOWED_ANY_USAGE:
+                self.result.violations.append(
+                    Violation(
+                        file_path=file_path,
+                        line_number=i,
+                        violation_type="json_type_usage",
+                        message=(
+                            "Use of 'dict[str, Any]' violates type safety policy. "
+                            "Use 'JSONObject' or 'JSONValue' from src.type_definitions.common instead. "
+                            "See docs/type_examples.md for examples."
+                        ),
+                        severity="error",
+                    ),
+                )
+
+            # Check for dict[str, Any] in type annotations
+            if (
+                (":" in line or "->" in line)
+                and file_path not in ALLOWED_ANY_USAGE
+                and ("dict[str, Any]" in line or "Dict[str, Any]" in line)
+            ):
+                self.result.violations.append(
+                    Violation(
+                        file_path=file_path,
+                        line_number=i,
+                        violation_type="json_type_usage",
+                        message=(
+                            "Use of 'dict[str, Any]' in type annotation violates type safety policy. "
+                            "Use 'JSONObject' or 'JSONValue' from src.type_definitions.common instead."
+                        ),
+                        severity="error",
+                    ),
+                )
+
+    def _check_update_type_usage(
+        self,
+        tree: ast.AST,
+        file_path: str,
+        content: str,  # noqa: ARG002 - content unused, kept for symmetry
+    ) -> None:
+        """Check that update operations use TypedDict classes like GeneUpdate."""
+        # Known update TypedDict classes
+        update_types = {
+            "GeneUpdate",
+            "VariantUpdate",
+            "PhenotypeUpdate",
+            "EvidenceUpdate",
+            "PublicationUpdate",
+        }
+
+        # Check for function definitions with "update" in name
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and "update" in node.name.lower()
+            ):
+                for arg in node.args.args:
+                    if arg.annotation:
+                        annotation_str = _ast_to_string(arg.annotation)
+                        uses_plain_dict = (
+                            "dict" in annotation_str.lower()
+                            and not any(
+                                update_type in annotation_str
+                                for update_type in update_types
+                            )
+                            and "JSONObject" not in annotation_str
+                        )
+                        likely_update_param = (
+                            "update" in annotation_str.lower()
+                            or arg.arg.lower() in ("updates", "update", "data")
+                        )
+                        if uses_plain_dict and likely_update_param:
+                            self.result.violations.append(
+                                Violation(
+                                    file_path=file_path,
+                                    line_number=node.lineno,
+                                    violation_type="update_type_usage",
+                                    message=(
+                                        f"Update operation '{node.name}' should use TypedDict classes "
+                                        f"(GeneUpdate, VariantUpdate, etc.) instead of plain dict. "
+                                        "See docs/type_examples.md for examples."
+                                    ),
+                                    severity="warning",
+                                ),
+                            )
+
+    def _check_test_fixture_usage(
+        self,
+        tree: ast.AST,
+        file_path: str,
+        content: str,
+    ) -> None:
+        """Check that test files use typed fixtures from tests.test_types."""
+        lines = content.splitlines()
+
+        # Check if file imports from test_types
+        has_test_types_import = any(
+            isinstance(node, ast.ImportFrom)
+            and node.module
+            and "test_types" in node.module
+            for node in ast.walk(tree)
+        )
+
+        # Check for plain dict usage in test data creation
+        for i, line in enumerate(lines, start=1):
+            # Look for patterns like: test_data = {"key": "value"}
+            # or: gene = {"gene_id": ...}
+            if (
+                "=" in line
+                and "{" in line
+                and "}" in line
+                and "(" not in line.split("=")[0]
+                and not line.strip().startswith("#")
+                and any(token in line.lower() for token in ("test_", "gene", "variant"))
+                and any(
+                    pattern in line.lower()
+                    for pattern in [
+                        "gene_id",
+                        "variant_id",
+                        "phenotype_id",
+                        "evidence_id",
+                        "publication_id",
+                    ]
+                )
+                and not has_test_types_import
+            ):
+                self.result.violations.append(
+                    Violation(
+                        file_path=file_path,
+                        line_number=i,
+                        violation_type="test_fixture_usage",
+                        message=(
+                            "Test file should use typed fixtures from tests.test_types.fixtures "
+                            "instead of plain dictionaries. See docs/type_examples.md for examples."
+                        ),
+                        severity="warning",
+                    ),
+                )
+
+    def _check_api_response_types(
+        self,
+        tree: ast.AST,
+        file_path: str,
+        content: str,  # noqa: ARG002 - retained for call consistency
+    ) -> None:
+        """Check that route endpoints return ApiResponse or PaginatedResponse."""
+        # Check for route decorators
+        route_functions: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
+
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for decorator in node.decorator_list:
+                    decorator_str = _ast_to_string(decorator)
+                    if any(
+                        method in decorator_str
+                        for method in [
+                            "@router.get",
+                            "@router.post",
+                            "@router.put",
+                            "@router.delete",
+                            "@router.patch",
+                        ]
+                    ):
+                        route_functions.append(node)
+                        break
+
+        # Check if file imports ApiResponse or PaginatedResponse
+        has_api_response_import = False
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and (
+                    "ApiResponse" in str(node.names)
+                    or "PaginatedResponse" in str(node.names)
+                )
+            ):
+                has_api_response_import = True
+                break
+
+        # Check return type annotations for route functions
+        for func in route_functions:
+            if func.returns:
+                return_annotation = _ast_to_string(func.returns)
+
+                # Check if return type uses ApiResponse or PaginatedResponse
+                missing_response_types = (
+                    "ApiResponse" not in return_annotation
+                    and "PaginatedResponse" not in return_annotation
+                    and "dict" not in return_annotation.lower()
+                )
+                if missing_response_types and has_api_response_import:
+                    self.result.violations.append(
+                        Violation(
+                            file_path=file_path,
+                            line_number=func.lineno,
+                            violation_type="api_response_type",
+                            message=(
+                                f"Route function '{func.name}' should return ApiResponse or PaginatedResponse. "
+                                "See docs/type_examples.md for examples."
+                            ),
+                            severity="warning",
+                        ),
+                    )
 
     def _allows_file_size_override(self, file_path: str, lines: int) -> bool:
         """Return True when file size is within the documented override."""

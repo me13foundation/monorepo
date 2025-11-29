@@ -7,54 +7,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import TYPE_CHECKING
 
-from src.models.api.common import (
-    ActivityFeedItem,
-    DashboardSummary,
-    GeneSummary,
-    PhenotypeSummary,
-    PublicationSummary,
-    VariantLinkSummary,
-)
-from src.models.api.evidence import (
-    EvidenceLevel as ApiEvidenceLevel,
-)
-from src.models.api.evidence import (
-    EvidenceResponse,
-    EvidenceSummaryResponse,
-)
-from src.models.api.evidence import (
-    EvidenceType as ApiEvidenceType,
-)
-from src.models.api.gene import (
-    GenePhenotypeSummary,
-    GeneResponse,
-)
-from src.models.api.gene import (
-    GeneType as ApiGeneType,
-)
-from src.models.api.phenotype import (
-    PhenotypeCategory as ApiPhenotypeCategory,
-)
-from src.models.api.phenotype import (
-    PhenotypeResponse,
-)
-from src.models.api.publication import (
-    AuthorInfo,
-    PublicationResponse,
-)
-from src.models.api.publication import (
-    PublicationType as ApiPublicationType,
-)
-from src.models.api.variant import (
-    ClinicalSignificance as ApiClinicalSignificance,
-)
-from src.models.api.variant import (
-    VariantResponse,
-    VariantSummaryResponse,
-)
-from src.models.api.variant import (
-    VariantType as ApiVariantType,
-)
+from src.models.api import common as api_common
+from src.models.api import evidence as evidence_api
+from src.models.api import gene as gene_api
+from src.models.api import phenotype as phenotype_api
+from src.models.api import publication as publication_api
+from src.models.api import variant as variant_api
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -64,6 +22,34 @@ if TYPE_CHECKING:
     from src.domain.entities.phenotype import Phenotype
     from src.domain.entities.publication import Publication
     from src.domain.entities.variant import EvidenceSummary, Variant, VariantSummary
+
+ActivityFeedItem = api_common.ActivityFeedItem
+DashboardSummary = api_common.DashboardSummary
+GeneSummary = api_common.GeneSummary
+PhenotypeSummary = api_common.PhenotypeSummary
+PublicationSummary = api_common.PublicationSummary
+VariantLinkSummary = api_common.VariantLinkSummary
+
+ApiEvidenceLevel = evidence_api.EvidenceLevel
+EvidenceResponse = evidence_api.EvidenceResponse
+EvidenceSummaryResponse = evidence_api.EvidenceSummaryResponse
+ApiEvidenceType = evidence_api.EvidenceType
+
+GenePhenotypeSummary = gene_api.GenePhenotypeSummary
+GeneResponse = gene_api.GeneResponse
+ApiGeneType = gene_api.GeneType
+
+ApiPhenotypeCategory = phenotype_api.PhenotypeCategory
+PhenotypeResponse = phenotype_api.PhenotypeResponse
+
+AuthorInfo = publication_api.AuthorInfo
+PublicationResponse = publication_api.PublicationResponse
+ApiPublicationType = publication_api.PublicationType
+
+ApiClinicalSignificance = variant_api.ClinicalSignificance
+VariantResponse = variant_api.VariantResponse
+VariantSummaryResponse = variant_api.VariantSummaryResponse
+ApiVariantType = variant_api.VariantType
 
 
 def serialize_variant_summary(summary: VariantSummary) -> VariantSummaryResponse:

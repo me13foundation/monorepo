@@ -6,8 +6,7 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.background.ingestion_scheduler import run_ingestion_scheduler_loop
-from src.background.session_cleanup import run_session_cleanup_loop
+from src.background import run_ingestion_scheduler_loop, run_session_cleanup_loop
 from src.database.seed import (
     ensure_default_research_space_seeded,
     ensure_source_catalog_seeded,
@@ -19,30 +18,30 @@ from src.infrastructure.dependency_injection.container import container
 from src.infrastructure.dependency_injection.dependencies import (
     initialize_legacy_session,
 )
-from src.middleware.auth import AuthMiddleware
-from src.middleware.jwt_auth import JWTAuthMiddleware
-from src.middleware.maintenance_mode import MaintenanceModeMiddleware
-from src.middleware.rate_limit import EndpointRateLimitMiddleware
-from src.routes.admin import router as admin_router
-from src.routes.auth import auth_router
-from src.routes.curation import router as curation_router
-from src.routes.dashboard import router as dashboard_router
-from src.routes.data_discovery import router as data_discovery_router
-from src.routes.evidence import router as evidence_router
-from src.routes.export import router as export_router
-from src.routes.genes import router as genes_router
-from src.routes.health import router as health_router
-from src.routes.phenotypes import router as phenotypes_router
-
-# Import models to ensure they're registered with SQLAlchemy
-from src.routes.research_space_discovery import (
-    router as research_space_discovery_router,
+from src.middleware import (
+    AuthMiddleware,
+    EndpointRateLimitMiddleware,
+    JWTAuthMiddleware,
+    MaintenanceModeMiddleware,
 )
-from src.routes.research_spaces import research_spaces_router
-from src.routes.resources import router as resources_router
-from src.routes.search import router as search_router
-from src.routes.users import users_router
-from src.routes.variants import router as variants_router
+from src.routes import (
+    admin_router,
+    auth_router,
+    curation_router,
+    dashboard_router,
+    data_discovery_router,
+    evidence_router,
+    export_router,
+    genes_router,
+    health_router,
+    phenotypes_router,
+    research_space_discovery_router,
+    research_spaces_router,
+    resources_router,
+    search_router,
+    users_router,
+    variants_router,
+)
 from src.type_definitions.common import JSONObject
 
 

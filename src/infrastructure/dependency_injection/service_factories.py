@@ -6,73 +6,50 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from src.application.curation.repositories.review_repository import (
-    SqlAlchemyReviewRepository,
-)
-from src.application.curation.services.curation_service import CurationService
+from src.application.curation import CurationService, SqlAlchemyReviewRepository
 from src.application.export.export_service import BulkExportService
 from src.application.search.search_service import UnifiedSearchService
-from src.application.services.dashboard_service import DashboardService
-from src.application.services.data_discovery_service import DataDiscoveryService
-from src.application.services.data_source_activation_service import (
+from src.application.services import (
+    DashboardService,
+    DataDiscoveryService,
     DataSourceActivationService,
-)
-from src.application.services.discovery_configuration_service import (
     DiscoveryConfigurationService,
-)
-from src.application.services.evidence_service import EvidenceApplicationService
-from src.application.services.gene_service import GeneApplicationService
-from src.application.services.phenotype_service import PhenotypeApplicationService
-from src.application.services.publication_service import PublicationApplicationService
-from src.application.services.pubmed_discovery_service import PubMedDiscoveryService
-from src.application.services.pubmed_query_builder import PubMedQueryBuilder
-from src.application.services.source_management_service import SourceManagementService
-from src.application.services.storage_configuration_service import (
+    EvidenceApplicationService,
+    GeneApplicationService,
+    PhenotypeApplicationService,
+    PublicationApplicationService,
+    PubMedDiscoveryService,
+    PubMedQueryBuilder,
+    SourceManagementService,
     StorageConfigurationService,
-)
-from src.application.services.storage_operation_coordinator import (
     StorageOperationCoordinator,
+    VariantApplicationService,
 )
-from src.application.services.variant_service import VariantApplicationService
-from src.domain.services.evidence_domain_service import EvidenceDomainService
-from src.domain.services.gene_domain_service import GeneDomainService
-from src.domain.services.variant_domain_service import VariantDomainService
-from src.infrastructure.data_sources.pubmed_search_gateway import (
+from src.domain.services import (
+    EvidenceDomainService,
+    GeneDomainService,
+    VariantDomainService,
+)
+from src.infrastructure.data_sources import (
     DeterministicPubMedSearchGateway,
     SimplePubMedPdfGateway,
 )
 from src.infrastructure.queries.source_query_client import HTTPQueryClient
-from src.infrastructure.repositories.data_discovery_repository_impl import (
+from src.infrastructure.repositories import (
     SQLAlchemyDataDiscoverySessionRepository,
+    SqlAlchemyDataSourceActivationRepository,
     SQLAlchemyDiscoveryPresetRepository,
     SQLAlchemyDiscoverySearchJobRepository,
+    SqlAlchemyEvidenceRepository,
+    SqlAlchemyGeneRepository,
+    SqlAlchemyPhenotypeRepository,
+    SqlAlchemyPublicationRepository,
     SQLAlchemyQueryTestResultRepository,
     SQLAlchemySourceCatalogRepository,
-)
-from src.infrastructure.repositories.data_source_activation_repository import (
-    SqlAlchemyDataSourceActivationRepository,
-)
-from src.infrastructure.repositories.evidence_repository import (
-    SqlAlchemyEvidenceRepository,
-)
-from src.infrastructure.repositories.gene_repository import SqlAlchemyGeneRepository
-from src.infrastructure.repositories.phenotype_repository import (
-    SqlAlchemyPhenotypeRepository,
-)
-from src.infrastructure.repositories.publication_repository import (
-    SqlAlchemyPublicationRepository,
-)
-from src.infrastructure.repositories.source_template_repository import (
     SqlAlchemySourceTemplateRepository,
-)
-from src.infrastructure.repositories.storage_repository import (
     SqlAlchemyStorageConfigurationRepository,
     SqlAlchemyStorageOperationRepository,
-)
-from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
-)
-from src.infrastructure.repositories.variant_repository import (
     SqlAlchemyVariantRepository,
 )
 

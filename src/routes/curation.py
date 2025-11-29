@@ -7,22 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from src.application.curation.repositories.audit_repository import (
-    SqlAlchemyAuditRepository,
-)
-from src.application.curation.repositories.review_repository import (
-    SqlAlchemyReviewRepository,
-)
-from src.application.curation.services.approval_service import ApprovalService
-from src.application.curation.services.comment_service import CommentService
-from src.application.curation.services.detail_service import CurationDetailService
-from src.application.curation.services.review_service import (
+from src.application.curation import (
+    ApprovalService,
+    CommentService,
+    CurationDetailService,
     ReviewQuery,
     ReviewQueueItem,
     ReviewService,
+    SqlAlchemyAuditRepository,
+    SqlAlchemyReviewRepository,
 )
-from src.application.services.audit_service import AuditTrailService
-from src.application.services.authorization_service import AuthorizationService
+from src.application.services import AuditTrailService, AuthorizationService
 from src.database.session import get_session
 from src.domain.entities.user import User
 from src.domain.value_objects.permission import Permission
@@ -73,6 +68,16 @@ class ReviewQueueItemResponse(BaseModel):
     last_updated: datetime | None
 
 
+class CurationQueueParams(BaseModel):
+    entity_type: str | None = Field(default=None)
+    status: str | None = Field(default=None)
+    priority: str | None = Field(default=None)
+    limit: int = Field(default=100, ge=1, le=1000)
+    offset: int = Field(default=0, ge=0)
+
+    model_config = {"extra": "ignore"}
+
+
 def _review_service() -> ReviewService:
     return ReviewService(SqlAlchemyReviewRepository())
 
@@ -111,11 +116,7 @@ async def _require_permission(
 
 @router.get("/queue", response_model=list[ReviewQueueItemResponse])
 async def list_queue(
-    entity_type: str | None = None,
-    status: str | None = None,
-    priority: str | None = None,
-    limit: int = 100,
-    offset: int = 0,
+    params: CurationQueueParams = Depends(),
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_active_user),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
@@ -129,11 +130,11 @@ async def list_queue(
     results: list[ReviewQueueItem] = service.list_queue(
         db,
         ReviewQuery(
-            entity_type=entity_type,
-            status=status,
-            priority=priority,
-            limit=limit,
-            offset=offset,
+            entity_type=params.entity_type,
+            status=params.status,
+            priority=params.priority,
+            limit=params.limit,
+            offset=params.offset,
         ),
     )
     return [

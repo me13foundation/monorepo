@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
@@ -25,6 +25,22 @@ from src.type_definitions.common import (
     JSONObject,
     QueryFilters,
 )
+
+
+class EvidenceQueryParams(BaseModel):
+    page: int = Field(1, ge=1, description="Page number")
+    per_page: int = Field(20, ge=1, le=100, description="Items per page")
+    search: str | None = Field(None, description="Search in description or summary")
+    sort_by: str = Field("created_at", description="Sort field")
+    sort_order: str = Field("desc", pattern="^(asc|desc)$", description="Sort order")
+    variant_id: str | None = Field(None, description="Filter by variant ID")
+    phenotype_id: str | None = Field(None, description="Filter by phenotype ID")
+    evidence_level: str | None = Field(None, description="Filter by evidence level")
+    evidence_type: str | None = Field(None, description="Filter by evidence type")
+    reviewed: bool | None = Field(None, description="Filter by review status")
+
+    model_config = {"extra": "ignore"}
+
 
 if TYPE_CHECKING:
     from src.application.services.evidence_service import EvidenceApplicationService
@@ -136,38 +152,29 @@ def get_evidence_service(
     response_model=PaginatedResponse[EvidenceResponse],
 )
 async def get_evidence(
-    page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    search: str | None = Query(None, description="Search in description or summary"),
-    sort_by: str = Query("created_at", description="Sort field"),
-    sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order"),
-    variant_id: str | None = Query(None, description="Filter by variant ID"),
-    phenotype_id: str | None = Query(None, description="Filter by phenotype ID"),
-    evidence_level: str | None = Query(None, description="Filter by evidence level"),
-    evidence_type: str | None = Query(None, description="Filter by evidence type"),
-    reviewed: bool | None = Query(None, description="Filter by review status"),
+    params: EvidenceQueryParams = Depends(),
     service: "EvidenceApplicationService" = Depends(get_evidence_service),
 ) -> PaginatedResponse[EvidenceResponse]:
     filters_payload: QueryFilters = {}
-    if variant_id is not None:
-        filters_payload["variant_id"] = variant_id
-    if phenotype_id is not None:
-        filters_payload["phenotype_id"] = phenotype_id
-    if evidence_level is not None:
-        filters_payload["evidence_level"] = evidence_level
-    if evidence_type is not None:
-        filters_payload["evidence_type"] = evidence_type
-    if reviewed is not None:
-        filters_payload["reviewed"] = reviewed
+    if params.variant_id is not None:
+        filters_payload["variant_id"] = params.variant_id
+    if params.phenotype_id is not None:
+        filters_payload["phenotype_id"] = params.phenotype_id
+    if params.evidence_level is not None:
+        filters_payload["evidence_level"] = params.evidence_level
+    if params.evidence_type is not None:
+        filters_payload["evidence_type"] = params.evidence_type
+    if params.reviewed is not None:
+        filters_payload["reviewed"] = params.reviewed
 
     filter_arg = filters_payload or None
 
     try:
         evidence_list, total = service.list_evidence(
-            page=page,
-            per_page=per_page,
-            sort_by=sort_by,
-            sort_order=sort_order,
+            page=params.page,
+            per_page=params.per_page,
+            sort_by=params.sort_by,
+            sort_order=params.sort_order,
             filters=filter_arg,
         )
 
@@ -175,15 +182,15 @@ async def get_evidence(
             serialize_evidence(evidence) for evidence in evidence_list
         ]
 
-        total_pages = (total + per_page - 1) // per_page
+        total_pages = (total + params.per_page - 1) // params.per_page
         return PaginatedResponse(
             items=evidence_responses,
             total=total,
-            page=page,
-            per_page=per_page,
+            page=params.page,
+            per_page=params.per_page,
             total_pages=total_pages,
-            has_next=page < total_pages,
-            has_prev=page > 1,
+            has_next=params.page < total_pages,
+            has_prev=params.page > 1,
         )
     except Exception as e:
         raise HTTPException(

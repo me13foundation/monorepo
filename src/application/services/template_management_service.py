@@ -7,6 +7,8 @@ usage tracking, and community template management.
 
 from uuid import UUID, uuid4
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from src.domain.entities.source_template import (
     SourceTemplate,
     TemplateCategory,
@@ -22,54 +24,35 @@ MAX_TAGS = 10
 MAX_TAG_LENGTH = 50
 
 
-class CreateTemplateRequest:
+class CreateTemplateRequest(BaseModel):
     """Request model for creating a new template."""
 
-    def __init__(  # noqa: PLR0913 - explicit fields; boolean kept keyword-friendly in future DTO
-        self,
-        creator_id: UUID,
-        name: str,
-        description: str,
-        category: TemplateCategory,
-        source_type: SourceType,
-        schema_definition: JSONObject,
-        validation_rules: list[ValidationRule] | None = None,
-        ui_config: TemplateUIConfig | None = None,
-        tags: list[str] | None = None,
-        is_public: bool = False,  # noqa: FBT001, FBT002
-    ):
-        self.creator_id = creator_id
-        self.name = name
-        self.description = description
-        self.category = category
-        self.source_type = source_type
-        self.schema_definition = schema_definition
-        self.validation_rules = validation_rules or []
-        self.ui_config = ui_config or TemplateUIConfig()
-        self.tags = tags or []
-        self.is_public = is_public
+    creator_id: UUID
+    name: str = Field(max_length=TEMPLATE_NAME_MAX_LEN)
+    description: str
+    category: TemplateCategory
+    source_type: SourceType
+    schema_definition: JSONObject
+    validation_rules: list[ValidationRule] = Field(default_factory=list)
+    ui_config: TemplateUIConfig = Field(default_factory=TemplateUIConfig)
+    tags: list[str] = Field(default_factory=list)
+    is_public: bool = False  # noqa: FBT001, FBT002
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-class UpdateTemplateRequest:
+class UpdateTemplateRequest(BaseModel):
     """Request model for updating a template."""
 
-    def __init__(  # noqa: PLR0913 - explicit request fields
-        self,
-        name: str | None = None,
-        description: str | None = None,
-        category: TemplateCategory | None = None,
-        schema_definition: JSONObject | None = None,
-        validation_rules: list[ValidationRule] | None = None,
-        ui_config: TemplateUIConfig | None = None,
-        tags: list[str] | None = None,
-    ):
-        self.name = name
-        self.description = description
-        self.category = category
-        self.schema_definition = schema_definition
-        self.validation_rules = validation_rules
-        self.ui_config = ui_config
-        self.tags = tags
+    name: str | None = Field(default=None, max_length=TEMPLATE_NAME_MAX_LEN)
+    description: str | None = None
+    category: TemplateCategory | None = None
+    schema_definition: JSONObject | None = None
+    validation_rules: list[ValidationRule] | None = None
+    ui_config: TemplateUIConfig | None = None
+    tags: list[str] | None = None
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class TemplateManagementService:

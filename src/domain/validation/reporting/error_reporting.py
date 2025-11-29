@@ -55,6 +55,19 @@ class ErrorSummary:
     critical_issues: list[ErrorReport] = field(default_factory=list)
 
 
+@dataclass
+class ErrorRecordInput:
+    entity_type: str
+    entity_id: str | None
+    field: str
+    rule: str
+    message: str
+    severity: ValidationSeverity = ValidationSeverity.ERROR
+    suggestion: str | None = None
+    context: JSONObject | None = None
+    source: str = "validation"
+
+
 class ErrorReporter:
     """Minimal error reporter with typed summaries."""
 
@@ -66,32 +79,21 @@ class ErrorReporter:
     # Recording
     # ------------------------------------------------------------------ #
 
-    def add_error(
-        self,
-        entity_type: str,
-        entity_id: str | None,
-        field: str,
-        rule: str,
-        message: str,
-        severity: ValidationSeverity = ValidationSeverity.ERROR,
-        suggestion: str | None = None,
-        context: JSONObject | None = None,
-        source: str = "validation",
-    ) -> ErrorReport:
+    def add_error(self, error: ErrorRecordInput) -> ErrorReport:
         report = ErrorReport(
             error_id=self._next_id(),
-            category=self._categorise(rule, message),
-            priority=self._priority_for(severity),
-            severity=severity,
-            entity_type=entity_type,
-            entity_id=entity_id,
-            field=field,
-            rule=rule,
-            message=message,
-            suggestion=suggestion,
-            context=context or {},
+            category=self._categorise(error.rule, error.message),
+            priority=self._priority_for(error.severity),
+            severity=error.severity,
+            entity_type=error.entity_type,
+            entity_id=error.entity_id,
+            field=error.field,
+            rule=error.rule,
+            message=error.message,
+            suggestion=error.suggestion,
+            context=error.context or {},
             timestamp=datetime.now(UTC),
-            source=source,
+            source=error.source,
         )
         self._errors.append(report)
         return report

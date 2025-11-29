@@ -9,6 +9,7 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.database.session import get_session
@@ -28,6 +29,22 @@ from src.models.api import (
 )
 from src.routes.serializers import serialize_phenotype
 from src.type_definitions.common import PhenotypeUpdate as PhenotypeUpdatePayload
+
+
+class PhenotypeListParams(BaseModel):
+    page: int = Field(1, ge=1, description="Page number")
+    per_page: int = Field(20, ge=1, le=100, description="Items per page")
+    search: str | None = Field(
+        None,
+        description="Search by HPO term, name, or synonyms",
+    )
+    sort_by: str = Field("name", description="Sort field")
+    sort_order: str = Field("asc", pattern="^(asc|desc)$", description="Sort order")
+    category: str | None = Field(None, description="Filter by category")
+    is_root_term: bool | None = Field(None, description="Filter by root terms")
+
+    model_config = {"extra": "ignore"}
+
 
 if TYPE_CHECKING:
     from src.application.services.phenotype_service import PhenotypeApplicationService
@@ -92,34 +109,24 @@ def get_phenotype_service(
     response_model=PaginatedResponse[PhenotypeResponse],
 )
 async def get_phenotypes(
-    page: int = Query(1, ge=1, description="Page number"),
-    per_page: int = Query(20, ge=1, le=100, description="Items per page"),
-    search: str
-    | None = Query(
-        None,
-        description="Search by HPO term, name, or synonyms",
-    ),
-    sort_by: str = Query("name", description="Sort field"),
-    sort_order: str = Query("asc", pattern="^(asc|desc)$", description="Sort order"),
-    category: str | None = Query(None, description="Filter by category"),
-    is_root_term: bool | None = Query(None, description="Filter by root terms"),
+    params: PhenotypeListParams = Depends(),
     service: "PhenotypeApplicationService" = Depends(get_phenotype_service),
 ) -> PaginatedResponse[PhenotypeResponse]:
     """
     Retrieve a paginated list of phenotypes with optional search and filters.
     """
     filters = {
-        "category": category,
-        "is_root_term": is_root_term,
+        "category": params.category,
+        "is_root_term": params.is_root_term,
     }
     filters = {k: v for k, v in filters.items() if v is not None}
 
     try:
         phenotypes, total = service.list_phenotypes(
-            page=page,
-            per_page=per_page,
-            sort_by=sort_by,
-            sort_order=sort_order,
+            page=params.page,
+            per_page=params.per_page,
+            sort_by=params.sort_by,
+            sort_order=params.sort_order,
             filters=filters,
         )
 
@@ -127,15 +134,15 @@ async def get_phenotypes(
             serialize_phenotype(phenotype) for phenotype in phenotypes
         ]
 
-        total_pages = (total + per_page - 1) // per_page
+        total_pages = (total + params.per_page - 1) // params.per_page
         return PaginatedResponse(
             items=phenotype_responses,
             total=total,
-            page=page,
-            per_page=per_page,
+            page=params.page,
+            per_page=params.per_page,
             total_pages=total_pages,
-            has_next=page < total_pages,
-            has_prev=page > 1,
+            has_next=params.page < total_pages,
+            has_prev=params.page > 1,
         )
     except Exception as e:
         raise HTTPException(

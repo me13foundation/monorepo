@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from uuid import UUID, uuid4
 
 from src.domain.entities.research_space import ResearchSpace, SpaceStatus
+from src.domain.entities.user import User, UserRole
 from src.domain.repositories.research_space_repository import (
     ResearchSpaceRepository,
 )
@@ -164,7 +165,7 @@ class ResearchSpaceManagementService:
         self,
         space_id: UUID,
         request: UpdateSpaceRequest,
-        user_id: UUID,
+        user: User,
     ) -> ResearchSpace | None:
         """
         Update a research space.
@@ -172,7 +173,7 @@ class ResearchSpaceManagementService:
         Args:
             space_id: The space ID
             request: Update request
-            user_id: The user making the request (for authorization)
+            user: The user making the request (for authorization)
 
         Returns:
             The updated ResearchSpace if successful, None if not found or not authorized
@@ -181,8 +182,8 @@ class ResearchSpaceManagementService:
         if not space:
             return None
 
-        # Check authorization - only owner can update
-        if not space.can_be_modified_by(user_id):
+        # Check authorization - owner or platform admin can update
+        if not (space.can_be_modified_by(user.id) or user.role == UserRole.ADMIN):
             return None
 
         # Apply updates using immutable pattern

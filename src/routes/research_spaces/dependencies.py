@@ -21,6 +21,7 @@ from src.application.services.source_management_service import (
     SourceManagementService,
 )
 from src.database.session import get_session
+from src.domain.entities.user import UserRole
 from src.infrastructure.repositories.research_space_membership_repository import (
     SqlAlchemyResearchSpaceMembershipRepository,
 )
@@ -68,6 +69,7 @@ def verify_space_membership(
     user_id: UUID,
     membership_service: MembershipManagementService,
     session: Session,
+    user_role: UserRole | None = None,
 ) -> None:
     """
     Verify that a user is a member of a research space.
@@ -75,6 +77,10 @@ def verify_space_membership(
     Checks both explicit membership and ownership.
     Raises HTTPException if user is not a member or owner.
     """
+    # Platform admins can access any space
+    if user_role == UserRole.ADMIN:
+        return
+
     # Check if user is an explicit member
     if membership_service.is_user_member(space_id, user_id):
         return

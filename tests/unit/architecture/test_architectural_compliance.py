@@ -16,6 +16,7 @@ The tests check for:
 5. Import dependency violations
 """
 
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,8 @@ import pytest
 
 # Get the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.architecture
@@ -220,6 +223,201 @@ class TestArchitecturalCompliance:
                 f"Found files exceeding maximum size threshold:\n{violation_details}\n\n"
                 "Large files may violate Single Responsibility Principle. "
                 "Consider splitting into smaller, focused modules.",
+            )
+
+    def test_srp_import_count(self) -> None:
+        """
+        Verify files don't have excessive imports (SRP violation).
+
+        Per Single Responsibility Principle, files with many imports
+        may be handling multiple responsibilities.
+        """
+        validator_script = PROJECT_ROOT / "scripts" / "validate_architecture.py"
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, str(validator_script)],
+            check=False,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check for import count violations (errors, not warnings)
+        output = result.stdout + result.stderr
+        import_violations = [
+            line
+            for line in output.splitlines()
+            if "import_count" in line.lower()
+            and "error" in line.lower()
+            and "too many imports" in line.lower()
+        ]
+
+        if import_violations:
+            violation_details = "\n".join(import_violations)
+            pytest.fail(
+                f"Found files with excessive imports:\n{violation_details}\n\n"
+                "Files with many imports may violate Single Responsibility Principle. "
+                "Consider splitting into smaller, focused modules.",
+            )
+
+    def test_srp_function_parameters(self) -> None:
+        """
+        Verify functions don't have excessive parameters (SRP violation).
+
+        Per Single Responsibility Principle, functions with many parameters
+        often indicate the function is doing too much.
+        """
+        validator_script = PROJECT_ROOT / "scripts" / "validate_architecture.py"
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, str(validator_script)],
+            check=False,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check for parameter count violations
+        output = result.stdout + result.stderr
+        param_violations = [
+            line
+            for line in output.splitlines()
+            if "parameter_count" in line.lower()
+            and "too many parameters" in line.lower()
+        ]
+
+        if param_violations:
+            violation_details = "\n".join(param_violations)
+            pytest.fail(
+                f"Found functions with excessive parameters:\n{violation_details}\n\n"
+                "Functions with many parameters may violate Single Responsibility Principle. "
+                "Consider using a parameter object or splitting responsibilities.",
+            )
+
+    def test_json_type_usage_compliance(self) -> None:
+        """
+        Verify that code uses JSONObject/JSONValue instead of dict[str, Any].
+
+        Per docs/type_examples.md and AGENTS.md, dict[str, Any] should be replaced
+        with proper JSON types from src.type_definitions.common.
+        """
+        validator_script = PROJECT_ROOT / "scripts" / "validate_architecture.py"
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, str(validator_script)],
+            check=False,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check for JSON type usage violations
+        output = result.stdout + result.stderr
+        json_type_violations = [
+            line
+            for line in output.splitlines()
+            if "json_type_usage" in line.lower() and "error" in line.lower()
+        ]
+
+        if json_type_violations:
+            violation_details = "\n".join(json_type_violations)
+            pytest.fail(
+                f"Found 'dict[str, Any]' usage violations:\n{violation_details}\n\n"
+                "Per docs/type_examples.md, use 'JSONObject' or 'JSONValue' "
+                "from src.type_definitions.common instead of 'dict[str, Any]'.",
+            )
+
+    def test_update_type_usage_compliance(self) -> None:
+        """
+        Verify that update operations use TypedDict classes.
+
+        Per docs/type_examples.md, update operations should use TypedDict classes
+        like GeneUpdate, VariantUpdate, etc. instead of plain dict.
+        """
+        validator_script = PROJECT_ROOT / "scripts" / "validate_architecture.py"
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, str(validator_script)],
+            check=False,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check for update type usage violations (warnings are acceptable)
+        output = result.stdout + result.stderr
+        update_type_violations = [
+            line for line in output.splitlines() if "update_type_usage" in line.lower()
+        ]
+
+        # Log warnings but don't fail (these are warnings, not errors)
+        if update_type_violations:
+            violation_details = "\n".join(update_type_violations)
+            logger.warning(
+                "\n⚠️  Update type usage warnings found:\n%s\n\n"
+                "Consider using TypedDict classes (GeneUpdate, VariantUpdate, etc.) "
+                "for update operations. See docs/type_examples.md for examples.",
+                violation_details,
+            )
+
+    def test_test_fixture_usage_compliance(self) -> None:
+        """
+        Verify that test files use typed fixtures from tests.test_types.
+
+        Per docs/type_examples.md, tests should use typed fixtures from
+        tests.test_types.fixtures and tests.test_types.mocks instead of plain dicts.
+        """
+        validator_script = PROJECT_ROOT / "scripts" / "validate_architecture.py"
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, str(validator_script)],
+            check=False,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check for test fixture usage violations (warnings are acceptable)
+        output = result.stdout + result.stderr
+        fixture_violations = [
+            line for line in output.splitlines() if "test_fixture_usage" in line.lower()
+        ]
+
+        # Log warnings but don't fail (these are warnings, not errors)
+        if fixture_violations:
+            violation_details = "\n".join(fixture_violations)
+            logger.warning(
+                "\n⚠️  Test fixture usage warnings found:\n%s\n\n"
+                "Consider using typed fixtures from tests.test_types.fixtures "
+                "and tests.test_types.mocks. See docs/type_examples.md for examples.",
+                violation_details,
+            )
+
+    def test_api_response_type_compliance(self) -> None:
+        """
+        Verify that route endpoints return ApiResponse or PaginatedResponse.
+
+        Per docs/type_examples.md, API endpoints should return ApiResponse<T>
+        or PaginatedResponse<T> for type-safe responses.
+        """
+        validator_script = PROJECT_ROOT / "scripts" / "validate_architecture.py"
+        result = subprocess.run(  # noqa: S603
+            [sys.executable, str(validator_script)],
+            check=False,
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+        )
+
+        # Check for API response type violations (warnings are acceptable)
+        output = result.stdout + result.stderr
+        api_response_violations = [
+            line for line in output.splitlines() if "api_response_type" in line.lower()
+        ]
+
+        # Log warnings but don't fail (these are warnings, not errors)
+        if api_response_violations:
+            violation_details = "\n".join(api_response_violations)
+            logger.warning(
+                "\n⚠️  API response type warnings found:\n%s\n\n"
+                "Consider using ApiResponse<T> or PaginatedResponse<T> for route endpoints. "
+                "See docs/type_examples.md for examples.",
+                violation_details,
             )
 
 

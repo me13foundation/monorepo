@@ -5,51 +5,28 @@ Shared dependencies and constants for admin routes.
 from __future__ import annotations
 
 from collections.abc import Generator
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from src.application.services.data_source_activation_service import (
+from src.application.services import (
     DataSourceActivationService,
-)
-from src.application.services.data_source_authorization_service import (
     DataSourceAuthorizationService,
-)
-
-if TYPE_CHECKING:
-    from src.application.services.ingestion_scheduling_service import (
-        IngestionSchedulingService,
-    )
-from src.application.services.source_management_service import (
+    IngestionSchedulingService,
     SourceManagementService,
-)
-from src.application.services.storage_configuration_service import (
     StorageConfigurationService,
-)
-from src.application.services.system_status_service import SystemStatusService
-from src.application.services.template_management_service import (
+    SystemStatusService,
     TemplateManagementService,
 )
 from src.database.session import SessionLocal
 from src.domain.entities.data_discovery_session import SourceCatalogEntry
-from src.infrastructure.repositories.data_discovery_repository_impl import (
-    SQLAlchemySourceCatalogRepository,
-)
-from src.infrastructure.repositories.data_source_activation_repository import (
-    SqlAlchemyDataSourceActivationRepository,
-)
-
-if TYPE_CHECKING:
-    from src.infrastructure.repositories.ingestion_job_repository import (
-        SqlAlchemyIngestionJobRepository,
-    )
 from src.infrastructure.dependency_injection.container import container
-from src.infrastructure.repositories.source_template_repository import (
+from src.infrastructure.repositories import (
+    SqlAlchemyDataSourceActivationRepository,
+    SqlAlchemyIngestionJobRepository,
+    SQLAlchemySourceCatalogRepository,
     SqlAlchemySourceTemplateRepository,
-)
-from src.infrastructure.repositories.user_data_source_repository import (
     SqlAlchemyUserDataSourceRepository,
 )
 
@@ -108,10 +85,6 @@ def get_ingestion_scheduling_service() -> (
 
 def get_ingestion_job_repository() -> SqlAlchemyIngestionJobRepository:
     """Instantiate the ingestion job repository."""
-    from src.infrastructure.repositories.ingestion_job_repository import (  # noqa: PLC0415
-        SqlAlchemyIngestionJobRepository,
-    )
-
     session = get_db_session()
     return SqlAlchemyIngestionJobRepository(session)
 

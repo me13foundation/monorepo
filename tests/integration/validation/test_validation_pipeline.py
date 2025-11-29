@@ -18,7 +18,10 @@ from src.domain.validation.gates.quality_gate import (
     create_parsing_gate,
 )
 from src.domain.validation.reporting.dashboard import ValidationDashboard
-from src.domain.validation.reporting.error_reporting import ErrorReporter
+from src.domain.validation.reporting.error_reporting import (
+    ErrorRecordInput,
+    ErrorReporter,
+)
 from src.domain.validation.reporting.metrics import MetricsCollector
 from src.domain.validation.rules.base_rules import ValidationRuleEngine
 from src.domain.validation.testing.test_data_generator import TestDataGenerator
@@ -116,12 +119,14 @@ class TestValidationPipelineIntegration:
         """Test error reporting integration with validation."""
         # Add some validation errors
         self.error_reporter.add_error(
-            "gene",
-            "TP53",
-            "symbol",
-            "test_rule",
-            "Test validation error",
-            source="integration_test",
+            ErrorRecordInput(
+                entity_type="gene",
+                entity_id="TP53",
+                field="symbol",
+                rule="test_rule",
+                message="Test validation error",
+                source="integration_test",
+            ),
         )
 
         # Get error summary
@@ -161,11 +166,13 @@ class TestValidationPipelineIntegration:
         """Test dashboard data collection and presentation."""
         # Add some test data
         self.error_reporter.add_error(
-            "gene",
-            "TP53",
-            "symbol",
-            "test_rule",
-            "Test error",
+            ErrorRecordInput(
+                entity_type="gene",
+                entity_id="TP53",
+                field="symbol",
+                rule="test_rule",
+                message="Test error",
+            ),
         )
 
         validation_results = [self.rule_engine.validate_entity("gene", self.test_gene)]
@@ -306,12 +313,14 @@ class TestValidationWorkflowIntegration:
         for result in results:
             for issue in result.issues:
                 self.error_reporter.add_error(
-                    "gene",
-                    None,
-                    issue.get("field", "unknown"),
-                    issue.get("rule", "unknown"),
-                    issue.get("message", ""),
-                    source="workflow_test",
+                    ErrorRecordInput(
+                        entity_type="gene",
+                        entity_id=None,
+                        field=issue.get("field", "unknown"),
+                        rule=issue.get("rule", "unknown"),
+                        message=issue.get("message", ""),
+                        source="workflow_test",
+                    ),
                 )
 
         # Verify errors were recorded
@@ -480,12 +489,14 @@ class TestValidationWorkflowIntegration:
 
         # Add some test data and errors
         self.error_reporter.add_error(
-            "gene",
-            "TP53",
-            "symbol",
-            "format_check",
-            "Test error for reporting",
-            source="e2e_test",
+            ErrorRecordInput(
+                entity_type="gene",
+                entity_id="TP53",
+                field="symbol",
+                rule="format_check",
+                message="Test error for reporting",
+                source="e2e_test",
+            ),
         )
 
         validation_results = [self.rule_engine.validate_entity("gene", self.test_gene)]

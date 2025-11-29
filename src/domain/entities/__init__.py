@@ -26,6 +26,7 @@ from .discovery_search_job import (
     DiscoverySearchJob,
     DiscoverySearchStatus,
 )
+from .drug import Drug, DrugApprovalStatus, TherapeuticModality
 from .evidence import Evidence
 from .gene import Gene
 
@@ -37,7 +38,8 @@ from .ingestion_job import (
     IngestionTrigger,
     JobMetrics,
 )
-from .phenotype import Phenotype
+from .pathway import Pathway
+from .phenotype import LongitudinalObservation, Phenotype
 from .publication import Publication
 from .source_template import (
     SourceTemplate,
@@ -60,11 +62,13 @@ from .user_data_source import (
     SourceType,
     UserDataSource,
 )
-from .variant import Variant
+from .variant import InSilicoScores, ProteinStructuralAnnotation, Variant
 
 __all__ = [
     "AdvancedQueryParameters",
     "DataDiscoverySession",
+    "Drug",
+    "DrugApprovalStatus",
     "Evidence",
     "Gene",
     "IngestionError",
@@ -72,8 +76,12 @@ __all__ = [
     "IngestionSchedule",
     "IngestionStatus",
     "IngestionTrigger",
+    "InSilicoScores",
     "JobMetrics",
+    "LongitudinalObservation",
+    "Pathway",
     "Phenotype",
+    "ProteinStructuralAnnotation",
     "Publication",
     "PubMedSortOption",
     "QualityMetrics",
@@ -89,6 +97,7 @@ __all__ = [
     "TemplateCategory",
     "TemplateUIConfig",
     "TestResultStatus",
+    "TherapeuticModality",
     "UserDataSource",
     "ValidationRule",
     "Variant",

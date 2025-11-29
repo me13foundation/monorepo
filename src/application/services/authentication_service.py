@@ -15,6 +15,9 @@ from src.application.dto.auth_responses import (
     TokenRefreshResponse,
     UserPublic,
 )
+from src.application.services.authentication_session_manager import (
+    SessionLifecycleManager,
+)
 from src.domain.entities.session import UserSession
 from src.domain.entities.user import User, UserStatus
 from src.domain.repositories.session_repository import SessionRepository
@@ -77,6 +80,12 @@ class AuthenticationService:
         self.session_repository = session_repository
         self.jwt_provider = jwt_provider
         self.password_hasher = password_hasher
+        self.session_lifecycle = SessionLifecycleManager(
+            user_repository=user_repository,
+            session_repository=session_repository,
+            access_token_expiry_minutes=self.ACCESS_TOKEN_EXPIRY_MINUTES,
+            refresh_token_expiry_days=self.REFRESH_TOKEN_EXPIRY_DAYS,
+        )
 
     async def authenticate_user(
         self,
@@ -114,7 +123,7 @@ class AuthenticationService:
         if not user or not password_valid:
             # Record failed attempt for security monitoring
             if user:
-                await self._record_failed_login_attempt(user)
+                await self.session_lifecycle.record_failed_login_attempt(user)
             msg = "Invalid email or password"
             raise InvalidCredentialsError(msg)
 
@@ -136,7 +145,7 @@ class AuthenticationService:
         refresh_token = self.jwt_provider.create_refresh_token(user.id)
 
         # Create session with tokens
-        await self._create_session(
+        await self.session_lifecycle.create_session(
             user,
             ip_address,
             user_agent,
@@ -453,79 +462,3 @@ class AuthenticationService:
             Number of sessions cleaned up
         """
         return await self.session_repository.cleanup_expired_sessions()
-
-    async def _create_session(
-        self,
-        user: User,
-        ip_address: str | None,
-        user_agent: str | None,
-        access_token: str,
-        refresh_token: str,
-    ) -> UserSession:
-        """
-        Create a new session for user.
-
-        Args:
-            user: Authenticated user
-            ip_address: Client IP
-            user_agent: Client user agent
-
-        Returns:
-            New session
-        """
-        # Check concurrent session limits
-        active_sessions = await self.session_repository.count_active_sessions(user.id)
-        max_sessions = 5  # Configurable
-
-        if active_sessions >= max_sessions:
-            # Remove oldest session
-            sessions = await self.session_repository.get_user_sessions(
-                user.id,
-                include_expired=False,
-            )
-            if sessions:
-                oldest_session = min(sessions, key=lambda s: s.created_at)
-                await self.session_repository.revoke_session(oldest_session.id)
-
-        # Create new session with tokens
-        session = UserSession(
-            user_id=user.id,
-            session_token=access_token,
-            refresh_token=refresh_token,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            expires_at=datetime.now(UTC)
-            + timedelta(
-                minutes=self.ACCESS_TOKEN_EXPIRY_MINUTES,
-            ),
-            refresh_expires_at=datetime.now(UTC)
-            + timedelta(
-                days=self.REFRESH_TOKEN_EXPIRY_DAYS,
-            ),
-        )
-
-        # Generate device fingerprint
-        if ip_address and user_agent:
-            session.generate_device_fingerprint(ip_address, user_agent)
-
-        return await self.session_repository.create(session)
-
-    async def _record_failed_login_attempt(self, user: User) -> None:
-        """
-        Record failed login attempt and handle security measures.
-
-        Args:
-            user: User who failed login
-        """
-        current_attempts = await self.user_repository.increment_login_attempts(user.id)
-
-        # Log security event (integration point for audit service)
-
-        # Lock account after max attempts
-        max_attempts = 5
-        if current_attempts >= max_attempts:
-            lockout_duration = timedelta(minutes=30)
-            await self.user_repository.lock_account(
-                user.id,
-                datetime.now(UTC) + lockout_duration,
-            )

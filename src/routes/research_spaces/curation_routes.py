@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Query
+from fastapi import Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.application.curation.services.review_service import ReviewQuery, ReviewService
@@ -31,6 +32,16 @@ from .router import (
 )
 
 
+class SpaceCurationQueueParams(BaseModel):
+    entity_type: str | None = Field(None, description="Filter by entity type")
+    status: str | None = Field(None, description="Filter by status")
+    priority: str | None = Field(None, description="Filter by priority")
+    skip: int = Field(0, ge=0)
+    limit: int = Field(50, ge=1, le=100)
+
+    model_config = {"extra": "ignore"}
+
+
 @research_spaces_router.get(
     "/{space_id}/curation/stats",
     response_model=CurationStatsResponse,
@@ -45,7 +56,13 @@ def get_space_curation_stats(
     session: Session = Depends(get_session),
 ) -> CurationStatsResponse:
     """Get curation statistics for a research space."""
-    verify_space_membership(space_id, current_user.id, membership_service, session)
+    verify_space_membership(
+        space_id,
+        current_user.id,
+        membership_service,
+        session,
+        current_user.role,
+    )
 
     try:
         stats = curation_service.get_stats(session, str(space_id))
@@ -65,27 +82,29 @@ def get_space_curation_stats(
 )
 def list_space_curation_queue(
     space_id: UUID,
-    entity_type: str | None = Query(None, description="Filter by entity type"),
-    status: str | None = Query(None, description="Filter by status"),
-    priority: str | None = Query(None, description="Filter by priority"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=100),
+    params: SpaceCurationQueueParams = Depends(),
     current_user: User = Depends(get_current_active_user),
     membership_service: MembershipManagementService = Depends(get_membership_service),
     curation_service: ReviewService = Depends(get_curation_service),
     session: Session = Depends(get_session),
 ) -> CurationQueueResponse:
     """List curation queue items for a research space."""
-    verify_space_membership(space_id, current_user.id, membership_service, session)
+    verify_space_membership(
+        space_id,
+        current_user.id,
+        membership_service,
+        session,
+        current_user.role,
+    )
 
     try:
         query = ReviewQuery(
-            entity_type=entity_type,
-            status=status,
-            priority=priority,
+            entity_type=params.entity_type,
+            status=params.status,
+            priority=params.priority,
             research_space_id=str(space_id),
-            limit=limit,
-            offset=skip,
+            limit=params.limit,
+            offset=params.skip,
         )
         items = curation_service.list_queue(session, query)
         return CurationQueueResponse(
@@ -105,8 +124,8 @@ def list_space_curation_queue(
                 for item in items
             ],
             total=len(items),
-            skip=skip,
-            limit=limit,
+            skip=params.skip,
+            limit=params.limit,
         )
     except Exception as e:
         raise HTTPException(

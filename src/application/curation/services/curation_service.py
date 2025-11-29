@@ -17,9 +17,11 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from src.application.curation.repositories.review_repository import ReviewRecordLike
-    from src.application.services.evidence_service import EvidenceApplicationService
-    from src.application.services.phenotype_service import PhenotypeApplicationService
-    from src.application.services.variant_service import VariantApplicationService
+    from src.application.services import (
+        EvidenceApplicationService,
+        PhenotypeApplicationService,
+        VariantApplicationService,
+    )
     from src.domain.entities.evidence import Evidence
     from src.domain.entities.variant import Variant
 from src.type_definitions.common import FilterValue, JSONObject, QueryFilters

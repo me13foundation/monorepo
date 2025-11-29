@@ -28,10 +28,12 @@ from src.application.export.utils import (
     get_phenotype_fields,
     get_variants_fields,
 )
-from src.application.services.evidence_service import EvidenceApplicationService
-from src.application.services.gene_service import GeneApplicationService
-from src.application.services.phenotype_service import PhenotypeApplicationService
-from src.application.services.variant_service import VariantApplicationService
+from src.application.services import (
+    EvidenceApplicationService,
+    GeneApplicationService,
+    PhenotypeApplicationService,
+    VariantApplicationService,
+)
 from src.type_definitions.common import (
     JSONObject,
     QueryFilters,
@@ -39,9 +41,7 @@ from src.type_definitions.common import (
 from src.type_definitions.storage import StorageOperationRecord, StorageUseCase
 
 if TYPE_CHECKING:
-    from src.application.services.storage_configuration_service import (
-        StorageConfigurationService,
-    )
+    from src.application.services import StorageConfigurationService
 
 
 class BulkExportService:

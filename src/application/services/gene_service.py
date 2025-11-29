@@ -9,6 +9,7 @@ from src.domain.repositories.variant_repository import VariantRepository
 from src.domain.services.gene_domain_service import GeneDomainService
 from src.domain.value_objects.identifiers import GeneIdentifier
 from src.domain.value_objects.provenance import Provenance
+from src.type_definitions.api import GeneCreateRequest
 from src.type_definitions.common import GeneUpdate, JSONObject
 
 AllowedGeneField = Literal[
@@ -50,37 +51,13 @@ class GeneApplicationService:
         self._gene_domain_service = gene_domain_service
         self._variant_repository = variant_repository
 
-    def create_gene(  # noqa: PLR0913 - explicit domain fields
+    def create_gene(
         self,
-        symbol: str,
-        name: str | None = None,
-        description: str | None = None,
-        gene_type: str = "protein_coding",
-        gene_id: str | None = None,
-        chromosome: str | None = None,
-        start_position: int | None = None,
-        end_position: int | None = None,
-        ensembl_id: str | None = None,
-        ncbi_gene_id: int | None = None,
-        uniprot_id: str | None = None,
+        request: GeneCreateRequest,
         provenance: Provenance | None = None,
     ) -> Gene:
         """
         Create a new gene with validation and business rules.
-
-        Args:
-            symbol: Gene symbol
-            name: Full gene name
-            description: Gene description
-            gene_type: Type of gene
-            gene_id: Optional pre-defined gene identifier
-            chromosome: Chromosome location
-            start_position: Start position on chromosome
-            end_position: End position on chromosome
-            ensembl_id: Ensembl gene ID
-            ncbi_gene_id: NCBI Gene ID
-            uniprot_id: UniProt accession
-            provenance: Data provenance information
 
         Returns:
             Created Gene entity
@@ -88,6 +65,21 @@ class GeneApplicationService:
         Raises:
             ValueError: If validation fails
         """
+        symbol = request["symbol"]
+        if symbol.strip() == "":
+            msg = "symbol is required to create a gene"
+            raise ValueError(msg)
+
+        gene_type = request.get("gene_type") or "protein_coding"
+        name = request.get("name")
+        description = request.get("description")
+        chromosome = request.get("chromosome")
+        start_position = request.get("start_position")
+        end_position = request.get("end_position")
+        ensembl_id = request.get("ensembl_id")
+        ncbi_gene_id = request.get("ncbi_gene_id")
+        uniprot_id = request.get("uniprot_id")
+
         # Validate positions if both are provided
         if (
             start_position is not None
@@ -98,7 +90,7 @@ class GeneApplicationService:
             raise ValueError(msg)
 
         normalized_symbol = symbol.upper()
-        gene_identifier = gene_id or normalized_symbol
+        gene_identifier = normalized_symbol
 
         # Create the gene entity
         gene_entity = Gene.create(

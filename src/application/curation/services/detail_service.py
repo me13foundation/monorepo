@@ -21,18 +21,17 @@ from src.application.curation.dto import (
 from src.models.database.audit import AuditLog
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import Session
-
-    from src.application.curation.conflict_detector import ConflictDetector
-    from src.application.curation.repositories.review_repository import (
-        ReviewRepository,
-    )
-    from src.application.services.evidence_service import EvidenceApplicationService
-    from src.application.services.variant_service import VariantApplicationService
-
-if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from sqlalchemy.orm import Session
+
+    from src.application.curation import conflict_detector, repositories  # noqa: F401
+    from src.application.services import (
+        EvidenceApplicationService,
+        VariantApplicationService,
+    )
+
+if TYPE_CHECKING:
     from src.domain.entities.evidence import Evidence
     from src.domain.entities.phenotype import Phenotype
     from src.domain.entities.variant import Variant
@@ -53,8 +52,8 @@ class CurationDetailService:
     variant_service: VariantApplicationService
     evidence_service: EvidenceApplicationService
     phenotype_repository: PhenotypeRepository
-    conflict_detector: ConflictDetector
-    review_repository: ReviewRepository
+    conflict_detector: conflict_detector.ConflictDetector
+    review_repository: repositories.review_repository.ReviewRepository
     db_session: Session
 
     def get_detail(self, entity_type: str, entity_id: str) -> CuratedRecordDetailDTO:
