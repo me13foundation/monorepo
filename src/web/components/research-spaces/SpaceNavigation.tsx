@@ -6,13 +6,13 @@ import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
-  Database,
+  CloudDownload,
   Settings,
-  FileText,
+  ListChecks,
   LayoutDashboard,
   Users,
   EllipsisVertical,
-  Waypoints,
+  Network,
 } from 'lucide-react'
 import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 import {
@@ -61,21 +61,21 @@ export function SpaceNavigation() {
     {
       label: 'Data Sources',
       href: `${basePath}/data-sources`,
-      icon: Database,
+      icon: CloudDownload,
       description: 'Manage data sources and discover new ones',
       prefetch: prefetchSpaceDetail,
     },
     {
       label: 'Data Curation',
       href: `${basePath}/curation`,
-      icon: FileText,
+      icon: ListChecks,
       description: 'Curate and review data',
       prefetch: prefetchSpaceCuration,
     },
     {
       label: 'Knowledge Graph',
       href: `${basePath}/knowledge-graph`,
-      icon: Waypoints,
+      icon: Network,
       description: 'Explore knowledge graph',
       prefetch: prefetchSpaceDetail,
     },
