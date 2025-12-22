@@ -72,7 +72,7 @@ export default function RegisterPage() {
       )}
 
       {success && (
-        <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
+        <Alert variant="success" className="mb-4">
           <CheckCircle className="size-4" />
           <AlertDescription>{success}</AlertDescription>
         </Alert>

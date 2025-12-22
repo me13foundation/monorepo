@@ -53,7 +53,10 @@
   --chart-4: 143 58% 38%;
   --chart-5: 28 78% 52%;
 
-           /* Typography - Readable, Modern, Gentle */
+  /* Typography - Readable, Modern, Gentle */
+  --font-heading: "Nunito Sans", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-body: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  --font-display: "Playfair Display", "Times New Roman", serif;
 
   --radius: .5rem;
 
@@ -67,8 +70,13 @@
   --shadow-xl: 0px 20px 25px -5px hsl(210 20% 20% / 0.08), 0px 8px 10px -6px hsl(210 20% 20% / 0.06);
   --shadow-2xl: 0px 25px 50px -12px hsl(210 20% 20% / 0.12);
 
-  --tracking-normal: 0em;
   --spacing: 0.25rem;
+
+  /* Spacing Tokens from Guidelines */
+  --space-sm: 1.5rem;   /* 24px */
+  --space-md: 2.5rem;   /* 40px */
+  --space-lg: 4rem;     /* 64px */
+  --space-xl: 6rem;     /* 96px */
 
   /* Automatically computed borders - intensity can be controlled by the user by the --opaque-button-border-intensity setting */
   /* Fallback for older browsers */
@@ -204,6 +212,35 @@
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
+  }
+
+  /* Fluid Typography from Design Guidelines */
+  .hero-heading {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: clamp(2.5rem, 5vw, 3.75rem); /* 40px to 60px */
+    line-height: 1.15;
+    @apply tracking-tight;
+  }
+
+  .section-heading {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: clamp(2rem, 4vw, 2.5rem); /* 32px to 40px */
+    line-height: 1.2;
+  }
+
+  .subsection-heading {
+    font-family: var(--font-heading);
+    font-weight: 600;
+    font-size: clamp(1.25rem, 2vw, 1.5rem); /* 20px to 24px */
+    line-height: 1.3;
+  }
+
+  .body-large {
+    font-family: var(--font-body);
+    font-size: clamp(1.125rem, 1.5vw, 1.25rem); /* 18px to 20px */
+    line-height: 1.7;
   }
 }
 

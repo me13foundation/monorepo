@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { Search, Bell, Plus, ChevronRight } from "lucide-react"
 
-import { SidebarTrigger } from "@/components/ui/sidebar"
+import { SidebarTrigger, SidebarTriggerRight } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { buildBreadcrumbs } from "@/lib/navigation-config"
@@ -115,6 +115,9 @@ export function GlobalHeader({ currentSpace }: GlobalHeaderProps) {
             <span className="hidden sm:inline">{primaryAction.label}</span>
           </Link>
         </Button>
+
+        <Separator orientation="vertical" className="ml-1 h-4 shrink-0 sm:ml-2" />
+        <SidebarTriggerRight className="size-8 sm:size-9" />
       </div>
     </header>
   )

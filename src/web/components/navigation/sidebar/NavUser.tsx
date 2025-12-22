@@ -156,7 +156,7 @@ function UserAvatar({ user }: { user: SidebarUserInfo }) {
     .toUpperCase()
 
   return (
-    <div className="flex size-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+    <div className="flex size-9 items-center justify-center rounded-lg border border-sidebar-border bg-sidebar-primary/10 text-sidebar-primary">
       <span className="text-sm font-semibold">{initials}</span>
     </div>
   )

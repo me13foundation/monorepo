@@ -9,15 +9,28 @@ if (WS_BASE_URL) {
 if (isDevelopment) {
   connectSources.push('ws://localhost:3000')
 }
+// Enhanced CSP for better security
+// Note: 'unsafe-inline' and 'unsafe-eval' are required for Next.js HMR and some features
+// In production, consider using nonces or hashes for stricter CSP
 const cspDirectives = [
   "default-src 'self'",
   "frame-ancestors 'none'",
   "img-src 'self' data: https:",
   "object-src 'none'",
+  // Next.js requires 'unsafe-inline' for styles and 'unsafe-eval' for HMR
+  // Consider using nonces in production for stricter security
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
   `connect-src ${connectSources.join(' ')}`,
   "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:"
+  "font-src 'self' data:",
+  // Prevent base tag injection attacks
+  "base-uri 'self'",
+  // Prevent form action hijacking
+  "form-action 'self'",
+  // Restrict plugin types
+  "plugin-types 'none'",
+  // Upgrade insecure requests
+  "upgrade-insecure-requests"
 ].join('; ')
 
 /** @type {import('next').NextConfig} */

@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react"
 
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 import { AppSidebar } from "./AppSidebar"
+import { CollaborativeSidebar } from "./CollaborativeSidebar"
 import { GlobalHeader } from "../GlobalHeader"
 import { useResearchSpaces, useSpaceMembership } from "@/lib/queries/research-spaces"
 import { extractSpaceIdFromPath } from "@/types/navigation"
@@ -108,12 +109,15 @@ export function SidebarWrapper({ children, initialSpaces, initialTotal }: Sideba
         currentSpace={currentSpace}
         userSpaceRole={userSpaceRole}
       />
-      <SidebarInset>
+      <SidebarInset className="rounded-3xl overflow-hidden shadow-brand-md">
         <GlobalHeader currentSpace={currentSpace} />
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          {children}
+        <main className="flex-1 overflow-auto">
+          <div className="mx-auto w-full max-w-[1200px] p-brand-sm md:p-brand-md lg:p-brand-lg">
+            {children}
+          </div>
         </main>
       </SidebarInset>
+      <CollaborativeSidebar />
     </SidebarProvider>
   )
 }

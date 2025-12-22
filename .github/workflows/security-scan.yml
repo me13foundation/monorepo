@@ -1,0 +1,158 @@
+name: Security Scanning
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: "18"
+
+jobs:
+  dependency-security:
+    name: Dependency Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: src/web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: src/web
+        run: npm ci
+
+      - name: Run npm audit (moderate and above)
+        working-directory: src/web
+        run: |
+          echo "🔍 Running npm audit for moderate+ severity vulnerabilities..."
+          npm audit --production --audit-level=moderate --json > npm-audit-results.json || true
+
+      - name: Check for critical vulnerabilities
+        working-directory: src/web
+        run: |
+          if npm audit --production --audit-level=critical 2>&1 | grep -q "found"; then
+            echo "❌ CRITICAL vulnerabilities found!"
+            npm audit --production --audit-level=critical
+            exit 1
+          else
+            echo "✅ No critical vulnerabilities found"
+          fi
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-results
+          path: src/web/npm-audit-results.json
+          retention-days: 30
+
+      - name: Check for outdated packages
+        working-directory: src/web
+        run: |
+          echo "📦 Checking for outdated packages..."
+          npm outdated --json > npm-outdated.json || true
+          cat npm-outdated.json
+
+      - name: Upload outdated packages report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-outdated
+          path: src/web/npm-outdated.json
+          retention-days: 7
+
+  code-security:
+    name: Code Security Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: "npm"
+          cache-dependency-path: src/web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: src/web
+        run: npm ci
+
+      - name: Check for dangerous patterns
+        working-directory: src/web
+        run: |
+          echo "🔍 Scanning for dangerous security patterns..."
+
+          # Check for dangerouslySetInnerHTML usage
+          if grep -r "dangerouslySetInnerHTML" --include="*.tsx" --include="*.ts" --include="*.jsx" --include="*.js" .; then
+            echo "⚠️ WARNING: dangerouslySetInnerHTML found. Ensure all content is sanitized with DOMPurify."
+            echo "Files using dangerouslySetInnerHTML:"
+            grep -r "dangerouslySetInnerHTML" --include="*.tsx" --include="*.ts" --include="*.jsx" --include="*.js" -l .
+          else
+            echo "✅ No dangerouslySetInnerHTML usage found"
+          fi
+
+          # Check for hardcoded secrets/API keys
+          if grep -riE "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]+['\"]" --include="*.tsx" --include="*.ts" --include="*.jsx" --include="*.js" --exclude-dir=node_modules --exclude-dir=.next .; then
+            echo "⚠️ WARNING: Potential hardcoded secrets found. Review the files above."
+            exit 1
+          else
+            echo "✅ No obvious hardcoded secrets found"
+          fi
+
+          # Check for eval usage
+          if grep -r "eval(" --include="*.tsx" --include="*.ts" --include="*.jsx" --include="*.js" --exclude-dir=node_modules --exclude-dir=.next .; then
+            echo "❌ ERROR: eval() usage found. This is a security risk."
+            exit 1
+          else
+            echo "✅ No eval() usage found"
+          fi
+
+      - name: Run ESLint security rules
+        working-directory: src/web
+        run: |
+          echo "🔍 Running ESLint with security-focused rules..."
+          npm run lint || echo "⚠️ Linting issues found (non-blocking)"
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [dependency-security, code-security]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download audit results
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-audit-results
+          path: ./audit-results
+
+      - name: Generate security summary
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Dependency Security" >> $GITHUB_STEP_SUMMARY
+          if [ -f "./audit-results/npm-audit-results.json" ]; then
+            echo "✅ Audit results generated" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Audit results not available" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Code Security" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Pattern scanning completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Review audit results in artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Update vulnerable dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "- Address any code security warnings" >> $GITHUB_STEP_SUMMARY

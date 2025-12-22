@@ -34,7 +34,7 @@ function DashboardContent() {
     : null
 
   return (
-    <div className="space-y-6 sm:space-y-8">
+    <div className="flex flex-col gap-brand-md sm:gap-brand-lg">
       <PageHero
         eyebrow="Admin"
         title="Admin Console"
@@ -98,20 +98,20 @@ function DashboardContent() {
             ))}
           </div>
         ) : (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center px-4 py-10 text-center sm:px-8">
-              <div className="mb-4 rounded-full bg-muted p-3 sm:p-4">
-                <FolderPlus className="size-6 text-muted-foreground sm:size-8" />
+          <Card className="border-dashed border-brand-primary/20 bg-brand-primary/5">
+            <CardContent className="flex flex-col items-center justify-center px-4 py-16 text-center sm:px-8">
+              <div className="mb-6 rounded-full bg-brand-primary/10 p-4 sm:p-6">
+                <FolderPlus className="size-8 text-brand-primary sm:size-10" />
               </div>
-              <p className="mb-2 text-lg font-semibold">No research spaces yet</p>
-              <p className="mb-6 max-w-md text-sm text-muted-foreground">
+              <h3 className="mb-2 text-xl font-bold font-heading">No research spaces yet</h3>
+              <p className="mb-8 max-w-md text-base text-muted-foreground">
                 Create a space to organize MED13 research work. Data sources, records, and activity
                 will live inside each space.
               </p>
               {canCreateSpace && (
-                <Button onClick={() => router.push('/spaces/new')} className="flex items-center gap-2">
+                <Button onClick={() => router.push('/spaces/new')} className="flex items-center gap-2 shadow-brand-md">
                   <Plus className="size-5" />
-                  Create your first space
+                  <span>Create your first space</span>
                 </Button>
               )}
             </CardContent>

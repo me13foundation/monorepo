@@ -10,9 +10,18 @@ export default {
   theme: {
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        '3xl': '1.5rem', /* 24px - Soft Clinical Main Containers */
+        '2xl': '1rem',   /* 16px - Secondary Containers */
+        xl: '.75rem',    /* 12px - Cards */
+        lg: ".5625rem",  /* 9px */
+        md: ".375rem",   /* 6px */
+        sm: ".1875rem",  /* 3px */
+      },
+      spacing: {
+        'brand-sm': 'var(--space-sm)',
+        'brand-md': 'var(--space-md)',
+        'brand-lg': 'var(--space-lg)',
+        'brand-xl': 'var(--space-xl)',
       },
       colors: {
         // Flat / base colors (regular buttons)

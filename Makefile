@@ -714,6 +714,12 @@ web-test-coverage: ## Run Next.js tests with coverage report
 web-visual-test: ## Run Percy-powered visual regression snapshots (requires PERCY_TOKEN)
 	./scripts/run_visual_snapshots.sh
 
+web-security-audit: ## Run npm security audit for Next.js app
+	cd src/web && npm run security:audit
+
+web-security-check: ## Run full security check (audit + outdated packages)
+	cd src/web && npm run security:check
+
 test-web: web-test ## Alias for web-test
 
 # Quality Assurance

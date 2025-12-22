@@ -57,13 +57,13 @@ export function DashboardSection({
   className,
 }: DashboardSectionProps) {
   return (
-    <Card className={cn('h-full', className)}>
-      <CardHeader className="space-y-1">
+    <Card className={cn('h-full shadow-brand-sm border-card-border rounded-2xl', className)}>
+      <CardHeader className="space-y-1.5 pb-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="font-heading">{title}</CardTitle>
+            <CardTitle className="section-heading !text-2xl">{title}</CardTitle>
             {description && (
-              <CardDescription>{description}</CardDescription>
+              <CardDescription className="text-base mt-1.5">{description}</CardDescription>
             )}
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
@@ -103,21 +103,24 @@ export function PageHero({
   return (
     <div
       className={cn(
-        'mb-6 rounded-2xl border border-border p-6 sm:p-8 bg-gradient-to-br text-foreground',
+        'mb-brand-lg rounded-3xl border border-brand-primary/10 p-brand-md sm:p-brand-lg bg-gradient-to-br from-brand-primary/5 via-background to-brand-secondary/5 text-foreground relative overflow-hidden shadow-brand-sm',
         theme.hero,
         className,
       )}
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="absolute top-0 right-0 -mr-20 -mt-20 size-64 rounded-full bg-brand-primary/5 blur-3xl" />
+      <div className="absolute bottom-0 left-0 -ml-20 -mb-20 size-64 rounded-full bg-brand-secondary/5 blur-3xl" />
+
+      <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           {eyebrow && (
-            <p className="text-xs uppercase tracking-wide text-muted-foreground/80">
+            <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground/70 font-semibold mb-2">
               {eyebrow}
             </p>
           )}
-          <h1 className="font-heading text-2xl font-bold sm:text-3xl">{title}</h1>
+          <h1 className="hero-heading">{title}</h1>
           {description && (
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
+            <p className="body-large mt-4 max-w-2xl text-muted-foreground">
               {description}
             </p>
           )}

@@ -4,9 +4,9 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, CheckCircle } from "lucide-react"
+import { AuthShell } from "@/components/auth/AuthShell"
 
 export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null)
@@ -47,50 +47,33 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="from-brand-primary/8 to-brand-secondary/8 flex min-h-screen items-center justify-center bg-gradient-to-br via-background px-4">
-      <div className="w-full max-w-md">
-        <div className="mb-8 text-center">
-          <h1 className="font-heading text-3xl font-bold text-foreground">
-            MED13 Admin
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Reset your password
-          </p>
+    <AuthShell
+      title="Reset Password"
+      description="Enter your email address and we'll send you a link to reset your password."
+      footer={
+        <div className="text-center text-sm text-muted-foreground">
+          Remember your password?{" "}
+          <Link href="/auth/login" className="text-primary hover:underline">
+            Sign in
+          </Link>
         </div>
+      }
+    >
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="size-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Forgot Password</CardTitle>
-            <CardDescription className="text-center">
-              Enter your email address and we&apos;ll send you a link to reset your password
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertCircle className="size-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+      {success && (
+        <Alert variant="success" className="mb-4">
+          <CheckCircle className="size-4" />
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      )}
 
-            {success && (
-              <Alert className="mb-4 border-green-200 bg-green-50 text-green-800">
-                <CheckCircle className="size-4" />
-                <AlertDescription>{success}</AlertDescription>
-              </Alert>
-            )}
-
-            <ForgotPasswordForm onSubmit={handleForgotPassword} isLoading={isLoading} />
-
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Remember your password?{" "}
-              <Link href="/auth/login" className="text-primary hover:underline">
-                Sign in
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+      <ForgotPasswordForm onSubmit={handleForgotPassword} isLoading={isLoading} />
+    </AuthShell>
   )
 }

@@ -47,7 +47,7 @@ export function WorkspaceDropdown({
             aria-label={displayLabel}
             className="bg-brand-primary/5 text-foreground transition-colors hover:bg-brand-primary/10 data-[state=open]:bg-brand-primary/15 data-[state=open]:text-foreground group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!gap-0"
           >
-            <div className="flex aspect-square size-12 items-center justify-center rounded-md border border-brand-primary/20 bg-white text-brand-primary shadow-sm transition-colors dark:border-brand-primary/30 dark:bg-zinc-800">
+            <div className="flex aspect-square size-12 items-center justify-center rounded-md border border-brand-primary/20 bg-white text-brand-primary shadow-sm transition-colors dark:border-brand-primary/30 dark:bg-card">
               <Image
                 src={logo.src}
                 alt={logo.alt}

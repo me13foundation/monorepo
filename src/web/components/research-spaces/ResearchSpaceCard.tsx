@@ -23,10 +23,10 @@ interface ResearchSpaceCardProps {
 }
 
 const statusColors: Record<SpaceStatus, string> = {
-  [SpaceStatus.ACTIVE]: 'bg-green-500',
-  [SpaceStatus.INACTIVE]: 'bg-gray-500',
-  [SpaceStatus.ARCHIVED]: 'bg-yellow-500',
-  [SpaceStatus.SUSPENDED]: 'bg-red-500',
+  [SpaceStatus.ACTIVE]: 'bg-brand-primary text-primary-foreground',
+  [SpaceStatus.INACTIVE]: 'bg-muted text-muted-foreground',
+  [SpaceStatus.ARCHIVED]: 'bg-brand-accent text-accent-foreground',
+  [SpaceStatus.SUSPENDED]: 'bg-destructive text-destructive-foreground',
 }
 
 const statusLabels: Record<SpaceStatus, string> = {
@@ -45,14 +45,14 @@ export function ResearchSpaceCard({
   const tags = space.tags ?? []
 
   return (
-    <Card className="transition-shadow hover:shadow-lg">
+    <Card className="transition-all hover:shadow-brand-md hover:-translate-y-0.5">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <CardTitle className="mb-2 text-xl">
               <Link
                 href={`/spaces/${space.id}`}
-                className="hover:underline"
+                className="hover:text-brand-primary transition-colors"
               >
                 {space.name}
               </Link>
@@ -63,9 +63,8 @@ export function ResearchSpaceCard({
           </div>
           <Badge
             className={cn(
-              'ml-2',
-              statusColors[space.status],
-              'text-white'
+              'ml-2 border-none font-medium',
+              statusColors[space.status]
             )}
           >
             {statusLabels[space.status]}
@@ -101,18 +100,19 @@ export function ResearchSpaceCard({
       </CardContent>
       <CardFooter className="flex gap-2">
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
           asChild
           className="flex-1"
         >
-          <Link href={`/spaces/${space.id}`}>View</Link>
+          <Link href={`/spaces/${space.id}`}>View Space</Link>
         </Button>
         {onManage && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => onManage(space.id)}
+            className="hover:bg-brand-primary/10 hover:text-brand-primary"
           >
             <Users className="mr-1 size-4" />
             Members
@@ -120,9 +120,10 @@ export function ResearchSpaceCard({
         )}
         {onSettings && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => onSettings(space.id)}
+            className="hover:bg-brand-primary/10 hover:text-brand-primary"
           >
             <Settings className="size-4" />
           </Button>

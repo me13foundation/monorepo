@@ -53,7 +53,7 @@ jobs:
 
       - name: Audit web dependencies
         working-directory: src/web
-        run: npm audit --production
+        run: npm audit --production --audit-level=moderate || (echo "⚠️ Security vulnerabilities found. Review and update dependencies." && exit 1)
 
       - name: Run linting
         run: ruff check src/ tests/

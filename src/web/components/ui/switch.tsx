@@ -18,8 +18,8 @@ export const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
       onClick={() => !disabled && onCheckedChange?.(!checked)}
       data-state={checked ? 'checked' : 'unchecked'}
       className={cn(
-        'relative inline-flex h-6 w-11 items-center rounded-full border border-input bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 data-[state=checked]:bg-primary',
-        className,
+        'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted shadow-inner',
+        className
       )}
       ref={ref}
       disabled={disabled}
@@ -28,8 +28,8 @@ export const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(
       <span
         data-state={checked ? 'checked' : 'unchecked'}
         className={cn(
-          'pointer-events-none inline-block size-4 transform rounded-full bg-background shadow transition-transform',
-          checked ? 'translate-x-5' : 'translate-x-1',
+          "pointer-events-none block size-5 rounded-full bg-background shadow-brand-md ring-0 transition-transform data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0 relative",
+          "after:absolute after:inset-[20%] after:rounded-full after:bg-muted-foreground/10" // Tactile center mark
         )}
       />
     </button>
