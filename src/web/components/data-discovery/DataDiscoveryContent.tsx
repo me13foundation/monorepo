@@ -50,7 +50,13 @@ export function DataDiscoveryContent({
   useEffect(() => {
     if (!sessionsLoading && sessions.length === 0 && !createSession.isPending && !hasInitiatedCreate) {
       setHasInitiatedCreate(true)
-      createSession.mutate({})
+      createSession.mutate({
+        name: 'New Discovery Session',
+        initial_parameters: {
+          gene_symbol: null,
+          search_term: null,
+        },
+      })
     }
   }, [sessionsLoading, sessions.length, createSession, hasInitiatedCreate])
 
@@ -88,11 +94,11 @@ export function DataDiscoveryContent({
       const query = parts.join(' ').trim() || 'MED13'
       return {
         metadata: {
-        query,
-        max_results: params?.max_results ?? 100,
-        date_from: params?.date_from ?? null,
-        date_to: params?.date_to ?? null,
-        publication_types: params?.publication_types ?? [],
+          query,
+          max_results: params?.max_results ?? 100,
+          date_from: params?.date_from ?? null,
+          date_to: params?.date_to ?? null,
+          publication_types: params?.publication_types ?? [],
         },
       }
     }

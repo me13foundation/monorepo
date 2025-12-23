@@ -162,7 +162,7 @@ async def list_space_sessions(
     summary="Create a discovery session within the space",
 )
 async def create_space_session(
-    request: schemas.CreateSessionRequest,
+    payload: schemas.CreateSessionRequest,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
     audit_context: AuditContext = Depends(get_audit_context),
@@ -172,8 +172,8 @@ async def create_space_session(
 
     session_entity = context.service.create_session(
         owner_id=current_user.id,
-        name=request.name,
-        parameters=_build_query_parameters(request.initial_parameters),
+        name=payload.name,
+        parameters=_build_query_parameters(payload.initial_parameters),
     )
 
     audit_service = dependencies.get_audit_trail_service()
@@ -184,7 +184,7 @@ async def create_space_session(
         actor_id=current_user.id,
         details={
             "research_space_id": str(context.service.space_id),
-            "name": request.name,
+            "name": payload.name,
         },
         context=audit_context,
         success=True,
@@ -290,7 +290,7 @@ async def get_space_session(
 )
 async def update_space_session_parameters(
     session_id: UUID,
-    request: schemas.UpdateParametersRequest,
+    payload: schemas.UpdateParametersRequest,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
     audit_context: AuditContext = Depends(get_audit_context),
@@ -301,7 +301,7 @@ async def update_space_session_parameters(
 
     updated = context.service.update_parameters(
         session_id,
-        _build_query_parameters(request.parameters),
+        _build_query_parameters(payload.parameters),
         owner_id=owner_filter,
     )
     if not updated:
@@ -316,7 +316,7 @@ async def update_space_session_parameters(
         action="data_discovery.session.update_parameters",
         target=("data_discovery_session", str(updated.id)),
         actor_id=current_user.id,
-        details=request.parameters.model_dump(),
+        details=payload.parameters.model_dump(),
         context=audit_context,
         success=True,
     )
@@ -373,7 +373,7 @@ async def toggle_space_session_source(
 )
 async def set_space_session_selections(
     session_id: UUID,
-    request: schemas.UpdateSelectionRequest,
+    payload: schemas.UpdateSelectionRequest,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
     audit_context: AuditContext = Depends(get_audit_context),
@@ -384,7 +384,7 @@ async def set_space_session_selections(
 
     updated = context.service.set_source_selection(
         session_id,
-        request.source_ids,
+        payload.source_ids,
         owner_id=owner_filter,
     )
     if not updated:

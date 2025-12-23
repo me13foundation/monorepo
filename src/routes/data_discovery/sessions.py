@@ -61,7 +61,7 @@ def get_orchestration_service(
     description="Create a new data discovery workbench session.",
 )
 async def create_session(
-    request: CreateSessionRequest,
+    payload: CreateSessionRequest,
     current_user: User = Depends(get_current_active_user),
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> DataDiscoverySessionResponse:
@@ -69,9 +69,9 @@ async def create_session(
     try:
         session_request = CreateDataDiscoverySessionRequest(
             owner_id=current_user.id,
-            name=request.name,
-            research_space_id=request.research_space_id or DEFAULT_RESEARCH_SPACE_ID,
-            initial_parameters=request.initial_parameters.to_domain_model(),
+            name=payload.name,
+            research_space_id=payload.research_space_id or DEFAULT_RESEARCH_SPACE_ID,
+            initial_parameters=payload.initial_parameters.to_domain_model(),
         )
         session = service.create_session(session_request)
         return data_discovery_session_to_response(session)
@@ -160,7 +160,7 @@ async def get_session_details(
 )
 async def update_session_parameters(
     session_id: UUID,
-    request: UpdateParametersRequest,
+    payload: UpdateParametersRequest,
     current_user: User = Depends(get_current_active_user),
     service: DataDiscoveryService = Depends(get_data_discovery_service_dependency),
 ) -> DataDiscoverySessionResponse:
@@ -168,7 +168,7 @@ async def update_session_parameters(
     try:
         update_req = UpdateSessionParametersRequest(
             session_id=session_id,
-            parameters=request.parameters.to_domain_model(),
+            parameters=payload.parameters.to_domain_model(),
         )
         session = service.update_session_parameters(update_req)
         if session is None:

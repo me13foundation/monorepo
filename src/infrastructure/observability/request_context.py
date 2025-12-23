@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from typing import Final
 from uuid import uuid4
 
-if TYPE_CHECKING:  # pragma: no cover - typing helpers only
-    from fastapi import Request
+from fastapi import Request  # noqa: TC002 - Needed at runtime for FastAPI DI
 
-    from src.type_definitions.common import AuditContext
+from src.type_definitions.common import AuditContext  # noqa: TC001
 
 REQUEST_ID_HEADER: Final[str] = "X-Request-ID"
 

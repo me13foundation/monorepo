@@ -27,10 +27,14 @@ const cspDirectives = [
   "base-uri 'self'",
   // Prevent form action hijacking
   "form-action 'self'",
+]
 
-  // Upgrade insecure requests
-  "upgrade-insecure-requests"
-].join('; ')
+// Upgrade insecure requests only in production
+if (!isDevelopment) {
+  cspDirectives.push("upgrade-insecure-requests")
+}
+
+const cspHeader = cspDirectives.join('; ')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -79,7 +83,7 @@ const nextConfig = {
           },
           {
             key: 'Content-Security-Policy',
-            value: cspDirectives,
+            value: cspHeader,
           },
           {
             key: 'Strict-Transport-Security',
