@@ -165,6 +165,8 @@ export interface UserActivity {
   details?: Record<string, unknown>
   ipAddress?: string
   userAgent?: string
+  requestId?: string
+  success?: boolean
   timestamp: string
 }
 
@@ -178,6 +180,8 @@ export interface AuditLog {
   newValues?: Record<string, unknown>
   ipAddress?: string
   userAgent?: string
+  requestId?: string
+  success?: boolean
   timestamp: string
 }
 

@@ -558,7 +558,7 @@ ifeq ($(POSTGRES_ACTIVE),)
 else
 	@$(MAKE) -s postgres-wait
 	@echo "Applying Alembic migrations (Postgres)..."
-	$(call run_with_postgres_env,$(ALEMBIC_BIN) upgrade head)
+	$(call run_with_postgres_env,$(ALEMBIC_BIN) upgrade heads)
 endif
 
 # Database
@@ -566,7 +566,7 @@ db-migrate: ## Run database migrations
 ifeq ($(POSTGRES_ACTIVE),)
 	alembic upgrade head
 else
-	$(call run_with_postgres_env,alembic upgrade head)
+	$(call run_with_postgres_env,alembic upgrade heads)
 endif
 
 db-create: ## Create database migration

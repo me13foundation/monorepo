@@ -20,7 +20,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -310,29 +316,37 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
             <div className="space-y-2">
               <Label htmlFor="role-filter">Role</Label>
               <Select
-                id="role-filter"
                 value={filters.role ?? 'all'}
-                onChange={(event) => handleRoleChange(event.target.value)}
+                onValueChange={handleRoleChange}
               >
-                {ROLE_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                <SelectTrigger id="role-filter">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_FILTERS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="status-filter">Status</Label>
               <Select
-                id="status-filter"
                 value={filters.status_filter ?? 'all'}
-                onChange={(event) => handleStatusChange(event.target.value)}
+                onValueChange={handleStatusChange}
               >
-                {STATUS_FILTERS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                <SelectTrigger id="status-filter">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_FILTERS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
@@ -595,15 +609,19 @@ function CreateUserDialog({
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
               <Select
-                id="role"
                 value={form.role}
-                onChange={(event) => updateField('role', event.target.value)}
+                onValueChange={(value) => updateField('role', value)}
               >
-                {ROLE_FILTERS.filter((role) => role.value !== 'all').map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                <SelectTrigger id="role">
+                  <SelectValue placeholder="Select role" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_FILTERS.filter((role) => role.value !== 'all').map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
           </div>

@@ -24,7 +24,13 @@ import {
 } from '@/components/ui/form'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
 import { MembershipRole } from '@/types/research-space'
 import { roleLabels } from './role-utils'
@@ -110,15 +116,19 @@ export function InviteMemberDialog({
                   <FormLabel>Role</FormLabel>
                   <FormControl>
                     <Select
-                      {...field}
                       value={field.value}
-                      onChange={(e) => field.onChange(e.target.value as MembershipRole)}
+                      onValueChange={(value) => field.onChange(value as MembershipRole)}
                     >
-                      {Object.values(MembershipRole).map((role) => (
-                        <option key={role} value={role}>
-                          {roleLabels[role]}
-                        </option>
-                      ))}
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.values(MembershipRole).map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {roleLabels[role]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                   </FormControl>
                   <FormDescription>

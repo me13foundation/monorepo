@@ -20,12 +20,14 @@ from src.application.services.storage_configuration_service import (
     StorageConfigurationService,
 )
 from src.domain.entities.storage_configuration import StorageConfiguration
+from src.infrastructure.observability.request_context import get_audit_context
 from src.routes.admin_routes.dependencies import (
     SYSTEM_ACTOR_ID,
     get_admin_db_session,
     get_storage_configuration_service,
 )
 from src.routes.data_discovery.dependencies import get_audit_trail_service
+from src.type_definitions.common import AuditContext
 from src.type_definitions.storage import (
     StorageConfigurationModel,
     StorageHealthReport,
@@ -137,6 +139,7 @@ async def create_storage_configuration(
         AuditTrailService,
         Depends(get_audit_trail_service),
     ],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> StorageConfigurationModel:
     configuration = await service.create_configuration(request)
     audit_service.record_action(
@@ -145,6 +148,8 @@ async def create_storage_configuration(
         target=("storage_configuration", str(configuration.id)),
         actor_id=SYSTEM_ACTOR_ID,
         details={"name": configuration.name, "provider": configuration.provider.value},
+        context=audit_context,
+        success=True,
     )
     return _serialize_configuration(configuration)
 
@@ -166,6 +171,7 @@ async def update_storage_configuration(
         AuditTrailService,
         Depends(get_audit_trail_service),
     ],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> StorageConfigurationModel:
     try:
         configuration = await service.update_configuration(configuration_id, request)
@@ -180,6 +186,8 @@ async def update_storage_configuration(
         target=("storage_configuration", str(configuration.id)),
         actor_id=SYSTEM_ACTOR_ID,
         details=request.model_dump(exclude_unset=True),
+        context=audit_context,
+        success=True,
     )
     return _serialize_configuration(configuration)
 
@@ -207,6 +215,7 @@ async def delete_storage_configuration(
         AuditTrailService,
         Depends(get_audit_trail_service),
     ],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> dict[str, str]:
     try:
         deleted = await service.delete_configuration(configuration_id, force=force)
@@ -220,6 +229,8 @@ async def delete_storage_configuration(
         target=("storage_configuration", str(configuration_id)),
         actor_id=SYSTEM_ACTOR_ID,
         details={"force": force},
+        context=audit_context,
+        success=True,
     )
     return {"message": f"Storage configuration {action}"}
 
@@ -240,6 +251,7 @@ async def test_storage_configuration(
         AuditTrailService,
         Depends(get_audit_trail_service),
     ],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> StorageProviderTestResult:
     try:
         result = await service.test_configuration(configuration_id)
@@ -252,6 +264,8 @@ async def test_storage_configuration(
         target=("storage_configuration", str(configuration_id)),
         actor_id=SYSTEM_ACTOR_ID,
         details={"success": result.success},
+        context=audit_context,
+        success=True,
     )
     return result
 

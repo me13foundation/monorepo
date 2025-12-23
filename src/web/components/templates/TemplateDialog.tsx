@@ -8,6 +8,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { TemplateCreatePayload, TemplateCategory, TemplateResponse, TemplateUpdatePayload } from '@/types/template'
 import { SourceType } from '@/types/data-source'
 import { Textarea } from '@/components/ui/textarea'
@@ -176,13 +184,18 @@ export function TemplateDialog({
                   <FormItem>
                     <FormLabel>Category</FormLabel>
                     <FormControl>
-                      <select {...field} className="rounded-md border px-3 py-2 text-sm">
-                        {templateCategories.map((cat) => (
-                          <option key={cat} value={cat}>
-                            {cat.replace('_', ' ')}
-                          </option>
-                        ))}
-                      </select>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templateCategories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat.replace('_', ' ')}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -195,13 +208,18 @@ export function TemplateDialog({
                   <FormItem>
                     <FormLabel>Source Type</FormLabel>
                     <FormControl>
-                      <select {...field} className="rounded-md border px-3 py-2 text-sm">
-                        {templateSourceTypes.map((type) => (
-                          <option key={type} value={type}>
-                            {type.replace('_', ' ')}
-                          </option>
-                        ))}
-                      </select>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select source type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {templateSourceTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type.replace('_', ' ')}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -239,11 +257,9 @@ export function TemplateDialog({
               name="is_public"
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={field.value}
-                    onChange={(event) => field.onChange(event.target.checked)}
-                    className="size-4 rounded border"
+                    onCheckedChange={field.onChange}
                   />
                   <FormLabel className="!mt-0">Public template</FormLabel>
                 </FormItem>

@@ -25,8 +25,9 @@ from src.infrastructure.dependency_injection.container import container
 from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,
 )
+from src.infrastructure.observability.request_context import get_audit_context
 from src.routes.auth import get_current_active_user
-from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.common import AuditContext, JSONObject, JSONValue
 
 router = APIRouter(prefix="/curation", tags=["curation"])
 
@@ -159,6 +160,7 @@ async def submit(
     current_user: User = Depends(get_current_active_user),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
     audit_service: AuditTrailService = Depends(_audit_service),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> dict[str, int]:
     await _require_permission(
         current_user,
@@ -173,6 +175,8 @@ async def submit(
         target=(req.entity_type, req.entity_id),
         actor_id=current_user.id,
         details={"priority": req.priority, "review_id": created.id},
+        context=audit_context,
+        success=True,
     )
     return {"id": created.id}
 
@@ -184,6 +188,7 @@ async def bulk(
     current_user: User = Depends(get_current_active_user),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
     audit_service: AuditTrailService = Depends(_audit_service),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> dict[str, int]:
     await _require_permission(
         current_user,
@@ -207,6 +212,8 @@ async def bulk(
         target=("curation_queue", ",".join(str(_id) for _id in ids_list)),
         actor_id=current_user.id,
         details={"ids": ids_payload, "updated": count},
+        context=audit_context,
+        success=True,
     )
     return {"updated": count}
 
@@ -218,6 +225,7 @@ async def comment(
     current_user: User = Depends(get_current_active_user),
     authz_service: AuthorizationService = Depends(container.get_authorization_service),
     audit_service: AuditTrailService = Depends(_audit_service),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> dict[str, int]:
     await _require_permission(
         current_user,
@@ -238,6 +246,8 @@ async def comment(
         target=(req.entity_type, req.entity_id),
         actor_id=current_user.id,
         details={"comment_id": comment_id, "delegated_user": req.user},
+        context=audit_context,
+        success=True,
     )
     return {"id": comment_id}
 

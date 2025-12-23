@@ -16,6 +16,7 @@ from src.database.session import get_session
 from src.domain.entities.data_discovery_parameters import AdvancedQueryParameters
 from src.domain.entities.user import User, UserRole
 from src.infrastructure.dependency_injection.container import container
+from src.infrastructure.observability.request_context import get_audit_context
 from src.infrastructure.repositories.research_space_membership_repository import (
     SqlAlchemyResearchSpaceMembershipRepository,
 )
@@ -23,6 +24,7 @@ from src.infrastructure.repositories.research_space_repository import (
     SqlAlchemyResearchSpaceRepository,
 )
 from src.routes.auth import get_current_active_user
+from src.type_definitions.common import AuditContext
 
 from .data_discovery import dependencies, mappers, schemas
 
@@ -163,6 +165,7 @@ async def create_space_session(
     request: schemas.CreateSessionRequest,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> schemas.DataDiscoverySessionResponse:
     """Create a new session pinned to the research space."""
     require_space_access(context, current_user)
@@ -183,6 +186,8 @@ async def create_space_session(
             "research_space_id": str(context.service.space_id),
             "name": request.name,
         },
+        context=audit_context,
+        success=True,
     )
     return mappers.session_to_response(session_entity)
 
@@ -288,6 +293,7 @@ async def update_space_session_parameters(
     request: schemas.UpdateParametersRequest,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> schemas.DataDiscoverySessionResponse:
     """Update query parameters for a session within the space."""
     require_space_access(context, current_user)
@@ -311,6 +317,8 @@ async def update_space_session_parameters(
         target=("data_discovery_session", str(updated.id)),
         actor_id=current_user.id,
         details=request.parameters.model_dump(),
+        context=audit_context,
+        success=True,
     )
     return mappers.session_to_response(updated)
 
@@ -325,6 +333,7 @@ async def toggle_space_session_source(
     catalog_entry_id: str,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> schemas.DataDiscoverySessionResponse:
     """Toggle source selection for a session within this space."""
     require_space_access(context, current_user)
@@ -351,6 +360,8 @@ async def toggle_space_session_source(
             "catalog_entry_id": catalog_entry_id,
             "selected_sources": list(updated.selected_sources),
         },
+        context=audit_context,
+        success=True,
     )
     return mappers.session_to_response(updated)
 
@@ -365,6 +376,7 @@ async def set_space_session_selections(
     request: schemas.UpdateSelectionRequest,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> schemas.DataDiscoverySessionResponse:
     """Replace the selected sources within a session."""
     require_space_access(context, current_user)
@@ -388,6 +400,8 @@ async def set_space_session_selections(
         target=("data_discovery_session", str(updated.id)),
         actor_id=current_user.id,
         details={"selected_sources": list(updated.selected_sources)},
+        context=audit_context,
+        success=True,
     )
     return mappers.session_to_response(updated)
 
@@ -401,6 +415,7 @@ async def delete_space_session(
     session_id: UUID,
     context: SpaceDiscoveryContext = Depends(get_space_discovery_context),
     current_user: User = Depends(get_current_active_user),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> None:
     """Delete a session scoped to this space."""
     require_space_access(context, current_user)
@@ -423,6 +438,8 @@ async def delete_space_session(
         target=("data_discovery_session", str(session_id)),
         actor_id=current_user.id,
         details={"research_space_id": str(context.service.space_id)},
+        context=audit_context,
+        success=True,
     )
 
 

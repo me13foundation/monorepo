@@ -27,8 +27,7 @@ const cspDirectives = [
   "base-uri 'self'",
   // Prevent form action hijacking
   "form-action 'self'",
-  // Restrict plugin types
-  "plugin-types 'none'",
+
   // Upgrade insecure requests
   "upgrade-insecure-requests"
 ].join('; ')

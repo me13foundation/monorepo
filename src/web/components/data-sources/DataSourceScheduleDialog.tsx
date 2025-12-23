@@ -27,7 +27,14 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const scheduleSchema = z.object({
   enabled: z.boolean().default(false),
@@ -143,11 +150,9 @@ export function DataSourceScheduleDialog({
                     </FormDescription>
                   </div>
                   <FormControl>
-                    <input
-                      type="checkbox"
-                      className="size-5 rounded border border-input"
+                    <Checkbox
                       checked={field.value}
-                      onChange={(event) => field.onChange(event.target.checked)}
+                      onCheckedChange={field.onChange}
                     />
                   </FormControl>
                 </FormItem>
@@ -161,12 +166,21 @@ export function DataSourceScheduleDialog({
                 <FormItem>
                   <FormLabel>Frequency</FormLabel>
                   <FormControl>
-                    <Select {...field} disabled={!form.watch('enabled')}>
-                      {frequencyOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={!form.watch('enabled')}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select frequency" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {frequencyOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                   </FormControl>
                   <FormDescription>

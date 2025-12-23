@@ -14,7 +14,14 @@ import {
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -127,8 +134,8 @@ export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProp
       setFormState((prev) => ({ ...prev, [field]: value }))
     }
 
-  const handleStatusChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    setFormState((prev) => ({ ...prev, status: event.target.value as SpaceStatus }))
+  const handleStatusChange = (value: string) => {
+    setFormState((prev) => ({ ...prev, status: value as SpaceStatus }))
   }
 
   const handleAdvancedChange = <K extends keyof AdvancedSettingsState>(
@@ -261,12 +268,17 @@ export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProp
 
             <div className="space-y-2">
               <Label htmlFor="space-status">Status</Label>
-              <Select id="space-status" value={formState.status} onChange={handleStatusChange}>
-                {Object.values(SpaceStatus).map((status) => (
-                  <option key={status} value={status}>
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </option>
-                ))}
+              <Select value={formState.status} onValueChange={handleStatusChange}>
+                <SelectTrigger id="space-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.values(SpaceStatus).map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
 
@@ -367,15 +379,17 @@ export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProp
                 <div className="space-y-1">
                   <Label htmlFor="notification-frequency">Notification Frequency</Label>
                   <Select
-                    id="notification-frequency"
                     value={advancedSettings.notificationFrequency}
-                    onChange={(event) =>
-                      handleAdvancedChange('notificationFrequency', event.target.value)
-                    }
+                    onValueChange={(value) => handleAdvancedChange('notificationFrequency', value)}
                   >
-                    <option value="instant">Instant</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
+                    <SelectTrigger id="notification-frequency">
+                      <SelectValue placeholder="Select frequency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="instant">Instant</SelectItem>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                    </SelectContent>
                   </Select>
                 </div>
               </CardContent>
@@ -412,11 +426,10 @@ interface ToggleRowProps {
 function ToggleRow({ label, description, checked, onCheckedChange }: ToggleRowProps) {
   return (
     <label className="flex items-start gap-3">
-      <input
-        type="checkbox"
-        className="mt-1 size-4 rounded border border-input text-primary focus-visible:outline-primary"
+      <Checkbox
         checked={checked}
-        onChange={(event) => onCheckedChange(event.target.checked)}
+        onCheckedChange={onCheckedChange}
+        className="mt-1"
       />
       <span>
         <p className="text-sm font-medium leading-none">{label}</p>

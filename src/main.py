@@ -19,10 +19,12 @@ from src.infrastructure.dependency_injection.dependencies import (
     initialize_legacy_session,
 )
 from src.middleware import (
+    AuditLoggingMiddleware,
     AuthMiddleware,
     EndpointRateLimitMiddleware,
     JWTAuthMiddleware,
     MaintenanceModeMiddleware,
+    RequestContextMiddleware,
 )
 from src.routes import (
     admin_router,
@@ -141,11 +143,17 @@ def create_app() -> FastAPI:
         expose_headers=["*"],
     )
 
+    # Attach request IDs + audit context metadata
+    app.add_middleware(RequestContextMiddleware)
+
     # Add legacy API key authentication middleware (runs first)
     app.add_middleware(AuthMiddleware)
 
     # Add JWT authentication middleware
     app.add_middleware(JWTAuthMiddleware)
+
+    # Log read access for audit trails
+    app.add_middleware(AuditLoggingMiddleware)
 
     # Add rate limiting middleware
     app.add_middleware(EndpointRateLimitMiddleware)

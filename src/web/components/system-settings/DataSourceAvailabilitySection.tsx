@@ -14,7 +14,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   useAdminCatalogEntries,
   useCatalogAvailability,
@@ -489,26 +495,31 @@ export function DataSourceAvailabilitySection() {
                                 </Badge>
                                 <Select
                                   value={selectValue}
-                                  onChange={(event) => {
-                                    const value = event.target.value as PermissionLevel | 'inherit'
-                                    if (value === 'inherit') {
+                                  onValueChange={(value) => {
+                                    const permissionValue = value as PermissionLevel | 'inherit'
+                                    if (permissionValue === 'inherit') {
                                       handleProjectReset(space.id)
                                     } else {
-                                      handleProjectPermissionChange(space.id, value)
+                                      handleProjectPermissionChange(space.id, permissionValue)
                                     }
                                   }}
                                   disabled={
                                     setProjectAvailability.isPending || clearProjectAvailability.isPending
                                   }
                                 >
-                                  <option value="inherit">
-                                    Inherit ({PERMISSION_LABELS[inheritedPermission]})
-                                  </option>
-                                  {PERMISSION_ORDER.map((permission) => (
-                                    <option key={permission} value={permission}>
-                                      {PERMISSION_LABELS[permission]} — {PERMISSION_DESCRIPTIONS[permission]}
-                                    </option>
-                                  ))}
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select permission" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="inherit">
+                                      Inherit ({PERMISSION_LABELS[inheritedPermission]})
+                                    </SelectItem>
+                                    {PERMISSION_ORDER.map((permission) => (
+                                      <SelectItem key={permission} value={permission}>
+                                        {PERMISSION_LABELS[permission]} — {PERMISSION_DESCRIPTIONS[permission]}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
                                 </Select>
                               </div>
                             </div>

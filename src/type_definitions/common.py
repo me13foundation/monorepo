@@ -158,6 +158,17 @@ class ValidationResult(TypedDict):
     warnings: list[ValidationError]
 
 
+# Audit context types
+class AuditContext(TypedDict, total=False):
+    """Request metadata captured for audit logging."""
+
+    request_id: str
+    ip_address: str | None
+    user_agent: str | None
+    method: str
+    path: str
+
+
 # Status and filter types
 EntityStatus = Literal["pending", "approved", "rejected", "quarantined"]
 PriorityLevel = Literal["high", "medium", "low"]

@@ -9,6 +9,7 @@ import { SidebarTrigger, SidebarTriggerRight } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { buildBreadcrumbs } from "@/lib/navigation-config"
+import { cn } from "@/lib/utils"
 import type { ResearchSpace } from "@/types/research-space"
 
 interface GlobalHeaderProps {
@@ -35,7 +36,11 @@ export function GlobalHeader({ currentSpace }: GlobalHeaderProps) {
   }, [pathname, currentSpace])
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background px-2 sm:px-4">
+    <header
+      className={cn(
+        "sticky top-2 z-50 flex h-14 shrink-0 items-center gap-2 rounded-2xl border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 px-3 sm:px-4 mx-2 sm:mx-4 mt-2 mb-4 shadow-brand-sm transition-all duration-300 ease-in-out"
+      )}
+    >
       {/* Sidebar toggle and breadcrumbs */}
       <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
         <SidebarTrigger className="-ml-1 shrink-0" />

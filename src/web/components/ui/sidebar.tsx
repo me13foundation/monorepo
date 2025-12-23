@@ -3,14 +3,14 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft, PanelRight } from "lucide-react"
+import { PanelLeft, MessageCircle } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -51,6 +51,8 @@ type SidebarContext = {
   setOpenRight: (open: boolean) => void
   openMobile: boolean
   setOpenMobile: (open: boolean) => void
+  openMobileRight: boolean
+  setOpenMobileRight: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
   toggleRightSidebar: () => void
@@ -92,6 +94,7 @@ const SidebarProvider = React.forwardRef<
     const isMobile = useIsMobile()
     const initialOpen = React.useRef<boolean>(getInitialSidebarOpen(defaultOpen))
     const [openMobile, setOpenMobile] = React.useState(false)
+    const [openMobileRight, setOpenMobileRight] = React.useState(false)
 
     // Left Sidebar State
     const [_open, _setOpen] = React.useState(initialOpen.current)
@@ -121,8 +124,10 @@ const SidebarProvider = React.forwardRef<
     }, [isMobile, setOpen, setOpenMobile])
 
     const toggleRightSidebar = React.useCallback(() => {
-      setOpenRight((prev) => !prev)
-    }, [])
+      return isMobile
+        ? setOpenMobileRight((open) => !open)
+        : setOpenRight((prev) => !prev)
+    }, [isMobile, setOpenMobileRight, setOpenRight])
 
     // Adds a keyboard shortcut to toggle the left sidebar.
     React.useEffect(() => {
@@ -154,10 +159,12 @@ const SidebarProvider = React.forwardRef<
         isMobile,
         openMobile,
         setOpenMobile,
+        openMobileRight,
+        setOpenMobileRight,
         toggleSidebar,
         toggleRightSidebar,
       }),
-      [state, open, setOpen, stateRight, openRight, isMobile, openMobile, setOpenMobile, toggleSidebar, toggleRightSidebar]
+      [state, open, setOpen, stateRight, openRight, isMobile, openMobile, setOpenMobile, openMobileRight, setOpenMobileRight, toggleSidebar, toggleRightSidebar]
     )
 
     return (
@@ -206,8 +213,10 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state: stateLeft, stateRight, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state: stateLeft, stateRight, openMobile, setOpenMobile, openMobileRight, setOpenMobileRight } = useSidebar()
     const state = side === "left" ? stateLeft : stateRight
+    const isOpenMobile = side === "left" ? openMobile : openMobileRight
+    const setIsOpenMobile = side === "left" ? setOpenMobile : setOpenMobileRight
 
     if (collapsible === "none") {
       return (
@@ -226,7 +235,7 @@ const Sidebar = React.forwardRef<
 
     if (isMobile) {
       return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
+        <Sheet open={isOpenMobile} onOpenChange={setIsOpenMobile} {...props}>
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
@@ -238,6 +247,10 @@ const Sidebar = React.forwardRef<
             }
             side={side}
           >
+            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+            <SheetDescription className="sr-only">
+              Access your research spaces, dashboard, and settings.
+            </SheetDescription>
             <div className="flex size-full flex-col">{children}</div>
           </SheetContent>
         </Sheet>
@@ -336,7 +349,7 @@ const SidebarTriggerRight = React.forwardRef<
       }}
       {...props}
     >
-      <PanelRight />
+      <MessageCircle />
       <span className="sr-only">Toggle Right Sidebar</span>
     </Button>
   )
@@ -382,8 +395,8 @@ const SidebarInset = React.forwardRef<
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background",
-        "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-3xl md:peer-data-[variant=inset]:shadow-brand-md",
+        "relative flex h-svh flex-1 flex-col bg-background",
+        "peer-data-[variant=inset]:h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-3xl md:peer-data-[variant=inset]:shadow-brand-md",
         className
       )}
       {...props}

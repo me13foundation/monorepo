@@ -25,8 +25,10 @@ from src.infrastructure.dependency_injection.dependencies import (
     get_discovery_configuration_service_dependency,
     get_pubmed_discovery_service_dependency,
 )
+from src.infrastructure.observability.request_context import get_audit_context
 from src.routes.auth import get_current_active_user
 from src.routes.data_discovery.dependencies import get_audit_trail_service
+from src.type_definitions.common import AuditContext
 
 from .mappers import (
     preset_to_response,
@@ -94,6 +96,7 @@ async def create_pubmed_preset(
     ],
     db: Annotated[Session, Depends(get_session)],
     audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
     current_user: User = Depends(get_current_active_user),
 ) -> DiscoveryPresetResponse:
     """Create a new PubMed preset."""
@@ -120,6 +123,8 @@ async def create_pubmed_preset(
                     str(preset.research_space_id) if preset.research_space_id else None
                 ),
             },
+            context=audit_context,
+            success=True,
         )
 
         return preset_to_response(preset)
@@ -149,6 +154,7 @@ async def delete_pubmed_preset(
     ],
     db: Annotated[Session, Depends(get_session)],
     audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
     current_user: User = Depends(get_current_active_user),
 ) -> None:
     """Delete a preset owned by the current user."""
@@ -165,6 +171,8 @@ async def delete_pubmed_preset(
         action="discovery.preset.delete",
         target=("discovery_preset", str(preset_id)),
         actor_id=current_user.id,
+        context=audit_context,
+        success=True,
     )
 
 
@@ -182,6 +190,7 @@ async def run_pubmed_search(
     ],
     db: Annotated[Session, Depends(get_session)],
     audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
     current_user: User = Depends(get_current_active_user),
 ) -> DiscoverySearchJobResponse:
     """Start executing an advanced PubMed search."""
@@ -202,6 +211,8 @@ async def run_pubmed_search(
             "gene_symbol": job.parameters.gene_symbol,
             "max_results": job.parameters.max_results,
         },
+        context=audit_context,
+        success=True,
     )
 
     return search_job_to_response(job)
@@ -243,6 +254,7 @@ async def download_pubmed_article_pdf(
     ],
     db: Annotated[Session, Depends(get_session)],
     audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
     current_user: User = Depends(get_current_active_user),
 ) -> StorageOperationResponse:
     """Trigger PDF storage for a PubMed article."""
@@ -263,6 +275,8 @@ async def download_pubmed_article_pdf(
                 "article_id": request.article_id,
                 "key": record.key,
             },
+            context=audit_context,
+            success=True,
         )
 
         return storage_operation_to_response(record)

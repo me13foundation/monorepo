@@ -49,6 +49,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -976,16 +977,14 @@ export function SourceParameterModal({
             <div className="space-y-4">
               <div className="flex flex-wrap items-center justify-end gap-3">
                 <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    className="size-4 rounded border border-input"
+                  <Checkbox
                     checked={advancedValues.scheduling.enabled}
-                    onChange={(event) => {
+                    onCheckedChange={(checked) => {
                       setAdvancedValues((prev) => ({
                         ...prev,
                         scheduling: {
                           ...prev.scheduling,
-                          enabled: event.target.checked,
+                          enabled: checked,
                         },
                       }))
                       setIsDirty(true)

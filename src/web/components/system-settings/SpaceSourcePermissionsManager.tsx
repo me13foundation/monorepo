@@ -4,7 +4,13 @@ import { useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Loader2 } from 'lucide-react'
 import {
@@ -141,26 +147,30 @@ export function SpaceSourcePermissionsManager() {
                               </Badge>
                               <Select
                                 value={selectValue}
-                                onChange={(event) =>
+                                onValueChange={(value) =>
                                   handlePermissionChange(
                                     source.id,
                                     space.id,
-                                    event.target.value as PermissionLevel | 'inherit',
+                                    value as PermissionLevel | 'inherit',
                                   )
                                 }
                                 disabled={
                                   setPermissionMutation.isPending || clearPermissionMutation.isPending
                                 }
-                                className="w-full"
                               >
-                                <option value="inherit">
-                                  Inherit ({PERMISSION_LABELS[inherited]})
-                                </option>
-                                {PERMISSION_ORDER.map((permission) => (
-                                  <option key={permission} value={permission}>
-                                    {PERMISSION_LABELS[permission]} — {PERMISSION_DESCRIPTIONS[permission]}
-                                  </option>
-                                ))}
+                                <SelectTrigger className="w-full">
+                                  <SelectValue placeholder="Select permission" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="inherit">
+                                    Inherit ({PERMISSION_LABELS[inherited]})
+                                  </SelectItem>
+                                  {PERMISSION_ORDER.map((permission) => (
+                                    <SelectItem key={permission} value={permission}>
+                                      {PERMISSION_LABELS[permission]} — {PERMISSION_DESCRIPTIONS[permission]}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
                               </Select>
                             </div>
                           </TableCell>

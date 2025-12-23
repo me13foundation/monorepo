@@ -24,7 +24,13 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
 
 const dataSourceSchema = z.object({
@@ -124,11 +130,16 @@ export function CreateDataSourceDialog({
                 <FormItem>
                   <FormLabel>Source Type</FormLabel>
                   <FormControl>
-                    <Select {...field}>
-                      <option value="api">REST API</option>
-                      <option value="database">Database Connection</option>
-                      <option value="file_upload">File Upload</option>
-                      <option value="web_scraping">Web Scraping</option>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select source type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="api">REST API</SelectItem>
+                        <SelectItem value="database">Database Connection</SelectItem>
+                        <SelectItem value="file_upload">File Upload</SelectItem>
+                        <SelectItem value="web_scraping">Web Scraping</SelectItem>
+                      </SelectContent>
                     </Select>
                   </FormControl>
                   <FormDescription>

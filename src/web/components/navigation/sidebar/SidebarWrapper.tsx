@@ -23,6 +23,7 @@ interface SidebarWrapperProps {
 
 export function SidebarWrapper({ children, initialSpaces, initialTotal }: SidebarWrapperProps) {
   const { data: session, status } = useSession()
+
   const hasInitialSpaces = Boolean(initialSpaces && initialSpaces.length > 0)
   const { data: spacesData, isLoading: spacesLoading } = useResearchSpaces(undefined, {
     enabled: !hasInitialSpaces,
@@ -109,13 +110,11 @@ export function SidebarWrapper({ children, initialSpaces, initialTotal }: Sideba
         currentSpace={currentSpace}
         userSpaceRole={userSpaceRole}
       />
-      <SidebarInset className="rounded-3xl overflow-hidden shadow-brand-md">
+      <SidebarInset className="rounded-3xl shadow-brand-md relative h-svh md:h-[calc(100svh-theme(spacing.4))] overflow-y-auto overflow-x-hidden flex flex-col">
         <GlobalHeader currentSpace={currentSpace} />
-        <main className="flex-1 overflow-auto">
-          <div className="mx-auto w-full max-w-[1200px] p-brand-sm md:p-brand-md lg:p-brand-lg">
-            {children}
-          </div>
-        </main>
+        <div className="mx-auto w-full max-w-[1200px] p-brand-sm md:p-brand-md lg:p-brand-lg pt-0 md:pt-0 lg:pt-0 flex-1">
+          {children}
+        </div>
       </SidebarInset>
       <CollaborativeSidebar />
     </SidebarProvider>

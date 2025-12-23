@@ -16,7 +16,9 @@ from src.domain.entities.user import User
 from src.infrastructure.dependency_injection.dependencies import (
     get_data_discovery_service_dependency,
 )
+from src.infrastructure.observability.request_context import get_audit_context
 from src.routes.auth import get_current_active_user
+from src.type_definitions.common import AuditContext
 
 from .dependencies import (
     get_audit_trail_service,
@@ -44,6 +46,7 @@ async def execute_query_test(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_session),
     audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    audit_context: AuditContext = Depends(get_audit_context),
 ) -> QueryTestResultResponse:
     """Execute a query test."""
     try:
@@ -77,6 +80,8 @@ async def execute_query_test(
                 "catalog_entry_id": request.catalog_entry_id,
                 "status": result.status.value,
             },
+            context=audit_context,
+            success=True,
         )
         return test_result_to_response(result)
 
