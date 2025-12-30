@@ -27,6 +27,7 @@ defusedxml>=0.7.0
 # Utilities
 python-multipart>=0.0.6
 pyyaml>=6.0.0
+bcrypt>=4.1.0
 flujo
 
 # Google Cloud (uncomment when gcloud SDK is set up)
