@@ -59,7 +59,7 @@ jobs:
         run: ruff check src/ tests/
 
       - name: Run type checking
-        run: mypy src/
+        run: mypy src/ --install-types --non-interactive
 
       - name: Run security audit (Bandit)
         run: |
