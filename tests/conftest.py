@@ -144,6 +144,11 @@ def setup_test_environment():
         class_=Session,
     )
     # Ensure schema exists for the sync engine used in tests
+    if "audit_logs" not in Base.metadata.tables:
+        print(f"DEBUG: Tables in metadata: {list(Base.metadata.tables.keys())}")
+        # Force import to see if it fixes it
+        import src.models.database.audit  # noqa: F401
+    
     Base.metadata.create_all(bind=sync_engine)
 
     # Propagate the updated SessionLocal/engine to test modules that import them.
