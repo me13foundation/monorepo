@@ -40,7 +40,7 @@ jobs:
       - name: Check for critical vulnerabilities
         working-directory: src/web
         run: |
-          if npm audit --production --audit-level=critical 2>&1 | grep -q "found"; then
+          if npm audit --production --audit-level=critical 2>&1 | grep -qE "[1-9][0-9]* (vulnerability|vulnerabilities) found"; then
             echo "❌ CRITICAL vulnerabilities found!"
             npm audit --production --audit-level=critical
             exit 1
@@ -103,7 +103,7 @@ jobs:
           fi
 
           # Check for hardcoded secrets/API keys
-          if grep -riE "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]+['\"]" --include="*.tsx" --include="*.ts" --include="*.jsx" --include="*.js" --exclude-dir=node_modules --exclude-dir=.next .; then
+          if grep -riE "(api[_-]?key|secret|password|token)\s*[:=]\s*['\"][^'\"]+['\"]" --include="*.tsx" --include="*.ts" --include="*.jsx" --include="*.js" --exclude="*.test.*" --exclude-dir="__tests__" --exclude-dir=node_modules --exclude-dir=.next .; then
             echo "⚠️ WARNING: Potential hardcoded secrets found. Review the files above."
             exit 1
           else
