@@ -16,14 +16,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
 import src.models.database  # noqa: F401
-from src.models.database.audit import AuditLog  # noqa: F401
-from src.models.database.base import Base
-from src.models.database.user import UserModel  # noqa: F401
 from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
 from src.database.url_resolver import (
     resolve_async_database_url,
     to_async_database_url,
 )
+from src.models.database.audit import AuditLog  # noqa: F401
+from src.models.database.base import Base
+from src.models.database.user import UserModel  # noqa: F401
+
 # The original `from src.models.database.base import Base` was here, but it's moved up.
 
 # Test database configuration (absolute path to avoid divergent relative paths)
