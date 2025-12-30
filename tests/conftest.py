@@ -25,7 +25,6 @@ from src.models.database.base import Base
 
 # Test database configuration (absolute path to avoid divergent relative paths)
 # Support pytest-xdist by using unique database files per worker
-import os
 
 worker_id = os.environ.get("PYTEST_XDIST_WORKER", "")
 db_filename = f"test_med13_{worker_id}.db" if worker_id else "test_med13.db"
