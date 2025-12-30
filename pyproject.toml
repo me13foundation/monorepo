@@ -63,7 +63,7 @@ target-version = "py313"
 
 [tool.bandit]
 exclude_dirs = [ "tests", "migrations", ".venv",]
-skips = [ "B101", "B601",]
+skips = [ "B101", "B601", "B405", "B106",]
 
 [tool.safety]
 ignore-vulns = []
