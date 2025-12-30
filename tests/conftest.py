@@ -21,7 +21,9 @@ from src.database.url_resolver import (
     to_async_database_url,
 )
 from src.models.database import storage as _storage_models  # noqa: F401
+from src.models.database.audit import AuditLog  # noqa: F401
 from src.models.database.base import Base
+from src.models.database.user import UserModel  # noqa: F401
 
 # Test database configuration (absolute path to avoid divergent relative paths)
 TEST_DB_PATH = Path.cwd() / "test_med13.db"
