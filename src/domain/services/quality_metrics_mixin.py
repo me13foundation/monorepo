@@ -216,7 +216,7 @@ class QualityMetricsMixin:
                 # Simple type inference
                 if all(isinstance(v, str) for v in values):
                     types[column] = "string"
-                elif all(isinstance(v, (int, float)) for v in values):
+                elif all(isinstance(v, int | float) for v in values):
                     if all(isinstance(v, int) for v in values):
                         types[column] = "integer"
                     else:

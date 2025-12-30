@@ -11,14 +11,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
+from src.application.export.export_types import (
+    CompressionFormat,
+    ExportFormat,
+)
 from src.application.export.formatters import (
     export_as_csv,
     export_as_json,
     export_as_jsonl,
-)
-from src.application.export.types import (
-    CompressionFormat,
-    ExportFormat,
 )
 from src.application.export.utils import (
     collect_paginated,
@@ -154,7 +154,7 @@ class BulkExportService:
         compression: CompressionFormat = CompressionFormat.NONE,
         filters: QueryFilters | None = None,
         chunk_size: int = 1000,
-    ) -> Generator[str | bytes, None, None]:
+    ) -> Generator[str | bytes]:
         if entity_type == "genes":
             yield from self._export_genes(
                 export_format,
@@ -193,7 +193,7 @@ class BulkExportService:
         compression: CompressionFormat,
         filters: QueryFilters | None,
         chunk_size: int,
-    ) -> Generator[str | bytes, None, None]:
+    ) -> Generator[str | bytes]:
         filters_payload = copy_filters(filters)
         search_value = filters_payload.get("search")
         search_term = search_value if isinstance(search_value, str) else None
@@ -226,7 +226,7 @@ class BulkExportService:
         compression: CompressionFormat,
         filters: QueryFilters | None,
         chunk_size: int,
-    ) -> Generator[str | bytes, None, None]:
+    ) -> Generator[str | bytes]:
         variants = collect_paginated(
             lambda page, size: self._variant_service.list_variants(
                 page=page,
@@ -256,7 +256,7 @@ class BulkExportService:
         compression: CompressionFormat,
         filters: QueryFilters | None,
         chunk_size: int,
-    ) -> Generator[str | bytes, None, None]:
+    ) -> Generator[str | bytes]:
         phenotypes = collect_paginated(
             lambda page, size: self._phenotype_service.list_phenotypes(
                 page=page,
@@ -286,7 +286,7 @@ class BulkExportService:
         compression: CompressionFormat,
         filters: QueryFilters | None,
         chunk_size: int,
-    ) -> Generator[str | bytes, None, None]:
+    ) -> Generator[str | bytes]:
         evidence_list = collect_paginated(
             lambda page, size: self._evidence_service.list_evidence(
                 page=page,

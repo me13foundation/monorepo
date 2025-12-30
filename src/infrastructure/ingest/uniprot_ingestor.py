@@ -159,7 +159,7 @@ class UniProtIngestor(UniProtRecordParserMixin, UniProtXmlParserMixin, BaseInges
 
         raw_size = kwargs.get("max_results", 50)
         size = 50
-        if isinstance(raw_size, (int, float)) or (
+        if isinstance(raw_size, int | float) or (
             isinstance(raw_size, str) and raw_size.isdigit()
         ):
             size = int(raw_size)

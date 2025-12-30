@@ -58,7 +58,7 @@ def test_engine():
 
 
 @pytest.fixture(scope="function")
-def db_session(test_engine) -> Generator[Session, None, None]:
+def db_session(test_engine) -> Generator[Session]:
     """Provide a database session for tests."""
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
@@ -79,9 +79,9 @@ def setup_test_environment():
     os.environ["DATABASE_URL"] = TEST_DATABASE_URL
     os.environ["ASYNC_DATABASE_URL"] = to_async_database_url(TEST_DATABASE_URL)
     os.environ["TESTING"] = "true"
-    os.environ[
-        "MED13_DEV_JWT_SECRET"
-    ] = "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz"
+    os.environ["MED13_DEV_JWT_SECRET"] = (
+        "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz"
+    )
 
     # Ensure the global dependency container uses the test JWT secret
     from src.infrastructure.dependency_injection import container as container_module

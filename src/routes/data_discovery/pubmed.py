@@ -56,8 +56,7 @@ router = APIRouter(prefix="/pubmed", tags=["data-discovery-pubmed"])
 )
 async def list_pubmed_presets(
     *,
-    research_space_id: UUID
-    | None = Query(
+    research_space_id: UUID | None = Query(
         None,
         description="Include presets shared with this space",
     ),

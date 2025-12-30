@@ -194,7 +194,7 @@ class JWTProvider(JWTProviderService):
             raise ValueError(message) from exc
 
         exp_timestamp = payload.get("exp")
-        if not isinstance(exp_timestamp, (int, float)):
+        if not isinstance(exp_timestamp, int | float):
             message = "Token has no expiration"
             raise TypeError(message)
 
@@ -368,14 +368,14 @@ class JWTProvider(JWTProviderService):
             result["iss"] = issuer
 
         issued_at = payload.get("iat")
-        if isinstance(issued_at, (int, float)):
+        if isinstance(issued_at, int | float):
             result["iat"] = int(issued_at)
         else:
             message = "Token missing issued-at timestamp"
             raise TypeError(message)
 
         expires = payload.get("exp")
-        if isinstance(expires, (int, float)):
+        if isinstance(expires, int | float):
             result["exp"] = int(expires)
         else:
             message = "Token missing expiration timestamp"

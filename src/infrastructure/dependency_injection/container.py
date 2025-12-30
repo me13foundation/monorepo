@@ -13,6 +13,11 @@ from typing import AsyncGenerator  # noqa: UP035
 from uuid import uuid4
 
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from src.application import curation as app_curation
 from src.application import services as app_services
@@ -38,9 +43,7 @@ from src.infrastructure.security import JWTProvider, PasswordHasher
 
 from .service_factories import ApplicationServiceFactoryMixin
 
-AsyncSession = sa.ext.asyncio.AsyncSession
-async_sessionmaker = sa.ext.asyncio.async_sessionmaker
-create_async_engine = sa.ext.asyncio.create_async_engine
+# AsyncSession, async_sessionmaker, and create_async_engine are imported above
 
 DEFAULT_DEV_JWT_SECRET = os.getenv("MED13_DEV_JWT_SECRET") or os.urandom(48).hex()
 
@@ -241,7 +244,7 @@ class DependencyContainer(ApplicationServiceFactoryMixin):
             db_session=session,
         )
 
-    async def get_db_session(self) -> AsyncGenerator[AsyncSession, None]:
+    async def get_db_session(self) -> AsyncGenerator[AsyncSession]:
         async with self.async_session_factory() as session:
             try:
                 yield session
@@ -249,7 +252,7 @@ class DependencyContainer(ApplicationServiceFactoryMixin):
                 await session.close()
 
     @asynccontextmanager
-    async def lifespan_context(self) -> AsyncGenerator[None, None]:
+    async def lifespan_context(self) -> AsyncGenerator[None]:
         # Startup
         try:
             yield

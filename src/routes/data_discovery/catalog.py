@@ -27,8 +27,7 @@ router = APIRouter()
 async def get_source_catalog(
     category: str | None = Query(None, description="Filter by category"),
     search: str | None = Query(None, description="Search query"),
-    research_space_id: UUID
-    | None = Query(
+    research_space_id: UUID | None = Query(
         None,
         description="Optional research space context for availability filtering",
     ),

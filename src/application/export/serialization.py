@@ -33,7 +33,7 @@ def serialize_item(item: object) -> JSONValue:
     if hasattr(item, "__dict__"):
         return _serialize_object(item)
 
-    if isinstance(item, (list, tuple)):
+    if isinstance(item, list | tuple):
         return _serialize_sequence(item)
 
     return coerce_scalar(item)
@@ -54,7 +54,7 @@ def item_to_csv_row(item: object, field_names: list[str]) -> dict[str, str]:
         if "." in field:
             value = resolve_nested_value(serialized, field.split("."))
 
-        if isinstance(value, (list, tuple)):
+        if isinstance(value, list | tuple):
             rendered: str = ";".join(str(v) for v in value)
         elif value is None:
             rendered = ""
@@ -80,7 +80,7 @@ def resolve_nested_value(source: JSONValue, path: Sequence[str]) -> JSONValue:
 
 def coerce_scalar(value: object) -> JSONValue:
     """Convert non-JSON values into strings."""
-    if isinstance(value, (str, int, float, bool)) or value is None:
+    if isinstance(value, str | int | float | bool) or value is None:
         return value
     return str(value)
 

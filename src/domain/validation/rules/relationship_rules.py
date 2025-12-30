@@ -230,7 +230,7 @@ class RelationshipValidationRules:
         confidence = data.get("confidence_score")
         if confidence is None:
             return None
-        if isinstance(confidence, (int, float)):
+        if isinstance(confidence, int | float):
             numeric_confidence = float(confidence)
             if not 0 <= numeric_confidence <= 1:
                 return (
@@ -261,7 +261,7 @@ class RelationshipValidationRules:
         p_value = data.get("p_value")
         if p_value is None:
             return None
-        if isinstance(p_value, (int, float)):
+        if isinstance(p_value, int | float):
             numeric_p = float(p_value)
             if not 0 <= numeric_p <= 1:
                 return (
@@ -300,7 +300,7 @@ class RelationshipValidationRules:
         effect_size = data.get("effect_size")
         if effect_size is None:
             return None
-        if isinstance(effect_size, (int, float)):
+        if isinstance(effect_size, int | float):
             return None
         return (
             False,
@@ -313,7 +313,7 @@ class RelationshipValidationRules:
         ci = data.get("confidence_interval")
         if ci is None:
             return None
-        if not isinstance(ci, (tuple, list)) or len(ci) != 2:
+        if not isinstance(ci, tuple | list) or len(ci) != 2:
             return (
                 False,
                 "Confidence interval must be a two-element numeric tuple",
@@ -321,9 +321,9 @@ class RelationshipValidationRules:
             )
         lower_bound = ci[0]
         upper_bound = ci[1]
-        if not isinstance(lower_bound, (int, float)) or not isinstance(
+        if not isinstance(lower_bound, int | float) or not isinstance(
             upper_bound,
-            (int, float),
+            int | float,
         ):
             return (
                 False,

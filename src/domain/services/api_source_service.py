@@ -67,15 +67,13 @@ class APISourceGateway(Protocol):
     async def test_connection(
         self,
         configuration: SourceConfiguration,
-    ) -> APIConnectionTest:
-        ...
+    ) -> APIConnectionTest: ...
 
     async def fetch_data(
         self,
         configuration: SourceConfiguration,
         request_parameters: JSONObject | None = None,
-    ) -> APIRequestResult:
-        ...
+    ) -> APIRequestResult: ...
 
 
 class APISourceService:

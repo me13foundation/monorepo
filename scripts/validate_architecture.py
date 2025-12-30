@@ -560,7 +560,7 @@ class ArchitectureValidator:
                 methods = [
                     n
                     for n in node.body
-                    if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef)
                 ]
                 if len(
                     methods,
@@ -590,15 +590,13 @@ class ArchitectureValidator:
         for child in ast.walk(node):
             if isinstance(
                 child,
-                (
-                    ast.If,
-                    ast.While,
-                    ast.For,
-                    ast.AsyncFor,
-                    ast.Try,
-                    ast.With,
-                    ast.AsyncWith,
-                ),
+                ast.If
+                | ast.While
+                | ast.For
+                | ast.AsyncFor
+                | ast.Try
+                | ast.With
+                | ast.AsyncWith,
             ):
                 complexity += 1
             elif isinstance(child, ast.BoolOp):
@@ -611,7 +609,7 @@ class ArchitectureValidator:
         imports = [
             node
             for node in ast.walk(tree)
-            if isinstance(node, (ast.Import, ast.ImportFrom))
+            if isinstance(node, ast.Import | ast.ImportFrom)
         ]
 
         if len(imports) > MAX_IMPORTS_PER_FILE:
@@ -645,7 +643,7 @@ class ArchitectureValidator:
     def _check_function_parameters(self, tree: ast.AST, file_path: str) -> None:
         """Check if functions have too many parameters."""
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 # Count parameters (including self/cls for methods)
                 # Note: Methods will have self/cls, so effective param count is len - 1
                 param_count = len(node.args.args)
@@ -751,7 +749,7 @@ class ArchitectureValidator:
         # Check for function definitions with "update" in name
         for node in ast.walk(tree):
             if (
-                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
                 and "update" in node.name.lower()
             ):
                 for arg in node.args.args:
@@ -848,7 +846,7 @@ class ArchitectureValidator:
         route_functions: list[ast.FunctionDef | ast.AsyncFunctionDef] = []
 
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
                 for decorator in node.decorator_list:
                     decorator_str = _ast_to_string(decorator)
                     if any(

@@ -232,7 +232,7 @@ class TemplateValidationHelpersMixin:
         elif expected_type == "integer":
             valid = isinstance(value, int)
         elif expected_type == "float":
-            valid = isinstance(value, (int, float))
+            valid = isinstance(value, int | float)
         elif expected_type == "boolean":
             valid = isinstance(value, bool)
         elif expected_type == "array":
@@ -294,7 +294,7 @@ class TemplateValidationHelpersMixin:
     def _coerce_float_value(value: JSONValue | None) -> float | None:
         if isinstance(value, bool):
             return float(value)
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return float(value)
         if isinstance(value, str):
             try:
@@ -335,6 +335,6 @@ class TemplateValidationHelpersMixin:
         normalized = {
             key: val
             for key, val in value.items()
-            if isinstance(val, (str, int, float, bool)) or val is None
+            if isinstance(val, str | int | float | bool) or val is None
         }
         return normalized or None

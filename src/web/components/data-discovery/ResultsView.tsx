@@ -477,11 +477,10 @@ function UnifiedSourceCard({
         {/* Left Section: Source Info & Params */}
         <div className="flex items-start gap-4">
           <div
-            className={`mt-1 rounded-lg p-2 ${
-              latestResult?.status === 'success'
+            className={`mt-1 rounded-lg p-2 ${latestResult?.status === 'success'
                 ? 'bg-primary/20 text-primary-foreground dark:bg-primary/30 dark:text-primary-foreground'
                 : 'bg-secondary text-secondary-foreground'
-            }`}
+              }`}
           >
             <IconComponent className="size-5" />
           </div>
@@ -749,11 +748,10 @@ export function SourceParameterModal({
                 {capabilityFlags.map((flag) => (
                   <div
                     key={flag.key}
-                    className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs ${
-                      flag.enabled
+                    className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs ${flag.enabled
                         ? 'border-primary/60 text-primary dark:text-primary'
                         : 'border-border/60 text-muted-foreground'
-                    }`}
+                      }`}
                   >
                     {flag.enabled ? <CheckCircle2 className="size-3" /> : <Slash className="size-3" />}
                     <span>{flag.label}</span>
@@ -956,158 +954,158 @@ export function SourceParameterModal({
           )}
 
           <div className="mt-6 space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4">
-          <button
-            type="button"
-            onClick={() => setIsSchedulingExpanded(!isSchedulingExpanded)}
-            className="flex w-full items-center justify-between rounded-md p-2 text-left transition-colors hover:bg-muted/50"
-          >
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Scheduling (optional)</p>
-              <p className="text-xs text-muted-foreground">
-                Configure how often MED13 should ingest this source once promoted to a research space.
-              </p>
-            </div>
-            {isSchedulingExpanded ? (
-              <ChevronUp className="size-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="size-4 text-muted-foreground" />
-            )}
-          </button>
-          {isSchedulingExpanded && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <Checkbox
-                    checked={advancedValues.scheduling.enabled}
-                    onCheckedChange={(checked) => {
+            <button
+              type="button"
+              onClick={() => setIsSchedulingExpanded(!isSchedulingExpanded)}
+              className="flex w-full items-center justify-between rounded-md p-2 text-left transition-colors hover:bg-muted/50"
+            >
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">Scheduling (optional)</p>
+                <p className="text-xs text-muted-foreground">
+                  Configure how often MED13 should ingest this source once promoted to a research space.
+                </p>
+              </div>
+              {isSchedulingExpanded ? (
+                <ChevronUp className="size-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="size-4 text-muted-foreground" />
+              )}
+            </button>
+            {isSchedulingExpanded && (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <label className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Checkbox
+                      checked={advancedValues.scheduling.enabled}
+                      onCheckedChange={(checked) => {
+                        setAdvancedValues((prev) => ({
+                          ...prev,
+                          scheduling: {
+                            ...prev.scheduling,
+                            enabled: checked === true,
+                          },
+                        }))
+                        setIsDirty(true)
+                      }}
+                    />
+                    Enable
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Frequency</Label>
+                    <select
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      value={advancedValues.scheduling.frequency}
+                      disabled={!advancedValues.scheduling.enabled}
+                      onChange={(event) => {
+                        const value = event.target.value as ScheduleFrequency
+                        setAdvancedValues((prev) => ({
+                          ...prev,
+                          scheduling: {
+                            ...prev.scheduling,
+                            frequency: value,
+                          },
+                        }))
+                        setIsDirty(true)
+                      }}
+                    >
+                      <option value="manual">Manual</option>
+                      <option value="hourly">Hourly</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="cron">Cron</option>
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Timezone</Label>
+                    <Input
+                      className="mt-1 bg-background"
+                      placeholder="UTC"
+                      value={advancedValues.scheduling.timezone}
+                      disabled={!advancedValues.scheduling.enabled}
+                      onChange={(event) => {
+                        setAdvancedValues((prev) => ({
+                          ...prev,
+                          scheduling: {
+                            ...prev.scheduling,
+                            timezone: event.target.value || 'UTC',
+                          },
+                        }))
+                        setIsDirty(true)
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Start time</Label>
+                    <Input
+                      type="datetime-local"
+                      className="mt-1 bg-background"
+                      value={advancedValues.scheduling.startTime ?? ''}
+                      disabled={!advancedValues.scheduling.enabled}
+                      onChange={(event) => {
+                        setAdvancedValues((prev) => ({
+                          ...prev,
+                          scheduling: {
+                            ...prev.scheduling,
+                            startTime: event.target.value || null,
+                          },
+                        }))
+                        setIsDirty(true)
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Cron expression</Label>
+                    <Input
+                      className="mt-1 bg-background"
+                      placeholder="0 0 * * *"
+                      value={advancedValues.scheduling.cronExpression ?? ''}
+                      disabled={
+                        !advancedValues.scheduling.enabled ||
+                        advancedValues.scheduling.frequency !== 'cron'
+                      }
+                      onChange={(event) => {
+                        setAdvancedValues((prev) => ({
+                          ...prev,
+                          scheduling: {
+                            ...prev.scheduling,
+                            cronExpression: event.target.value || null,
+                          },
+                        }))
+                        setIsDirty(true)
+                      }}
+                    />
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Only used when frequency is set to cron.
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-muted-foreground">Notes / Integration details</Label>
+                  <textarea
+                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    rows={3}
+                    placeholder="Optional notes, credentials location, mapping requirements..."
+                    value={advancedValues.notes}
+                    onChange={(event) => {
                       setAdvancedValues((prev) => ({
                         ...prev,
-                        scheduling: {
-                          ...prev.scheduling,
-                          enabled: checked,
-                        },
+                        notes: event.target.value,
                       }))
                       setIsDirty(true)
                     }}
                   />
-                  Enable
-                </label>
+                </div>
               </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <Label className="text-xs text-muted-foreground">Frequency</Label>
-              <select
-                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={advancedValues.scheduling.frequency}
-                disabled={!advancedValues.scheduling.enabled}
-                onChange={(event) => {
-                  const value = event.target.value as ScheduleFrequency
-                  setAdvancedValues((prev) => ({
-                    ...prev,
-                    scheduling: {
-                      ...prev.scheduling,
-                      frequency: value,
-                    },
-                  }))
-                  setIsDirty(true)
-                }}
-              >
-                <option value="manual">Manual</option>
-                <option value="hourly">Hourly</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="cron">Cron</option>
-              </select>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Timezone</Label>
-              <Input
-                className="mt-1 bg-background"
-                placeholder="UTC"
-                value={advancedValues.scheduling.timezone}
-                disabled={!advancedValues.scheduling.enabled}
-                onChange={(event) => {
-                  setAdvancedValues((prev) => ({
-                    ...prev,
-                    scheduling: {
-                      ...prev.scheduling,
-                      timezone: event.target.value || 'UTC',
-                    },
-                  }))
-                  setIsDirty(true)
-                }}
-              />
-            </div>
+            )}
           </div>
-
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <Label className="text-xs text-muted-foreground">Start time</Label>
-              <Input
-                type="datetime-local"
-                className="mt-1 bg-background"
-                value={advancedValues.scheduling.startTime ?? ''}
-                disabled={!advancedValues.scheduling.enabled}
-                onChange={(event) => {
-                  setAdvancedValues((prev) => ({
-                    ...prev,
-                    scheduling: {
-                      ...prev.scheduling,
-                      startTime: event.target.value || null,
-                    },
-                  }))
-                  setIsDirty(true)
-                }}
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Cron expression</Label>
-              <Input
-                className="mt-1 bg-background"
-                placeholder="0 0 * * *"
-                value={advancedValues.scheduling.cronExpression ?? ''}
-                disabled={
-                  !advancedValues.scheduling.enabled ||
-                  advancedValues.scheduling.frequency !== 'cron'
-                }
-                onChange={(event) => {
-                  setAdvancedValues((prev) => ({
-                    ...prev,
-                    scheduling: {
-                      ...prev.scheduling,
-                      cronExpression: event.target.value || null,
-                    },
-                  }))
-                  setIsDirty(true)
-                }}
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Only used when frequency is set to cron.
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <Label className="text-xs text-muted-foreground">Notes / Integration details</Label>
-            <textarea
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              rows={3}
-              placeholder="Optional notes, credentials location, mapping requirements..."
-              value={advancedValues.notes}
-              onChange={(event) => {
-                setAdvancedValues((prev) => ({
-                  ...prev,
-                  notes: event.target.value,
-                }))
-                setIsDirty(true)
-              }}
-            />
-          </div>
-            </div>
-          )}
-        </div>
         </div>
 
         <DialogFooter className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

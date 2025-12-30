@@ -65,8 +65,7 @@ class FileUploadGateway(Protocol):
         file_bytes: bytes,
         configuration: SourceConfiguration,
         max_records: int = 5_000,
-    ) -> FileUploadResult:
-        ...
+    ) -> FileUploadResult: ...
 
     def parse_records(
         self,
@@ -75,8 +74,7 @@ class FileUploadGateway(Protocol):
         content_type: str,
         file_bytes: bytes,
         max_records: int = 5_000,
-    ) -> list[DataRecord]:
-        ...
+    ) -> list[DataRecord]: ...
 
 
 class FileUploadService:

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
 
-    from src.application.packaging.types import (
+    from src.application.packaging.packaging_types import (
         LicenseSourceEntry,
     )
     from src.type_definitions.common import JSONObject

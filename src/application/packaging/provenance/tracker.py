@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.application.packaging.types import (
+    from src.application.packaging.packaging_types import (
         ProvenanceMetadata,
         ProvenanceSourceEntry,
     )

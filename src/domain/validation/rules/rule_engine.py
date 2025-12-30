@@ -6,13 +6,13 @@ from collections.abc import Iterable, Sequence
 
 from src.type_definitions.common import JSONObject, JSONValue
 
-from .base_rules import (
-    DataQualityValidator,
+from .validation_types import (
     ValidationIssue,
     ValidationLevel,
     ValidationResult,
     ValidationRule,
     ValidationSeverity,
+    calculate_quality_score,
 )
 
 
@@ -72,7 +72,7 @@ class ValidationRuleEngine:
                     ),
                 )
 
-        score = DataQualityValidator.calculate_quality_score(issues)
+        score = calculate_quality_score(issues)
         is_valid = not any(
             issue.severity is ValidationSeverity.ERROR for issue in issues
         )

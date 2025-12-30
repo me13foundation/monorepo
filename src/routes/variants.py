@@ -266,8 +266,7 @@ async def update_variant(
 async def update_variant_classification(
     variant_id: int,
     variant_type: str | None = Query(None, description="New variant type"),
-    clinical_significance: str
-    | None = Query(
+    clinical_significance: str | None = Query(
         None,
         description="New clinical significance",
     ),
@@ -340,8 +339,7 @@ async def get_variant_evidence(
 )
 async def get_variants_by_gene(
     gene_id: int,
-    limit: int
-    | None = Query(
+    limit: int | None = Query(
         None,
         ge=1,
         le=100,
@@ -374,8 +372,7 @@ async def search_variants(
     q: str = Query(..., description="Search query"),
     limit: int = Query(10, ge=1, le=100, description="Maximum number of results"),
     gene_id: str | None = Query(None, description="Filter by gene ID"),
-    clinical_significance: str
-    | None = Query(
+    clinical_significance: str | None = Query(
         None,
         description="Filter by clinical significance",
     ),

@@ -14,7 +14,7 @@ from uuid import uuid4
 import pytest
 
 from src.application.export.export_service import BulkExportService
-from src.application.export.types import ExportFormat
+from src.application.export.export_types import ExportFormat
 from src.application.services.pubmed_discovery_service import (
     PubMedDiscoveryService,
     PubmedDownloadRequest,

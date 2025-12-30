@@ -135,7 +135,7 @@ class VariantValidationRules:
                         f"Population code '{population}' is not recognised",
                         "Use standard population codes such as AFR, EUR, ASN",
                     )
-                if not isinstance(freq, (int, float)):
+                if not isinstance(freq, int | float):
                     return (
                         False,
                         f"Frequency for '{population}' must be numeric",

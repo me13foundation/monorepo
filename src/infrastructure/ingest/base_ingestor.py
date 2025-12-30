@@ -361,7 +361,7 @@ class BaseIngestor(ABC):
     @staticmethod
     def _coerce_json_value(value: object) -> JSONValue:
         """Ensure arbitrary values conform to JSONValue contract."""
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, str | int | float | bool) or value is None:
             return value
         if isinstance(value, Mapping):
             json_obj: JSONObject = {}
@@ -370,7 +370,7 @@ class BaseIngestor(ABC):
             return json_obj
         if isinstance(value, Sequence) and not isinstance(
             value,
-            (str, bytes, bytearray),
+            str | bytes | bytearray,
         ):
             return [BaseIngestor._coerce_json_value(item) for item in value]
         message = f"Unsupported JSON value: {type(value)!r}"

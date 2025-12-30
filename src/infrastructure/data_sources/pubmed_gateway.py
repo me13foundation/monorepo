@@ -42,7 +42,7 @@ class PubMedSourceGateway(PubMedGateway):
             score = None
             if isinstance(relevance, dict):
                 score_value = relevance.get("score")
-                if isinstance(score_value, (int, float)):
+                if isinstance(score_value, int | float):
                     score = int(score_value)
             if score is None or score >= threshold:
                 filtered.append(record)

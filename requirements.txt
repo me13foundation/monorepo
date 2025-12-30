@@ -1,5 +1,5 @@
 # MED13 Resource Library - Production Dependencies
-# Compatible with Python 3.12+
+# Compatible with Python 3.13+
 
 # Core web framework
 fastapi>=0.115.0
@@ -27,7 +27,8 @@ defusedxml>=0.7.0
 # Utilities
 python-multipart>=0.0.6
 pyyaml>=6.0.0
+flujo
 
 # Google Cloud (uncomment when gcloud SDK is set up)
-# google-cloud-secretmanager>=2.16.0
+# google-cloud-secret-manager>=2.16.0
 # google-cloud-storage>=2.10.0
