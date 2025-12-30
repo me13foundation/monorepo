@@ -159,6 +159,7 @@ def setup_test_environment():
         "tests.e2e.test_curation_detail_endpoint",
         "tests.e2e.test_curation_workflow",
         "tests.integration.test_space_discovery_isolation",
+        "tests.e2e.test_auth_regression",
     ):
         if module_name not in sys.modules:
             __import__(module_name)
