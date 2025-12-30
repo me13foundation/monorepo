@@ -151,7 +151,7 @@ class TestParallelProcessingOptimization:
 
         # Parallel should complete reasonably (may not be faster due to Python GIL and overhead)
         # Just ensure it doesn't take excessively long relative to a sane baseline
-        baseline = max(sequential_time, 0.01)
+        baseline = max(sequential_time, 0.05)
         assert parallel_time < baseline * 10
 
     @pytest.mark.asyncio

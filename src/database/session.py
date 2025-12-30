@@ -32,7 +32,7 @@ SessionLocal = sessionmaker(
 )
 
 
-def get_session() -> Generator[Session, None, None]:
+def get_session() -> Generator[Session]:
     """Provide a SQLAlchemy session scoped to the request."""
     db = SessionLocal()
     try:

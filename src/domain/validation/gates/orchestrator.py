@@ -119,7 +119,7 @@ class QualityGateOrchestrator:
         quality_values = [
             float(v)
             for v in (data.get("quality_score") for data in stage_results.values())
-            if isinstance(v, (int, float))
+            if isinstance(v, int | float)
         ]
         average_quality = (
             float(sum(quality_values) / len(quality_values)) if quality_values else 1.0

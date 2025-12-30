@@ -6,7 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete, text
 
-from src.database.session import SessionLocal, engine
+from src.database import session as db_session
 from src.domain.entities.user import UserRole, UserStatus
 from src.infrastructure.dependency_injection import container as container_module
 from src.infrastructure.security.password_hasher import PasswordHasher
@@ -49,7 +49,7 @@ async def _reset_container_services() -> None:
 
 async def _reset_tables() -> None:
     """Clear tables touched by this test to avoid cross-test leakage."""
-    session = SessionLocal()
+    session = db_session.SessionLocal()
     try:
         for model in (
             AuditLog,
@@ -78,7 +78,7 @@ async def _reset_tables() -> None:
 
 
 def _drop_permission_enum_if_supported() -> None:
-    with engine.begin() as connection:
+    with db_session.engine.begin() as connection:
         if connection.dialect.name != "postgresql":
             return
         connection.execute(
@@ -90,7 +90,7 @@ async def _seed_curation_context() -> None:
     """Create the gene/variant/phenotype/evidence records needed by the test."""
     await _reset_tables()
 
-    session = SessionLocal()
+    session = db_session.SessionLocal()
     try:
         gene_data = create_test_gene(gene_id="GENE-E2E", symbol="MED13E2E")
         gene = GeneModel(
@@ -197,6 +197,7 @@ async def _seed_curation_context() -> None:
         await async_session.execute(delete(GeneModel))
         await async_session.execute(
             GeneModel.__table__.insert().values(
+                id=gene.id,
                 gene_id=gene.gene_id,
                 symbol=gene.symbol,
                 name=gene.name,
@@ -212,6 +213,7 @@ async def _seed_curation_context() -> None:
         )
         await async_session.execute(
             VariantModel.__table__.insert().values(
+                id=variant.id,
                 gene_id=variant.gene_id,
                 variant_id=variant.variant_id,
                 clinvar_id=variant.clinvar_id,
@@ -232,6 +234,7 @@ async def _seed_curation_context() -> None:
         )
         await async_session.execute(
             PhenotypeModel.__table__.insert().values(
+                id=phenotype.id,
                 hpo_id=phenotype.hpo_id,
                 hpo_term=phenotype.hpo_term,
                 name=phenotype.name,
@@ -243,6 +246,7 @@ async def _seed_curation_context() -> None:
         )
         await async_session.execute(
             EvidenceModel.__table__.insert().values(
+                id=evidence.id,
                 variant_id=evidence.variant_id,
                 phenotype_id=evidence.phenotype_id,
                 evidence_level=evidence.evidence_level,
@@ -255,6 +259,7 @@ async def _seed_curation_context() -> None:
         )
         await async_session.execute(
             ReviewRecord.__table__.insert().values(
+                id=review_record.id,
                 entity_type=review_record.entity_type,
                 entity_id=review_record.entity_id,
                 status=review_record.status,
@@ -265,6 +270,7 @@ async def _seed_curation_context() -> None:
         )
         await async_session.execute(
             AuditLog.__table__.insert().values(
+                id=audit_log.id,
                 action=audit_log.action,
                 entity_type=audit_log.entity_type,
                 entity_id=audit_log.entity_id,
@@ -333,7 +339,7 @@ async def _create_admin_user(
     password: str | None = None,
 ) -> tuple[str, str]:
     resolved_password = password or TEST_ADMIN_PASSWORD
-    session = SessionLocal()
+    session = db_session.SessionLocal()
     try:
         session.query(UserModel).filter(UserModel.email == email).delete()
         admin = UserModel(

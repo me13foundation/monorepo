@@ -12,7 +12,7 @@ import pytest
 import yaml
 
 from src.application.packaging.licenses.validator import LicenseValidator
-from src.application.packaging.types import LicenseSourceEntry
+from src.application.packaging.packaging_types import LicenseSourceEntry
 
 
 class TestLicenseValidator:

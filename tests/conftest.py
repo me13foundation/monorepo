@@ -15,16 +15,24 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool, StaticPool
 
+import src.models.database  # noqa: F401
 from src.database.sqlite_utils import build_sqlite_connect_args, configure_sqlite_engine
 from src.database.url_resolver import (
     resolve_async_database_url,
     to_async_database_url,
 )
-from src.models.database import storage as _storage_models  # noqa: F401
+from src.models.database.audit import AuditLog  # noqa: F401
 from src.models.database.base import Base
+from src.models.database.user import UserModel  # noqa: F401
+
+# The original `from src.models.database.base import Base` was here, but it's moved up.
 
 # Test database configuration (absolute path to avoid divergent relative paths)
-TEST_DB_PATH = Path.cwd() / "test_med13.db"
+# Support pytest-xdist by using unique database files per worker
+
+worker_id = os.environ.get("PYTEST_XDIST_WORKER", "")
+db_filename = f"test_med13_{worker_id}.db" if worker_id else "test_med13.db"
+TEST_DB_PATH = Path.cwd() / db_filename
 TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
 # Set core env vars early so imports (e.g., SessionLocal) bind to the test DB.
@@ -58,7 +66,7 @@ def test_engine():
 
 
 @pytest.fixture(scope="function")
-def db_session(test_engine) -> Generator[Session, None, None]:
+def db_session(test_engine) -> Generator[Session]:
     """Provide a database session for tests."""
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
@@ -79,9 +87,9 @@ def setup_test_environment():
     os.environ["DATABASE_URL"] = TEST_DATABASE_URL
     os.environ["ASYNC_DATABASE_URL"] = to_async_database_url(TEST_DATABASE_URL)
     os.environ["TESTING"] = "true"
-    os.environ[
-        "MED13_DEV_JWT_SECRET"
-    ] = "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz"
+    os.environ["MED13_DEV_JWT_SECRET"] = (
+        "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz"
+    )
 
     # Ensure the global dependency container uses the test JWT secret
     from src.infrastructure.dependency_injection import container as container_module
@@ -151,6 +159,7 @@ def setup_test_environment():
         "tests.e2e.test_curation_detail_endpoint",
         "tests.e2e.test_curation_workflow",
         "tests.integration.test_space_discovery_isolation",
+        "tests.e2e.test_auth_regression",
     ):
         if module_name not in sys.modules:
             __import__(module_name)

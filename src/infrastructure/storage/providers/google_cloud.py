@@ -37,49 +37,41 @@ class StorageBlobProtocol(Protocol):
     name: str
 
     @property
-    def public_url(self) -> str:
-        ...
+    def public_url(self) -> str: ...
 
     def upload_from_filename(
         self,
         filename: str,
         content_type: str | None = ...,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def generate_signed_url(
         self,
         expiration: datetime,
         version: str = ...,
-    ) -> str:
-        ...
+    ) -> str: ...
 
-    def delete(self) -> None:
-        ...
+    def delete(self) -> None: ...
 
 
 @runtime_checkable
 class StorageBucketProtocol(Protocol):
-    def blob(self, name: str) -> StorageBlobProtocol:
-        ...
+    def blob(self, name: str) -> StorageBlobProtocol: ...
 
 
 @runtime_checkable
 class StorageClientProtocol(Protocol):
     project: str
 
-    def bucket(self, name: str) -> StorageBucketProtocol:
-        ...
+    def bucket(self, name: str) -> StorageBucketProtocol: ...
 
     def list_blobs(
         self,
         bucket_name: str,
         prefix: str | None = None,
-    ) -> Iterable[StorageBlobProtocol]:
-        ...
+    ) -> Iterable[StorageBlobProtocol]: ...
 
-    def lookup_bucket(self, bucket_name: str) -> object:
-        ...
+    def lookup_bucket(self, bucket_name: str) -> object: ...
 
 
 gcs_storage: ModuleType | None

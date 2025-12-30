@@ -11,7 +11,7 @@ from src.type_definitions.common import QueryFilters, clone_query_filters
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from .types import EntityItem
+    from .export_types import EntityItem
 
 __all__ = [
     "collect_paginated",

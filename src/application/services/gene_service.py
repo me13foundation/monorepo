@@ -366,14 +366,14 @@ class GeneApplicationService:
         stats_raw = self._gene_repository.get_gene_statistics()
         stats: JSONObject = {}
         for key, value in stats_raw.items():
-            if isinstance(value, (int, float, bool, str)) or value is None:
+            if isinstance(value, int | float | bool | str) or value is None:
                 stats[key] = value
 
         total_genes_value = stats_raw.get("total_genes")
         total_genes = self._coerce_int(
             (
                 total_genes_value
-                if isinstance(total_genes_value, (int, float, str))
+                if isinstance(total_genes_value, int | float | str)
                 else None
             ),
         )
@@ -440,7 +440,7 @@ class GeneApplicationService:
 
     @staticmethod
     def _coerce_int(value: float | str | None, default: int = 0) -> int:
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return int(value)
         if isinstance(value, str):
             try:

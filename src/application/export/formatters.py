@@ -15,8 +15,8 @@ if TYPE_CHECKING:
 
     from src.type_definitions.common import JSONObject
 
+from .export_types import CompressionFormat, EntityItem, ExportFormat
 from .serialization import item_to_csv_row, serialize_item
-from .types import CompressionFormat, EntityItem, ExportFormat
 
 __all__ = ["export_as_csv", "export_as_json", "export_as_jsonl"]
 
@@ -25,7 +25,7 @@ def export_as_json(
     items: list[EntityItem],
     compression: CompressionFormat,
     entity_type: str,
-) -> Generator[str | bytes, None, None]:
+) -> Generator[str | bytes]:
     """Serialize entity collections into a JSON object."""
     data: JSONObject = {entity_type: [serialize_item(item) for item in items]}
     json_str = json.dumps(data, indent=2, default=str)
@@ -38,7 +38,7 @@ def export_as_json(
 def export_as_jsonl(
     items: list[EntityItem],
     compression: CompressionFormat,
-) -> Generator[str | bytes, None, None]:
+) -> Generator[str | bytes]:
     """Serialize entity collections into JSON Lines."""
     lines = [json.dumps(serialize_item(item), default=str) for item in items]
     payload = "\n".join(lines)
@@ -53,7 +53,7 @@ def export_as_csv(
     export_format: ExportFormat,
     compression: CompressionFormat,
     field_names: list[str],
-) -> Generator[str | bytes, None, None]:
+) -> Generator[str | bytes]:
     """Serialize entity collections into CSV/TSV data."""
     delimiter = "\t" if export_format == ExportFormat.TSV else ","
     output = StringIO()

@@ -32,28 +32,23 @@ T_co = TypeVar("T_co", covariant=True)
 class SQLiteCursor(Protocol):
     """Minimal cursor protocol for SQLite operations."""
 
-    def execute(self, statement: str) -> object:
-        ...
+    def execute(self, statement: str) -> object: ...
 
-    def fetchone(self) -> object:
-        ...
+    def fetchone(self) -> object: ...
 
-    def close(self) -> None:
-        ...
+    def close(self) -> None: ...
 
 
 class SQLiteConnection(Protocol):
     """Protocol capturing methods used on SQLite connections."""
 
-    def cursor(self) -> SQLiteCursor:
-        ...
+    def cursor(self) -> SQLiteCursor: ...
 
 
 class RetryableOperation(Protocol[T_co]):
     """Callable protocol for retryable database operations."""
 
-    def __call__(self) -> T_co:
-        ...
+    def __call__(self) -> T_co: ...
 
 
 def configure_sqlite_engine(

@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from src.models.resource import Resource
+from src.models.resource_model import Resource
 
 
 def list_resources() -> Sequence[Resource]:

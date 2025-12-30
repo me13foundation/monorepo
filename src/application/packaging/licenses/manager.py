@@ -8,7 +8,7 @@ from enum import Enum
 from pathlib import Path
 from typing import ClassVar, TypedDict
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 
 class LicenseCompatibility(str, Enum):

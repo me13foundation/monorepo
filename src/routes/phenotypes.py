@@ -56,7 +56,7 @@ def _stat_count(stats: Mapping[str, object], key: str) -> int:
     value = stats.get(key, 0)
     if isinstance(value, bool):
         return int(value)
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return int(value)
     if isinstance(value, str):
         try:
@@ -347,8 +347,7 @@ async def search_phenotypes(
 )
 async def get_phenotypes_by_category(
     category: str,
-    limit: int
-    | None = Query(
+    limit: int | None = Query(
         None,
         ge=1,
         le=100,

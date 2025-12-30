@@ -5,6 +5,7 @@ Revises: 20250211_discovery_jobs
 Create Date: 2025-11-23 13:51:11.728247
 
 """
+
 from collections.abc import Sequence
 
 from alembic import op

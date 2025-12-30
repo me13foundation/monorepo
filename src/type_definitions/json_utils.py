@@ -51,7 +51,7 @@ def list_of_strings(value: JSONValue | None) -> list[str]:
     for item in as_list(value):
         if isinstance(item, str):
             result.append(item)
-        elif isinstance(item, (int, float)):
+        elif isinstance(item, int | float):
             result.append(str(item))
     return result
 
@@ -60,7 +60,7 @@ def as_str(value: JSONValue | None, *, fallback: str | None = None) -> str | Non
     """Return the value as a string if possible."""
     if isinstance(value, str):
         return value
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return str(value)
     return fallback
 
@@ -79,7 +79,7 @@ def as_int(value: JSONValue | None) -> int | None:
 
 def as_float(value: JSONValue | None) -> float | None:
     """Return the value as a float when coercion is safe."""
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return float(value)
     if isinstance(value, str):
         try:
@@ -105,13 +105,13 @@ def to_json_value(value: object) -> JSONValue:
     """
 
     result: JSONValue
-    if value is None or isinstance(value, (str, int, float, bool)):
+    if value is None or isinstance(value, str | int | float | bool):
         result = value
-    elif isinstance(value, (datetime, date)):
+    elif isinstance(value, datetime | date):
         result = value.isoformat()
     elif isinstance(value, Enum):
         enum_value = value.value
-        if isinstance(enum_value, (str, int, float, bool)):
+        if isinstance(enum_value, str | int | float | bool):
             result = enum_value
         else:
             result = str(enum_value)
@@ -120,7 +120,7 @@ def to_json_value(value: object) -> JSONValue:
         result = {key: to_json_value(item) for key, item in dataclass_dict.items()}
     elif isinstance(value, dict):
         result = {str(key): to_json_value(item) for key, item in value.items()}
-    elif isinstance(value, (list, tuple, set)):
+    elif isinstance(value, list | tuple | set):
         result = [to_json_value(item) for item in value]
     else:
         result = str(value)

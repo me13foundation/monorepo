@@ -65,7 +65,7 @@ SESSION_CLEANUP_INTERVAL_SECONDS = int(
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     """Application lifespan context manager."""
     legacy_session = None
     scheduler_task: asyncio.Task[None] | None = None

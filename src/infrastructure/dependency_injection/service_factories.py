@@ -68,8 +68,7 @@ class ApplicationServiceFactoryMixin:
         _storage_plugin_registry: StoragePluginRegistry
         _storage_metrics_recorder: StorageMetricsRecorder
 
-        def get_system_status_service(self) -> SystemStatusService:
-            ...
+        def get_system_status_service(self) -> SystemStatusService: ...
 
     def create_gene_application_service(
         self,

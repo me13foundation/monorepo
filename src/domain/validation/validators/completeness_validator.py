@@ -97,7 +97,7 @@ class CompletenessValidator:
                 if value.strip():
                     filled_fields += 1
                 continue
-            if isinstance(value, (list, dict)):
+            if isinstance(value, list | dict):
                 if value:
                     filled_fields += 1
                 continue
@@ -183,7 +183,7 @@ class CompletenessValidator:
         for field, min_score in quality_scores.items():
             if field in entity_data:
                 score = entity_data[field]
-                if isinstance(score, (int, float)) and score < min_score:
+                if isinstance(score, int | float) and score < min_score:
                     issues.append(
                         ValidationIssue(
                             field=field,

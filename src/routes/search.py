@@ -96,8 +96,7 @@ def get_search_service(db: Session = Depends(get_session)) -> "UnifiedSearchServ
 )
 async def unified_search(
     query: str = Query(..., min_length=1, max_length=200, description="Search query"),
-    entity_types: list[SearchEntity]
-    | None = Query(
+    entity_types: list[SearchEntity] | None = Query(
         None,
         description="Entity types to search (defaults to all)",
     ),
@@ -124,7 +123,7 @@ async def unified_search(
         total_results_value_obj = payload.get("total_results")
         total_results_value = (
             int(total_results_value_obj)
-            if isinstance(total_results_value_obj, (int, float))
+            if isinstance(total_results_value_obj, int | float)
             else len(result_items)
         )
 
@@ -247,7 +246,7 @@ def _build_search_results(raw_results: object) -> list[SearchResultItem]:
 
         if not isinstance(title_value, str) or not isinstance(description_value, str):
             continue
-        if isinstance(relevance_value, (int, float, str)):
+        if isinstance(relevance_value, int | float | str):
             try:
                 relevance_score = float(relevance_value)
             except (TypeError, ValueError):
@@ -272,7 +271,7 @@ def _build_search_results(raw_results: object) -> list[SearchResultItem]:
 def _ensure_breakdown(raw_breakdown: Mapping[str, object]) -> dict[str, int]:
     breakdown: dict[str, int] = {}
     for key, value in raw_breakdown.items():
-        if isinstance(key, str) and isinstance(value, (int, float)):
+        if isinstance(key, str) and isinstance(value, int | float):
             breakdown[key] = int(value)
     return breakdown
 
@@ -286,7 +285,7 @@ def _build_statistics_response(stats: Mapping[str, object]) -> SearchStatisticsR
         {
             key: int(val)
             for key, val in total_entities_raw.items()
-            if isinstance(key, str) and isinstance(val, (int, float))
+            if isinstance(key, str) and isinstance(val, int | float)
         }
         if isinstance(total_entities_raw, Mapping)
         else {}

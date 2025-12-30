@@ -14,7 +14,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import delete
 
-from src.database.session import SessionLocal
+from src.database import session as db_session
 from src.domain.entities.user import UserRole, UserStatus
 from src.infrastructure.dependency_injection import container as container_module
 from src.infrastructure.security.password_hasher import PasswordHasher
@@ -34,7 +34,7 @@ async def _seed_user(
     resolved_password = password or TEST_AUTH_PASSWORD
 
     # Sync store
-    session = SessionLocal()
+    session = db_session.SessionLocal()
     try:
         session.query(UserModel).filter(UserModel.email == email).delete()
         session.add(
@@ -71,7 +71,7 @@ async def _seed_user(
     return email, resolved_password
 
 
-async def test_auth_login_regression() -> None:
+async def test_auth_login_regression(test_engine) -> None:
     """Ensure /auth/login succeeds for a valid user in test env."""
     email, password = await _seed_user()
     app = create_app()

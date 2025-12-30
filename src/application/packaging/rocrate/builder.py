@@ -12,7 +12,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from src.application.packaging.types import (
+from src.application.packaging.packaging_types import (
     ProvenanceMetadata,
     ROCrateFileEntry,
 )

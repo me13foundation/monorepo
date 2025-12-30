@@ -15,8 +15,8 @@ from uuid import uuid4
 import pytest
 
 from src.application.export.export_service import BulkExportService
+from src.application.export.export_types import CompressionFormat, ExportFormat
 from src.application.export.serialization import item_to_csv_row, serialize_item
-from src.application.export.types import CompressionFormat, ExportFormat
 from src.application.export.utils import get_gene_fields, get_variants_fields
 from src.application.services.storage_configuration_service import (
     StorageConfigurationService,

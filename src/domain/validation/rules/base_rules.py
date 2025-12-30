@@ -11,96 +11,18 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterable
-from dataclasses import dataclass
-from enum import Enum, auto
-from typing import TYPE_CHECKING, Protocol
 
 from src.type_definitions.common import JSONObject, JSONValue
 
-
-class ValidatorFn(Protocol):
-    def __call__(self, value: JSONValue) -> tuple[bool, str, str | None]:
-        ...
-
-
-ValidationOutcome = tuple[bool, str, str | None]
-
-
-class ValidationLevel(Enum):
-    """Levels of validation strictness."""
-
-    LAX = auto()
-    STANDARD = auto()
-    STRICT = auto()
-
-
-class ValidationSeverity(Enum):
-    """Severity levels for validation issues."""
-
-    ERROR = auto()
-    WARNING = auto()
-    INFO = auto()
-
-
-@dataclass(frozen=True)
-class ValidationRule:
-    """Configuration describing a validation rule."""
-
-    field: str
-    rule: str
-    validator: ValidatorFn
-    severity: ValidationSeverity
-    level: ValidationLevel
-
-
-@dataclass
-class ValidationIssue:
-    """A single validation issue discovered for an entity."""
-
-    field: str
-    value: JSONValue
-    rule: str
-    message: str
-    severity: ValidationSeverity
-    suggestion: str | None = None
-
-    def __getitem__(
-        self,
-        key: str,
-    ) -> JSONValue | str | ValidationSeverity | None:
-        if key == "field":
-            return self.field
-        if key == "value":
-            return self.value
-        if key == "rule":
-            return self.rule
-        if key == "message":
-            return self.message
-        if key == "severity":
-            return self.severity
-        if key == "suggestion":
-            return self.suggestion
-        message = f"Unknown validation issue attribute: {key}"
-        raise KeyError(message)
-
-    def get(
-        self,
-        key: str,
-        default: JSONValue | str | None = None,
-    ) -> JSONValue | str | ValidationSeverity | None:
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-
-@dataclass
-class ValidationResult:
-    """Collection of validation issues with a derived quality score."""
-
-    is_valid: bool
-    issues: list[ValidationIssue]
-    score: float = 0.0
+from .rule_engine import ValidationRuleEngine
+from .validation_types import (
+    ValidationIssue,
+    ValidationLevel,
+    ValidationOutcome,
+    ValidationResult,
+    ValidationRule,
+    ValidationSeverity,
+)
 
 
 class DataQualityValidator:
@@ -282,7 +204,7 @@ class DataQualityValidator:
         minimum: float,
         maximum: float,
     ) -> ValidationOutcome:
-        if not isinstance(value, (int, float)):
+        if not isinstance(value, int | float):
             return (
                 False,
                 "Value must be numeric",
@@ -440,22 +362,11 @@ class DataQualityValidator:
         return DataQualityValidator._calculate_quality_score(issues)
 
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from .rule_engine import ValidationRuleEngine
-
-
-def __getattr__(name: str) -> object:
-    if name == "ValidationRuleEngine":
-        from .rule_engine import ValidationRuleEngine as _ValidationRuleEngine
-
-        return _ValidationRuleEngine
-    raise AttributeError(name)
-
-
 __all__ = [
     "DataQualityValidator",
     "ValidationIssue",
     "ValidationLevel",
+    "ValidationOutcome",
     "ValidationResult",
     "ValidationRule",
     "ValidationRuleEngine",

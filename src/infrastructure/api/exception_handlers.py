@@ -25,7 +25,7 @@ async def storage_error_handler(
     exc: Exception,
 ) -> JSONResponse:
     """Handle generic storage backend failures."""
-    if not isinstance(exc, (StorageOperationError, StorageConnectionError)):
+    if not isinstance(exc, StorageOperationError | StorageConnectionError):
         msg = f"Unexpected exception type: {type(exc)!r}"
         raise TypeError(msg)
     response: ApiErrorResponse = {

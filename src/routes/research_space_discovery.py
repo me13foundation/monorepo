@@ -131,8 +131,7 @@ async def get_space_catalog(
 )
 async def list_space_sessions(
     include_inactive: bool = Query(False, description="Include inactive sessions"),
-    owner_id: UUID
-    | None = Query(
+    owner_id: UUID | None = Query(
         None,
         description="Filter sessions by owner (admin only)",
     ),
@@ -198,8 +197,7 @@ async def create_space_session(
     summary="List PubMed presets available within the space",
 )
 async def list_space_presets(
-    owner_id: UUID
-    | None = Query(
+    owner_id: UUID | None = Query(
         None,
         description="Filter presets by owner (admin only)",
     ),
@@ -232,8 +230,7 @@ async def list_space_presets(
     summary="Get default advanced parameters for the space",
 )
 async def get_space_default_parameters(
-    owner_id: UUID
-    | None = Query(
+    owner_id: UUID | None = Query(
         None,
         description="Override owner when requesting defaults (admin only)",
     ),

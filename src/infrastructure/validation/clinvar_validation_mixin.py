@@ -105,7 +105,7 @@ class ClinVarValidationMixin:
                 id_list = [
                     str(identifier)
                     for identifier in raw_idlist
-                    if isinstance(identifier, (str, int))
+                    if isinstance(identifier, str | int)
                 ]
 
                 sanitized_esearch = {
@@ -260,7 +260,7 @@ class ClinVarValidationMixin:
             "last_updated",
         ):
             field_value = record_value.get(field_name)
-            if isinstance(field_value, (str, int)):
+            if isinstance(field_value, str | int):
                 record[field_name] = str(field_value)
 
         for structured_field in (
@@ -324,7 +324,7 @@ class ClinVarValidationMixin:
             if key == "uids":
                 if isinstance(value, list):
                     sanitized_records["uids"] = [
-                        str(uid) for uid in value if isinstance(uid, (str, int))
+                        str(uid) for uid in value if isinstance(uid, str | int)
                     ]
                 continue
 

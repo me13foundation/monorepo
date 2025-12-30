@@ -163,7 +163,7 @@ class PubMedRecordTransformer:
     def _extract_relevance_score(self, value: object) -> int | None:
         if isinstance(value, dict):
             score = value.get("score")
-            if isinstance(score, (int, float)):
+            if isinstance(score, int | float):
                 if score <= 0:
                     return None
                 clamped = max(RELEVANCE_SCORE_MIN, min(RELEVANCE_SCORE_MAX, int(score)))

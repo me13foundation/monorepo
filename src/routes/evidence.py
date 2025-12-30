@@ -335,8 +335,7 @@ async def delete_evidence(
 )
 async def get_evidence_by_variant(
     variant_id: int,
-    limit: int
-    | None = Query(
+    limit: int | None = Query(
         None,
         ge=1,
         le=100,
@@ -371,8 +370,7 @@ async def get_evidence_by_variant(
 )
 async def get_evidence_by_phenotype(
     phenotype_id: int,
-    limit: int
-    | None = Query(
+    limit: int | None = Query(
         None,
         ge=1,
         le=100,
