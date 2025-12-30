@@ -63,7 +63,7 @@ jobs:
 
       - name: Run security audit (Bandit)
         run: |
-          bandit -r src/ -f json -o bandit-results.json
+          bandit -r src/ -c pyproject.toml -f json -o bandit-results.json
 
       - name: Upload security scan results (Bandit)
         if: always()
