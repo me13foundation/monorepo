@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from .manager import LicenseCompatibility, LicenseManager
 
