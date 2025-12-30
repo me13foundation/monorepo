@@ -97,7 +97,7 @@ jobs:
 
       - name: Upload coverage reports
         if: always()
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           file: ./coverage.xml
 
@@ -105,7 +105,7 @@ jobs:
         run: docker build -t med13-resource-library:test .
 
       - name: Scan container image with Trivy
-        uses: aquasecurity/trivy-action@v0.29.0
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: med13-resource-library:test
           format: table
