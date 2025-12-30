@@ -24,7 +24,12 @@ from src.database.url_resolver import (
 from src.models.database.base import Base
 
 # Test database configuration (absolute path to avoid divergent relative paths)
-TEST_DB_PATH = Path.cwd() / "test_med13.db"
+# Support pytest-xdist by using unique database files per worker
+import os
+
+worker_id = os.environ.get("PYTEST_XDIST_WORKER", "")
+db_filename = f"test_med13_{worker_id}.db" if worker_id else "test_med13.db"
+TEST_DB_PATH = Path.cwd() / db_filename
 TEST_DATABASE_URL = f"sqlite:///{TEST_DB_PATH}"
 
 # Set core env vars early so imports (e.g., SessionLocal) bind to the test DB.
