@@ -71,9 +71,7 @@ async def get_auth_service() -> DataSourceAuthorizationService:
     return DataSourceAuthorizationService()
 
 
-def get_ingestion_scheduling_service() -> (
-    Generator[IngestionSchedulingService, None, None]
-):
+def get_ingestion_scheduling_service() -> Generator[IngestionSchedulingService]:
     """Yield an ingestion scheduling service tied to a scoped session."""
     from src.infrastructure.factories.ingestion_scheduler_factory import (  # noqa: PLC0415
         ingestion_scheduling_service_context,
@@ -104,9 +102,7 @@ def get_catalog_entry(session: Session, catalog_entry_id: str) -> SourceCatalogE
     return entry
 
 
-def get_storage_configuration_service() -> (
-    Generator[StorageConfigurationService, None, None]
-):
+def get_storage_configuration_service() -> Generator[StorageConfigurationService]:
     """Yield a storage configuration service scoped to a session."""
 
     session = get_db_session()
@@ -117,7 +113,7 @@ def get_storage_configuration_service() -> (
         session.close()
 
 
-def get_admin_db_session() -> Generator[Session, None, None]:
+def get_admin_db_session() -> Generator[Session]:
     """Yield a scoped SQLAlchemy session for admin endpoints."""
 
     session = get_db_session()

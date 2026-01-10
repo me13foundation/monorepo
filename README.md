@@ -27,6 +27,10 @@ MED13 Resource Library
 - **Cloud-Native**: Multi-service Google Cloud Run deployment
 - **Quality Assurance**: Enterprise-grade linting, testing, and security scanning
 
+### Documentation and roadmap
+- The current graph implementation path is Postgres-backed with NetworkX traversal. TypeDB is an optional future migration.
+- Start with `docs/README.md` for the canonical documentation order and status.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

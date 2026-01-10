@@ -103,9 +103,7 @@ def get_legacy_dependency_container() -> DependencyContainer:
     return container
 
 
-def get_data_discovery_service_dependency() -> (
-    Generator[DataDiscoveryService, None, None]
-):
+def get_data_discovery_service_dependency() -> Generator[DataDiscoveryService]:
     """
     Provide a per-request DataDiscoveryService with isolated SQLAlchemy session.
 
@@ -121,7 +119,7 @@ def get_data_discovery_service_dependency() -> (
 
 
 def get_discovery_configuration_service_dependency() -> (
-    Generator[DiscoveryConfigurationService, None, None]
+    Generator[DiscoveryConfigurationService]
 ):
     """Provide a scoped DiscoveryConfigurationService for FastAPI routes."""
     session = SessionLocal()
@@ -132,9 +130,7 @@ def get_discovery_configuration_service_dependency() -> (
         session.close()
 
 
-def get_pubmed_discovery_service_dependency() -> (
-    Generator[PubMedDiscoveryService, None, None]
-):
+def get_pubmed_discovery_service_dependency() -> Generator[PubMedDiscoveryService]:
     """Provide a scoped PubMedDiscoveryService for FastAPI routes."""
     session = SessionLocal()
     try:

@@ -196,7 +196,7 @@ class ValidationReportGenerator:
         metrics_section = performance_report.get("metrics")
         if isinstance(metrics_section, dict):
             raw_value = metrics_section.get(metric_name)
-            if isinstance(raw_value, (int, float)):
+            if isinstance(raw_value, int | float):
                 return float(raw_value)
         return None
 
@@ -205,7 +205,7 @@ class ValidationReportGenerator:
         score_block = quality_metrics.get("quality_score")
         if isinstance(score_block, dict):
             average_value = score_block.get("average")
-            if isinstance(average_value, (int, float)):
+            if isinstance(average_value, int | float):
                 return float(average_value)
         return 0.0
 

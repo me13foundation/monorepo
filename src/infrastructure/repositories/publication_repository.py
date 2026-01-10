@@ -25,20 +25,16 @@ class PublicationQueryMixin:
     if TYPE_CHECKING:  # pragma: no cover - typing only
 
         @property
-        def session(self) -> Session:
-            ...  # noqa: D401 - documentation inherited
+        def session(self) -> Session: ...  # noqa: D401 - documentation inherited
 
         def _to_domain_sequence(
             self,
             models: list[PublicationModel],
-        ) -> list[Publication]:
-            ...
+        ) -> list[Publication]: ...
 
-        def _to_domain(self, model: PublicationModel | None) -> Publication | None:
-            ...
+        def _to_domain(self, model: PublicationModel | None) -> Publication | None: ...
 
-        def count(self) -> int:
-            ...
+        def count(self) -> int: ...
 
     def find_by_year(self, year: int, limit: int | None = None) -> list[Publication]:
         stmt = select(PublicationModel).where(PublicationModel.publication_year == year)

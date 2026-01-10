@@ -9,8 +9,7 @@ if TYPE_CHECKING:
 
 
 class AuditRepository(Protocol):
-    def record(self, db: Session, log: AuditLog) -> AuditLog:
-        ...
+    def record(self, db: Session, log: AuditLog) -> AuditLog: ...
 
 
 class SqlAlchemyAuditRepository:

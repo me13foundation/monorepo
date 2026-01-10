@@ -33,8 +33,7 @@ async def list_data_sources(
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     status: SourceStatus | None = Query(None, description="Filter by status"),
     source_type: str | None = Query(None, description="Filter by source type"),
-    research_space_id: UUID
-    | None = Query(
+    research_space_id: UUID | None = Query(
         None,
         description="Filter by research space ID",
     ),

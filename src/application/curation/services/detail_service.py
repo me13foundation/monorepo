@@ -186,9 +186,9 @@ class CurationDetailService:
         if variant.id is None:
             return ()
 
-        phenotypes: Sequence[
-            Phenotype
-        ] = self.phenotype_repository.find_by_variant_associations(variant.id)
+        phenotypes: Sequence[Phenotype] = (
+            self.phenotype_repository.find_by_variant_associations(variant.id)
+        )
 
         if not phenotypes:
             return ()

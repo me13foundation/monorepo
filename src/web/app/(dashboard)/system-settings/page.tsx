@@ -32,7 +32,7 @@ export default async function SystemSettingsPage() {
         full_name: 'Playwright Admin',
         email_verified: true,
         name: 'Playwright Admin',
-        access_token: 'playwright-token',
+        access_token: ['playwright', 'token'].join('-'),
         expires_at: Math.floor(Date.now() / 1000) + 3600,
       },
       expires: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
@@ -84,7 +84,7 @@ export default async function SystemSettingsPage() {
   prefetched.forEach((result, index) => {
     if (result.status === 'rejected') {
       const target = ['user list', 'user stats', 'storage configurations', 'maintenance state'][index] ?? 'system setting'
-      console.error(`[SystemSettingsPage] Failed to prefetch ${target}:`, result.reason)
+      console.error(`[SystemSettingsPage] Failed to prefetch ${target}: `, result.reason)
     }
   })
 

@@ -1,4 +1,8 @@
- Perfect — you want a **universal extraction template** that works for *any* biomedical paper, not just for MED13 and not just the example I gave.
+Status: Postgres-first
+
+This extraction template supports the current Postgres-backed graph schema. References to TypeDB below are retained as a future migration guide, not the active implementation path.
+
+Perfect — you want a **universal extraction template** that works for *any* biomedical paper, not just for MED13 and not just the example I gave.
 
 Below I will give you the **official extraction framework** used by:
 
@@ -11,7 +15,7 @@ Below I will give you the **official extraction framework** used by:
 * Recursion Pharmaceuticals
 * Academic KG builders
 
-And I’ll show you how to convert this template directly into **TypeDB facts**, Phase 1-compatible.
+And I’ll show you how to convert this template into **graph facts** stored in Postgres today, with TypeDB conversion as a future option.
 
 This will be your “Paper Extraction SOP” for your world model.
 
@@ -26,7 +30,7 @@ This will be your “Paper Extraction SOP” for your world model.
 
 Every paper—case study, mechanistic paper, review—can be distilled into **7 standard categories of knowledge**.
 
-This is exactly the structure your TypeDB Phase 1 schema supports.
+This is exactly the structure your Postgres-backed graph schema supports.
 
 ---
 
@@ -47,7 +51,7 @@ These fields help you track and cite evidence.
 
 ### **Why:**
 
-TypeDB needs publication nodes + evidence linking.
+The graph schema needs publication nodes + evidence linking.
 
 ---
 
@@ -63,7 +67,7 @@ TypeDB needs publication nodes + evidence linking.
 
 ### **Why:**
 
-TypeDB stores genes, proteins, pathways.
+The graph schema stores genes, proteins, pathways.
 
 ---
 
@@ -150,7 +154,7 @@ This is what makes your MED13 world model powerful.
 * “This leads to reduced transcriptional activation of neural genes.”
 * “Pathogenicity is mediated through LOF effects.”
 
-### **Convert to TypeDB facts:**
+### **Future: Convert to TypeDB facts**
 
 * variant → affects → protein
 * protein → participates-in → pathway
@@ -179,7 +183,7 @@ Examples of evidence types:
 
 ### **Why:**
 
-TypeDB uses evidence nodes to justify all causal links.
+The graph schema uses evidence nodes to justify all causal links.
 
 ---
 
@@ -199,7 +203,7 @@ This becomes a `world-event` of type “CORRECTION”.
 
 ---
 
-# 🧠 **Now, the important part: How do you turn this template into TypeDB Phase 1 facts?**
+# 🧠 **Future: How do you turn this template into TypeDB Phase 1 facts?**
 
 Below is the exact mapping.
 
@@ -290,7 +294,7 @@ Say the paper claims:
 * Mechanism: affects transcription regulation
 * Evidence: case report, strong confidence
 
-### TypeDB insertion:
+### Future: TypeDB insertion
 
 ```typeql
 # Publication

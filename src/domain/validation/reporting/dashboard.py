@@ -108,9 +108,9 @@ class ValidationDashboard:
 
         performance_metrics: JSONObject = {}
         if throughput_summary:
-            performance_metrics[
-                "throughput_items_per_second"
-            ] = throughput_summary.average
+            performance_metrics["throughput_items_per_second"] = (
+                throughput_summary.average
+            )
         if execution_summary:
             performance_metrics["execution_time_seconds"] = execution_summary.average
 

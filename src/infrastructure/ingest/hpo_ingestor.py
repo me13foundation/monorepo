@@ -463,16 +463,14 @@ class HPOIngestor(BaseIngestor):
                 phenotype["search_score"] = (
                     2
                     if query_lower in name
-                    else 0 + 1
-                    if query_lower in definition
-                    else 0
+                    else 0 + 1 if query_lower in definition else 0
                 )
                 matches.append(phenotype)
 
         # Sort by relevance score
         def _match_score(value: RawRecord) -> int:
             score_value = value.get("search_score")
-            return int(score_value) if isinstance(score_value, (int, float)) else 0
+            return int(score_value) if isinstance(score_value, int | float) else 0
 
         matches.sort(key=_match_score, reverse=True)
         return matches

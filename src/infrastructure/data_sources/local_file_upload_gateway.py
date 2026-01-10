@@ -272,7 +272,7 @@ class LocalFileUploadGateway(FileUploadGateway):
 
     @staticmethod
     def _to_json_value(value: object) -> JSONValue:
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, str | int | float | bool) or value is None:
             return value
         if isinstance(value, dict):
             return {
@@ -383,7 +383,7 @@ class LocalFileUploadGateway(FileUploadGateway):
     def _is_float_like(value: JSONValue) -> bool:
         if isinstance(value, bool):
             return False
-        if isinstance(value, (int, float)):
+        if isinstance(value, int | float):
             return True
         if isinstance(value, str):
             try:

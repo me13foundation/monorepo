@@ -249,7 +249,7 @@ class HttpxAPISourceGateway(APISourceGateway):
         return configuration.metadata
 
     def _coerce_limit(self, value: object | None, default: int) -> int:
-        if isinstance(value, (int, float, str)):
+        if isinstance(value, int | float | str):
             try:
                 parsed = int(value)
             except (TypeError, ValueError):
@@ -307,7 +307,7 @@ class HttpxAPISourceGateway(APISourceGateway):
         return normalized
 
     def _format_param_value(self, value: object) -> QueryParamValue:
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, str | int | float | bool) or value is None:
             return value
         return json.dumps(value)
 
@@ -323,7 +323,7 @@ class HttpxAPISourceGateway(APISourceGateway):
         return {"value": self._coerce_json_value(payload)}
 
     def _coerce_json_value(self, value: object) -> JSONValue:
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, str | int | float | bool) or value is None:
             return value
         if isinstance(value, list):
             return [self._coerce_json_value(item) for item in value]

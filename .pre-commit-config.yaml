@@ -1,5 +1,5 @@
 default_language_version:
-  python: python3.12
+  python: python3.13
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -14,13 +14,13 @@ repos:
       - id: check-ast
 
   - repo: https://github.com/psf/black
-    rev: 23.12.1
+    rev: 24.10.0
     hooks:
       - id: black
-        language_version: python3.12
+        language_version: python3.13
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.3
+    rev: v0.9.1
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
@@ -29,7 +29,7 @@ repos:
     hooks:
       - id: validate-architecture
         name: Validate Architecture
-        entry: python scripts/validate_architecture.py
+        entry: python3 scripts/validate_architecture.py
         language: system
         pass_filenames: false
         always_run: true
@@ -37,7 +37,7 @@ repos:
 
       - id: validate-dependencies
         name: Validate Dependencies
-        entry: python scripts/validate_dependencies.py
+        entry: python3 scripts/validate_dependencies.py
         language: system
         pass_filenames: false
         always_run: true
@@ -47,7 +47,7 @@ repos:
         name: Prevent Any/any types
         entry: scripts/check_no_any.py
         language: python
-        language_version: python3.12
+        language_version: python3.13
         types_or: [python, javascript, jsx, ts, tsx]
         pass_filenames: true
 

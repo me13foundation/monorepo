@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 import aiohttp
 import requests
-from requests.adapters import HTTPAdapter
+from requests.adapters import BaseAdapter, HTTPAdapter
 from urllib3.util.retry import Retry
 
 from src.domain.entities.data_discovery_parameters import (
@@ -34,9 +34,9 @@ logger = logging.getLogger(__name__)
 class SessionLike(Protocol):
     """Minimal protocol for the HTTP session used by the query client."""
 
-    headers: MutableMapping[str, str]
+    headers: MutableMapping[str, str | bytes]
 
-    def mount(self, prefix: str, adapter: object) -> None:
+    def mount(self, prefix: str | bytes, adapter: BaseAdapter) -> None:
         """Attach an adapter for the specified prefix."""
 
     def close(self) -> None:
@@ -357,7 +357,7 @@ class HTTPQueryClient(SourceQueryClient):
 
     @staticmethod
     def _coerce_json_value(value: object) -> JSONValue:
-        if isinstance(value, (str, int, float, bool)) or value is None:
+        if isinstance(value, str | int | float | bool) or value is None:
             return value
         if isinstance(value, dict):
             return {

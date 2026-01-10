@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from src.application.export.export_service import BulkExportService
-from src.application.export.types import CompressionFormat, ExportFormat
+from src.application.export.export_types import CompressionFormat, ExportFormat
 from src.database.session import get_session
 from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,
@@ -47,8 +47,7 @@ async def export_entity_data(
         CompressionFormat.NONE,
         description="Compression format",
     ),
-    limit: int
-    | None = Query(
+    limit: int | None = Query(
         None,
         ge=1,
         le=100000,
@@ -85,7 +84,7 @@ async def export_entity_data(
             media_type = "application/octet-stream"
 
         # Create streaming response
-        def generate() -> Generator[str | bytes, None, None]:
+        def generate() -> Generator[str | bytes]:
             try:
                 yield from service.export_data(
                     entity_type=entity_type,

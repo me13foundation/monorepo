@@ -36,34 +36,29 @@ class ReviewRepository(Protocol):
         flt: ReviewFilter,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[ReviewRecordLike]:
-        ...
+    ) -> list[ReviewRecordLike]: ...
 
     def bulk_update_status(
         self,
         db: Session,
         ids: tuple[int, ...] | list[int],
         status: str,
-    ) -> int:
-        ...
+    ) -> int: ...
 
-    def add(self, db: Session, record: object) -> ReviewRecordLike:
-        ...
+    def add(self, db: Session, record: object) -> ReviewRecordLike: ...
 
     def find_by_entity(
         self,
         db: Session,
         entity_type: str,
         entity_id: str,
-    ) -> ReviewRecordLike | None:
-        ...
+    ) -> ReviewRecordLike | None: ...
 
     def get_stats(
         self,
         db: Session,
         research_space_id: str | None = None,
-    ) -> dict[str, int]:
-        ...
+    ) -> dict[str, int]: ...
 
 
 class SqlAlchemyReviewRepository:

@@ -5,6 +5,7 @@ Revises: e9c9f4b2fe38
 Create Date: 2025-11-14 21:54:39.353572
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -98,9 +99,9 @@ def upgrade() -> None:
             batch.alter_column(
                 "permission_level",
                 server_default=None,
-                existing_type=permission_enum
-                if dialect_name != "sqlite"
-                else sa.String(32),
+                existing_type=(
+                    permission_enum if dialect_name != "sqlite" else sa.String(32)
+                ),
             )
 
     # --- Data discovery sessions must belong to a space --------------------

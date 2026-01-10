@@ -1,6 +1,22 @@
 Here is the detailed **Engineering Implementation Plan** to evolve the MED13 Resource Library into a **Translational AI Platform**.
 
-This plan follows **Clean Architecture principles**, ensuring that our Domain Layer (Business Logic) remains independent of specific tools (like TypeDB vs. NetworkX), allowing us to start fast with Python/JSON and scale to a graph database later.
+This plan follows **Clean Architecture principles** and assumes a **Postgres-backed graph model with NetworkX traversal** for Phases 1-4. The storage choice is intentionally swappable; a TypeDB migration remains a **future option** if graph semantics or scale demand it.
+
+## Goals alignment (explicit)
+
+- Mechanistic reasoning (Variant -> ProteinDomain -> Mechanism -> Phenotype) is the primary graph path.
+- Hypotheses are human-verifiable and never auto-promoted to truth.
+- The graph is the system of record with provenance and curation status on every edge.
+- Agent assistance is bounded, auditable, and cannot write to validated data directly.
+- Clinical and scientific credibility is enforced via audit logging, evidence transparency, and review workflows.
+
+## Graph service strategy
+
+- Initial implementation lives inside the existing FastAPI backend as an application service.
+- Expose a stable graph API contract (`/api/graph/export`, `/api/graph/neighborhood`, `/api/hypotheses`) so clients are insulated from storage changes.
+- Postgres remains the system of record; NetworkX is used for traversal and export.
+- Extraction to an independent service is optional and only justified by scale, latency, or external consumer needs.
+- Any future TypeDB migration must preserve the API contract.
 
 ---
 
@@ -27,6 +43,11 @@ We must introduce three new core entities to the `src/domain/entities/` module.
     *   **Attributes:** `name` (e.g., "Cyclin C binding interface"), `start_residue`, `end_residue`, `3d_coordinates` (AlphaFold JSON), `function`.
     *   **Usage:** Value Object embedded within `Gene` or linked to `Variant`.
 
+*   **`Mechanism` (Causal Link)**
+    *   **Purpose:** Represents a biological mechanism that bridges variants/domains to phenotypes.
+    *   **Attributes:** `id`, `name`, `description`, `evidence_tier`, `confidence_score`.
+    *   **Usage:** Node type in the graph, backed by evidence with provenance.
+
 ### **1.2 Expanded Mechanism & Outcome Entities (Sprint 3)**
 To fully capture the disease mechanism, we will add these entities in the next phase:
 
@@ -42,7 +63,18 @@ To fully capture the disease mechanism, we will add these entities in the next p
     *   **Purpose:** Defines the biological environment where a phenotype occurs.
     *   **Attributes:** `cell_type` (e.g., GABAergic Neuron), `developmental_stage` (e.g., E14.5), `tissue`.
 
-### **1.3 Enhance Existing Entities**
+### **1.3 Hypothesis and Curation Entities (Sprint 3)**
+To enable human-verifiable hypotheses, we will add explicit structures for review and provenance:
+
+*   **`Hypothesis`**
+    *   **Purpose:** Stores proposed mechanistic paths with evidence and contradictions.
+    *   **Attributes:** `id`, `summary`, `support_score`, `contradiction_score`, `net_score`, `status`.
+
+*   **`ReviewDecision`**
+    *   **Purpose:** Captures human validation events.
+    *   **Attributes:** `reviewer_id`, `decision`, `notes`, `reviewed_at`.
+
+### **1.4 Enhance Existing Entities**
 *   **Refactor `Variant` (`src/domain/entities/variant.py`)**
     *   **Add `StructuralAnnotation`:** Links a variant to specific `ProteinDomains` (e.g., "Variant R123X is in the IDR region").
     *   **Add `InSilicoScores`:** Fields for `cadd_phred`, `revel`, `alpha_missense` (critical for AI classification).
@@ -101,22 +133,27 @@ To fully capture the disease mechanism, we will add these entities in the next p
 This is the core engine. It orchestrates the retrieval of data from Repositories and constructs the Graph.
 
 *   **Responsibility:**
-    1.  Fetch all `Variants`, `Phenotypes`, `Domains`, `Drugs`.
+    1.  Fetch all `Variants`, `Phenotypes`, `Domains`, `Mechanisms`, `Drugs`.
     2.  Construct Nodes for each.
-    3.  Construct Edges based on business rules:
+    3.  Construct Edges based on business rules with provenance and curation status:
         *   `Variant` --(*causes*)--> `Phenotype`
         *   `Variant` --(*located_in*)--> `ProteinDomain`
+        *   `ProteinDomain` --(*impacts*)--> `Mechanism`
+        *   `Mechanism` --(*explains*)--> `Phenotype`
         *   `Drug` --(*targets*)--> `Pathway`/`Gene`
         *   `Gene` --(*interacts_with*)--> `Gene` (PPI)
 
 ### **3.2 Graph Implementation (Infrastructure)**
-*   **MVP (NetworkX):**
-    *   Build the graph in-memory using Python's `networkx` library.
+*   **MVP (Postgres + NetworkX):**
+    *   Store nodes and edges in Postgres tables as the system of record.
+    *   Include provenance, evidence references, and curation status on edges.
+    *   Build the graph in-memory using Python's `networkx` library for traversal and export.
     *   Fast, easy to debug, perfect for exporting to JSON for the frontend/public.
     *   **Output:** `med13_knowledge_graph.json` (Node-Link format).
 
-*   **Target (TypeDB/Neo4j):**
-    *   As per your `TypeDb_plan.md`, we will eventually persist this to a graph DB for complex querying (e.g., "Find all drugs targeting pathways affected by variants in the Cyclin C binding domain").
+*   **Future option (TypeDB/Neo4j):**
+    *   Optional migration if Postgres + NetworkX hits scale or semantic constraints.
+    *   See `docs/world_model/TypeDb_plan.md` for a future migration concept (not current execution).
 
 ### **3.3 Public API (`src/routes/graph.py`)**
 *   **Endpoint:** `GET /api/graph/export`
@@ -139,6 +176,12 @@ This is the core engine. It orchestrates the retrieval of data from Repositories
     *   Find `Drugs` that target these pathways (or inverse-target them).
     *   Rank candidates based on `safety` and `brain_penetrance`.
 
+### **4.3 Hypothesis Evaluation (`HypothesisScoringService`)**
+*   **Logic:** Evidence aggregation with explicit contradictions.
+    *   Compute support, contradiction, and net scores.
+    *   Emit human-readable mechanism reports with citations.
+    *   Require human review before promotion to validated knowledge.
+
 ---
 
 ## **Risk Assessment & Mitigation**
@@ -154,7 +197,7 @@ This is the core engine. It orchestrates the retrieval of data from Repositories
 *   **Description:** Loading the entire knowledge graph into memory (NetworkX) could become a bottleneck if the dataset grows significantly (e.g., including all genome-wide interactions).
 *   **Mitigation:**
     *   **MVP Scope:** Limit the initial graph to MED13-specific interactions (~100k nodes), which easily fits in memory.
-    *   **Future Scaling:** The architecture allows swapping the `GraphService` implementation from NetworkX to a dedicated graph database (TypeDB/Neo4j) without changing the API contract.
+    *   **Future Scaling:** The architecture allows an optional migration of `GraphService` from NetworkX to a dedicated graph database (TypeDB/Neo4j) without changing the API contract.
     *   **Pagination:** Implement subgraph querying (e.g., `get_neighborhood(node_id, depth=1)`) instead of full-graph dumps for UI endpoints.
 
 ### **Risk 3: Data Quality Propagation**
@@ -169,9 +212,9 @@ This is the core engine. It orchestrates the retrieval of data from Repositories
 
 | Sprint | Focus | Key Deliverables |
 | :--- | :--- | :--- |
-| **Sprint 1** | **Ontology** | `Drug`, `Pathway`, `ProteinDomain` entities created. `Variant` schema updated. |
+| **Sprint 1** | **Ontology** | `Drug`, `Pathway`, `ProteinDomain`, `Mechanism` entities created. `Variant` schema updated. |
 | **Sprint 2** | **Atlas Data** | `UniProtIngestor` upgraded to fetch Domains. `Variant` repository updated to store new fields. |
-| **Sprint 3** | **Graph Core** | `GraphService` implemented with `networkx`. `GET /graph/export` endpoint live. |
+| **Sprint 3** | **Graph Core** | `GraphService` implemented with `networkx`. `GET /graph/export` endpoint live. Hypothesis and review scaffolding added. |
 | **Sprint 4** | **UI & Public** | "Network Explorer" in Next.js UI (using `react-force-graph`). Public release of the dataset. |
 
 ## **Recommendation for "Right Now"**

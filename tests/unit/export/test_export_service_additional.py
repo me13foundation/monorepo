@@ -17,13 +17,13 @@ from unittest.mock import Mock, call
 import pytest
 
 from src.application.export.export_service import BulkExportService
+from src.application.export.export_types import CompressionFormat, ExportFormat
 from src.application.export.serialization import (
     coerce_scalar,
     item_to_csv_row,
     resolve_nested_value,
     serialize_item,
 )
-from src.application.export.types import CompressionFormat, ExportFormat
 from src.application.export.utils import (
     collect_paginated,
     copy_filters,

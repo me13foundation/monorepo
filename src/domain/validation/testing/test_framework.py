@@ -110,7 +110,7 @@ class ValidationTestFramework:
             issues_match = len(actual.issues) == len(expected_issues)
 
         score_match = True
-        if isinstance(expected_score, (int, float)):
+        if isinstance(expected_score, int | float):
             score_match = actual.score >= float(expected_score)
 
         return "passed" if issues_match and score_match else "failed"

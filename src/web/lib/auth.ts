@@ -1,0 +1,294 @@
+import { NextAuthOptions, DefaultSession } from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { JWT } from "next-auth/jwt"
+import axios from "axios"
+
+// Extend the built-in session types
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user: {
+      id: string
+      email: string
+      username: string
+      full_name: string
+      role: string
+      email_verified: boolean
+      access_token: string
+      expires_at: number
+    } & DefaultSession["user"]
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    access_token: string
+    refresh_token: string
+    expires_at: number
+    user: {
+      id: string
+      email: string
+      username: string
+      full_name: string
+      role: string
+      email_verified: boolean
+    }
+  }
+}
+
+interface BackendUser {
+  id: string
+  email: string
+  username: string
+  full_name: string
+  role: string
+  email_verified: boolean
+}
+
+interface BackendLoginResponse {
+  user: BackendUser
+  access_token: string
+  refresh_token: string
+  expires_in: number
+}
+
+interface AuthenticatedUser extends BackendUser {
+  access_token: string
+  refresh_token: string
+  expires_at: number
+}
+
+// FastAPI backend URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+
+export const authOptions: NextAuthOptions = {
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        try {
+          // Call FastAPI login endpoint
+          const response = await axios.post<BackendLoginResponse>(`${API_BASE_URL}/auth/login`, {
+            email: credentials.email,
+            password: credentials.password,
+          })
+
+          const { user, access_token, refresh_token, expires_in } = response.data
+
+          // Validate token format (JWT should have 3 parts)
+          if (access_token && typeof access_token === 'string') {
+            const tokenParts = access_token.split('.')
+            if (tokenParts.length !== 3) {
+              console.error('[authorize] Invalid access_token format from backend', {
+                tokenLength: access_token.length,
+                partsCount: tokenParts.length,
+                tokenPreview: access_token.substring(0, 50),
+              })
+              throw new Error('Invalid token format received from backend')
+            }
+
+            // Debug logging in development
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[authorize] Token received from backend', {
+                tokenLength: access_token.length,
+                tokenPreview: `${access_token.substring(0, 20)}...${access_token.substring(access_token.length - 20)}`,
+                partsCount: tokenParts.length,
+              })
+            }
+          } else {
+            console.error('[authorize] Missing or invalid access_token in response', {
+              hasAccessToken: !!access_token,
+              accessTokenType: typeof access_token,
+              responseKeys: Object.keys(response.data),
+            })
+            throw new Error('Missing access_token in login response')
+          }
+
+          // Return user object with tokens
+          const authenticatedUser: AuthenticatedUser = {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            full_name: user.full_name,
+            role: user.role,
+            email_verified: user.email_verified,
+            access_token,
+            refresh_token,
+            expires_at: Date.now() + expires_in * 1000, // Convert to milliseconds
+          }
+
+          return authenticatedUser
+        } catch (error) {
+          console.error("Authentication error:", error)
+          // Log more details for debugging
+          if (axios.isAxiosError(error)) {
+            if (error.response) {
+              console.error("Backend response status:", error.response.status)
+              console.error("Backend response data:", error.response.data)
+            } else if (error.request) {
+              console.error("No response received from backend:", error.request)
+            } else if (error.message) {
+              console.error("Error setting up request:", error.message)
+            }
+          } else if (error instanceof Error) {
+            console.error("Unexpected authentication error:", error.message)
+          }
+          return null
+        }
+      }
+    })
+  ],
+  session: {
+    strategy: "jwt",
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  jwt: {
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  callbacks: {
+    async jwt({ token, user, account }) {
+      // Initial sign in
+      if (user && account) {
+        const customUser = user as AuthenticatedUser
+
+        // Validate token format before storing
+        if (customUser.access_token) {
+          const tokenParts = customUser.access_token.split('.')
+          if (tokenParts.length !== 3) {
+            console.error('[jwt callback] Invalid access_token format', {
+              tokenLength: customUser.access_token?.length || 0,
+              partsCount: tokenParts.length,
+              tokenPreview: customUser.access_token?.substring(0, 50) || 'null',
+            })
+            throw new Error('Invalid token format in JWT callback')
+          }
+
+          // Debug logging in development
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('[jwt callback] Storing token', {
+              tokenLength: customUser.access_token.length,
+              tokenPreview: `${customUser.access_token.substring(0, 20)}...${customUser.access_token.substring(customUser.access_token.length - 20)}`,
+              partsCount: tokenParts.length,
+            })
+          }
+        }
+
+        return {
+          access_token: customUser.access_token,
+          refresh_token: customUser.refresh_token,
+          expires_at: customUser.expires_at,
+          user: {
+            id: customUser.id,
+            email: customUser.email!,
+            username: customUser.username,
+            full_name: customUser.full_name,
+            role: customUser.role,
+            email_verified: customUser.email_verified,
+          }
+        }
+      }
+
+      // Return previous token if the access token has not expired yet
+      const expiresAt = token.expires_at as number | undefined
+      if (expiresAt && Date.now() < expiresAt) {
+        // Ensure access_token exists before returning
+        if (!token.access_token) {
+          console.warn("JWT callback: Token exists but missing access_token", { token })
+        }
+        return token
+      }
+
+      // If token expired or missing, return null to force re-authentication
+      if (!expiresAt || Date.now() >= expiresAt) {
+        console.warn("JWT callback: Token expired or missing expires_at", {
+          expiresAt,
+          now: Date.now(),
+          hasAccessToken: !!token.access_token
+        })
+      }
+
+      // Access token has expired, try to refresh it
+      const refreshToken = token.refresh_token
+      if (!refreshToken) {
+        console.error("JWT callback: Cannot refresh token - refresh_token is missing", { token })
+        // Return token as-is to allow session to expire naturally
+        return token
+      }
+
+      try {
+        const response = await axios.post<{ access_token: string; refresh_token: string; expires_in: number }>(`${API_BASE_URL}/auth/refresh`, {
+          refresh_token: refreshToken
+        })
+
+        const { access_token, refresh_token, expires_in } = response.data
+
+        if (!access_token) {
+          console.error("JWT callback: Token refresh succeeded but no access_token returned")
+          // Return token as-is if refresh failed
+          return token
+        }
+
+        return {
+          ...token,
+          access_token,
+          refresh_token,
+          expires_at: Date.now() + expires_in * 1000,
+        }
+      } catch (error) {
+        if (axios.isAxiosError(error)) {
+          console.error("Token refresh error:", error.response?.data || error.message)
+        } else {
+          console.error("Token refresh error:", (error as Error)?.message)
+        }
+        // Return token as-is to allow session to expire naturally
+        return token
+      }
+    },
+    async session({ session, token }) {
+      const tokenAccessToken = token.access_token
+      const tokenUser = token.user
+
+      if (tokenUser) {
+        session.user = {
+          ...session.user,
+          id: tokenUser.id,
+          email: tokenUser.email,
+          username: tokenUser.username,
+          full_name: tokenUser.full_name,
+          role: tokenUser.role,
+          email_verified: tokenUser.email_verified,
+          access_token: tokenAccessToken,
+          expires_at: token.expires_at,
+        }
+
+        // Debug: Log if access_token is missing
+        if (!tokenAccessToken) {
+          console.error("Session callback: access_token is missing from token!", {
+            tokenKeys: Object.keys(token || {}),
+            hasUser: !!tokenUser,
+            hasAccessToken: !!tokenAccessToken,
+          })
+        }
+      } else {
+        // Log warning if session is missing user data
+        console.warn("Session callback: token.user is missing", {
+          token,
+          tokenKeys: Object.keys(token as Record<string, unknown>),
+        })
+      }
+      return session
+    },
+  },
+  pages: {
+    signIn: "/auth/login",
+    error: "/auth/login", // Error code passed in query string as ?error=
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+}
