@@ -1,10 +1,14 @@
+Status: Future/Optional
+
+This document describes a potential TypeDB migration path. The current execution path uses **Postgres-backed graph storage with NetworkX traversal** (see `docs/plan.md`). Use this document as a future reference, not the active roadmap.
+
 Below is a **full, production-ready roadmap** for your MED13 World Model development.
 It includes:
 
 * **Phase 1 (Foundational World Model)**
 * **Phase 2 (Enterprise Temporal + Agentic World Model)**
 * Clear milestones, deliverables, metrics, and risk controls.
-* Designed to align with: TypeDB, pgvector/Postgres (optional), GPT-5 deep research, your Meta-Agent framework, and biomedical research workflows.
+* Designed to align with a future TypeDB migration, plus pgvector/Postgres (current system of record), GPT-5 deep research, your Meta-Agent framework, and biomedical research workflows.
 
 This is the kind of plan you can present to:
 Stanford collaborators, CZI reviewers, PIs, or funding bodies.
