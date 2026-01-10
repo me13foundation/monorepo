@@ -93,7 +93,7 @@ export const authOptions: NextAuthOptions = {
               })
               throw new Error('Invalid token format received from backend')
             }
-            
+
             // Debug logging in development
             if (process.env.NODE_ENV === 'development') {
               console.debug('[authorize] Token received from backend', {
@@ -157,7 +157,7 @@ export const authOptions: NextAuthOptions = {
       // Initial sign in
       if (user && account) {
         const customUser = user as AuthenticatedUser
-        
+
         // Validate token format before storing
         if (customUser.access_token) {
           const tokenParts = customUser.access_token.split('.')
@@ -169,7 +169,7 @@ export const authOptions: NextAuthOptions = {
             })
             throw new Error('Invalid token format in JWT callback')
           }
-          
+
           // Debug logging in development
           if (process.env.NODE_ENV === 'development') {
             console.debug('[jwt callback] Storing token', {
@@ -179,7 +179,7 @@ export const authOptions: NextAuthOptions = {
             })
           }
         }
-        
+
         return {
           access_token: customUser.access_token,
           refresh_token: customUser.refresh_token,
@@ -204,13 +204,13 @@ export const authOptions: NextAuthOptions = {
         }
         return token
       }
-      
+
       // If token expired or missing, return null to force re-authentication
       if (!expiresAt || Date.now() >= expiresAt) {
-        console.warn("JWT callback: Token expired or missing expires_at", { 
-          expiresAt, 
+        console.warn("JWT callback: Token expired or missing expires_at", {
+          expiresAt,
           now: Date.now(),
-          hasAccessToken: !!token.access_token 
+          hasAccessToken: !!token.access_token
         })
       }
 
@@ -254,7 +254,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       const tokenAccessToken = token.access_token
       const tokenUser = token.user
-      
+
       if (tokenUser) {
         session.user = {
           ...session.user,
@@ -267,7 +267,7 @@ export const authOptions: NextAuthOptions = {
           access_token: tokenAccessToken,
           expires_at: token.expires_at,
         }
-        
+
         // Debug: Log if access_token is missing
         if (!tokenAccessToken) {
           console.error("Session callback: access_token is missing from token!", {
@@ -278,7 +278,7 @@ export const authOptions: NextAuthOptions = {
         }
       } else {
         // Log warning if session is missing user data
-        console.warn("Session callback: token.user is missing", { 
+        console.warn("Session callback: token.user is missing", {
           token,
           tokenKeys: Object.keys(token as Record<string, unknown>),
         })

@@ -1,9 +1,9 @@
 /**
  * Security utilities for sanitizing user-generated content
- * 
+ *
  * This module provides safe HTML sanitization using DOMPurify
  * to prevent XSS attacks when rendering user content.
- * 
+ *
  * @module lib/security/sanitize
  */
 
@@ -37,11 +37,11 @@ const SANITIZE_CONFIG: Config = {
 
 /**
  * Sanitize HTML content to prevent XSS attacks
- * 
+ *
  * @param dirty - Unsanitized HTML string from user input
  * @param config - Optional DOMPurify configuration override
  * @returns Sanitized HTML string safe for rendering
- * 
+ *
  * @example
  * ```tsx
  * const userContent = "<p>Hello <script>alert('XSS')</script></p>"
@@ -67,7 +67,7 @@ export function sanitizeHtml(
 
 /**
  * Sanitize HTML and add security attributes to links
- * 
+ *
  * @param dirty - Unsanitized HTML string
  * @returns Sanitized HTML with secure link attributes
  */
@@ -98,7 +98,7 @@ export function sanitizeHtmlWithSecureLinks(dirty: string): string {
 /**
  * Strip all HTML tags and return plain text
  * Useful for previews or when HTML is not needed
- * 
+ *
  * @param html - HTML string to strip
  * @returns Plain text with HTML tags removed
  */
@@ -119,7 +119,7 @@ export function stripHtml(html: string): string {
 /**
  * Validate that a URL is safe for use in href attributes
  * Prevents javascript: and data: protocol attacks
- * 
+ *
  * @param url - URL to validate
  * @returns true if URL is safe, false otherwise
  */
@@ -149,4 +149,3 @@ export function isSafeUrl(url: string): boolean {
     trimmed.startsWith('?')
   )
 }
-

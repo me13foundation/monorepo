@@ -212,15 +212,15 @@ export function useAddDiscoverySourceToSpace() {
       }),
     onSuccess: (_dataSourceId, variables) => {
       // Invalidate and explicitly refetch queries to update the UI immediately
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: dataSourceKeys.space(variables.researchSpaceId),
       })
       // Explicitly refetch to ensure immediate update - this will refetch all matching queries
-      queryClient.refetchQueries({ 
+      queryClient.refetchQueries({
         queryKey: dataSourceKeys.space(variables.researchSpaceId),
         type: 'active',
       })
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: dataSourceKeys.lists(),
       })
     },

@@ -155,4 +155,3 @@ export async function unlockUser(
 
   return apiPost<GenericSuccessResponse>(`/users/${userId}/unlock`, {}, { token })
 }
-

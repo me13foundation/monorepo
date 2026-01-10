@@ -1,6 +1,6 @@
 /**
  * Centralized authentication error handling
- * 
+ *
  * Provides a single point of control for handling 401 errors
  * to prevent multiple simultaneous redirects and improve UX.
  */
@@ -9,7 +9,7 @@ let isHandlingAuthError = false
 
 /**
  * Handles authentication errors gracefully
- * 
+ *
  * Features:
  * - Prevents multiple simultaneous redirects
  * - Uses NextAuth signOut for clean session cleanup
@@ -47,7 +47,7 @@ export async function handleAuthError(errorMessage?: string): Promise<void> {
 
     // Dynamically import NextAuth to avoid SSR issues
     const { signOut } = await import('next-auth/react')
-    
+
     // Sign out without redirect (we'll handle navigation ourselves)
     await signOut({
       redirect: false,
@@ -59,7 +59,7 @@ export async function handleAuthError(errorMessage?: string): Promise<void> {
     if (errorMessage) {
       loginUrl.searchParams.set('message', errorMessage)
     }
-    
+
     window.location.href = loginUrl.toString()
   } catch (error) {
     // Fallback: direct navigation if signOut fails
@@ -81,4 +81,3 @@ export async function handleAuthError(errorMessage?: string): Promise<void> {
 export function resetAuthErrorHandler(): void {
   isHandlingAuthError = false
 }
-

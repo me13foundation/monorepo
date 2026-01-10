@@ -138,4 +138,3 @@ describe('admin user query hooks', () => {
     expect(fetchUserStatisticsMock).toHaveBeenCalledWith('token-789')
   })
 })
-

@@ -283,7 +283,7 @@ export function buildBreadcrumbs(
         members: "Members",
         settings: "Settings",
       }
-      
+
       items.push({
         label: subPageLabels[subPage] || subPage,
         isCurrent: segments.length === 3,
@@ -312,7 +312,7 @@ export function buildBreadcrumbs(
   if (pathname.startsWith("/admin")) {
     items.push({ label: "Dashboard", href: "/dashboard" })
     items.push({ label: "Admin", href: "/admin" })
-    
+
     if (segments.length > 1) {
       const adminPage = segments[1]
       const adminLabels: Record<string, string> = {
@@ -324,7 +324,7 @@ export function buildBreadcrumbs(
         label: adminLabels[adminPage] || adminPage,
         isCurrent: segments.length === 2,
       })
-      
+
       // Handle deeper routes like /admin/data-sources/templates
       if (segments.length > 2) {
         const subPage = segments[2]

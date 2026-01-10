@@ -9,4 +9,3 @@ export const spaceDiscoveryKeys = {
     [...spaceDiscoveryKeys.all, spaceId, 'catalog', filters] as const,
   sessions: (spaceId: string) => [...spaceDiscoveryKeys.all, spaceId, 'sessions'] as const,
 }
-

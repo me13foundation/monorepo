@@ -42,4 +42,3 @@ if (isSafeUrl(userUrl)) {
 
 - [React Security Hardening Guide](../../../../docs/security/react-security-hardening.md)
 - [DOMPurify Documentation](https://github.com/cure53/DOMPurify)
-

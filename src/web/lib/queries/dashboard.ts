@@ -11,7 +11,7 @@ export function useDashboardStats() {
   const token = session?.user?.access_token
   // Only enable if we have BOTH authenticated status AND a valid token
   const isAuthenticated = status === 'authenticated' && typeof token === 'string' && token.length > 0
-  
+
   // Debug logging
   if (status === 'authenticated' && !token) {
     console.warn('[useDashboardStats] Session authenticated but missing access_token', {
@@ -23,7 +23,7 @@ export function useDashboardStats() {
       tokenValue: token,
     })
   }
-  
+
   const queryKey = token
     ? dashboardKeys.stats(token)
     : dashboardKeys.stats('unauthenticated')
@@ -33,8 +33,8 @@ export function useDashboardStats() {
     queryFn: async () => {
       // Double-check token before making request
       if (!token || typeof token !== 'string' || token.length === 0) {
-        console.error('[useDashboardStats] Query executed without valid token!', { 
-          status, 
+        console.error('[useDashboardStats] Query executed without valid token!', {
+          status,
           session,
           token,
           tokenType: typeof token,
@@ -55,7 +55,7 @@ export function useRecentActivities(limit = 10) {
   const token = session?.user?.access_token
   // Only enable if we have BOTH authenticated status AND a valid token
   const isAuthenticated = status === 'authenticated' && typeof token === 'string' && token.length > 0
-  
+
   // Debug logging
   if (status === 'authenticated' && !token) {
     console.warn('[useRecentActivities] Session authenticated but missing access_token', {
@@ -67,7 +67,7 @@ export function useRecentActivities(limit = 10) {
       tokenValue: token,
     })
   }
-  
+
   const queryKey = token
     ? dashboardKeys.activities(limit, token)
     : dashboardKeys.activities(limit, 'unauthenticated')
@@ -77,8 +77,8 @@ export function useRecentActivities(limit = 10) {
     queryFn: async () => {
       // Double-check token before making request
       if (!token || typeof token !== 'string' || token.length === 0) {
-        console.error('[useRecentActivities] Query executed without valid token!', { 
-          status, 
+        console.error('[useRecentActivities] Query executed without valid token!', {
+          status,
           session,
           token,
           tokenType: typeof token,

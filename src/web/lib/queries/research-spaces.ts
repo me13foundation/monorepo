@@ -38,13 +38,13 @@ import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
 function useAuthToken() {
   const { data: session, status } = useSession()
   const token = session?.user?.access_token
-  
+
   // Validate token format (JWT should have 3 parts)
-  const isValidToken = token && 
-    typeof token === 'string' && 
+  const isValidToken = token &&
+    typeof token === 'string' &&
     token.length > 0 &&
     token.split('.').length === 3
-  
+
   // Only consider authenticated if:
   // 1. Session status is authenticated (not loading, not unauthenticated)
   // 2. Token exists and is a valid JWT format
@@ -55,7 +55,7 @@ function useAuthToken() {
     isValidToken &&
     !!session?.user &&
     !!session?.user?.access_token
-  
+
   // Debug logging in development
   if (process.env.NODE_ENV === 'development') {
     if (status === 'authenticated' && !isValidToken) {
@@ -78,7 +78,7 @@ function useAuthToken() {
       })
     }
   }
-  
+
   return { token: isValidToken ? token : undefined, isAuthenticated, status }
 }
 

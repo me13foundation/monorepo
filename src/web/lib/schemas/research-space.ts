@@ -51,4 +51,3 @@ export type CreateSpaceFormData = z.infer<typeof createSpaceSchema>
 export type UpdateSpaceFormData = z.infer<typeof updateSpaceSchema>
 export type InviteMemberFormData = z.infer<typeof inviteMemberSchema>
 export type UpdateMemberRoleFormData = z.infer<typeof updateMemberRoleSchema>
-

@@ -4,4 +4,3 @@ export const adminKeys = {
   spaceSourceAvailability: (spaceId: string) =>
     [...adminKeys.root, 'space-source-availability', spaceId] as const,
 }
-

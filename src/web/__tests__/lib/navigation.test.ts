@@ -42,7 +42,7 @@ describe('Navigation Utilities', () => {
       // Since we can't easily mock window.location.href in jsdom,
       // we verify the function structure and that it accesses window.location.origin
       const originalOrigin = window.location.origin
-      
+
       // The function should use window.location.origin
       // We verify it doesn't throw and would use the current origin
       expect(() => {
