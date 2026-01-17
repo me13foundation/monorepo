@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-from src.application.services import DataSourceAiTestService
+from src.application.services import DataSourceAiTestService, DataSourceAiTestSettings
 from src.database.session import SessionLocal
 from src.infrastructure.data_sources import PubMedSourceGateway
 from src.infrastructure.llm.flujo_agent_adapter import FlujoAgentAdapter
@@ -29,14 +30,18 @@ def build_data_source_ai_test_service(
     """Create a fully wired AI test service for the current session."""
     source_repository = SqlAlchemyUserDataSourceRepository(session)
     research_space_repository = SqlAlchemyResearchSpaceRepository(session)
-    ai_agent = FlujoAgentAdapter()
+    model_name = os.getenv("MED13_AI_AGENT_MODEL", "openai:gpt-4o-mini")
+    ai_agent = FlujoAgentAdapter(model=model_name)
 
     return DataSourceAiTestService(
         source_repository=source_repository,
         pubmed_gateway=PubMedSourceGateway(),
         ai_agent=ai_agent,
         research_space_repository=research_space_repository,
-        sample_size=DEFAULT_AI_TEST_SAMPLE_SIZE,
+        settings=DataSourceAiTestSettings(
+            sample_size=DEFAULT_AI_TEST_SAMPLE_SIZE,
+            ai_model_name=model_name,
+        ),
     )
 
 

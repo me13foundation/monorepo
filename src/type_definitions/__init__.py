@@ -16,7 +16,11 @@ from .common import (
     ValidationResult,
     VariantUpdate,
 )
-from .data_sources import DataSourceAiTestResult
+from .data_sources import (
+    DataSourceAiTestFinding,
+    DataSourceAiTestLink,
+    DataSourceAiTestResult,
+)
 from .external_apis import (
     ClinVarSearchResponse,
     ClinVarVariantResponse,
@@ -55,6 +59,8 @@ __all__ = [
     "APIResponse",
     "ClinVarSearchResponse",
     "ClinVarVariantResponse",
+    "DataSourceAiTestFinding",
+    "DataSourceAiTestLink",
     "DataSourceAiTestResult",
     "EvidenceUpdate",
     "GeneUpdate",

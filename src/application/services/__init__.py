@@ -43,6 +43,7 @@ AuditTrailService = audit_service.AuditTrailService
 DashboardService = dashboard_service.DashboardService
 DataDiscoveryService = data_discovery_service.DataDiscoveryService
 DataSourceAiTestService = data_source_ai_test_service.DataSourceAiTestService
+DataSourceAiTestSettings = data_source_ai_test_service.DataSourceAiTestSettings
 DataSourceActivationService = data_source_activation_service.DataSourceActivationService
 DataSourceAuthorizationService = (
     data_source_authorization_service.DataSourceAuthorizationService
@@ -99,6 +100,7 @@ __all__ = [
     "DashboardService",
     "DataDiscoveryService",
     "DataSourceAiTestService",
+    "DataSourceAiTestSettings",
     "DataSourceActivationService",
     "DataSourceAuthorizationService",
     "DataSourceAvailabilitySummary",

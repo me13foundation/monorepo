@@ -60,13 +60,31 @@ export interface IngestionRunResponse {
   executed_query?: string | null
 }
 
+export interface DataSourceAiTestLink {
+  label: string
+  url: string
+}
+
+export interface DataSourceAiTestFinding {
+  title: string
+  pubmed_id?: string | null
+  doi?: string | null
+  pmc_id?: string | null
+  publication_date?: string | null
+  journal?: string | null
+  links: DataSourceAiTestLink[]
+}
+
 export interface DataSourceAiTestResult {
   source_id: string
+  model?: string | null
   success: boolean
   message: string
   executed_query?: string | null
+  search_terms: string[]
   fetched_records: number
   sample_size: number
+  findings: DataSourceAiTestFinding[]
   checked_at: string
 }
 

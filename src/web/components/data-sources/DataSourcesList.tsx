@@ -42,8 +42,10 @@ import { DataSourceScheduleDialog } from './DataSourceScheduleDialog'
 import { DataSourceAiConfigDialog } from './DataSourceAiConfigDialog'
 import { DataSourceIngestionDetailsDialog, type ManualIngestionSummary } from './DataSourceIngestionDetailsDialog'
 import { DiscoverSourcesDialog } from './DiscoverSourcesDialog'
+import { DataSourceAiTestDialog } from './DataSourceAiTestDialog'
 import type { DataSource } from '@/types/data-source'
 import { componentRegistry } from '@/lib/components/registry'
+import type { DataSourceAiTestResult } from '@/lib/api/data-sources'
 
 interface DataSourcesListProps {
   spaceId: string
@@ -63,6 +65,9 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
   const [runningSourceId, setRunningSourceId] = useState<string | null>(null)
   const [testingSourceId, setTestingSourceId] = useState<string | null>(null)
   const [deleteSourceId, setDeleteSourceId] = useState<string | null>(null)
+  const [aiTestDialogSource, setAiTestDialogSource] = useState<DataSource | null>(null)
+  const [aiTestResult, setAiTestResult] = useState<DataSourceAiTestResult | null>(null)
+  const [isAiTestDialogOpen, setIsAiTestDialogOpen] = useState(false)
   const StatusBadge = componentRegistry.get<{ status: string }>('dataSource.statusBadge')
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -123,14 +128,9 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
     try {
       setTestingSourceId(source.id)
       const result = await testAiConfiguration.mutateAsync(source.id)
-      const description = result.executed_query
-        ? `Query: ${result.executed_query}`
-        : undefined
-      if (result.success) {
-        toast.success(result.message, { description })
-      } else {
-        toast.error(result.message, { description })
-      }
+      setAiTestDialogSource(source)
+      setAiTestResult(result)
+      setIsAiTestDialogOpen(true)
     } catch (error) {
       toast.error(getErrorMessage(error))
     } finally {
@@ -448,6 +448,18 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
         onOpenChange={(open) => {
           if (!open) {
             setDetailSourceId(null)
+          }
+        }}
+      />
+      <DataSourceAiTestDialog
+        source={aiTestDialogSource}
+        result={aiTestResult}
+        open={isAiTestDialogOpen}
+        onOpenChange={(open) => {
+          setIsAiTestDialogOpen(open)
+          if (!open) {
+            setAiTestDialogSource(null)
+            setAiTestResult(null)
           }
         }}
       />

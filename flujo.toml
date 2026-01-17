@@ -7,3 +7,10 @@ memory_indexing_enabled = false
 
 [architect]
 state_machine_default = false
+
+[cost]
+strict = false
+
+[cost.providers.openai."gpt-4o-mini"]
+prompt_tokens_per_1k = 0.00015
+completion_tokens_per_1k = 0.0006

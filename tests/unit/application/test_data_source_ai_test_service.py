@@ -7,7 +7,10 @@ from uuid import uuid4
 
 import pytest
 
-from src.application.services.data_source_ai_test_service import DataSourceAiTestService
+from src.application.services.data_source_ai_test_service import (
+    DataSourceAiTestService,
+    DataSourceAiTestSettings,
+)
 from src.application.services.ports.ai_agent_port import AiAgentPort
 from src.domain.entities.research_space import ResearchSpace, SpaceStatus
 from src.domain.entities.user_data_source import (
@@ -285,18 +288,37 @@ async def test_ai_test_success_returns_result() -> None:
 
     service = DataSourceAiTestService(
         source_repository=StubUserDataSourceRepository(source),
-        pubmed_gateway=StubPubMedGateway([{"pubmed_id": "1"}]),
+        pubmed_gateway=StubPubMedGateway(
+            [
+                {
+                    "pubmed_id": "1",
+                    "title": "MED13 findings in cardiac research",
+                    "doi": "10.1000/xyz",
+                    "pmc_id": "PMC12345",
+                    "publication_date": "2024-01-01",
+                    "journal": {"title": "Nature Medicine"},
+                },
+            ],
+        ),
         ai_agent=StubAiAgent("MED13[Title/Abstract]"),
         research_space_repository=StubResearchSpaceRepository(space),
-        sample_size=3,
+        settings=DataSourceAiTestSettings(
+            sample_size=3,
+            ai_model_name="openai:gpt-test",
+        ),
     )
 
     result = await service.test_ai_configuration(source_id)
 
     assert result.success is True
     assert result.executed_query == "MED13[Title/Abstract]"
+    assert result.model == "openai:gpt-test"
+    assert "MED13" in result.search_terms
     assert result.fetched_records == 1
     assert result.sample_size == 3
+    assert len(result.findings) == 1
+    assert result.findings[0].title == "MED13 findings in cardiac research"
+    assert any(link.label == "PubMed" for link in result.findings[0].links)
 
 
 @pytest.mark.asyncio
@@ -313,12 +335,14 @@ async def test_ai_disabled_returns_failure() -> None:
         pubmed_gateway=StubPubMedGateway([{"pubmed_id": "1"}]),
         ai_agent=StubAiAgent("MED13"),
         research_space_repository=StubResearchSpaceRepository(None),
+        settings=DataSourceAiTestSettings(ai_model_name="openai:gpt-test"),
     )
 
     result = await service.test_ai_configuration(source_id)
 
     assert result.success is False
     assert "AI-managed queries are disabled" in result.message
+    assert result.findings == []
 
 
 @pytest.mark.asyncio
@@ -335,9 +359,11 @@ async def test_no_results_returns_failure() -> None:
         pubmed_gateway=StubPubMedGateway([]),
         ai_agent=StubAiAgent("MED13"),
         research_space_repository=StubResearchSpaceRepository(None),
+        settings=DataSourceAiTestSettings(ai_model_name="openai:gpt-test"),
     )
 
     result = await service.test_ai_configuration(source_id)
 
     assert result.success is False
     assert "no results" in result.message.lower()
+    assert result.findings == []
