@@ -63,6 +63,7 @@ class UpdateSourceRequest(BaseModel):
 
     name: str | None = None
     description: str | None = None
+    status: SourceStatus | None = None
     configuration: SourceConfiguration | None = None
     ingestion_schedule: IngestionSchedule | None = None
     tags: list[str] | None = None
@@ -115,6 +116,8 @@ class SourceManagementService:
             changed.append("name")
         if request.description is not None:
             changed.append("description")
+        if request.status is not None:
+            changed.append("status")
         if request.configuration is not None:
             changed.append("configuration")
         if request.ingestion_schedule is not None:
@@ -181,14 +184,15 @@ class SourceManagementService:
         self,
         source_id: UUID,
         request: UpdateSourceRequest,
-        owner_id: UUID,
+        owner_id: UUID | None,
     ) -> UserDataSource | None:
         source = self._source_repository.find_by_id(source_id)
-        if not source or source.owner_id != owner_id:
+        if not source or (owner_id is not None and source.owner_id != owner_id):
             return None
 
         # Apply updates
         updated_source = source
+        previous_status = source.status
         if request.name is not None:
             updated_source = updated_source.model_copy(
                 update={"name": request.name},
@@ -197,6 +201,8 @@ class SourceManagementService:
             updated_source = updated_source.model_copy(
                 update={"description": request.description},
             )
+        if request.status is not None and request.status != updated_source.status:
+            updated_source = updated_source.update_status(request.status)
         if request.configuration is not None:
             sanitized_config = self._apply_plugin_validation(
                 updated_source.source_type,
@@ -219,11 +225,18 @@ class SourceManagementService:
                     changed_fields=changed_fields,
                 ),
             )
+        if request.status is not None and request.status != previous_status:
+            self._publish_event(
+                SourceStatusChangedEvent.from_source(
+                    saved_source,
+                    previous_status=previous_status,
+                ),
+            )
         return saved_source
 
-    def delete_source(self, source_id: UUID, owner_id: UUID) -> bool:
+    def delete_source(self, source_id: UUID, owner_id: UUID | None) -> bool:
         source = self._source_repository.find_by_id(source_id)
-        if not source or source.owner_id != owner_id:
+        if not source or (owner_id is not None and source.owner_id != owner_id):
             return False
 
         return self._source_repository.delete(source_id)

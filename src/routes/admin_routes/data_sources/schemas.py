@@ -15,6 +15,7 @@ from src.domain.entities.user_data_source import (
     SourceType,
 )
 from src.models.api.common import PaginatedResponse
+from src.type_definitions.common import JSONObject
 
 
 class CreateDataSourceRequest(BaseModel):
@@ -109,6 +110,7 @@ class IngestionRunResponse(BaseModel):
     parsed_publications: int
     created_publications: int
     updated_publications: int
+    executed_query: str | None = None
 
 
 class IngestionJobResponse(BaseModel):
@@ -123,6 +125,7 @@ class IngestionJobResponse(BaseModel):
     records_failed: int
     records_skipped: int
     bytes_processed: int
+    metadata: JSONObject | None = None
 
 
 class IngestionJobHistoryResponse(BaseModel):

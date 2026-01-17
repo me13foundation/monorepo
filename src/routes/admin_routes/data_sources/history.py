@@ -29,6 +29,7 @@ def _job_to_response(job: IngestionJob) -> IngestionJobResponse:
         records_failed=metrics.records_failed,
         records_skipped=metrics.records_skipped,
         bytes_processed=metrics.bytes_processed,
+        metadata=job.metadata,
     )
 
 

@@ -18,6 +18,7 @@ from src.infrastructure.dependency_injection.container import container
 from src.infrastructure.dependency_injection.dependencies import (
     initialize_legacy_session,
 )
+from src.infrastructure.security.cors import get_allowed_origins
 from src.middleware import (
     AuditLoggingMiddleware,
     AuthMiddleware,
@@ -40,11 +41,11 @@ from src.routes import (
     research_space_discovery_router,
     research_spaces_router,
     resources_router,
+    root_router,
     search_router,
     users_router,
     variants_router,
 )
-from src.type_definitions.common import JSONObject
 
 
 def _skip_startup_tasks() -> bool:
@@ -129,14 +130,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "https://med13foundation.org",
-            "https://curate.med13foundation.org",
-            "https://admin.med13foundation.org",
-            "http://localhost:3000",  # Next.js admin interface
-            "http://localhost:3001",  # Next.js admin interface (alternate port)
-            "http://localhost:8080",  # FastAPI backend
-        ],
+        allow_origins=get_allowed_origins(),
         allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         allow_headers=["*"],
         allow_credentials=True,
@@ -159,39 +153,8 @@ def create_app() -> FastAPI:
     app.add_middleware(EndpointRateLimitMiddleware)
     app.add_middleware(MaintenanceModeMiddleware)
 
-    # Root endpoint
-    @app.get("/", summary="Welcome to MED13 Resource Library", tags=["info"])
-    async def root() -> JSONObject:
-        """Welcome endpoint with API information."""
-        return {
-            "message": "Welcome to the MED13 Resource Library API",
-            "description": "Curated resource library for MED13 variants, "
-            "phenotypes, and evidence",
-            "version": "0.1.0",
-            "documentation": "/docs",
-            "health_check": "/health/",
-            "resources": "/resources/",
-            "genes": "/genes/",
-            "authentication": {
-                "type": "JWT Bearer Token",
-                "header": "Authorization",
-                "format": "Bearer {token}",
-                "login_endpoint": "/auth/login",
-                "description": "Use JWT tokens obtained from /auth/login for API authentication",
-            },
-            "rate_limiting": {
-                "description": "Rate limiting applied based on client IP",
-                "headers": [
-                    "X-RateLimit-Remaining",
-                    "X-RateLimit-Limit",
-                    "X-RateLimit-Reset",
-                ],
-            },
-            "contact": "https://med13foundation.org",
-            "license": "CC-BY 4.0",
-        }
-
     app.include_router(health_router)
+    app.include_router(root_router)
     app.include_router(resources_router)
     app.include_router(genes_router)
     app.include_router(variants_router)

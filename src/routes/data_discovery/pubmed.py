@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -15,9 +14,6 @@ from src.application.services import (
     PubMedDiscoveryService,
     PubmedDownloadRequest,
     RunPubmedSearchRequest,
-)
-from src.application.services.discovery_configuration_requests import (
-    CreatePubmedPresetRequest,
 )
 from src.database.session import get_session
 from src.domain.entities.user import User
@@ -89,26 +85,21 @@ async def list_pubmed_presets(
 )
 async def create_pubmed_preset(
     request: CreatePubmedPresetRequestModel,
-    service: Annotated[
-        DiscoveryConfigurationService,
-        Depends(get_discovery_configuration_service_dependency),
-    ],
-    db: Annotated[Session, Depends(get_session)],
-    audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
-    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+    service: DiscoveryConfigurationService = Depends(
+        get_discovery_configuration_service_dependency,
+    ),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    audit_context: AuditContext = Depends(get_audit_context),
     current_user: User = Depends(get_current_active_user),
 ) -> DiscoveryPresetResponse:
     """Create a new PubMed preset."""
 
     try:
-        domain_request = CreatePubmedPresetRequest(
-            name=request.name,
-            description=request.description,
-            scope=request.scope,
-            research_space_id=request.research_space_id,
-            parameters=request.to_advanced_parameters(),
+        preset = service.create_pubmed_preset(
+            current_user.id,
+            request.to_domain_request(),
         )
-        preset = service.create_pubmed_preset(current_user.id, domain_request)
 
         audit_service.record_action(
             db,
@@ -147,13 +138,12 @@ async def create_pubmed_preset(
 )
 async def delete_pubmed_preset(
     preset_id: UUID,
-    service: Annotated[
-        DiscoveryConfigurationService,
-        Depends(get_discovery_configuration_service_dependency),
-    ],
-    db: Annotated[Session, Depends(get_session)],
-    audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
-    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+    service: DiscoveryConfigurationService = Depends(
+        get_discovery_configuration_service_dependency,
+    ),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    audit_context: AuditContext = Depends(get_audit_context),
     current_user: User = Depends(get_current_active_user),
 ) -> None:
     """Delete a preset owned by the current user."""
@@ -183,13 +173,10 @@ async def delete_pubmed_preset(
 )
 async def run_pubmed_search(
     request: RunPubmedSearchRequestModel,
-    service: Annotated[
-        PubMedDiscoveryService,
-        Depends(get_pubmed_discovery_service_dependency),
-    ],
-    db: Annotated[Session, Depends(get_session)],
-    audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
-    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+    service: PubMedDiscoveryService = Depends(get_pubmed_discovery_service_dependency),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    audit_context: AuditContext = Depends(get_audit_context),
     current_user: User = Depends(get_current_active_user),
 ) -> DiscoverySearchJobResponse:
     """Start executing an advanced PubMed search."""
@@ -247,13 +234,10 @@ async def get_pubmed_search_job(
 )
 async def download_pubmed_article_pdf(
     request: PubmedDownloadRequestModel,
-    service: Annotated[
-        PubMedDiscoveryService,
-        Depends(get_pubmed_discovery_service_dependency),
-    ],
-    db: Annotated[Session, Depends(get_session)],
-    audit_service: Annotated[AuditTrailService, Depends(get_audit_trail_service)],
-    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+    service: PubMedDiscoveryService = Depends(get_pubmed_discovery_service_dependency),
+    db: Session = Depends(get_session),
+    audit_service: AuditTrailService = Depends(get_audit_trail_service),
+    audit_context: AuditContext = Depends(get_audit_context),
     current_user: User = Depends(get_current_active_user),
 ) -> StorageOperationResponse:
     """Trigger PDF storage for a PubMed article."""

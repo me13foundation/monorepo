@@ -14,6 +14,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from starlette.types import ASGIApp
 
+from src.infrastructure.security.cors import get_allowed_origins
+
 _ENVIRONMENT = os.getenv("MED13_ENV", "development").lower()
 _ALLOW_MISSING_KEYS = (
     os.getenv("MED13_ALLOW_MISSING_API_KEYS")
@@ -163,11 +165,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Add CORS headers to error response
             origin = request.headers.get("origin")
             headers = {"WWW-Authenticate": "APIKey"}
-            if origin and origin in [
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "http://localhost:8080",
-            ]:
+            allowed_origins = get_allowed_origins()
+            if origin and origin.rstrip("/") in allowed_origins:
                 headers.update(
                     {
                         "Access-Control-Allow-Origin": origin,
@@ -186,11 +185,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Add CORS headers to error response
             origin = request.headers.get("origin")
             headers = {}
-            if origin and origin in [
-                "http://localhost:3000",
-                "http://localhost:3001",
-                "http://localhost:8080",
-            ]:
+            allowed_origins = get_allowed_origins()
+            if origin and origin.rstrip("/") in allowed_origins:
                 headers.update(
                     {
                         "Access-Control-Allow-Origin": origin,

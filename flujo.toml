@@ -1,0 +1,9 @@
+# Flujo configuration for MED13 Resource Library
+state_uri = "sqlite:///flujo_state.db"
+
+[settings]
+test_mode = false
+memory_indexing_enabled = false
+
+[architect]
+state_machine_default = false

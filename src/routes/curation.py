@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -47,7 +46,7 @@ class SubmitRequest(BaseModel):
 
 
 class BulkRequest(BaseModel):
-    ids: Sequence[int]
+    ids: list[int]
     action: str = Field(pattern="^(approve|reject|quarantine)$")
 
 

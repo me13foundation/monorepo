@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from src.application.services import (
     DataSourceActivationService,
+    DataSourceAiTestService,
     DataSourceAuthorizationService,
     IngestionSchedulingService,
     SourceManagementService,
@@ -81,6 +82,16 @@ def get_ingestion_scheduling_service() -> Generator[IngestionSchedulingService]:
         yield service
 
 
+def get_data_source_ai_test_service() -> Generator[DataSourceAiTestService]:
+    """Yield a data source AI test service tied to a scoped session."""
+    from src.infrastructure.factories.data_source_ai_test_factory import (  # noqa: PLC0415
+        data_source_ai_test_service_context,
+    )
+
+    with data_source_ai_test_service_context() as service:
+        yield service
+
+
 def get_ingestion_job_repository() -> SqlAlchemyIngestionJobRepository:
     """Instantiate the ingestion job repository."""
     session = get_db_session()
@@ -132,6 +143,7 @@ __all__ = [
     "get_db_session",
     "get_ingestion_scheduling_service",
     "get_ingestion_job_repository",
+    "get_data_source_ai_test_service",
     "get_source_service",
     "get_storage_configuration_service",
     "get_admin_db_session",

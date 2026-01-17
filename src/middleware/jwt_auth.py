@@ -18,6 +18,7 @@ from src.application.services.authentication_service import (
     AuthenticationService,
 )
 from src.infrastructure.dependency_injection.container import container
+from src.infrastructure.security.cors import get_allowed_origins
 
 SKIP_JWT_VALIDATION = os.getenv("MED13_BYPASS_JWT_FOR_TESTS") == "1"
 
@@ -64,15 +65,8 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         """Get CORS headers for the request origin."""
         origin = request.headers.get("origin")
         cors_headers = {"WWW-Authenticate": "Bearer"}
-        allowed_origins = [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:8080",
-            "https://med13foundation.org",
-            "https://curate.med13foundation.org",
-            "https://admin.med13foundation.org",
-        ]
-        if origin and origin in allowed_origins:
+        allowed_origins = get_allowed_origins()
+        if origin and origin.rstrip("/") in allowed_origins:
             cors_headers.update(
                 {
                     "Access-Control-Allow-Origin": origin,

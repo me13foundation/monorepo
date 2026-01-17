@@ -18,10 +18,11 @@ from src.type_definitions.storage import StorageUseCase
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from src.application.services.ports.ai_agent_port import AiAgentPort
     from src.application.services.storage_configuration_service import (
         StorageConfigurationService,
     )
-    from src.domain.repositories.publication_repository import PublicationRepository
+    from src.domain.repositories import PublicationRepository, ResearchSpaceRepository
     from src.type_definitions.common import (
         PublicationUpdate,
         RawRecord,
@@ -32,17 +33,21 @@ if TYPE_CHECKING:
 class PubMedIngestionService:
     """Coordinate fetching, transforming, and persisting PubMed data per source."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         gateway: PubMedGateway,
         publication_repository: PublicationRepository,
         transformer: PubMedRecordTransformer | None = None,
         storage_service: StorageConfigurationService | None = None,
+        ai_agent: AiAgentPort | None = None,
+        research_space_repository: ResearchSpaceRepository | None = None,
     ) -> None:
         self._gateway = gateway
         self._publication_repository = publication_repository
         self._transformer = transformer or PubMedRecordTransformer()
         self._storage_service = storage_service
+        self._ai_agent = ai_agent
+        self._research_space_repository = research_space_repository
 
     async def ingest(
         self,
@@ -51,6 +56,34 @@ class PubMedIngestionService:
         """Execute ingestion for a PubMed data source."""
         self._assert_source_type(source)
         config = self._build_config(source.configuration)
+
+        # AI-Managed Logic
+        if (
+            config.agent_config.is_ai_managed
+            and self._ai_agent
+            and self._research_space_repository
+        ):
+            research_space_description = ""
+            if (
+                config.agent_config.use_research_space_context
+                and source.research_space_id
+            ):
+                space = self._research_space_repository.find_by_id(
+                    source.research_space_id,
+                )
+                if space:
+                    research_space_description = space.description
+
+            # Generate intelligent query
+            intelligent_query = await self._ai_agent.generate_intelligent_query(
+                research_space_description=research_space_description,
+                user_instructions=config.agent_config.agent_prompt,
+                source_type="pubmed",
+            )
+
+            if intelligent_query:
+                # Override static query with AI-generated one
+                config = config.model_copy(update={"query": intelligent_query})
 
         raw_records = await self._gateway.fetch_records(config)
 
@@ -67,6 +100,7 @@ class PubMedIngestionService:
             parsed_publications=len(publications),
             created_publications=created,
             updated_publications=updated,
+            executed_query=config.query,
         )
 
     async def _persist_raw_records(

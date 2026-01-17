@@ -14,6 +14,7 @@ from . import (
     research_space_discovery,
     research_spaces,
     resources,
+    root,
     search,
     users,
     variants,
@@ -32,6 +33,7 @@ phenotypes_router = phenotypes.router
 research_space_discovery_router = research_space_discovery.router
 research_spaces_router = research_spaces.research_spaces_router
 resources_router = resources.router
+root_router = root.router
 search_router = search.router
 users_router = users.users_router
 variants_router = variants.router
@@ -50,6 +52,7 @@ __all__ = [
     "research_space_discovery_router",
     "research_spaces_router",
     "resources_router",
+    "root_router",
     "search_router",
     "users_router",
     "variants_router",

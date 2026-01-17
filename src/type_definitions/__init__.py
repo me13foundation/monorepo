@@ -16,6 +16,7 @@ from .common import (
     ValidationResult,
     VariantUpdate,
 )
+from .data_sources import DataSourceAiTestResult
 from .external_apis import (
     ClinVarSearchResponse,
     ClinVarVariantResponse,
@@ -54,6 +55,7 @@ __all__ = [
     "APIResponse",
     "ClinVarSearchResponse",
     "ClinVarVariantResponse",
+    "DataSourceAiTestResult",
     "EvidenceUpdate",
     "GeneUpdate",
     "GoogleCloudStorageConfig",

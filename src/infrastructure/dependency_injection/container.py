@@ -19,7 +19,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from src.application import curation as app_curation
 from src.application import services as app_services
 from src.domain.services import (
     EvidenceDomainService,
@@ -34,7 +33,6 @@ from src.infrastructure.dependency_injection.db_utils import (
     resolve_async_database_url,
 )
 from src.infrastructure.repositories import (
-    SqlAlchemyPhenotypeRepository,
     SqlAlchemySessionRepository,
     SqlAlchemySystemStatusRepository,
     SqlAlchemyUserRepository,
@@ -125,6 +123,7 @@ class DependencyContainer(ApplicationServiceFactoryMixin):
         )
         self._system_status_repository: SqlAlchemySystemStatusRepository | None = None
         self._system_status_service: app_services.SystemStatusService | None = None
+        self._ai_agent_port = None
 
     def get_user_repository(self) -> SqlAlchemyUserRepository:
         if self._user_repository is None:
@@ -225,24 +224,6 @@ class DependencyContainer(ApplicationServiceFactoryMixin):
         """Backward-compatible alias for the search service factory."""
 
         return self.create_search_service(session)
-
-    def create_curation_detail_service(
-        self,
-        session: sa.orm.Session,
-    ) -> app_curation.CurationDetailService:
-        conflict_detector = app_curation.ConflictDetector(
-            variant_domain_service=self.get_variant_domain_service(),
-            evidence_domain_service=self.get_evidence_domain_service(),
-        )
-
-        return app_curation.CurationDetailService(
-            variant_service=self.create_variant_application_service(session),
-            evidence_service=self.create_evidence_application_service(session),
-            phenotype_repository=SqlAlchemyPhenotypeRepository(session),
-            conflict_detector=conflict_detector,
-            review_repository=app_curation.SqlAlchemyReviewRepository(),
-            db_session=session,
-        )
 
     async def get_db_session(self) -> AsyncGenerator[AsyncSession]:
         async with self.async_session_factory() as session:

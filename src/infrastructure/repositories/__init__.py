@@ -11,6 +11,7 @@ from .gene_repository import SqlAlchemyGeneRepository
 from .ingestion_job_repository import SqlAlchemyIngestionJobRepository
 from .phenotype_repository import SqlAlchemyPhenotypeRepository
 from .publication_repository import SqlAlchemyPublicationRepository
+from .research_space_repository import SqlAlchemyResearchSpaceRepository
 from .source_template_repository import SqlAlchemySourceTemplateRepository
 from .sqlalchemy_session_repository import SqlAlchemySessionRepository
 from .sqlalchemy_user_repository import SqlAlchemyUserRepository
@@ -34,6 +35,7 @@ __all__ = [
     "SqlAlchemyIngestionJobRepository",
     "SqlAlchemyPhenotypeRepository",
     "SqlAlchemyPublicationRepository",
+    "SqlAlchemyResearchSpaceRepository",
     "SqlAlchemySourceTemplateRepository",
     "SqlAlchemySessionRepository",
     "SqlAlchemyStorageConfigurationRepository",

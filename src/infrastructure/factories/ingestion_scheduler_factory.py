@@ -20,10 +20,12 @@ from src.infrastructure.data_sources import (
     PubMedSourceGateway,
     SimplePubMedPdfGateway,
 )
+from src.infrastructure.llm.flujo_agent_adapter import FlujoAgentAdapter
 from src.infrastructure.repositories import (
     SQLAlchemyDiscoverySearchJobRepository,
     SqlAlchemyIngestionJobRepository,
     SqlAlchemyPublicationRepository,
+    SqlAlchemyResearchSpaceRepository,
     SqlAlchemyStorageConfigurationRepository,
     SqlAlchemyStorageOperationRepository,
     SqlAlchemyUserDataSourceRepository,
@@ -50,6 +52,7 @@ def build_ingestion_scheduling_service(
     publication_repository = SqlAlchemyPublicationRepository(session)
     user_source_repository = SqlAlchemyUserDataSourceRepository(session)
     job_repository = SqlAlchemyIngestionJobRepository(session)
+    research_space_repository = SqlAlchemyResearchSpaceRepository(session)
 
     storage_configuration_repository = SqlAlchemyStorageConfigurationRepository(
         session,
@@ -61,10 +64,15 @@ def build_ingestion_scheduling_service(
         plugin_registry=initialize_storage_plugins(),
     )
 
+    # Initialize AI Agent Port
+    ai_agent_port = FlujoAgentAdapter()
+
     pubmed_service = PubMedIngestionService(
         gateway=PubMedSourceGateway(),
         publication_repository=publication_repository,
         storage_service=storage_service,
+        ai_agent=ai_agent_port,
+        research_space_repository=research_space_repository,
     )
 
     storage_coordinator = StorageOperationCoordinator(storage_service)
