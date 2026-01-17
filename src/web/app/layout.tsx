@@ -26,7 +26,7 @@ const nunitoSans = Nunito_Sans({
   display: 'swap',
   variable: '--font-heading',
   weight: ['400', '600', '700', '800'],
-  adjustFontFallback: true,
+  adjustFontFallback: false,
   fallback: ['system-ui', 'arial'],
   preload: true,
 })

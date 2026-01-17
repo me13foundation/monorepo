@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from src.domain.entities.data_source_configs import PubMedQueryConfig
-from src.domain.entities.user_data_source import SourceType
+from src.domain.entities.user_data_source import SourceType, UserDataSource
 from src.type_definitions.data_sources import (
     DataSourceAiTestFinding,
     DataSourceAiTestLink,
@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from uuid import UUID
 
     from src.application.services.ports.ai_agent_port import AiAgentPort
-    from src.domain.entities.user_data_source import UserDataSource
     from src.domain.repositories.research_space_repository import (
         ResearchSpaceRepository,
     )
