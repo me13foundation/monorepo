@@ -22,6 +22,7 @@ export type ManualIngestionSummary = {
   created_publications: number
   updated_publications: number
   completedAt: string
+  executed_query?: string | null
 }
 
 interface DataSourceIngestionDetailsDialogProps {
@@ -98,6 +99,12 @@ export function DataSourceIngestionDetailsDialog({
             {summary ? (
               <div className="space-y-1 rounded-md border p-3">
                 <InfoRow label="Completed" value={formatTimestamp(summary.completedAt)} />
+                {summary.executed_query && (
+                  <div className="mb-2 mt-1 space-y-1 border-b pb-2">
+                    <span className="text-xs text-muted-foreground">Executed Query:</span>
+                    <p className="rounded bg-muted p-2 font-mono text-xs">{summary.executed_query}</p>
+                  </div>
+                )}
                 <InfoRow label="Fetched records" value={summary.fetched_records.toString()} />
                 <InfoRow label="Parsed publications" value={summary.parsed_publications.toString()} />
                 <InfoRow label="New publications" value={summary.created_publications.toString()} />
@@ -131,17 +138,39 @@ export function DataSourceIngestionDetailsDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {historyItems.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-medium capitalize">{job.status}</TableCell>
-                        <TableCell className="capitalize">{job.trigger}</TableCell>
-                        <TableCell>{formatTimestamp(job.started_at)}</TableCell>
-                        <TableCell>{formatTimestamp(job.completed_at)}</TableCell>
-                        <TableCell className="text-right">
-                          {job.records_processed} (+{job.records_failed}/{job.records_skipped})
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {historyItems.map((job) => {
+                      const executedQuery =
+                        typeof job.metadata?.executed_query === 'string'
+                          ? job.metadata.executed_query
+                          : null
+                      return (
+                        <TableRow
+                          key={job.id}
+                          className="cursor-help"
+                          title={executedQuery ? `Query: ${executedQuery}` : undefined}
+                        >
+                          <TableCell className="font-medium capitalize">
+                            <div className="flex flex-col">
+                              <span>{job.status}</span>
+                              {executedQuery && (
+                                <span
+                                  className="line-clamp-1 max-w-[100px] text-[10px] text-muted-foreground"
+                                  title={executedQuery}
+                                >
+                                  {executedQuery}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="capitalize">{job.trigger}</TableCell>
+                          <TableCell>{formatTimestamp(job.started_at)}</TableCell>
+                          <TableCell>{formatTimestamp(job.completed_at)}</TableCell>
+                          <TableCell className="text-right">
+                            {job.records_processed} (+{job.records_failed}/{job.records_skipped})
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>

@@ -30,11 +30,23 @@ jest.mock('@/lib/queries/data-sources', () => ({
     mutateAsync: jest.fn(),
     isPending: false,
   }),
+  useTestDataSourceAiConfiguration: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
   useCreateDataSourceInSpace: () => ({
     mutateAsync: jest.fn(),
     isPending: false,
   }),
   useConfigureDataSourceSchedule: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
+  useUpdateDataSource: () => ({
+    mutateAsync: jest.fn(),
+    isPending: false,
+  }),
+  useDeleteDataSource: () => ({
     mutateAsync: jest.fn(),
     isPending: false,
   }),

@@ -1,22 +1,49 @@
 "use client"
 
 import { useState } from 'react'
+import { isAxiosError } from 'axios'
 import { toast } from 'sonner'
 import {
   useSpaceDataSources,
   useTriggerDataSourceIngestion,
+  useTestDataSourceAiConfiguration,
+  useUpdateDataSource,
+  useDeleteDataSource,
 } from '@/lib/queries/data-sources'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Database, Loader2, Clock, RefreshCw, Info, Search } from 'lucide-react'
-import { CreateDataSourceDialog } from './CreateDataSourceDialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  Database,
+  Loader2,
+  Clock,
+  RefreshCw,
+  Info,
+  Search,
+  MoreVertical,
+  Trash2,
+  TestTube,
+} from 'lucide-react'
 import { DataSourceScheduleDialog } from './DataSourceScheduleDialog'
+import { DataSourceAiConfigDialog } from './DataSourceAiConfigDialog'
 import { DataSourceIngestionDetailsDialog, type ManualIngestionSummary } from './DataSourceIngestionDetailsDialog'
 import { DiscoverSourcesDialog } from './DiscoverSourcesDialog'
 import type { DataSource } from '@/types/data-source'
 import { componentRegistry } from '@/lib/components/registry'
-import type { IngestionRunResponse } from '@/lib/api/data-sources'
 
 interface DataSourcesListProps {
   spaceId: string
@@ -27,11 +54,30 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
   const [lastSummaries, setLastSummaries] = useState<Record<string, ManualIngestionSummary>>({})
   const [detailSourceId, setDetailSourceId] = useState<string | null>(null)
   const triggerIngestion = useTriggerDataSourceIngestion(spaceId)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const testAiConfiguration = useTestDataSourceAiConfiguration()
+  const updateDataSource = useUpdateDataSource(spaceId)
+  const deleteDataSource = useDeleteDataSource(spaceId)
   const [isDiscoverDialogOpen, setIsDiscoverDialogOpen] = useState(false)
   const [scheduleDialogSource, setScheduleDialogSource] = useState<DataSource | null>(null)
+  const [aiConfigDialogSource, setAiConfigDialogSource] = useState<DataSource | null>(null)
   const [runningSourceId, setRunningSourceId] = useState<string | null>(null)
+  const [testingSourceId, setTestingSourceId] = useState<string | null>(null)
+  const [deleteSourceId, setDeleteSourceId] = useState<string | null>(null)
   const StatusBadge = componentRegistry.get<{ status: string }>('dataSource.statusBadge')
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value)
+  const getErrorMessage = (error: unknown): string => {
+    if (isAxiosError(error)) {
+      const data = error.response?.data
+      if (isRecord(data) && typeof data.detail === 'string') {
+        return data.detail
+      }
+    }
+    if (error instanceof Error) {
+      return error.message
+    }
+    return 'Unable to test AI configuration'
+  }
 
   if (isLoading) {
     return (
@@ -70,6 +116,48 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
       })
     } finally {
       setRunningSourceId(null)
+    }
+  }
+
+  const handleTestAiConfiguration = async (source: DataSource) => {
+    try {
+      setTestingSourceId(source.id)
+      const result = await testAiConfiguration.mutateAsync(source.id)
+      const description = result.executed_query
+        ? `Query: ${result.executed_query}`
+        : undefined
+      if (result.success) {
+        toast.success(result.message, { description })
+      } else {
+        toast.error(result.message, { description })
+      }
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    } finally {
+      setTestingSourceId(null)
+    }
+  }
+
+  const handleRetire = async (source: DataSource) => {
+    try {
+      await updateDataSource.mutateAsync({
+        sourceId: source.id,
+        payload: {
+          status: 'archived',
+        },
+      })
+    } catch (error) {
+      // Error toast is handled by the mutation
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleteSourceId) return
+    try {
+      await deleteDataSource.mutateAsync(deleteSourceId)
+      setDeleteSourceId(null)
+    } catch (error) {
+      // Error toast is handled by the mutation
     }
   }
 
@@ -132,10 +220,6 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
             <Search className="mr-2 size-4" />
             Add from Library
           </Button>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="mr-2 size-4" />
-            Create Custom Source
-          </Button>
         </div>
       </div>
 
@@ -146,16 +230,12 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
               <Database className="mx-auto mb-4 size-12 text-muted-foreground" />
               <h3 className="mb-2 text-lg font-semibold">No data sources added to this space yet</h3>
               <p className="mb-4 text-muted-foreground">
-                Choose from our library of pre-configured sources or create a custom integration.
+                Use the library to add PubMed or create a custom source from the same menu.
               </p>
               <div className="flex justify-center gap-3">
                 <Button onClick={() => setIsDiscoverDialogOpen(true)}>
                   <Search className="mr-2 size-4" />
                   Add from Library
-                </Button>
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="mr-2 size-4" />
-                  Create Custom Source
                 </Button>
               </div>
             </div>
@@ -184,7 +264,27 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Type:</span>
-                    <span className="font-medium">{source.source_type}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium capitalize">{source.source_type}</span>
+                      {(() => {
+                        const config = isRecord(source.config) ? source.config : {}
+                        const metadata = isRecord(config.metadata) ? config.metadata : {}
+                        const agentConfig = isRecord(metadata.agent_config)
+                          ? metadata.agent_config
+                          : {}
+                        if (agentConfig.is_ai_managed === true) {
+                          return (
+                            <Badge
+                              variant="secondary"
+                              className="bg-blue-100 px-1 py-0 text-[10px] uppercase text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            >
+                              AI Managed
+                            </Badge>
+                          )
+                        }
+                        return null
+                      })()}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Last ingested:</span>
@@ -199,43 +299,73 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
                       ))}
                     </div>
                   )}
-                  {source.source_type === 'pubmed' && (
-                    <div className="mt-3 space-y-2 rounded-md border p-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Clock className="size-4" />
-                          <span>Schedule</span>
+                  <div className="mt-3 space-y-2 rounded-md border p-3">
+                    {source.source_type === 'pubmed' && (
+                      <>
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-1 text-muted-foreground">
+                            <Clock className="size-4" />
+                            <span>Schedule</span>
+                          </div>
+                          <span className="font-medium">{formatScheduleLabel(source)}</span>
                         </div>
-                        <span className="font-medium">{formatScheduleLabel(source)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Timezone</span>
-                        <span>{source.ingestion_schedule?.timezone || 'UTC'}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Next run</span>
-                        <span>{formatRelativeTime(source.ingestion_schedule?.next_run_at)}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Last run</span>
-                        <span>{formatTimestamp(source.ingestion_schedule?.last_run_at)}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-2 pt-2">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Timezone</span>
+                          <span>{source.ingestion_schedule?.timezone || 'UTC'}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Next run</span>
+                          <span>{formatRelativeTime(source.ingestion_schedule?.next_run_at)}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Last run</span>
+                          <span>{formatTimestamp(source.ingestion_schedule?.last_run_at)}</span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {source.source_type === 'pubmed' && (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
                           onClick={() => setScheduleDialogSource(source)}
                         >
-                          Configure
+                          Configure schedule
                         </Button>
+                      )}
+                      {source.source_type === 'pubmed' && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setAiConfigDialogSource(source)}
+                        >
+                          Configure AI
+                        </Button>
+                      )}
+                      {source.source_type === 'pubmed' && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleTestAiConfiguration(source)}
+                          disabled={testAiConfiguration.isPending && testingSourceId === source.id}
+                        >
+                          {testAiConfiguration.isPending && testingSourceId === source.id ? (
+                            <Loader2 className="mr-2 size-4 animate-spin" />
+                          ) : (
+                            <TestTube className="mr-2 size-4" />
+                          )}
+                          Test AI
+                        </Button>
+                      )}
+                      {source.source_type === 'pubmed' && (
                         <Button
                           type="button"
                           size="sm"
                           onClick={() => handleRunNow(source)}
-                          disabled={
-                            triggerIngestion.isPending && runningSourceId === source.id
-                          }
+                          disabled={triggerIngestion.isPending && runningSourceId === source.id}
                         >
                           {triggerIngestion.isPending && runningSourceId === source.id ? (
                             <Loader2 className="mr-2 size-4 animate-spin" />
@@ -244,19 +374,46 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
                           )}
                           Run now
                         </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          className="text-muted-foreground"
-                          onClick={() => setDetailSourceId(source.id)}
-                        >
-                          <Info className="mr-2 size-4" />
-                          View details
-                        </Button>
-                      </div>
+                      )}
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-muted-foreground"
+                        onClick={() => setDetailSourceId(source.id)}
+                      >
+                        <Info className="mr-2 size-4" />
+                        View details
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                          >
+                            <MoreVertical className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={source.status === 'archived' || updateDataSource.isPending}
+                            onClick={() => handleRetire(source)}
+                          >
+                            Retire source
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => setDeleteSourceId(source.id)}
+                          >
+                            <Trash2 className="mr-2 size-4" />
+                            Remove source
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
-                  )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -264,11 +421,6 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
         </div>
       )}
 
-      <CreateDataSourceDialog
-        spaceId={spaceId}
-        open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
-      />
       <DataSourceScheduleDialog
         spaceId={spaceId}
         source={scheduleDialogSource}
@@ -276,6 +428,16 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
         onOpenChange={(open) => {
           if (!open) {
             setScheduleDialogSource(null)
+          }
+        }}
+      />
+      <DataSourceAiConfigDialog
+        spaceId={spaceId}
+        source={aiConfigDialogSource}
+        open={Boolean(aiConfigDialogSource)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAiConfigDialogSource(null)
           }
         }}
       />
@@ -298,6 +460,36 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
           await refetch()
         }}
       />
+      <Dialog open={Boolean(deleteSourceId)} onOpenChange={(open) => !open && setDeleteSourceId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove data source</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove this data source? This action cannot be undone and will
+              permanently delete the source from this research space.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteSourceId(null)}
+              disabled={deleteDataSource.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleteDataSource.isPending}
+            >
+              {deleteDataSource.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

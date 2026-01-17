@@ -45,14 +45,14 @@ export function ResearchSpaceCard({
   const tags = space.tags ?? []
 
   return (
-    <Card className="transition-all hover:shadow-brand-md hover:-translate-y-0.5">
+    <Card className="transition-all hover:-translate-y-0.5 hover:shadow-brand-md">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <CardTitle className="mb-2 text-xl">
               <Link
                 href={`/spaces/${space.id}`}
-                className="hover:text-brand-primary transition-colors"
+                className="transition-colors hover:text-brand-primary"
               >
                 {space.name}
               </Link>

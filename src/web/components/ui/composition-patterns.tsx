@@ -63,7 +63,7 @@ export function DashboardSection({
           <div>
             <CardTitle className="section-heading !text-2xl">{title}</CardTitle>
             {description && (
-              <CardDescription className="text-base mt-1.5">{description}</CardDescription>
+              <CardDescription className="mt-1.5 text-base">{description}</CardDescription>
             )}
           </div>
           {actions && <div className="shrink-0">{actions}</div>}
@@ -108,13 +108,13 @@ export function PageHero({
         className,
       )}
     >
-      <div className="absolute top-0 right-0 -mr-20 -mt-20 size-64 rounded-full bg-brand-primary/5 blur-3xl" />
-      <div className="absolute bottom-0 left-0 -ml-20 -mb-20 size-64 rounded-full bg-brand-secondary/5 blur-3xl" />
+      <div className="absolute right-0 top-0 -mr-20 -mt-20 size-64 rounded-full bg-brand-primary/5 blur-3xl" />
+      <div className="absolute bottom-0 left-0 -mb-20 -ml-20 size-64 rounded-full bg-brand-secondary/5 blur-3xl" />
 
       <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           {eyebrow && (
-            <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground/70 font-semibold mb-2">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.4em] text-muted-foreground/70">
               {eyebrow}
             </p>
           )}

@@ -7,12 +7,17 @@ import {
   createDataSource,
   createDataSourceInSpace,
   configureDataSourceSchedule,
+  updateDataSource,
+  deleteDataSource,
   triggerDataSourceIngestion,
+  testDataSourceAiConfiguration,
   fetchIngestionJobHistory,
   type DataSourceListParams,
   type DataSourceListResponse,
+  type DataSourceAiTestResult,
   type ScheduleConfigurationPayload,
   type IngestionRunResponse,
+  type UpdateDataSourcePayload,
 } from '../api/data-sources'
 import {
   fetchAdminCatalogEntries,
@@ -198,6 +203,53 @@ export function useConfigureDataSourceSchedule(spaceId?: string | null) {
   })
 }
 
+export function useUpdateDataSource(spaceId?: string | null) {
+  const { data: session } = useSession()
+  const token = session?.user?.access_token
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      sourceId,
+      payload,
+    }: {
+      sourceId: string
+      payload: UpdateDataSourcePayload
+    }) => updateDataSource(sourceId, payload, token),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.lists() })
+      if (spaceId) {
+        queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(spaceId) })
+      }
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.detail(variables.sourceId) })
+      toast.success('Data source updated')
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update data source: ${error.message}`)
+    },
+  })
+}
+
+export function useDeleteDataSource(spaceId?: string | null) {
+  const { data: session } = useSession()
+  const token = session?.user?.access_token
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (sourceId: string) => deleteDataSource(sourceId, token),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: dataSourceKeys.lists() })
+      if (spaceId) {
+        queryClient.invalidateQueries({ queryKey: dataSourceKeys.space(spaceId) })
+      }
+      toast.success('Data source removed')
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to remove data source: ${error.message}`)
+    },
+  })
+}
+
 export function useTriggerDataSourceIngestion(
   spaceId?: string | null,
   options?: {
@@ -222,6 +274,15 @@ export function useTriggerDataSourceIngestion(
     onError: (error: Error) => {
       toast.error(`Failed to trigger ingestion: ${error.message}`)
     },
+  })
+}
+
+export function useTestDataSourceAiConfiguration() {
+  const { data: session } = useSession()
+  const token = session?.user?.access_token
+
+  return useMutation<DataSourceAiTestResult, Error, string>({
+    mutationFn: (sourceId: string) => testDataSourceAiConfiguration(sourceId, token),
   })
 }
 

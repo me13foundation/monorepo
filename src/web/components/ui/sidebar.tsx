@@ -396,7 +396,7 @@ const SidebarInset = React.forwardRef<
       ref={ref}
       className={cn(
         "relative flex h-svh flex-1 flex-col bg-background",
-        "peer-data-[variant=inset]:h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-3xl md:peer-data-[variant=inset]:shadow-brand-md",
+        "peer-data-[variant=inset]:h-svh md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0",
         className
       )}
       {...props}
@@ -587,7 +587,7 @@ const SidebarMenuItem = React.forwardRef<
 SidebarMenuItem.displayName = "SidebarMenuItem"
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2 rounded-xl p-2 text-sm text-left outline-none ring-sidebar-ring transition-all duration-200 ease-out overflow-hidden text-sidebar-foreground/60 hover:bg-sidebar-primary/5 hover:text-sidebar-foreground/80 focus-visible:ring-2 focus-visible:ring-sidebar-primary/20 active:bg-sidebar-primary/8 active:text-sidebar-foreground/90 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 data-[active=true]:bg-sidebar-primary/10 data-[active=true]:font-semibold data-[active=true]:text-sidebar-primary data-[active=true]:border data-[active=true]:border-sidebar-primary/30 data-[state=open]:hover:bg-sidebar-primary/5 data-[state=open]:hover:text-sidebar-foreground/80 group-data-[collapsible=icon]:!size-12 group-data-[collapsible=icon]:!p-3 group-data-[collapsible=icon]:!gap-0 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0 [&>svg]:text-current",
+  "peer/menu-button flex w-full items-center gap-2 rounded-xl p-2 text-left text-sm outline-none ring-sidebar-ring transition-all duration-200 ease-out overflow-hidden text-sidebar-foreground/60 hover:bg-sidebar-primary/5 hover:text-sidebar-foreground/80 focus-visible:ring-2 focus-visible:ring-sidebar-primary/20 active:bg-sidebar-primary/10 active:text-sidebar-foreground/90 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 data-[active=true]:bg-sidebar-primary/10 data-[active=true]:border data-[active=true]:border-sidebar-primary/30 data-[active=true]:font-semibold data-[active=true]:text-sidebar-primary data-[state=open]:hover:bg-sidebar-primary/5 data-[state=open]:hover:text-sidebar-foreground/80 group-data-[collapsible=icon]:!size-12 group-data-[collapsible=icon]:!gap-0 group-data-[collapsible=icon]:!p-3 group-data-[collapsible=icon]:justify-center [&>span:last-child]:truncate [&>svg]:size-6 [&>svg]:shrink-0 [&>svg]:text-current",
   {
     variants: {
       variant: {

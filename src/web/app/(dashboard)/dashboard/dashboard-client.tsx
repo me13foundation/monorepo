@@ -103,7 +103,7 @@ function DashboardContent() {
               <div className="mb-6 rounded-full bg-brand-primary/10 p-4 sm:p-6">
                 <FolderPlus className="size-8 text-brand-primary sm:size-10" />
               </div>
-              <h3 className="mb-2 text-xl font-bold font-heading">No research spaces yet</h3>
+              <h3 className="mb-2 font-heading text-xl font-bold">No research spaces yet</h3>
               <p className="mb-8 max-w-md text-base text-muted-foreground">
                 Create a space to organize MED13 research work. Data sources, records, and activity
                 will live inside each space.

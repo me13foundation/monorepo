@@ -30,6 +30,14 @@ export interface ScheduleConfigurationPayload {
   cron_expression?: string | null
 }
 
+export interface UpdateDataSourcePayload {
+  name?: string
+  description?: string
+  status?: 'draft' | 'active' | 'inactive' | 'error' | 'pending_review' | 'archived'
+  config?: Record<string, unknown>
+  ingestion_schedule?: ScheduleConfigurationPayload
+}
+
 export interface ScheduledJobResponse {
   job_id: string
   source_id: string
@@ -49,6 +57,17 @@ export interface IngestionRunResponse {
   parsed_publications: number
   created_publications: number
   updated_publications: number
+  executed_query?: string | null
+}
+
+export interface DataSourceAiTestResult {
+  source_id: string
+  success: boolean
+  message: string
+  executed_query?: string | null
+  fetched_records: number
+  sample_size: number
+  checked_at: string
 }
 
 export interface IngestionJobHistoryItem {
@@ -144,6 +163,23 @@ export async function configureDataSourceSchedule(
   return response.data
 }
 
+export async function updateDataSource(
+  sourceId: string,
+  payload: UpdateDataSourcePayload,
+  token?: string,
+): Promise<DataSource> {
+  if (!token) {
+    throw new Error('Authentication token is required for updateDataSource')
+  }
+
+  const response = await apiClient.put<DataSource>(
+    `/admin/data-sources/${sourceId}`,
+    payload,
+    authHeaders(token),
+  )
+  return response.data
+}
+
 export async function triggerDataSourceIngestion(
   sourceId: string,
   token?: string,
@@ -154,6 +190,22 @@ export async function triggerDataSourceIngestion(
 
   const response = await apiClient.post<IngestionRunResponse>(
     `/admin/data-sources/${sourceId}/schedule/run`,
+    {},
+    authHeaders(token),
+  )
+  return response.data
+}
+
+export async function testDataSourceAiConfiguration(
+  sourceId: string,
+  token?: string,
+): Promise<DataSourceAiTestResult> {
+  if (!token) {
+    throw new Error('Authentication token is required for testDataSourceAiConfiguration')
+  }
+
+  const response = await apiClient.post<DataSourceAiTestResult>(
+    `/admin/data-sources/${sourceId}/ai/test`,
     {},
     authHeaders(token),
   )
@@ -176,4 +228,15 @@ export async function fetchIngestionJobHistory(
     },
   )
   return response.data
+}
+
+export async function deleteDataSource(
+  sourceId: string,
+  token?: string,
+): Promise<void> {
+  if (!token) {
+    throw new Error('Authentication token is required for deleteDataSource')
+  }
+
+  await apiClient.delete(`/admin/data-sources/${sourceId}`, authHeaders(token))
 }
