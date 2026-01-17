@@ -1,11 +1,19 @@
 """Flujo-based implementation of the AI agent port."""
 
+import logging
+import os
+
 from flujo import Flujo, Step
 from flujo.agents import make_agent_async
 from flujo.domain.models import PipelineContext, PipelineResult, StepResult
+from flujo.exceptions import FlujoError
 from pydantic import BaseModel, Field
 
 from src.application.services.ports.ai_agent_port import AiAgentPort
+
+logger = logging.getLogger(__name__)
+
+_INVALID_OPENAI_KEYS = {"test", "changeme", "placeholder"}
 
 
 class QueryOutput(BaseModel):
@@ -84,6 +92,13 @@ class FlujoAgentAdapter(AiAgentPort):
             # we return empty to ensure high-fidelity for supported sources.
             return ""
 
+        if self._model.startswith("openai:") and not self._has_openai_key():
+            logger.info(
+                "OpenAI API key not configured; skipping AI query generation for %s.",
+                source_type,
+            )
+            return ""
+
         pipeline = self._pipelines[source_key]
 
         input_text = (
@@ -95,17 +110,35 @@ class FlujoAgentAdapter(AiAgentPort):
 
         # Run the Flujo pipeline
         final_output: str | None = None
-        async for item in pipeline.run_async(input_text):
-            if isinstance(item, StepResult):
-                candidate = self._coerce_query_output(item.output)
-                if candidate:
-                    final_output = candidate
-            elif isinstance(item, PipelineResult):
-                candidate = self._extract_pipeline_result_output(item)
-                if candidate:
-                    final_output = candidate
+        try:
+            async for item in pipeline.run_async(input_text):
+                if isinstance(item, StepResult):
+                    candidate = self._coerce_query_output(item.output)
+                    if candidate:
+                        final_output = candidate
+                elif isinstance(item, PipelineResult):
+                    candidate = self._extract_pipeline_result_output(item)
+                    if candidate:
+                        final_output = candidate
+        except FlujoError as exc:
+            logger.warning(
+                "Flujo pipeline failed for %s; returning fallback output. Error: %s",
+                source_type,
+                exc,
+            )
+            return final_output or ""
 
         return final_output or ""
+
+    @staticmethod
+    def _has_openai_key() -> bool:
+        api_key = os.getenv("OPENAI_API_KEY") or os.getenv("FLUJO_OPENAI_API_KEY")
+        if api_key is None:
+            return False
+        normalized = api_key.strip()
+        if not normalized:
+            return False
+        return normalized.lower() not in _INVALID_OPENAI_KEYS
 
     @staticmethod
     def _coerce_query_output(output: object | None) -> str | None:

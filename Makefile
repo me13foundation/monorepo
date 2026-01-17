@@ -98,7 +98,18 @@ define run_with_postgres_env
 	@/bin/bash -lc 'set -a; source "$(POSTGRES_ENV_FILE)"; set +a; $(1)'
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
+define ensure_web_deps
+	@if [ ! -d "src/web/node_modules" ]; then \
+		echo "Installing Next.js dependencies..."; \
+		if [ -f "src/web/package-lock.json" ]; then \
+			(cd src/web && npm ci); \
+		else \
+			(cd src/web && npm install); \
+		fi; \
+	fi
+endef
+
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-clean web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
 
 # Default target
 help: ## Show this help message
@@ -310,6 +321,7 @@ run-all-postgres: ## Restart Postgres, run migrations, seed admin, start backend
 	@$(call run_with_postgres_env,$(MAKE) -s db-seed-admin)
 	@$(MAKE) -s start-local
 	@echo "Backend running in background. Starting Next.js..."
+	@$(MAKE) -s web-clean
 	@$(MAKE) -s start-web
 	@echo "All services running. FastAPI logs: $(BACKEND_LOG) | Next.js logs: $(WEB_LOG)"
 start-local: ## Run FastAPI backend in the background (logs/backend.log)
@@ -355,6 +367,7 @@ run-local-postgres: ## Run the FastAPI backend with Postgres env vars loaded
 
 
 run-web: ## Run the Next.js admin interface locally (seeds admin user if needed)
+	$(call ensure_web_deps)
 	@echo "Ensuring admin user exists..."
 ifeq ($(POSTGRES_ACTIVE),)
 	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
@@ -368,6 +381,7 @@ else
 endif
 
 run-web-postgres: ## Run the Next.js admin interface with Postgres env vars loaded
+	$(call ensure_web_deps)
 	@echo "Ensuring admin user exists (Postgres)..."
 	$(call run_with_postgres_env,$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)")
 	@echo "Starting Next.js admin interface (Postgres)..."
@@ -375,6 +389,7 @@ run-web-postgres: ## Run the Next.js admin interface with Postgres env vars load
 
 start-web: ## Run Next.js admin interface in the background (logs/web.log)
 	$(call check_venv)
+	$(call ensure_web_deps)
 	@mkdir -p $(dir $(WEB_LOG))
 	@if lsof -ti tcp:3000 >/dev/null 2>&1; then \
 		echo "Port 3000 already in use. Run 'make stop-web' or free the port before starting in background."; \
@@ -690,6 +705,9 @@ web-install: ## Install Next.js dependencies
 
 web-build: ## Build Next.js admin interface
 	cd src/web && npm run build
+
+web-clean: ## Remove Next.js build artifacts
+	rm -rf src/web/.next
 
 web-lint: ## Lint Next.js code
 	cd src/web && npm run lint

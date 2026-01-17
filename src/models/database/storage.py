@@ -55,6 +55,18 @@ class StorageHealthStatusEnum(str, Enum):
     OFFLINE = "offline"
 
 
+def _enum_values(enum_cls: type[Enum]) -> list[str]:
+    return [str(member.value) for member in enum_cls]
+
+
+def _storage_enum(enum_cls: type[Enum], name: str) -> SQLEnum:
+    return SQLEnum(
+        enum_cls,
+        name=name,
+        values_callable=_enum_values,
+    )
+
+
 class StorageConfigurationModel(Base):
     """SQLAlchemy model for storage configurations."""
 
@@ -66,7 +78,7 @@ class StorageConfigurationModel(Base):
     )
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     provider: Mapped[StorageProviderEnum] = mapped_column(
-        SQLEnum(StorageProviderEnum),
+        _storage_enum(StorageProviderEnum, "storageproviderenum"),
         nullable=False,
         index=True,
     )
@@ -119,14 +131,14 @@ class StorageOperationModel(Base):
         index=True,
     )
     operation_type: Mapped[StorageOperationTypeEnum] = mapped_column(
-        SQLEnum(StorageOperationTypeEnum),
+        _storage_enum(StorageOperationTypeEnum, "storageoperationtypeenum"),
         nullable=False,
         index=True,
     )
     key: Mapped[str] = mapped_column(String(512), nullable=False)
     file_size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     status: Mapped[StorageOperationStatusEnum] = mapped_column(
-        SQLEnum(StorageOperationStatusEnum),
+        _storage_enum(StorageOperationStatusEnum, "storageoperationstatusenum"),
         nullable=False,
         index=True,
     )
@@ -154,11 +166,11 @@ class StorageHealthSnapshotModel(Base):
         primary_key=True,
     )
     provider: Mapped[StorageProviderEnum] = mapped_column(
-        SQLEnum(StorageProviderEnum),
+        _storage_enum(StorageProviderEnum, "storageproviderenum"),
         nullable=False,
     )
     status: Mapped[StorageHealthStatusEnum] = mapped_column(
-        SQLEnum(StorageHealthStatusEnum),
+        _storage_enum(StorageHealthStatusEnum, "storagehealthstatusenum"),
         nullable=False,
     )
     last_checked_at: Mapped[datetime] = mapped_column(
