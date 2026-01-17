@@ -70,7 +70,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
     def save(self, source: UserDataSource) -> UserDataSource:
         """Save a user data source to the repository."""
         model = UserDataSourceMapper.to_model(source)
-        self.session.add(model)
+        model = self.session.merge(model)
         self.session.commit()
         self.session.refresh(model)
         return UserDataSourceMapper.to_domain(model)
