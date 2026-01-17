@@ -23,6 +23,7 @@ bandit>=1.8.0
 safety>=3.0.0
 
 # Development Tools
+virtualenv>=20.36.1
 watchdog>=3.0.0
 python-dotenv>=1.0.0
 
