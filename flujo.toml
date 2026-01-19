@@ -1,4 +1,5 @@
 # Flujo configuration for MED13 Resource Library
+# FLUJO_STATE_URI overrides this fallback.
 state_uri = "sqlite:///flujo_state.db"
 
 [settings]

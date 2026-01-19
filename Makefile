@@ -109,7 +109,7 @@ define ensure_web_deps
 	fi
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-clean web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate init-flujo-schema setup-postgres run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-clean web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
 
 # Default target
 help: ## Show this help message
@@ -575,6 +575,22 @@ else
 	@echo "Applying Alembic migrations (Postgres)..."
 	$(call run_with_postgres_env,$(ALEMBIC_BIN) upgrade heads)
 endif
+
+init-flujo-schema: ## Initialize the flujo schema in Postgres
+	$(call check_venv)
+	@echo "Creating flujo schema..."
+ifeq ($(POSTGRES_ACTIVE),)
+	$(USE_PYTHON) scripts/init_flujo_schema.py
+else
+	$(call run_with_postgres_env,$(USE_PYTHON) scripts/init_flujo_schema.py)
+endif
+
+setup-postgres: ## Full PostgreSQL setup including flujo schema
+	@$(MAKE) -s docker-postgres-up
+	@$(MAKE) -s postgres-wait
+	@$(MAKE) -s postgres-migrate
+	@$(MAKE) -s init-flujo-schema
+	@echo "PostgreSQL setup complete with flujo schema."
 
 # Database
 db-migrate: ## Run database migrations

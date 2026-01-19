@@ -8,6 +8,7 @@ across unit, integration, and end-to-end tests.
 import os
 from collections.abc import Generator
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 from sqlalchemy import create_engine
@@ -78,20 +79,21 @@ def db_session(test_engine) -> Generator[Session]:
         db.close()
 
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_environment():
-    """Set up test environment variables."""
-    original_env = os.environ.copy()
+def _apply_test_environment(existing_db_url: str) -> None:
+    use_postgres = existing_db_url.startswith("postgresql")
+    if not use_postgres:
+        os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+        os.environ["ASYNC_DATABASE_URL"] = to_async_database_url(TEST_DATABASE_URL)
+    elif not os.environ.get("ASYNC_DATABASE_URL"):
+        os.environ["ASYNC_DATABASE_URL"] = to_async_database_url(existing_db_url)
 
-    # Set test-specific environment variables
-    os.environ["DATABASE_URL"] = TEST_DATABASE_URL
-    os.environ["ASYNC_DATABASE_URL"] = to_async_database_url(TEST_DATABASE_URL)
     os.environ["TESTING"] = "true"
     os.environ["MED13_DEV_JWT_SECRET"] = (
         "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz"
     )
 
-    # Ensure the global dependency container uses the test JWT secret
+
+def _wire_container_dependencies() -> None:
     from src.infrastructure.dependency_injection import container as container_module
     from src.infrastructure.security.jwt_provider import JWTProvider
 
@@ -113,7 +115,6 @@ def setup_test_environment():
     if resolved_db_url.startswith("sqlite"):
         configure_sqlite_engine(async_engine.sync_engine)
 
-    # Rewire container to the test async engine
     container_module.container.database_url = resolved_db_url
     container_module.container.engine = async_engine
     container_module.container.async_session_factory = async_sessionmaker(
@@ -126,10 +127,25 @@ def setup_test_environment():
     container_module.container._user_repository = None
     container_module.container._session_repository = None
 
-    # Rewire synchronous SessionLocal/engine to the test database so imports in
-    # tests use the correct DB.
+
+def _propagate_session_local(session_module: ModuleType) -> None:
     import sys
 
+    for module_name in (
+        "tests.e2e.test_curation_detail_endpoint",
+        "tests.e2e.test_curation_workflow",
+        "tests.integration.test_space_discovery_isolation",
+        "tests.e2e.test_auth_regression",
+    ):
+        if module_name not in sys.modules:
+            __import__(module_name)
+        module = sys.modules.get(module_name)
+        if module:
+            module.SessionLocal = session_module.SessionLocal
+            module.engine = session_module.engine
+
+
+def _wire_sync_session() -> None:
     from src.database import session as session_module
 
     sync_db_url = os.environ["DATABASE_URL"]
@@ -151,28 +167,33 @@ def setup_test_environment():
         expire_on_commit=False,
         class_=Session,
     )
-    # Ensure schema exists for the sync engine used in tests
     Base.metadata.create_all(bind=sync_engine)
+    _propagate_session_local(session_module)
 
-    # Propagate the updated SessionLocal/engine to test modules that import them.
-    for module_name in (
-        "tests.e2e.test_curation_detail_endpoint",
-        "tests.e2e.test_curation_workflow",
-        "tests.integration.test_space_discovery_isolation",
-        "tests.e2e.test_auth_regression",
-    ):
-        if module_name not in sys.modules:
-            __import__(module_name)
-        module = sys.modules.get(module_name)
-        if module:
-            module.SessionLocal = session_module.SessionLocal
-            module.engine = session_module.engine
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_environment():
+    """Set up test environment variables."""
+    original_env = os.environ.copy()
+
+    existing_db_url = os.environ.get("DATABASE_URL", "")
+    _apply_test_environment(existing_db_url)
+    _wire_container_dependencies()
+    _wire_sync_session()
 
     yield
 
     # Restore original environment
     os.environ.clear()
     os.environ.update(original_env)
+
+
+@pytest.fixture(scope="session")
+def postgres_required():
+    """Skip test if PostgreSQL is not available."""
+    url = os.getenv("DATABASE_URL", "")
+    if not url.startswith("postgresql"):
+        pytest.skip("PostgreSQL required")
 
 
 @pytest.fixture

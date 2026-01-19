@@ -10,6 +10,7 @@ from flujo.exceptions import FlujoError
 from pydantic import BaseModel, Field
 
 from src.application.services.ports.ai_agent_port import AiAgentPort
+from src.infrastructure.llm.flujo_config import resolve_flujo_state_uri
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class FlujoAgentAdapter(AiAgentPort):
             model: The LLM model identifier to use for the agents
         """
         self._model = model
+        os.environ.setdefault("FLUJO_STATE_URI", resolve_flujo_state_uri())
         self._pipelines: dict[str, Flujo[str, QueryOutput, PipelineContext]] = {}
 
         # Initialize supported sources

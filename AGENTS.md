@@ -75,6 +75,10 @@ make setup-dev          # Create Python 3.12 venv + install dependencies
 source venv/bin/activate # Activate virtual environment
 ```
 
+### Flujo State Backend
+- `FLUJO_STATE_URI` overrides `flujo.toml` `state_uri`; use `search_path=flujo,public` for schema isolation.
+- Run `make init-flujo-schema` (or `make setup-postgres`) to create the `flujo` schema before first use.
+
 ### Development Servers
 ```bash
 make run-local          # Start FastAPI backend (port 8080)

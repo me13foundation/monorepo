@@ -48,7 +48,7 @@ The heavy lifting of AI orchestration lives here, powered by **Flujo**.
     - **Scalable Registry**: Uses a registry pattern to map `source_type` to specialized Flujo agents. This allows us to add ClinVar, UniProt, or custom scrapers without modifying the core adapter logic.
     - **Source-Specific Optimization**: Each agent (e.g., PubMed agent) is tuned with specific system prompts for that database's query syntax.
     - **Structured Output**: Uses Pydantic models to ensure the AI always returns a valid, parsable query object.
-- **`flujo.toml`**: Configured with a SQLite state backend to enable full replayability and auditing of every agent decision.
+- **`flujo.toml`**: Provides a SQLite fallback; production uses `FLUJO_STATE_URI` pointing to the Postgres `flujo` schema for durable audit trails.
 
 ### 4. Presentation Layer (Next.js Admin UI)
 Updated the frontend to provide curators with control over the new AI capabilities.
