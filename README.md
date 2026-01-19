@@ -52,8 +52,8 @@ make setup-dev
 # Install Next.js dependencies
 make web-install
 
-# Run everything on fresh Postgres (recommended)
-make run-all-postgres   # Wipes & recreates Postgres, applies migrations, seeds admin, starts backend + Next.js
+# Run everything on Postgres (recommended)
+make dev-postgres   # Starts Postgres (if needed), runs migrations + Flujo schema init, seeds admin, starts backend + Next.js
 
 # Optional background helpers
 make start-local     # Launch FastAPI in background (uses SQLite unless .postgres-active exists)
@@ -74,10 +74,13 @@ and tests against a Dockerized Postgres instance for closer-to-prod behavior.
 See `docs/local_postgres.md` for details. Key commands:
 
 ```bash
-# One-shot command: reset Postgres, run migrations, seed admin, start backend (background) + Next.js dev
+# One-shot command: start services with Postgres (no data wipe)
+make dev-postgres
+
+# Full reset: destroy data volume, recreate Postgres, run migrations, seed admin, start backend + Next.js
 make run-all-postgres
 
-# Restart workflow after changing migrations or seeds
+# Restart workflow after changing migrations or seeds (data wipe)
 make restart-postgres   # Destroys & recreates the Postgres container (data wiped; rerun run-all-postgres afterward)
 make run-all-postgres   # Rebuild stack with fresh data
 
@@ -85,15 +88,16 @@ make run-all-postgres   # Rebuild stack with fresh data
 make stop-all
 ```
 
-`make run-all-postgres` drops any existing Postgres dev container, recreates it via `docker-compose.postgres.yml`,
-runs Alembic migrations, seeds the default admin (`admin@med13.org` with the password you provide via
-`ADMIN_PASSWORD`/`MED13_ADMIN_PASSWORD`), ensures the default research space exists, then starts FastAPI in the
+`make dev-postgres` starts (or reuses) the Postgres container via `docker-compose.postgres.yml`, runs Alembic
+migrations, initializes the Flujo schema, seeds the default admin (`admin@med13.org` with the password you provide
+via `ADMIN_PASSWORD`/`MED13_ADMIN_PASSWORD`), ensures the default research space exists, then starts FastAPI in the
 background (logs → `logs/backend.log`) before launching the Next.js dev server.
 The command also writes a `.postgres-active` flag so all other Make targets automatically source `.env.postgres`
-and re-run migrations before touching the database.
+and re-run migrations before touching the database. For a clean reset, use `make run-all-postgres`, which destroys
+the Postgres data volume first.
 
 💡 **Tip:** add `MED13_ADMIN_PASSWORD=<your strong local password>` to `.env.postgres` (gitignored) so that
-`make run-all-postgres`, `make run-web-postgres`, and other Postgres-aware targets can seed/reset the admin user
+`make dev-postgres`, `make run-web-postgres`, and other Postgres-aware targets can seed/reset the admin user
 without additional CLI flags. For SQLite workflows, pass the password inline:
 `ADMIN_PASSWORD='changeme!' make db-seed-admin`.
 
@@ -256,7 +260,8 @@ make setup-dev          # Python environment + dependencies
 make web-install        # Next.js dependencies
 
 # Unified start/stop workflow (Postgres-backed dev stack)
-make run-all-postgres   # Clean Postgres -> migrations -> seed admin -> FastAPI + Next.js
+make dev-postgres       # Start Postgres (if needed) -> migrations -> Flujo schema -> seed admin -> FastAPI + Next.js
+make run-all-postgres   # Full reset: wipe Postgres -> migrations -> seed admin -> FastAPI + Next.js
 make restart-postgres   # Recreate Postgres container (rerun run-all-postgres afterward if services were stopped)
 make stop-all           # Stop FastAPI, Next.js, and Postgres containers
 
