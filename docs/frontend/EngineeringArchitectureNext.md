@@ -97,8 +97,8 @@ class OrchestratedSessionState(BaseModel):
     """ViewModel for the frontend."""
     session: DataDiscoverySessionResponse
     capabilities: SourceCapabilitiesDTO
-    validation: ValidationStatus
-    view_context: dict
+    validation: ValidationResultDTO
+    view_context: ViewContextDTO
 ```
 
 ### 📈 **Growth Principles**

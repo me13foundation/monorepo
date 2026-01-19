@@ -242,8 +242,8 @@ Benefits:
 #### **Shared Type Definitions**
 ```typescript
 // src/shared/types/
-# Enables frontend consistency across multiple UIs
-# Type safety from backend to frontend
+// Enables frontend consistency across multiple UIs
+// Type safety from backend to frontend
 ```
 
 #### **Domain Event System**
