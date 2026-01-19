@@ -59,6 +59,14 @@ export interface AuthorInfo {
   orcid?: string | null;
 }
 
+export interface CreatePubmedPresetRequest {
+  name: string;
+  description?: string | null;
+  scope?: 'user' | 'space';
+  parameters: AdvancedQueryParameters;
+  research_space_id?: string | null;
+}
+
 export interface CreatePubmedPresetRequestModel {
   name: string;
   description?: string | null;
@@ -204,6 +212,13 @@ export interface EvidenceUpdate {
   reviewed?: boolean | null;
   review_date?: string | null;
   reviewer_notes?: string | null;
+}
+
+export interface ExecuteQueryTestRequest {
+  session_id: string;
+  catalog_entry_id: string;
+  timeout_seconds?: number;
+  parameters?: AdvancedQueryParameters | null;
 }
 
 export interface ExecuteTestRequest {
@@ -485,6 +500,20 @@ export interface PubmedDownloadRequestModel {
   article_id: string;
 }
 
+export interface QueryParameterCapabilities {
+  supports_date_range?: boolean;
+  supports_publication_types?: boolean;
+  supports_language_filter?: boolean;
+  supports_sort_options?: boolean;
+  supports_additional_terms?: boolean;
+  max_results_limit?: number;
+  supported_storage_use_cases?: 'pdf' | 'export' | 'raw_source' | 'backup'[];
+  supports_variation_type?: boolean;
+  supports_clinical_significance?: boolean;
+  supports_review_status?: boolean;
+  supports_organism?: boolean;
+}
+
 export interface QueryParametersModel {
   gene_symbol?: string | null;
   search_term?: string | null;
@@ -530,7 +559,7 @@ export interface SourceCatalogEntry {
   usage_count: number;
   success_rate: number;
   tags: string[];
-  capabilities: Record<string, unknown>;
+  capabilities: QueryParameterCapabilities;
 }
 
 export interface SourceCatalogResponse {
@@ -546,7 +575,7 @@ export interface SourceCatalogResponse {
   usage_count: number;
   success_rate: number;
   tags: string[];
-  capabilities: Record<string, unknown>;
+  capabilities: QueryParameterCapabilities;
 }
 
 export interface StorageOperationResponse {

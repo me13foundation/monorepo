@@ -12,8 +12,9 @@ import type {
   PubmedDownloadRequestModel,
   QueryParametersModel,
   QueryTestResultResponse,
+  QueryParameterCapabilities as QueryParameterCapabilitiesModel,
   RunPubmedSearchRequestModel,
-  SourceCatalogEntry as GeneratedSourceCatalogEntry,
+  SourceCatalogEntry as SourceCatalogEntryModel,
   StorageOperationResponse,
   UpdateParametersRequest as UpdateParametersRequestModel,
 } from '@/types/generated'
@@ -27,8 +28,6 @@ export type TestResultStatus =
   | 'timeout'
   | 'validation_failed'
 
-export type StorageUseCase = 'pdf' | 'export' | 'raw_source' | 'backup'
-
 export type QueryParameters = QueryParametersModel
 
 export type PubmedSortOption =
@@ -40,25 +39,9 @@ export type PubmedSortOption =
 
 export type AdvancedQueryParameters = AdvancedQueryParametersModel
 
-export interface QueryParameterCapabilities {
-  supports_date_range: boolean
-  supports_publication_types: boolean
-  supports_language_filter: boolean
-  supports_sort_options: boolean
-  supports_additional_terms: boolean
-  max_results_limit: number
+export type QueryParameterCapabilities = QueryParameterCapabilitiesModel
 
-  supported_storage_use_cases: StorageUseCase[]
-
-  supports_variation_type: boolean
-  supports_clinical_significance: boolean
-  supports_review_status: boolean
-  supports_organism: boolean
-}
-
-export type SourceCatalogEntry = Omit<GeneratedSourceCatalogEntry, 'capabilities'> & {
-  capabilities: QueryParameterCapabilities
-}
+export type SourceCatalogEntry = SourceCatalogEntryModel
 
 export type QueryTestResult = QueryTestResultResponse
 

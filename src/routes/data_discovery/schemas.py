@@ -25,6 +25,7 @@ from src.application.services.discovery_configuration_requests import (
 from src.domain.entities.data_discovery_parameters import (
     AdvancedQueryParameters,
     PubMedSortOption,
+    QueryParameterCapabilities,
     TestResultStatus,
 )
 from src.domain.entities.discovery_preset import DiscoveryProvider, PresetScope
@@ -48,6 +49,7 @@ __all__ = [
     "QueryTestResultResponse",
     "RunPubmedSearchRequestModel",
     "SourceCatalogResponse",
+    "QueryParameterCapabilities",
     "StorageOperationResponse",
     "UpdateParametersRequest",
     "UpdateSelectionRequest",
@@ -57,6 +59,8 @@ __all__ = [
     "ViewContextDTO",
     "OrchestratedSessionState",
 ]
+
+_QUERY_PARAMETER_CAPABILITIES = QueryParameterCapabilities
 
 
 class CreateSessionRequest(BaseModel):

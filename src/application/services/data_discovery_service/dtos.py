@@ -8,10 +8,10 @@ from pydantic import BaseModel, Field
 from src.domain.entities.data_discovery_parameters import (
     AdvancedQueryParameters,
     PubMedSortOption,
+    QueryParameterCapabilities,
     QueryParameterType,
 )
 from src.domain.entities.user_data_source import SourceType
-from src.type_definitions.common import JSONObject
 
 
 class QueryParametersModel(BaseModel):
@@ -171,7 +171,7 @@ class SourceCatalogEntry(BaseModel):
     usage_count: int
     success_rate: float
     tags: list[str]
-    capabilities: JSONObject
+    capabilities: QueryParameterCapabilities
 
 
 class SourceCapabilitiesDTO(BaseModel):
