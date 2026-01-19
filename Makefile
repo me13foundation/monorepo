@@ -109,7 +109,7 @@ define ensure_web_deps
 	fi
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate init-flujo-schema setup-postgres run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-clean web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate init-flujo-schema setup-postgres dev-postgres run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-clean web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
 
 # Default target
 help: ## Show this help message
@@ -318,11 +318,20 @@ run-all-postgres: ## Restart Postgres, run migrations, seed admin, start backend
 	@$(MAKE) -s stop-all
 	@$(MAKE) -s docker-postgres-up
 	@$(MAKE) -s postgres-migrate
+	@$(MAKE) -s init-flujo-schema
 	@$(call run_with_postgres_env,$(MAKE) -s db-seed-admin)
-	@$(MAKE) -s start-local
+	@$(MAKE) -s start-local SKIP_POSTGRES_MIGRATE=1
 	@echo "Backend running in background. Starting Next.js..."
 	@$(MAKE) -s web-clean
-	@$(MAKE) -s start-web
+	@$(MAKE) -s start-web SKIP_POSTGRES_MIGRATE=1
+	@echo "All services running. FastAPI logs: $(BACKEND_LOG) | Next.js logs: $(WEB_LOG)"
+
+dev-postgres: ## Start Postgres (if needed) + services for local development
+	@$(MAKE) -s setup-postgres
+	@$(call run_with_postgres_env,$(MAKE) -s db-seed-admin)
+	@$(MAKE) -s start-local SKIP_POSTGRES_MIGRATE=1
+	@echo "Backend running in background. Starting Next.js..."
+	@$(MAKE) -s start-web SKIP_POSTGRES_MIGRATE=1
 	@echo "All services running. FastAPI logs: $(BACKEND_LOG) | Next.js logs: $(WEB_LOG)"
 start-local: ## Run FastAPI backend in the background (logs/backend.log)
 	$(call check_venv)
@@ -339,7 +348,9 @@ ifeq ($(POSTGRES_ACTIVE),)
 	@nohup $(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 >> "$(BACKEND_LOG)" 2>&1 &
 	@echo $$! > "$(BACKEND_PID_FILE)"
 else
+ifneq ($(SKIP_POSTGRES_MIGRATE),1)
 	@$(MAKE) postgres-migrate
+endif
 	@/bin/bash -lc "set -a; source \"$(POSTGRES_ENV_FILE)\"; set +a; nohup $(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 >> \"$(BACKEND_LOG)\" 2>&1 & echo \$$! > \"$(BACKEND_PID_FILE)\""
 endif
 	@i=0; while [ ! -f "$(BACKEND_PID_FILE)" ] && [ $$i -lt 10 ]; do sleep 0.5; i=$$((i+1)); done
@@ -404,7 +415,9 @@ ifeq ($(POSTGRES_ACTIVE),)
 	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
 	@/bin/bash -lc "cd src/web && $(NEXT_DEV_ENV) nohup npm run dev >> \"$(WEB_LOG_ABS)\" 2>&1 & echo \$$! > \"$(WEB_PID_FILE_ABS)\""
 else
+ifneq ($(SKIP_POSTGRES_MIGRATE),1)
 	@$(MAKE) postgres-migrate
+endif
 	$(call run_with_postgres_env,$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)")
 	@/bin/bash -lc "set -a; source \"$(POSTGRES_ENV_FILE)\"; set +a; cd src/web && $(NEXT_DEV_ENV) nohup npm run dev >> \"$(WEB_LOG_ABS)\" 2>&1 & echo \$$! > \"$(WEB_PID_FILE_ABS)\""
 endif
