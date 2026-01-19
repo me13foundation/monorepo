@@ -1,198 +1,153 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DataDiscoveryContent } from '@/components/data-discovery/DataDiscoveryContent'
-import { useAddDiscoverySourceToSpace, useSpaceSourceCatalog, useSpaceDiscoverySessions } from '@/lib/queries/space-discovery'
-import { dataSourceKeys } from '@/lib/query-keys/data-sources'
+import type { OrchestratedSessionState, SourceCatalogEntry } from '@/types/generated'
 
-const mockUseSession = jest.fn()
-const mockInvalidateQueries = jest.fn()
-const mockRefetchQueries = jest.fn().mockResolvedValue(undefined)
-const mockMutateAsync = jest.fn()
+const mockUpdateSelection = jest.fn()
+const mockAddSources = jest.fn()
 
-jest.mock('next-auth/react', () => ({
-  useSession: () => mockUseSession(),
+jest.mock('@/app/actions/space-discovery', () => ({
+  updateSpaceDiscoverySelection: (...args: unknown[]) => mockUpdateSelection(...args),
+  addSpaceDiscoverySources: (...args: unknown[]) => mockAddSources(...args),
 }))
 
-jest.mock('@/lib/queries/space-discovery', () => ({
-  useSpaceSourceCatalog: jest.fn(),
-  useSpaceDiscoverySessions: jest.fn(),
-  useCreateSpaceDiscoverySession: () => ({
-    mutate: jest.fn(),
-    isPending: false,
-  }),
-  useAddDiscoverySourceToSpace: jest.fn(),
+jest.mock('sonner', () => ({
+  toast: {
+    error: jest.fn(),
+    success: jest.fn(),
+  },
 }))
 
-jest.mock('@/components/data-discovery/SourceCatalog', () => ({
-  SourceCatalog: ({ onSelectionChange }: { onSelectionChange: (ids: Set<string>) => void }) => (
-    <div>
-      <button
-        onClick={() => onSelectionChange(new Set(['pubmed']))}
-        data-testid="select-pubmed"
-      >
-        Select PubMed
-      </button>
-      <div data-testid="catalog-placeholder">Source Catalog</div>
-    </div>
-  ),
-}))
-
-const mockCatalog = [
+const catalog: SourceCatalogEntry[] = [
   {
     id: 'pubmed',
     name: 'PubMed',
     description: 'Biomedical literature database',
     category: 'Scientific Literature',
+    subcategory: null,
     source_type: 'pubmed',
     param_type: 'gene',
     is_active: true,
     requires_auth: false,
     usage_count: 0,
-    success_rate: 1.0,
+    success_rate: 1,
+    tags: [],
     capabilities: {},
   },
 ]
 
-const mockSession = {
-  id: 'session-123',
-  owner_id: 'user-123',
-  research_space_id: 'space-123',
-  selected_sources: [],
-  current_parameters: {
-    gene_symbol: 'MED13',
-    search_term: '',
-    max_results: 100,
+const baseState: OrchestratedSessionState = {
+  session: {
+    id: 'session-123',
+    owner_id: 'user-123',
+    research_space_id: 'space-123',
+    name: 'Test Session',
+    selected_sources: [],
+    tested_sources: [],
+    total_tests_run: 0,
+    successful_tests: 0,
+    is_active: true,
+    last_activity_at: new Date().toISOString(),
+    current_parameters: {
+      gene_symbol: 'MED13',
+      search_term: '',
+      max_results: 100,
+    },
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   },
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
+  capabilities: {},
+  validation: { is_valid: true, issues: [] },
+  view_context: {
+    selected_count: 0,
+    total_available: 1,
+    can_run_search: false,
+    categories: {},
+  },
 }
 
-describe('DataDiscoveryContent - Query Invalidation', () => {
-  let queryClient: QueryClient
-
+describe('DataDiscoveryContent', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    queryClient = new QueryClient({
-      defaultOptions: {
-        queries: { retry: false },
-      },
-    })
-    // Mock queryClient methods
-    jest.spyOn(queryClient, 'invalidateQueries').mockImplementation(mockInvalidateQueries)
-    jest.spyOn(queryClient, 'refetchQueries').mockImplementation(mockRefetchQueries)
-    mockUseSession.mockReturnValue({
-      data: {
-        user: { id: 'user-123', access_token: 'token-123' },
-      },
-      status: 'authenticated',
-    })
-    ;(useSpaceSourceCatalog as jest.Mock).mockReturnValue({
-      data: mockCatalog,
-      isLoading: false,
-    })
-    ;(useSpaceDiscoverySessions as jest.Mock).mockReturnValue({
-      data: [mockSession],
-      isLoading: false,
-    })
-    ;(useAddDiscoverySourceToSpace as jest.Mock).mockReturnValue({
-      mutateAsync: mockMutateAsync,
-      isPending: false,
-    })
-    mockMutateAsync.mockResolvedValue('source-id-123')
   })
 
-  afterEach(() => {
-    jest.restoreAllMocks()
-  })
-
-  it('invalidates and refetches data sources query when source is added', async () => {
+  it('calls updateSpaceDiscoverySelection when toggling a source', async () => {
     const user = userEvent.setup()
-    const onComplete = jest.fn()
+    const nextState: OrchestratedSessionState = {
+      ...baseState,
+      session: {
+        ...baseState.session,
+        selected_sources: ['pubmed'],
+      },
+      view_context: {
+        ...baseState.view_context,
+        selected_count: 1,
+        can_run_search: true,
+      },
+    }
+
+    mockUpdateSelection.mockResolvedValue({ success: true, state: nextState })
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <DataDiscoveryContent
-          spaceId="space-123"
-          isModal={true}
-          onComplete={onComplete}
-        />
-      </QueryClientProvider>,
+      <DataDiscoveryContent
+        spaceId="space-123"
+        orchestratedState={baseState}
+        catalog={catalog}
+        isModal={true}
+      />,
     )
 
-    // Wait for the catalog to render
-    await waitFor(() => {
-      expect(screen.getByTestId('catalog-placeholder')).toBeInTheDocument()
-    })
-
-    // Select a source
-    const selectButton = screen.getByTestId('select-pubmed')
-    await user.click(selectButton)
-
-    // Wait for selection to update
-    await waitFor(() => {
-      expect(screen.getByText(/1 source selected/i)).toBeInTheDocument()
-    })
-
-    // Click "Add selected to space"
-    const addButton = screen.getByRole('button', { name: /add selected to space/i })
-    await user.click(addButton)
+    const entryButton = screen.getByRole('button', { name: /PubMed/i })
+    await user.click(entryButton)
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalled()
-    })
-
-    await waitFor(() => {
-      // Verify queries are invalidated
-      expect(queryClient.invalidateQueries).toHaveBeenCalledWith({
-        queryKey: dataSourceKeys.space('space-123'),
-      })
-      // Verify queries are refetched
-      expect(queryClient.refetchQueries).toHaveBeenCalledWith({
-        queryKey: dataSourceKeys.space('space-123'),
-        type: 'active',
-      })
+      expect(mockUpdateSelection).toHaveBeenCalledWith(
+        'session-123',
+        ['pubmed'],
+        '/spaces/space-123/data-sources',
+      )
     })
   })
 
-  it('calls onComplete callback after successful addition', async () => {
+  it('calls addSpaceDiscoverySources and onComplete on success', async () => {
     const user = userEvent.setup()
     const onComplete = jest.fn()
+    const selectedState: OrchestratedSessionState = {
+      ...baseState,
+      session: {
+        ...baseState.session,
+        selected_sources: ['pubmed'],
+      },
+      view_context: {
+        ...baseState.view_context,
+        selected_count: 1,
+        can_run_search: true,
+      },
+    }
+
+    mockAddSources.mockResolvedValue({ success: true, addedCount: 1 })
 
     render(
-      <QueryClientProvider client={queryClient}>
-        <DataDiscoveryContent
-          spaceId="space-123"
-          isModal={true}
-          onComplete={onComplete}
-        />
-      </QueryClientProvider>,
+      <DataDiscoveryContent
+        spaceId="space-123"
+        orchestratedState={selectedState}
+        catalog={catalog}
+        isModal={true}
+        onComplete={onComplete}
+      />,
     )
-
-    // Wait for the catalog to render
-    await waitFor(() => {
-      expect(screen.getByTestId('catalog-placeholder')).toBeInTheDocument()
-    })
-
-    const selectButton = screen.getByTestId('select-pubmed')
-    await user.click(selectButton)
-
-    // Wait for selection to update
-    await waitFor(() => {
-      expect(screen.getByText(/1 source selected/i)).toBeInTheDocument()
-    })
 
     const addButton = screen.getByRole('button', { name: /add selected to space/i })
     await user.click(addButton)
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalled()
-    })
-
-    // Wait for refetch to complete and onComplete to be called
-    await waitFor(() => {
-      expect(queryClient.refetchQueries).toHaveBeenCalled()
+      expect(mockAddSources).toHaveBeenCalledWith(
+        'session-123',
+        'space-123',
+        ['pubmed'],
+        '/spaces/space-123/data-sources',
+      )
       expect(onComplete).toHaveBeenCalled()
-    }, { timeout: 3000 })
+    })
   })
 })

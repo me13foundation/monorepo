@@ -152,20 +152,12 @@ export async function addDiscoverySourceToSpace(
   sourceConfig?: Record<string, unknown>,
 ): Promise<string> {
   requireToken(token)
-  const metadata =
-    (sourceConfig?.metadata as Record<string, unknown> | undefined) ?? {
-      query: 'MED13',
-    }
-  const enrichedConfig: Record<string, unknown> = {
-    ...sourceConfig,
-    metadata,
-  }
   const response = await apiClient.post<{ data_source_id: string }>(
     `/data-discovery/sessions/${sessionId}/add-to-space`,
     {
       catalog_entry_id: catalogEntryId,
       research_space_id: researchSpaceId,
-      source_config: enrichedConfig,
+      source_config: sourceConfig ?? {},
     },
     authHeaders(token),
   )

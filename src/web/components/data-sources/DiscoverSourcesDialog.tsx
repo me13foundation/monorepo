@@ -11,12 +11,16 @@ import { DataDiscoveryContent } from '@/components/data-discovery/DataDiscoveryC
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
+import type { OrchestratedSessionState, SourceCatalogEntry } from '@/types/generated'
 import { CreateDataSourceDialog } from './CreateDataSourceDialog'
 
 interface DiscoverSourcesDialogProps {
   spaceId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  discoveryState: OrchestratedSessionState | null
+  discoveryCatalog: SourceCatalogEntry[]
+  discoveryError?: string | null
   onSourceAdded?: () => void | Promise<void>
 }
 
@@ -24,6 +28,9 @@ export function DiscoverSourcesDialog({
   spaceId,
   open,
   onOpenChange,
+  discoveryState,
+  discoveryCatalog,
+  discoveryError,
   onSourceAdded,
 }: DiscoverSourcesDialogProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
@@ -51,7 +58,14 @@ export function DiscoverSourcesDialog({
           </div>
         </DialogHeader>
         <div className="flex-1 overflow-hidden p-6">
-          <DataDiscoveryContent spaceId={spaceId} isModal={true} onComplete={handleComplete} />
+          <DataDiscoveryContent
+            spaceId={spaceId}
+            isModal={true}
+            orchestratedState={discoveryState}
+            catalog={discoveryCatalog}
+            errorMessage={discoveryError}
+            onComplete={handleComplete}
+          />
         </div>
         <CreateDataSourceDialog
           spaceId={spaceId}

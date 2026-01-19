@@ -5,6 +5,7 @@ import { DataSourcesList } from '@/components/data-sources/DataSourcesList'
 import { DiscoverSourcesDialog } from '@/components/data-sources/DiscoverSourcesDialog'
 import { useSpaceDataSources } from '@/lib/queries/data-sources'
 import type { DataSource } from '@/types/data-source'
+import type { OrchestratedSessionState } from '@/types/generated'
 
 const mockUseSession = jest.fn()
 const mockRefetch = jest.fn()
@@ -57,25 +58,6 @@ jest.mock('@/lib/queries/data-sources', () => ({
   }),
 }))
 
-jest.mock('@/lib/queries/space-discovery', () => ({
-  useSpaceSourceCatalog: jest.fn(() => ({
-    data: [],
-    isLoading: false,
-  })),
-  useSpaceDiscoverySessions: jest.fn(() => ({
-    data: [],
-    isLoading: false,
-  })),
-  useCreateSpaceDiscoverySession: () => ({
-    mutate: jest.fn(),
-    isPending: false,
-  }),
-  useAddDiscoverySourceToSpace: () => ({
-    mutateAsync: jest.fn().mockResolvedValue('source-id'),
-    isPending: false,
-  }),
-}))
-
 jest.mock('@/components/data-discovery/DataDiscoveryContent', () => ({
   DataDiscoveryContent: ({ onComplete }: { onComplete?: () => void }) => (
     <div>
@@ -108,6 +90,8 @@ const mockDataSources: DataSource[] = [
     updated_at: new Date().toISOString(),
   },
 ]
+
+const discoveryState: OrchestratedSessionState | null = null
 
 describe('DataSourcesList - Auto-refresh on Source Addition', () => {
   let queryClient: QueryClient
@@ -145,7 +129,11 @@ describe('DataSourcesList - Auto-refresh on Source Addition', () => {
 
     render(
       <QueryClientProvider client={queryClient}>
-        <DataSourcesList spaceId="space-123" />
+        <DataSourcesList
+          spaceId="space-123"
+          discoveryState={discoveryState}
+          discoveryCatalog={[]}
+        />
       </QueryClientProvider>,
     )
 
@@ -187,7 +175,11 @@ describe('DataSourcesList - Auto-refresh on Source Addition', () => {
     // Initial render with 1 source
     const { rerender } = render(
       <QueryClientProvider client={queryClient}>
-        <DataSourcesList spaceId="space-123" />
+        <DataSourcesList
+          spaceId="space-123"
+          discoveryState={discoveryState}
+          discoveryCatalog={[]}
+        />
       </QueryClientProvider>,
     )
 
@@ -223,7 +215,11 @@ describe('DataSourcesList - Auto-refresh on Source Addition', () => {
     // Rerender to simulate React Query updating after refetch
     rerender(
       <QueryClientProvider client={queryClient}>
-        <DataSourcesList spaceId="space-123" />
+        <DataSourcesList
+          spaceId="space-123"
+          discoveryState={discoveryState}
+          discoveryCatalog={[]}
+        />
       </QueryClientProvider>,
     )
 
@@ -244,6 +240,8 @@ describe('DiscoverSourcesDialog - onSourceAdded prop', () => {
         spaceId="space-123"
         open={true}
         onOpenChange={jest.fn()}
+        discoveryState={discoveryState}
+        discoveryCatalog={[]}
         onSourceAdded={onSourceAdded}
       />,
     )

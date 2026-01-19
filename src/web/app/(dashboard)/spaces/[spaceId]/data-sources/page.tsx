@@ -8,6 +8,7 @@ import { HydrationBoundary } from '@tanstack/react-query'
 import SpaceDataSourcesClient from '../space-data-sources-client'
 import { dataSourceKeys } from '@/lib/query-keys/data-sources'
 import { fetchDataSourcesBySpace } from '@/lib/api/data-sources'
+import { fetchSpaceDiscoveryState } from '@/app/actions/space-discovery'
 
 interface SpaceDataSourcesPageProps {
   params: {
@@ -40,9 +41,19 @@ export default async function SpaceDataSourcesPage({ params }: SpaceDataSourcesP
     }),
   ])
 
+  const discoveryResult = await fetchSpaceDiscoveryState(params.spaceId)
+  const discoveryState = discoveryResult.success ? discoveryResult.data.orchestratedState : null
+  const discoveryCatalog = discoveryResult.success ? discoveryResult.data.catalog : []
+  const discoveryError = discoveryResult.success ? null : discoveryResult.error
+
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <SpaceDataSourcesClient spaceId={params.spaceId} />
+      <SpaceDataSourcesClient
+        spaceId={params.spaceId}
+        discoveryState={discoveryState}
+        discoveryCatalog={discoveryCatalog}
+        discoveryError={discoveryError}
+      />
     </HydrationBoundary>
   )
 }

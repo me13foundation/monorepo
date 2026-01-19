@@ -198,18 +198,13 @@ export function useAddDiscoverySourceToSpace() {
       catalogEntryId,
       researchSpaceId,
       sourceConfig,
-      requestedBy,
     }: {
       sessionId: string
       catalogEntryId: string
       researchSpaceId: string
       sourceConfig?: Record<string, unknown>
-      requestedBy?: string
     }) =>
-      addDiscoverySourceToSpace(sessionId, catalogEntryId, researchSpaceId, token, {
-        ...sourceConfig,
-        requested_by: requestedBy,
-      }),
+      addDiscoverySourceToSpace(sessionId, catalogEntryId, researchSpaceId, token, sourceConfig),
     onSuccess: (_dataSourceId, variables) => {
       // Invalidate and explicitly refetch queries to update the UI immediately
       queryClient.invalidateQueries({

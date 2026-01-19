@@ -43,15 +43,24 @@ import { DataSourceAiConfigDialog } from './DataSourceAiConfigDialog'
 import { DataSourceIngestionDetailsDialog, type ManualIngestionSummary } from './DataSourceIngestionDetailsDialog'
 import { DiscoverSourcesDialog } from './DiscoverSourcesDialog'
 import { DataSourceAiTestDialog } from './DataSourceAiTestDialog'
+import type { OrchestratedSessionState, SourceCatalogEntry } from '@/types/generated'
 import type { DataSource } from '@/types/data-source'
 import { componentRegistry } from '@/lib/components/registry'
 import type { DataSourceAiTestResult } from '@/lib/api/data-sources'
 
 interface DataSourcesListProps {
   spaceId: string
+  discoveryState: OrchestratedSessionState | null
+  discoveryCatalog: SourceCatalogEntry[]
+  discoveryError?: string | null
 }
 
-export function DataSourcesList({ spaceId }: DataSourcesListProps) {
+export function DataSourcesList({
+  spaceId,
+  discoveryState,
+  discoveryCatalog,
+  discoveryError,
+}: DataSourcesListProps) {
   const { data, isLoading, error, refetch } = useSpaceDataSources(spaceId)
   const [lastSummaries, setLastSummaries] = useState<Record<string, ManualIngestionSummary>>({})
   const [detailSourceId, setDetailSourceId] = useState<string | null>(null)
@@ -467,6 +476,9 @@ export function DataSourcesList({ spaceId }: DataSourcesListProps) {
         spaceId={spaceId}
         open={isDiscoverDialogOpen}
         onOpenChange={setIsDiscoverDialogOpen}
+        discoveryState={discoveryState}
+        discoveryCatalog={discoveryCatalog}
+        discoveryError={discoveryError}
         onSourceAdded={async () => {
           // Explicitly refetch the data sources list when a source is added
           await refetch()

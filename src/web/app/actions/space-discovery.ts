@@ -1,0 +1,222 @@
+"use server"
+
+import { revalidatePath } from "next/cache"
+import { getServerSession } from "next-auth"
+import type { AxiosError } from "axios"
+import { apiClient, authHeaders } from "@/lib/api/client"
+import { authOptions } from "@/lib/auth"
+import type {
+  AddToSpaceRequest,
+  CreateSessionRequest,
+  DataDiscoverySessionResponse,
+  OrchestratedSessionState,
+  SourceCatalogEntry,
+  UpdateSelectionRequest,
+} from "@/types/generated"
+
+type SpaceDiscoveryState = {
+  orchestratedState: OrchestratedSessionState
+  catalog: SourceCatalogEntry[]
+}
+
+type SpaceDiscoveryStateResult =
+  | { success: true; data: SpaceDiscoveryState }
+  | { success: false; error: string }
+
+type SpaceDiscoverySelectionResult =
+  | { success: true; state: OrchestratedSessionState }
+  | { success: false; error: string }
+
+type SpaceDiscoveryAddResult =
+  | { success: true; addedCount: number }
+  | { success: false; error: string }
+
+type IssueObject = {
+  msg: string
+  loc?: unknown
+}
+
+function isIssueObject(value: unknown): value is IssueObject {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "msg" in value &&
+    typeof (value as IssueObject).msg === "string"
+  )
+}
+
+function formatErrorDetail(detail: unknown): string | null {
+  if (typeof detail === "string") {
+    return detail
+  }
+  if (isIssueObject(detail)) {
+    const location = Array.isArray(detail.loc) ? detail.loc.join(".") : ""
+    return location ? `${location}: ${detail.msg}` : detail.msg
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((issue) => formatErrorDetail(issue))
+      .filter((value): value is string => Boolean(value))
+    return messages.length > 0 ? messages.join("; ") : null
+  }
+  return null
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+  const axiosError = error as AxiosError<{ detail?: unknown }>
+  const detail = axiosError.response?.data?.detail
+  const formatted = formatErrorDetail(detail)
+  if (formatted) {
+    return formatted
+  }
+  if (axiosError?.message) {
+    return axiosError.message
+  }
+  if (error instanceof Error) {
+    return error.message
+  }
+  return fallback
+}
+
+async function getAuthToken(): Promise<string> {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.access_token) {
+    throw new Error("Authentication required")
+  }
+  return session.user.access_token
+}
+
+async function ensureSpaceSession(
+  spaceId: string,
+  token: string
+): Promise<DataDiscoverySessionResponse> {
+  const { data: sessions } = await apiClient.get<DataDiscoverySessionResponse[]>(
+    `/research-spaces/${spaceId}/discovery/sessions`,
+    authHeaders(token)
+  )
+
+  if (sessions.length > 0) {
+    return sessions[0]
+  }
+
+  const payload: CreateSessionRequest = {
+    name: "New Discovery Session",
+    initial_parameters: {
+      gene_symbol: null,
+      search_term: null,
+    },
+  }
+
+  const { data: created } = await apiClient.post<DataDiscoverySessionResponse>(
+    `/research-spaces/${spaceId}/discovery/sessions`,
+    payload,
+    authHeaders(token)
+  )
+  return created
+}
+
+export async function fetchSpaceDiscoveryState(
+  spaceId: string
+): Promise<SpaceDiscoveryStateResult> {
+  try {
+    const token = await getAuthToken()
+    const session = await ensureSpaceSession(spaceId, token)
+    const [stateResponse, catalogResponse] = await Promise.all([
+      apiClient.get<OrchestratedSessionState>(
+        `/data-discovery/sessions/${session.id}/state`,
+        authHeaders(token)
+      ),
+      apiClient.get<SourceCatalogEntry[]>(
+        `/research-spaces/${spaceId}/discovery/catalog`,
+        authHeaders(token)
+      ),
+    ])
+
+    return {
+      success: true,
+      data: {
+        orchestratedState: stateResponse.data,
+        catalog: catalogResponse.data,
+      },
+    }
+  } catch (error: unknown) {
+    if (process.env.NODE_ENV !== "test") {
+      console.error("[ServerAction] fetchSpaceDiscoveryState failed:", error)
+    }
+    return {
+      success: false,
+      error: getErrorMessage(error, "Failed to load discovery state"),
+    }
+  }
+}
+
+export async function updateSpaceDiscoverySelection(
+  sessionId: string,
+  sourceIds: string[],
+  path: string
+): Promise<SpaceDiscoverySelectionResult> {
+  try {
+    const token = await getAuthToken()
+    const payload: UpdateSelectionRequest = { source_ids: sourceIds }
+    const response = await apiClient.post<OrchestratedSessionState>(
+      `/data-discovery/sessions/${sessionId}/selection`,
+      payload,
+      authHeaders(token)
+    )
+    revalidatePath(path)
+    return { success: true, state: response.data }
+  } catch (error: unknown) {
+    if (process.env.NODE_ENV !== "test") {
+      console.error("[ServerAction] updateSpaceDiscoverySelection failed:", error)
+    }
+    return {
+      success: false,
+      error: getErrorMessage(error, "Failed to update selection"),
+    }
+  }
+}
+
+export async function addSpaceDiscoverySources(
+  sessionId: string,
+  spaceId: string,
+  sourceIds: string[],
+  path: string
+): Promise<SpaceDiscoveryAddResult> {
+  try {
+    const token = await getAuthToken()
+    const results = await Promise.allSettled(
+      sourceIds.map(async (catalogEntryId) => {
+        const payload: AddToSpaceRequest = {
+          catalog_entry_id: catalogEntryId,
+          research_space_id: spaceId,
+          source_config: {},
+        }
+        await apiClient.post<{ data_source_id: string }>(
+          `/data-discovery/sessions/${sessionId}/add-to-space`,
+          payload,
+          authHeaders(token)
+        )
+        return catalogEntryId
+      })
+    )
+
+    const failed = results.filter((result) => result.status === "rejected")
+    if (failed.length > 0) {
+      return {
+        success: false,
+        error: "Some sources could not be added. Please retry.",
+      }
+    }
+
+    revalidatePath(path)
+    return { success: true, addedCount: sourceIds.length }
+  } catch (error: unknown) {
+    if (process.env.NODE_ENV !== "test") {
+      console.error("[ServerAction] addSpaceDiscoverySources failed:", error)
+    }
+    return {
+      success: false,
+      error: getErrorMessage(error, "Failed to add sources to space"),
+    }
+  }
+}

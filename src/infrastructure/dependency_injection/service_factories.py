@@ -18,6 +18,7 @@ from src.application.curation import (
 from src.application.services import (
     DashboardService,
     DataDiscoveryService,
+    DataDiscoveryServiceDependencies,
     DataSourceActivationService,
     DiscoveryConfigurationService,
     EvidenceApplicationService,
@@ -281,8 +282,10 @@ class ApplicationServiceFactoryMixin:
             query_result_repository=query_repo,
             source_query_client=query_client,
             source_management_service=source_service,
-            source_template_repository=template_repo,
-            activation_service=activation_service,
+            dependencies=DataDiscoveryServiceDependencies(
+                source_template_repository=template_repo,
+                activation_service=activation_service,
+            ),
         )
 
 

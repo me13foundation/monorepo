@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { ForgotPasswordForm } from "@/components/auth/ForgotPasswordForm"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle } from "lucide-react"
-import { AuthShell } from "@/components/auth/AuthShell"
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, CheckCircle } from 'lucide-react'
+import { AuthShell } from '@/components/auth/AuthShell'
+import { requestPasswordReset } from '@/app/actions/auth'
 
 export default function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null)
@@ -20,24 +21,16 @@ export default function ForgotPasswordPage() {
     setSuccess(null)
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/auth/forgot-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Failed to send reset email')
+      const result = await requestPasswordReset(email)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
-      setSuccess("If an account with that email exists, we've sent you a password reset link.")
+      setSuccess(result.message)
 
       // Redirect to login after a delay
       setTimeout(() => {
-        router.push("/auth/login")
+        router.push('/auth/login')
       }, 3000)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An unexpected error occurred')

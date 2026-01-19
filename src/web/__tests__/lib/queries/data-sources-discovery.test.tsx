@@ -70,7 +70,6 @@ describe('useAddDiscoverySourceToSpace', () => {
       catalogEntryId: 'pubmed',
       researchSpaceId: 'space-123',
       sourceConfig: { metadata: { query: 'MED13' } },
-      requestedBy: 'user-123',
     })
 
     await waitFor(() => {
@@ -105,7 +104,6 @@ describe('useAddDiscoverySourceToSpace', () => {
       catalogEntryId: 'pubmed',
       researchSpaceId: 'space-456',
       sourceConfig: { metadata: { query: 'MED13', max_results: 100 } },
-      requestedBy: 'user-456',
     }
 
     await result.current.mutateAsync(mutationParams)
@@ -117,7 +115,6 @@ describe('useAddDiscoverySourceToSpace', () => {
       'token-123',
       {
         metadata: { query: 'MED13', max_results: 100 },
-        requested_by: 'user-456',
       },
     )
   })
