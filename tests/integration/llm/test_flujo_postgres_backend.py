@@ -7,7 +7,7 @@ from flujo.state.backends.postgres import PostgresBackend
 from sqlalchemy import create_engine, text
 
 from src.database.url_resolver import resolve_sync_database_url
-from src.infrastructure.llm.flujo_config import resolve_flujo_state_uri
+from src.infrastructure.llm.config.flujo_config import resolve_flujo_state_uri
 
 
 @pytest.fixture

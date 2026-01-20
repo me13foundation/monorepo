@@ -52,6 +52,62 @@ This document provides essential context and instructions for AI agents building
 - **API endpoints**: Add to `/routes` with proper FastAPI router patterns
 - **Database changes**: Create Alembic migrations in `/alembic/versions`
 - **UI components**: Implement in the Next.js app (`/src/web`) with shared typed contracts from the backend
+- **AI agents**: Follow the agent architecture pattern (see below)
+
+### AI Agent Development Guidelines
+
+When working with AI agents (Flujo-based):
+
+#### Agent Architecture Pattern
+```
+src/domain/agents/           # Domain layer - contracts, contexts, ports
+├── contracts/               # Pydantic models with evidence fields
+├── contexts/                # Pipeline context classes
+└── ports/                   # Interface definitions (ABC classes)
+
+src/application/agents/      # Application layer - orchestration
+└── services/               # Use case services
+
+src/infrastructure/llm/      # Infrastructure - Flujo implementation
+├── adapters/               # Port implementations
+├── factories/              # Agent creation
+├── pipelines/              # Pipeline definitions with governance
+├── prompts/                # System prompts
+├── skills/                 # Skill registry
+└── state/                  # State backend management
+```
+
+#### Creating New Agents
+1. **Define contract** in `src/domain/agents/contracts/` extending `BaseAgentContract`
+2. **Define context** in `src/domain/agents/contexts/` extending `BaseAgentContext`
+3. **Define port** in `src/domain/agents/ports/` as an ABC class
+4. **Create prompt** in `src/infrastructure/llm/prompts/`
+5. **Create factory** in `src/infrastructure/llm/factories/`
+6. **Create pipeline** in `src/infrastructure/llm/pipelines/`
+7. **Create adapter** in `src/infrastructure/llm/adapters/`
+8. **Create service** in `src/application/agents/services/`
+
+#### Agent Contract Requirements
+```python
+from src.domain.agents.contracts.base import BaseAgentContract
+
+class MyAgentContract(BaseAgentContract):
+    """All contracts must include evidence-first fields."""
+
+    # Inherited from BaseAgentContract:
+    # - confidence_score: float (0.0-1.0)
+    # - rationale: str
+    # - evidence: list[EvidenceItem]
+
+    # Agent-specific fields:
+    result: str
+    decision: Literal["success", "fallback", "escalate"]
+```
+
+#### Type Safety Exception for Flujo
+The Flujo library uses `Any` types in some internal generics. This is a **documented exception** - the files are listed in `scripts/validate_architecture.py` `ALLOWED_ANY_USAGE`. Keep `Any` confined to infrastructure layer only. Domain contracts must be fully typed.
+
+**See:** `docs/flujo/agent_architecture.md` for complete guide
 
 ### Testing Requirements
 - **Unit tests**: Required for all domain logic and services
@@ -169,12 +225,22 @@ Phase 1-3 Complete: ✅
 med13-resource-library/
 ├── src/                          # Shared Python backend
 │   ├── domain/                  # Business logic (shared)
+│   │   └── agents/              # AI agent contracts, contexts, ports
 │   ├── application/             # Use cases (shared)
+│   │   └── agents/              # AI agent orchestration services
 │   ├── infrastructure/          # External adapters (shared)
+│   │   └── llm/                 # Flujo-based AI agent implementation
+│   │       ├── adapters/        # Port implementations
+│   │       ├── factories/       # Agent creation
+│   │       ├── pipelines/       # Pipeline definitions
+│   │       ├── prompts/         # System prompts
+│   │       ├── skills/          # Skill registry
+│   │       └── state/           # State backend management
 │   ├── presentation/            # Reserved for future UI adapters
 │   ├── web/                     # Next.js admin interface
 │   └── routes/                  # API endpoints
 ├── docs/                         # Documentation
+│   └── flujo/                   # AI agent documentation
 ├── tests/                        # Backend tests
 ├── node_js_migration_prd.md      # Next.js migration plan
 ├── data_sources_plan.md          # Data sources specification
@@ -517,17 +583,32 @@ src/
 ├── domain/                     # Business logic & entities
 │   ├── entities/              # Domain models (Pydantic)
 │   ├── repositories/          # Repository interfaces
-│   └── services/              # Domain services
+│   ├── services/              # Domain services
+│   └── agents/                # AI agent domain layer
+│       ├── contracts/         # Output contracts (evidence-first)
+│       ├── contexts/          # Pipeline contexts
+│       └── ports/             # Agent interfaces
 ├── application/               # Application services & use cases
-│   └── services/              # Application layer services
+│   ├── services/              # Application layer services
+│   └── agents/                # AI agent orchestration
+│       └── services/          # Agent use case services
 ├── infrastructure/            # External concerns & adapters
 │   ├── repositories/          # Repository implementations
 │   ├── mappers/              # Data mapping
-│   └── validation/           # External API validation
+│   ├── validation/           # External API validation
+│   └── llm/                   # AI agent infrastructure (Flujo)
+│       ├── adapters/          # Port implementations
+│       ├── config/            # Flujo configuration
+│       ├── factories/         # Agent factories
+│       ├── pipelines/         # Pipeline definitions
+│       ├── prompts/           # System prompts
+│       ├── skills/            # Skill registry
+│       └── state/             # State backend management
 ├── models/                    # Database models (SQLAlchemy)
 ├── web/                       # Next.js admin interface
 tests/                          # Test suites
 docs/                          # Documentation
+└── flujo/                     # AI agent documentation
 ```
 
 ### Build, Test, and Development Commands
@@ -585,6 +666,14 @@ make all                    # Complete quality gate
 - **UI/UX**: Next.js admin experience with shadcn/ui components
 - **Quality Assurance**: Type-safe throughout, ready for production
 
+### AI Agent System (Flujo) - Production Ready
+- **Contract-First Design**: Evidence-based output contracts with confidence scoring
+- **Clean Architecture Alignment**: Domain contracts/ports, application services, infrastructure adapters
+- **Governance Patterns**: Confidence-based routing, human-in-the-loop escalation
+- **Query Generation Agent**: PubMed Boolean query generation from research context
+- **Extensible Framework**: Pattern established for adding new agents (ClinVar, evidence extraction, etc.)
+- **Type Safety**: Fully typed domain layer (documented exception for Flujo generics in infrastructure)
+
 ### Architecture Improvements
 - **Clean Architecture**: Proper layer separation implemented
 - **Type Safety**: 100% MyPy compliance maintained
@@ -604,6 +693,13 @@ make all                    # Complete quality gate
 - `docs/EngineeringArchitecture.md`: Detailed architectural roadmap and phase plans
 - `data_sources_plan.md`: Complete Data Sources module specification
 - `docs/goal.md`: Project mission and success criteria
+
+**AI Agents (Flujo):**
+
+- `docs/flujo/agent_architecture.md`: **Complete agent implementation guide** - patterns, examples, adding new agents
+- `docs/flujo/reasoning.md`: Reasoning techniques (TreeSearchStep, GranularStep, A* search)
+- `docs/flujo/contract_orianted_ai.md`: Contract-first AI development patterns
+- `docs/flujo/prod_guide.md`: Production deployment and configuration
 
 **Domain & UI:**
 
@@ -647,6 +743,28 @@ make all                    # Complete quality gate
 - **Testing**: Healthcare software requires extensive validation with typed fixtures
 - **Documentation**: Clear docs prevent medical misinterpretation
 - **Security**: Healthcare data demands fortress-level security practices
+
+### AI Agent (Flujo) Development Guidelines
+- **Contract-First**: Always define domain contracts extending `BaseAgentContract` before implementation
+- **Evidence-Based**: All agent outputs must include `confidence_score`, `rationale`, and `evidence`
+- **Clean Architecture**: Domain contracts/ports in `src/domain/agents/`, implementations in `src/infrastructure/llm/`
+- **Governance Patterns**: Use confidence-based routing and human-in-the-loop escalation
+- **Lifecycle Management**: Register pipelines with `FlujoLifecycleManager` for proper cleanup
+- **State Backend**: Configure PostgreSQL backend with flujo schema for production
+- **Factory Pattern**: Use factories for consistent agent configuration and model selection
+- **Documented `Any` Exception**: Flujo generics require `Any` - keep confined to infrastructure, never in domain
+
+### AI Agent Reasoning Techniques
+Flujo provides structured reasoning primitives - choose based on problem complexity:
+
+| Reasoning Type | Flujo Primitive | When to Use |
+|----------------|-----------------|-------------|
+| **Simple** | Standard `Step` | Direct query generation, simple tasks |
+| **Chain of Thought** | `GranularStep` | Multi-turn reasoning, tool use, ReAct patterns |
+| **Tree of Thoughts** | `TreeSearchStep` | Branching exploration, complex planning, backtracking |
+| **Native Reasoning** | `Step` + reasoning model | Deep analysis with models like `openai:o1` |
+
+**See:** `docs/flujo/reasoning.md` for TreeSearchStep examples
 
 ---
 

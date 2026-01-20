@@ -13,8 +13,10 @@ from src.application.services import (
 )
 from src.database.session import SessionLocal
 from src.infrastructure.data_sources import PubMedSourceGateway
-from src.infrastructure.llm.flujo_agent_adapter import FlujoAgentAdapter
-from src.infrastructure.llm.flujo_state_repository import SqlAlchemyFlujoStateRepository
+from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
+from src.infrastructure.llm.state.flujo_state_repository import (
+    SqlAlchemyFlujoStateRepository,
+)
 from src.infrastructure.repositories import (
     SqlAlchemyResearchSpaceRepository,
     SqlAlchemyUserDataSourceRepository,
@@ -37,13 +39,13 @@ def build_data_source_ai_test_service(
     research_space_repository = SqlAlchemyResearchSpaceRepository(session)
     flujo_state_repository = SqlAlchemyFlujoStateRepository(session)
     model_name = os.getenv("MED13_AI_AGENT_MODEL", "openai:gpt-4o-mini")
-    ai_agent = FlujoAgentAdapter(model=model_name)
+    query_agent = FlujoQueryAgentAdapter(model=model_name)
 
     dependencies = DataSourceAiTestDependencies(
         source_repository=source_repository,
         pubmed_gateway=PubMedSourceGateway(),
-        ai_agent=ai_agent,
-        run_id_provider=ai_agent,
+        query_agent=query_agent,
+        run_id_provider=query_agent,
         research_space_repository=research_space_repository,
         flujo_state=flujo_state_repository,
     )
