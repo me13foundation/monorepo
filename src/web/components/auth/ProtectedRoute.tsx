@@ -18,11 +18,16 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const expiresAt = session?.user?.expires_at
+  const isExpired = typeof expiresAt === "number" && Date.now() >= expiresAt
 
   useEffect(() => {
     if (status === "loading") return // Still loading
 
-    if (!session) {
+    const sessionExpired =
+      typeof session?.user?.expires_at === "number" && Date.now() >= session.user.expires_at
+
+    if (!session || sessionExpired) {
       // Use replace instead of push to prevent back navigation
       router.replace("/auth/login?error=SessionExpired")
       return
@@ -48,7 +53,7 @@ export function ProtectedRoute({
   }
 
   // Don't render anything if not authenticated - redirect is happening
-  if (!session) {
+  if (!session || isExpired) {
     return fallback || (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">

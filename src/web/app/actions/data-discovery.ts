@@ -3,18 +3,8 @@
 import { revalidatePath } from "next/cache"
 import { apiClient, authHeaders } from "@/lib/api/client"
 import { OrchestratedSessionState, UpdateSelectionRequest } from "@/types/generated"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import type { AxiosError } from "axios"
-
-// Helper to get auth token on server side
-async function getAuthToken() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.access_token) {
-    throw new Error("Authentication required")
-  }
-  return session.user.access_token
-}
+import { requireAccessToken } from "@/app/actions/action-utils"
 
 /**
  * Server Action: Fetch the full orchestrated session state.
@@ -22,7 +12,7 @@ async function getAuthToken() {
  */
 export async function fetchSessionState(sessionId: string): Promise<OrchestratedSessionState> {
   try {
-    const token = await getAuthToken()
+    const token = await requireAccessToken()
     const response = await apiClient.get<OrchestratedSessionState>(
       `/data-discovery/sessions/${sessionId}/state`,
       authHeaders(token)
@@ -47,7 +37,7 @@ export async function updateSourceSelection(
   path: string
 ): Promise<{ success: boolean; state?: OrchestratedSessionState; error?: string }> {
   try {
-    const token = await getAuthToken()
+    const token = await requireAccessToken()
     const payload: UpdateSelectionRequest = { source_ids: sourceIds }
 
     const response = await apiClient.post<OrchestratedSessionState>(

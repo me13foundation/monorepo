@@ -51,8 +51,11 @@ export function getActionErrorMessage(error: unknown, fallback: string): string 
 
 export async function requireAccessToken(): Promise<string> {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.access_token) {
-    throw new Error('Authentication required')
+  const token = session?.user?.access_token
+  const expiresAt = session?.user?.expires_at
+  const isExpired = typeof expiresAt !== 'number' || Date.now() >= expiresAt
+  if (!token || isExpired) {
+    throw new Error('Session expired')
   }
-  return session.user.access_token
+  return token
 }

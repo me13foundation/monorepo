@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { SidebarWrapper } from '@/components/navigation/sidebar/SidebarWrapper'
@@ -21,6 +22,12 @@ function isValidUuid(value: string): boolean {
 export default async function DashboardLayout({ children, params }: DashboardLayoutProps) {
   const session = await getServerSession(authOptions)
   const token = session?.user?.access_token
+  const expiresAt = session?.user?.expires_at
+  const isExpired = typeof expiresAt !== 'number' || Date.now() >= expiresAt
+
+  if (!session || !token || isExpired) {
+    redirect('/auth/login?error=SessionExpired')
+  }
 
   let initialSpaces: Awaited<ReturnType<typeof fetchResearchSpaces>>['spaces'] = []
   let initialTotal = 0

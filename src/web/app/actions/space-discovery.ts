@@ -1,10 +1,9 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { getServerSession } from "next-auth"
 import type { AxiosError } from "axios"
 import { apiClient, authHeaders } from "@/lib/api/client"
-import { authOptions } from "@/lib/auth"
+import { requireAccessToken } from "@/app/actions/action-utils"
 import type {
   AddToSpaceRequest,
   CreateSessionRequest,
@@ -78,14 +77,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
-async function getAuthToken(): Promise<string> {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.access_token) {
-    throw new Error("Authentication required")
-  }
-  return session.user.access_token
-}
-
 async function ensureSpaceSession(
   spaceId: string,
   token: string
@@ -119,7 +110,7 @@ export async function fetchSpaceDiscoveryState(
   spaceId: string
 ): Promise<SpaceDiscoveryStateResult> {
   try {
-    const token = await getAuthToken()
+    const token = await requireAccessToken()
     const session = await ensureSpaceSession(spaceId, token)
     const [stateResponse, catalogResponse] = await Promise.all([
       apiClient.get<OrchestratedSessionState>(
@@ -156,7 +147,7 @@ export async function updateSpaceDiscoverySelection(
   path: string
 ): Promise<SpaceDiscoverySelectionResult> {
   try {
-    const token = await getAuthToken()
+    const token = await requireAccessToken()
     const payload: UpdateSelectionRequest = { source_ids: sourceIds }
     const response = await apiClient.post<OrchestratedSessionState>(
       `/data-discovery/sessions/${sessionId}/selection`,
@@ -183,7 +174,7 @@ export async function addSpaceDiscoverySources(
   path: string
 ): Promise<SpaceDiscoveryAddResult> {
   try {
-    const token = await getAuthToken()
+    const token = await requireAccessToken()
     const results = await Promise.allSettled(
       sourceIds.map(async (catalogEntryId) => {
         const payload: AddToSpaceRequest = {
