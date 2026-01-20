@@ -77,6 +77,7 @@ class FlujoAgentAdapter(AiAgentPort):
         self._model = model
         self._state_backend = _get_state_backend()
         self._pipelines: dict[str, Flujo[str, QueryOutput, PipelineContext]] = {}
+        self._last_run_id: str | None = None
 
         # Initialize supported sources
         self._setup_pubmed_agent()
@@ -121,6 +122,7 @@ class FlujoAgentAdapter(AiAgentPort):
         This method identifies the appropriate AI agent for the source and
         executes a Flujo workflow to generate a context-aware query.
         """
+        self._last_run_id = None
         source_key = source_type.lower()
         if source_key not in self._pipelines:
             # If the source is not explicitly supported with a specialized agent,
@@ -152,6 +154,7 @@ class FlujoAgentAdapter(AiAgentPort):
                     if candidate:
                         final_output = candidate
                 elif isinstance(item, PipelineResult):
+                    self._capture_run_id(item)
                     candidate = self._extract_pipeline_result_output(item)
                     if candidate:
                         final_output = candidate
@@ -164,6 +167,10 @@ class FlujoAgentAdapter(AiAgentPort):
             return final_output or ""
 
         return final_output or ""
+
+    def get_last_run_id(self) -> str | None:
+        """Expose the last Flujo run id for inspection."""
+        return self._last_run_id
 
     @staticmethod
     def _has_openai_key() -> bool:
@@ -196,4 +203,20 @@ class FlujoAgentAdapter(AiAgentPort):
                 candidate = self._coerce_query_output(step_result.output)
                 if candidate:
                     return candidate
+        return None
+
+    def _capture_run_id(self, result: PipelineResult[PipelineContext]) -> None:
+        run_id = self._extract_run_id(result)
+        if run_id:
+            self._last_run_id = run_id
+
+    @staticmethod
+    def _extract_run_id(result: PipelineResult[PipelineContext]) -> str | None:
+        context: object = result.final_pipeline_context
+        if isinstance(context, PipelineContext):
+            return context.run_id
+        if isinstance(context, dict):
+            candidate = context.get("run_id")
+            if isinstance(candidate, str) and candidate.strip():
+                return candidate.strip()
         return None

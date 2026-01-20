@@ -6,10 +6,15 @@ import os
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
-from src.application.services import DataSourceAiTestService, DataSourceAiTestSettings
+from src.application.services import (
+    DataSourceAiTestDependencies,
+    DataSourceAiTestService,
+    DataSourceAiTestSettings,
+)
 from src.database.session import SessionLocal
 from src.infrastructure.data_sources import PubMedSourceGateway
 from src.infrastructure.llm.flujo_agent_adapter import FlujoAgentAdapter
+from src.infrastructure.llm.flujo_state_repository import SqlAlchemyFlujoStateRepository
 from src.infrastructure.repositories import (
     SqlAlchemyResearchSpaceRepository,
     SqlAlchemyUserDataSourceRepository,
@@ -30,14 +35,20 @@ def build_data_source_ai_test_service(
     """Create a fully wired AI test service for the current session."""
     source_repository = SqlAlchemyUserDataSourceRepository(session)
     research_space_repository = SqlAlchemyResearchSpaceRepository(session)
+    flujo_state_repository = SqlAlchemyFlujoStateRepository(session)
     model_name = os.getenv("MED13_AI_AGENT_MODEL", "openai:gpt-4o-mini")
     ai_agent = FlujoAgentAdapter(model=model_name)
 
-    return DataSourceAiTestService(
+    dependencies = DataSourceAiTestDependencies(
         source_repository=source_repository,
         pubmed_gateway=PubMedSourceGateway(),
         ai_agent=ai_agent,
+        run_id_provider=ai_agent,
         research_space_repository=research_space_repository,
+        flujo_state=flujo_state_repository,
+    )
+    return DataSourceAiTestService(
+        dependencies,
         settings=DataSourceAiTestSettings(
             sample_size=DEFAULT_AI_TEST_SAMPLE_SIZE,
             ai_model_name=model_name,

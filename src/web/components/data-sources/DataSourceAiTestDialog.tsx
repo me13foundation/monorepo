@@ -1,6 +1,8 @@
 "use client"
 
-import { ExternalLink } from 'lucide-react'
+import { useState } from 'react'
+
+import { ChevronDown, ExternalLink } from 'lucide-react'
 
 import type { DataSource } from '@/types/data-source'
 import type {
@@ -17,6 +19,11 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import { Separator } from '@/components/ui/separator'
 
 interface DataSourceAiTestDialogProps {
@@ -99,6 +106,8 @@ export function DataSourceAiTestDialog({
   open,
   onOpenChange,
 }: DataSourceAiTestDialogProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   if (!source || !result) {
     return null
   }
@@ -108,18 +117,20 @@ export function DataSourceAiTestDialog({
   const executedQuery = result.executed_query
   const searchTerms = Array.isArray(result.search_terms) ? result.search_terms : []
   const findings = Array.isArray(result.findings) ? result.findings : []
+  const flujoTables = Array.isArray(result.flujo_tables) ? result.flujo_tables : []
+  const hasFlujoTables = flujoTables.length > 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[720px]">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-[720px]">
+        <DialogHeader className="shrink-0">
           <DialogTitle>AI test results</DialogTitle>
           <DialogDescription>
             Review the AI-generated PubMed query and sample findings for <b>{source.name}</b>.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="flex-1 space-y-6 overflow-y-auto pr-2">
           <section className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={result.success ? 'secondary' : 'destructive'}>
@@ -155,7 +166,7 @@ export function DataSourceAiTestDialog({
             {executedQuery && (
               <div className="space-y-1">
                 <span className="text-xs text-muted-foreground">Executed query</span>
-                <p className="rounded bg-muted p-2 font-mono text-xs">{executedQuery}</p>
+                <p className="break-all rounded bg-muted p-2 font-mono text-xs">{executedQuery}</p>
               </div>
             )}
           </section>
@@ -176,9 +187,104 @@ export function DataSourceAiTestDialog({
               </p>
             )}
           </section>
+
+          <Separator />
+
+          <section className="space-y-3">
+            <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">Advanced</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Flujo tables recorded for this AI test run.
+                  </p>
+                </div>
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className="gap-2">
+                    {showAdvanced ? 'Hide details' : 'Show details'}
+                    <ChevronDown
+                      className={`size-4 transition-transform ${
+                        showAdvanced ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </Button>
+                </CollapsibleTrigger>
+              </div>
+              <CollapsibleContent className="space-y-3">
+                {result.flujo_run_id ? (
+                  <div className="rounded-md border p-3">
+                    <InfoRow label="Flujo run ID" value={result.flujo_run_id} />
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No Flujo run metadata was recorded for this test. Confirm Postgres
+                    is active and the Flujo schema exists.
+                  </p>
+                )}
+                {hasFlujoTables ? (
+                  <div className="space-y-3">
+                    {flujoTables.map((table) => {
+                      const sampleRows = Array.isArray(table.sample_rows)
+                        ? table.sample_rows
+                        : []
+                      return (
+                        <details
+                          key={table.table_name}
+                          className="rounded-md border p-3"
+                        >
+                          <summary className="flex cursor-pointer items-center justify-between text-sm font-medium">
+                            <span>{table.table_name}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {table.row_count.toString()} row(s)
+                            </span>
+                          </summary>
+                          <div className="mt-3 space-y-3">
+                            <InfoRow
+                              label="Latest entry"
+                              value={formatTimestamp(table.latest_created_at)}
+                            />
+                            {sampleRows.length > 0 ? (
+                              <div className="space-y-3">
+                                {sampleRows.map((row, index) => (
+                                  <div key={`${table.table_name}-${index}`}>
+                                    <p className="text-xs text-muted-foreground">
+                                      Sample row {index + 1}
+                                    </p>
+                                    <pre className="mt-2 max-h-60 overflow-auto rounded-md bg-muted p-2 text-xs">
+                                      {JSON.stringify(row, null, 2)}
+                                    </pre>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">
+                                No sample rows captured for this table.
+                              </p>
+                            )}
+                          </div>
+                        </details>
+                      )
+                    })}
+                    <p className="text-xs text-muted-foreground">
+                      Sample rows show the latest Flujo records for this run.
+                      Long fields are truncated for readability.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    <p>Flujo table details are not available for this run.</p>
+                    <p className="mt-1 text-xs">
+                      If you expect data here, verify the Flujo schema is present in
+                      Postgres and the AI test executed successfully.
+                    </p>
+                  </div>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
+          </section>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>

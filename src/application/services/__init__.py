@@ -46,6 +46,7 @@ DataDiscoveryServiceDependencies = (
     data_discovery_service.DataDiscoveryServiceDependencies
 )
 DataSourceAiTestService = data_source_ai_test_service.DataSourceAiTestService
+DataSourceAiTestDependencies = data_source_ai_test_service.DataSourceAiTestDependencies
 DataSourceAiTestSettings = data_source_ai_test_service.DataSourceAiTestSettings
 DataSourceActivationService = data_source_activation_service.DataSourceActivationService
 DataSourceAuthorizationService = (
@@ -104,6 +105,7 @@ __all__ = [
     "DataDiscoveryService",
     "DataDiscoveryServiceDependencies",
     "DataSourceAiTestService",
+    "DataSourceAiTestDependencies",
     "DataSourceAiTestSettings",
     "DataSourceActivationService",
     "DataSourceAuthorizationService",

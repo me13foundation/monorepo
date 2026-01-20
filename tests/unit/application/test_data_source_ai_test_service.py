@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 
 from src.application.services.data_source_ai_test_service import (
+    DataSourceAiTestDependencies,
     DataSourceAiTestService,
     DataSourceAiTestSettings,
 )
@@ -286,7 +287,7 @@ async def test_ai_test_success_returns_result() -> None:
         ai_enabled=True,
     )
 
-    service = DataSourceAiTestService(
+    dependencies = DataSourceAiTestDependencies(
         source_repository=StubUserDataSourceRepository(source),
         pubmed_gateway=StubPubMedGateway(
             [
@@ -301,7 +302,11 @@ async def test_ai_test_success_returns_result() -> None:
             ],
         ),
         ai_agent=StubAiAgent("MED13[Title/Abstract]"),
+        run_id_provider=None,
         research_space_repository=StubResearchSpaceRepository(space),
+    )
+    service = DataSourceAiTestService(
+        dependencies,
         settings=DataSourceAiTestSettings(
             sample_size=3,
             ai_model_name="openai:gpt-test",
@@ -330,11 +335,15 @@ async def test_ai_disabled_returns_failure() -> None:
         ai_enabled=False,
     )
 
-    service = DataSourceAiTestService(
+    dependencies = DataSourceAiTestDependencies(
         source_repository=StubUserDataSourceRepository(source),
         pubmed_gateway=StubPubMedGateway([{"pubmed_id": "1"}]),
         ai_agent=StubAiAgent("MED13"),
+        run_id_provider=None,
         research_space_repository=StubResearchSpaceRepository(None),
+    )
+    service = DataSourceAiTestService(
+        dependencies,
         settings=DataSourceAiTestSettings(ai_model_name="openai:gpt-test"),
     )
 
@@ -354,11 +363,15 @@ async def test_no_results_returns_failure() -> None:
         ai_enabled=True,
     )
 
-    service = DataSourceAiTestService(
+    dependencies = DataSourceAiTestDependencies(
         source_repository=StubUserDataSourceRepository(source),
         pubmed_gateway=StubPubMedGateway([]),
         ai_agent=StubAiAgent("MED13"),
+        run_id_provider=None,
         research_space_repository=StubResearchSpaceRepository(None),
+    )
+    service = DataSourceAiTestService(
+        dependencies,
         settings=DataSourceAiTestSettings(ai_model_name="openai:gpt-test"),
     )
 

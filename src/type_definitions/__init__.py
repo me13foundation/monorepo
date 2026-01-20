@@ -20,6 +20,7 @@ from .data_sources import (
     DataSourceAiTestFinding,
     DataSourceAiTestLink,
     DataSourceAiTestResult,
+    FlujoTableSummary,
 )
 from .external_apis import (
     ClinVarSearchResponse,
@@ -62,6 +63,7 @@ __all__ = [
     "DataSourceAiTestFinding",
     "DataSourceAiTestLink",
     "DataSourceAiTestResult",
+    "FlujoTableSummary",
     "EvidenceUpdate",
     "GeneUpdate",
     "GoogleCloudStorageConfig",

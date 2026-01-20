@@ -4,6 +4,7 @@ import type {
   DataSourceIngestionSchedule,
   ScheduleFrequency,
 } from '@/types/data-source'
+import type { JSONObject } from '@/types/generated'
 
 export interface DataSourceListParams {
   page?: number
@@ -75,6 +76,13 @@ export interface DataSourceAiTestFinding {
   links: DataSourceAiTestLink[]
 }
 
+export interface FlujoTableSummary {
+  table_name: string
+  row_count: number
+  latest_created_at?: string | null
+  sample_rows?: JSONObject[]
+}
+
 export interface DataSourceAiTestResult {
   source_id: string
   model?: string | null
@@ -86,6 +94,8 @@ export interface DataSourceAiTestResult {
   sample_size: number
   findings: DataSourceAiTestFinding[]
   checked_at: string
+  flujo_run_id?: string | null
+  flujo_tables?: FlujoTableSummary[]
 }
 
 export interface IngestionJobHistoryItem {

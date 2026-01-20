@@ -4,44 +4,54 @@ Application service for testing AI-managed data source configurations.
 
 from __future__ import annotations
 
+import datetime as dt
 import logging
 import re
-from datetime import UTC, datetime
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+import pydantic
 
-from src.domain.entities.data_source_configs import PubMedQueryConfig
-from src.domain.entities.user_data_source import SourceType, UserDataSource
-from src.type_definitions.data_sources import (
-    DataSourceAiTestFinding,
-    DataSourceAiTestLink,
-    DataSourceAiTestResult,
-)
+from src.domain.entities import data_source_configs, user_data_source
+from src.type_definitions import data_sources as data_source_types
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from src.application.services.ports.ai_agent_port import AiAgentPort
-    from src.domain.repositories.research_space_repository import (
-        ResearchSpaceRepository,
+    from src.application.services.ports.ai_agent_port import (
+        AiAgentPort,
+        AiAgentRunMetadataProvider,
     )
-    from src.domain.repositories.user_data_source_repository import (
+    from src.application.services.ports.flujo_state_port import FlujoStatePort
+    from src.domain.repositories import (
+        ResearchSpaceRepository,
         UserDataSourceRepository,
     )
     from src.domain.services.pubmed_ingestion import PubMedGateway
     from src.type_definitions.common import RawRecord, SourceMetadata
 
 
-class DataSourceAiTestSettings(BaseModel):
+class DataSourceAiTestSettings(pydantic.BaseModel):
     """Settings for AI data source test execution."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = pydantic.ConfigDict(extra="forbid")
 
-    sample_size: int = Field(default=5, ge=1)
+    sample_size: int = pydantic.Field(default=5, ge=1)
     ai_model_name: str | None = None
+
+
+@dataclass(frozen=True)
+class DataSourceAiTestDependencies:
+    """Bundle dependencies required for AI test execution."""
+
+    source_repository: UserDataSourceRepository
+    pubmed_gateway: PubMedGateway
+    ai_agent: AiAgentPort | None
+    research_space_repository: ResearchSpaceRepository | None
+    flujo_state: FlujoStatePort | None = None
+    run_id_provider: AiAgentRunMetadataProvider | None = None
 
 
 class DataSourceAiTestService:
@@ -49,17 +59,15 @@ class DataSourceAiTestService:
 
     def __init__(
         self,
-        *,
-        source_repository: UserDataSourceRepository,
-        pubmed_gateway: PubMedGateway,
-        ai_agent: AiAgentPort | None,
-        research_space_repository: ResearchSpaceRepository | None,
+        dependencies: DataSourceAiTestDependencies,
         settings: DataSourceAiTestSettings | None = None,
     ) -> None:
-        self._source_repository = source_repository
-        self._pubmed_gateway = pubmed_gateway
-        self._ai_agent = ai_agent
-        self._research_space_repository = research_space_repository
+        self._source_repository = dependencies.source_repository
+        self._pubmed_gateway = dependencies.pubmed_gateway
+        self._ai_agent = dependencies.ai_agent
+        self._run_id_provider = dependencies.run_id_provider
+        self._research_space_repository = dependencies.research_space_repository
+        self._flujo_state = dependencies.flujo_state
         resolved_settings = settings or DataSourceAiTestSettings()
         self._sample_size = max(resolved_settings.sample_size, 1)
         self._ai_model_name = resolved_settings.ai_model_name
@@ -67,21 +75,25 @@ class DataSourceAiTestService:
     async def test_ai_configuration(
         self,
         source_id: UUID,
-    ) -> DataSourceAiTestResult:
+    ) -> data_source_types.DataSourceAiTestResult:
         """Run a lightweight AI-driven test against a data source configuration."""
         source = self._require_source(source_id)
-        checked_at = datetime.now(UTC)
+        checked_at = dt.datetime.now(dt.UTC)
         config = self._build_pubmed_config(source)
         error_message = self._validate_preconditions(source=source, config=config)
         executed_query: str | None = None
         fetched_records = 0
-        findings: list[DataSourceAiTestFinding] = []
+        findings: list[data_source_types.DataSourceAiTestFinding] = []
+        flujo_run_id: str | None = None
+        flujo_tables: list[data_source_types.FlujoTableSummary] = []
+        ai_executed = False
 
         if error_message is None and config is not None:
             research_space_description = self._resolve_research_space_description(
                 source,
                 config,
             )
+            ai_executed = True
             intelligent_query = await self._generate_intelligent_query(
                 research_space_description,
                 config.agent_config.agent_prompt,
@@ -111,6 +123,9 @@ class DataSourceAiTestService:
                     logger.exception("AI test failed for source %s", source.id)
                     error_message = f"PubMed request failed: {exc!s}"
 
+        if ai_executed:
+            flujo_run_id, flujo_tables = self._resolve_flujo_state(checked_at)
+
         success = error_message is None
         if error_message is None:
             message = f"AI test succeeded with {fetched_records} record(s) returned."
@@ -122,7 +137,7 @@ class DataSourceAiTestService:
             has_ai_agent=self._ai_agent is not None,
         )
 
-        return DataSourceAiTestResult(
+        return data_source_types.DataSourceAiTestResult(
             source_id=source.id,
             model=model_name,
             success=success,
@@ -133,9 +148,11 @@ class DataSourceAiTestService:
             sample_size=self._sample_size,
             findings=findings,
             checked_at=checked_at,
+            flujo_run_id=flujo_run_id,
+            flujo_tables=flujo_tables,
         )
 
-    def _require_source(self, source_id: UUID) -> UserDataSource:
+    def _require_source(self, source_id: UUID) -> user_data_source.UserDataSource:
         source = self._source_repository.find_by_id(source_id)
         if source is None:
             msg = f"Data source {source_id} not found"
@@ -144,22 +161,22 @@ class DataSourceAiTestService:
 
     @staticmethod
     def _build_pubmed_config(
-        source: UserDataSource,
-    ) -> PubMedQueryConfig | None:
+        source: user_data_source.UserDataSource,
+    ) -> data_source_configs.PubMedQueryConfig | None:
         metadata: SourceMetadata = dict(source.configuration.metadata or {})
         try:
-            return PubMedQueryConfig.model_validate(metadata)
-        except ValidationError as exc:
+            return data_source_configs.PubMedQueryConfig.model_validate(metadata)
+        except pydantic.ValidationError as exc:
             logger.warning("Invalid PubMed config for source %s: %s", source.id, exc)
             return None
 
     def _validate_preconditions(
         self,
         *,
-        source: UserDataSource,
-        config: PubMedQueryConfig | None,
+        source: user_data_source.UserDataSource,
+        config: data_source_configs.PubMedQueryConfig | None,
     ) -> str | None:
-        if source.source_type != SourceType.PUBMED:
+        if source.source_type != user_data_source.SourceType.PUBMED:
             return "AI testing is only supported for PubMed sources."
         if config is None:
             return "PubMed configuration is invalid. Review the source settings."
@@ -173,8 +190,8 @@ class DataSourceAiTestService:
 
     def _resolve_research_space_description(
         self,
-        source: UserDataSource,
-        config: PubMedQueryConfig,
+        source: user_data_source.UserDataSource,
+        config: data_source_configs.PubMedQueryConfig,
     ) -> str:
         if not config.agent_config.use_research_space_context:
             return ""
@@ -240,8 +257,8 @@ class DataSourceAiTestService:
     def _build_findings(
         self,
         records: list[RawRecord],
-    ) -> list[DataSourceAiTestFinding]:
-        findings: list[DataSourceAiTestFinding] = []
+    ) -> list[data_source_types.DataSourceAiTestFinding]:
+        findings: list[data_source_types.DataSourceAiTestFinding] = []
         for record in records[: self._sample_size]:
             pubmed_id = self._coerce_scalar(record.get("pubmed_id"))
             title = self._coerce_scalar(record.get("title")) or "Untitled PubMed record"
@@ -252,7 +269,7 @@ class DataSourceAiTestService:
             links = self._build_links(pubmed_id, pmc_id, doi)
 
             findings.append(
-                DataSourceAiTestFinding(
+                data_source_types.DataSourceAiTestFinding(
                     title=title,
                     pubmed_id=pubmed_id,
                     doi=doi,
@@ -288,30 +305,54 @@ class DataSourceAiTestService:
         pubmed_id: str | None,
         pmc_id: str | None,
         doi: str | None,
-    ) -> list[DataSourceAiTestLink]:
-        links: list[DataSourceAiTestLink] = []
+    ) -> list[data_source_types.DataSourceAiTestLink]:
+        links: list[data_source_types.DataSourceAiTestLink] = []
         if pubmed_id:
             links.append(
-                DataSourceAiTestLink(
+                data_source_types.DataSourceAiTestLink(
                     label="PubMed",
                     url=f"https://pubmed.ncbi.nlm.nih.gov/{pubmed_id}/",
                 ),
             )
         if pmc_id:
             links.append(
-                DataSourceAiTestLink(
+                data_source_types.DataSourceAiTestLink(
                     label="PubMed Central",
                     url=f"https://www.ncbi.nlm.nih.gov/pmc/articles/{pmc_id}/",
                 ),
             )
         if doi:
             links.append(
-                DataSourceAiTestLink(
+                data_source_types.DataSourceAiTestLink(
                     label="DOI",
                     url=f"https://doi.org/{doi}",
                 ),
             )
         return links
 
+    def _resolve_flujo_state(
+        self,
+        checked_at: dt.datetime,
+    ) -> tuple[str | None, list[data_source_types.FlujoTableSummary]]:
+        if self._flujo_state is None:
+            return None, []
 
-__all__ = ["DataSourceAiTestService", "DataSourceAiTestSettings"]
+        if self._run_id_provider is None:
+            return None, []
+
+        run_id = self._run_id_provider.get_last_run_id()
+        if run_id is None:
+            window_start = checked_at - dt.timedelta(minutes=2)
+            run_id = self._flujo_state.find_latest_run_id(since=window_start)
+
+        if run_id is None:
+            return None, []
+
+        return run_id, self._flujo_state.get_run_table_summaries(run_id)
+
+
+__all__ = [
+    "DataSourceAiTestDependencies",
+    "DataSourceAiTestService",
+    "DataSourceAiTestSettings",
+]

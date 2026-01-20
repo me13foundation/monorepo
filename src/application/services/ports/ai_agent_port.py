@@ -1,6 +1,7 @@
 """Port interface for AI agent operations."""
 
 from abc import ABC, abstractmethod
+from typing import Protocol, runtime_checkable
 
 
 class AiAgentPort(ABC):
@@ -29,3 +30,12 @@ class AiAgentPort(ABC):
         Returns:
             A generated query string compatible with the source type
         """
+
+
+@runtime_checkable
+class AiAgentRunMetadataProvider(Protocol):
+    """Optional protocol for AI agents that expose their last Flujo run id."""
+
+    def get_last_run_id(self) -> str | None:
+        """Return the most recently executed Flujo run id, if available."""
+        ...

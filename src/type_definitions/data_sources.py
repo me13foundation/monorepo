@@ -11,6 +11,8 @@ from uuid import UUID  # noqa: TC003
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.type_definitions.common import JSONObject  # noqa: TC001
+
 
 class DataSourceAiTestLink(BaseModel):
     """Reference link to a finding surfaced during AI testing."""
@@ -35,6 +37,17 @@ class DataSourceAiTestFinding(BaseModel):
     links: list[DataSourceAiTestLink] = Field(default_factory=list)
 
 
+class FlujoTableSummary(BaseModel):
+    """Summary of Flujo table rows recorded during a run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    table_name: str
+    row_count: int = Field(ge=0)
+    latest_created_at: datetime | None = None
+    sample_rows: list[JSONObject] = Field(default_factory=list)
+
+
 class DataSourceAiTestResult(BaseModel):
     """Result payload from testing an AI-managed data source configuration."""
 
@@ -50,10 +63,13 @@ class DataSourceAiTestResult(BaseModel):
     sample_size: int = Field(ge=1)
     findings: list[DataSourceAiTestFinding] = Field(default_factory=list)
     checked_at: datetime
+    flujo_run_id: str | None = None
+    flujo_tables: list[FlujoTableSummary] = Field(default_factory=list)
 
 
 __all__ = [
     "DataSourceAiTestFinding",
     "DataSourceAiTestLink",
     "DataSourceAiTestResult",
+    "FlujoTableSummary",
 ]
