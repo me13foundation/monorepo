@@ -62,6 +62,10 @@ make start-web       # Launch Next.js admin in background (logs/web.log)
 make stop-web        # Stop background Next.js (use stop-all to tear everything down)
 make stop-local      # Stop the FastAPI backend (foreground or background)
 
+# Note: background helpers are meant for interactive shells. Some non-interactive
+# runners terminate background processes when the command ends. Use `make run-local`
+# or `make run-web` in the foreground if the background process exits immediately.
+
 # Access the services
 # - API Documentation: http://localhost:8080/docs
 # - Admin Dashboard: http://localhost:3000/dashboard

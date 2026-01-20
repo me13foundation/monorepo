@@ -266,6 +266,7 @@ async def _seed_curation_context() -> None:
                 priority=review_record.priority,
                 quality_score=review_record.quality_score,
                 issues=review_record.issues,
+                # Use server default for last_updated to avoid tz mismatch in Postgres.
             ),
         )
         await async_session.execute(

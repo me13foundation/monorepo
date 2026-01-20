@@ -105,6 +105,9 @@ def _wire_container_dependencies() -> None:
     )
     resolved_db_url = resolve_async_database_url()
     engine_kwargs: dict[str, object] = {"echo": False, "pool_pre_ping": True}
+    if os.environ.get("TESTING") == "true" and not resolved_db_url.startswith("sqlite"):
+        # Avoid cross-event-loop reuse of asyncpg connections during test runs.
+        engine_kwargs["poolclass"] = NullPool
     if resolved_db_url.startswith("sqlite"):
         engine_kwargs["connect_args"] = build_sqlite_connect_args(
             include_thread_check=False,

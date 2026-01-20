@@ -88,6 +88,23 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return "AUTH_TOKEN_DATETIME_ERROR"
         return "AUTH_TOKEN_INVALID"
 
+    @staticmethod
+    def _should_bypass_test_headers(request: Request) -> bool:
+        allow_test_headers = (
+            os.getenv("TESTING") == "true"
+            or os.getenv("MED13_BYPASS_TEST_AUTH_HEADERS") == "1"
+        )
+        if not allow_test_headers:
+            return False
+        return all(
+            request.headers.get(key)
+            for key in (
+                "X-TEST-USER-ID",
+                "X-TEST-USER-EMAIL",
+                "X-TEST-USER-ROLE",
+            )
+        )
+
     async def dispatch(
         self,
         request: Request,
@@ -191,6 +208,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return True
 
         if self._should_skip_auth(request.url.path):
+            return True
+
+        if self._should_bypass_test_headers(request):
             return True
 
         # Check if user is already authenticated by previous middleware

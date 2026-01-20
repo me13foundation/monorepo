@@ -2,11 +2,15 @@
 
 import logging
 import os
+import threading
+from dataclasses import dataclass
 
 from flujo import Flujo, Step
 from flujo.agents import make_agent_async
+from flujo.application.core.runtime.factories import BackendFactory
 from flujo.domain.models import PipelineContext, PipelineResult, StepResult
 from flujo.exceptions import FlujoError
+from flujo.state.backends.base import StateBackend
 from pydantic import BaseModel, Field
 
 from src.application.services.ports.ai_agent_port import AiAgentPort
@@ -15,6 +19,34 @@ from src.infrastructure.llm.flujo_config import resolve_flujo_state_uri
 logger = logging.getLogger(__name__)
 
 _INVALID_OPENAI_KEYS = {"test", "changeme", "placeholder"}
+
+
+@dataclass
+class _StateBackendHolder:
+    value: StateBackend | None = None
+
+
+_STATE_BACKEND_LOCK = threading.Lock()
+_STATE_BACKEND_HOLDER = _StateBackendHolder()
+_STATE_BACKEND_FACTORY = BackendFactory()
+
+
+def _build_state_backend() -> StateBackend:
+    state_uri = resolve_flujo_state_uri()
+    os.environ["FLUJO_STATE_URI"] = state_uri
+    return _STATE_BACKEND_FACTORY.create_state_backend()
+
+
+def _get_state_backend() -> StateBackend:
+    existing = _STATE_BACKEND_HOLDER.value
+    if existing is not None:
+        return existing
+    with _STATE_BACKEND_LOCK:
+        existing = _STATE_BACKEND_HOLDER.value
+        if existing is None:
+            existing = _build_state_backend()
+            _STATE_BACKEND_HOLDER.value = existing
+        return existing
 
 
 class QueryOutput(BaseModel):
@@ -43,7 +75,7 @@ class FlujoAgentAdapter(AiAgentPort):
             model: The LLM model identifier to use for the agents
         """
         self._model = model
-        os.environ.setdefault("FLUJO_STATE_URI", resolve_flujo_state_uri())
+        self._state_backend = _get_state_backend()
         self._pipelines: dict[str, Flujo[str, QueryOutput, PipelineContext]] = {}
 
         # Initialize supported sources
@@ -74,6 +106,7 @@ class FlujoAgentAdapter(AiAgentPort):
                 name="generate_pubmed_query",
                 agent=agent,
             ),
+            state_backend=self._state_backend,
         )
 
     async def generate_intelligent_query(

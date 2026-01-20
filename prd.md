@@ -12,7 +12,7 @@
 
 ### 1.1 Objective
 
-Migrate the Flujo AI orchestration framework's state storage from SQLite (`flujo_state.db`) to PostgreSQL, using a dedicated `flujo` schema within our existing `med13_dev` database. This aligns our AI infrastructure with the project's existing database strategy and improves production readiness.
+Migrate the Flujo AI orchestration framework's state storage from SQLite (`flujo_ops.db` default; `flujo_state.db` via `flujo.toml`) to PostgreSQL, using a dedicated `flujo` schema within our existing `med13_dev` database. This aligns our AI infrastructure with the project's existing database strategy and improves production readiness.
 
 ### 1.2 Background
 
@@ -23,7 +23,7 @@ The MED13 Resource Library uses the **Flujo** Python library (`flujo>=0.6.3`) to
 - Token usage and cost tracking
 - Debugging traces
 
-Currently, this state is stored in a local SQLite file (`flujo_state.db`), which is unsuitable for production deployments with multiple instances.
+Currently, this state is stored in a local SQLite file (`flujo_ops.db` fallback in Flujo; `flujo_state.db` via `flujo.toml`), which is unsuitable for production deployments with multiple instances.
 
 ### 1.3 Business Value
 
@@ -61,6 +61,10 @@ strict = false
 prompt_tokens_per_1k = 0.00015
 completion_tokens_per_1k = 0.0006
 ```
+
+**Runtime note:** The current integration constructs `Flujo(...)` without a `state_backend`. Flujo's default state backend ignores `FLUJO_STATE_URI`/`state_uri` and writes to `flujo_ops.db`. Postgres will not be used until we pass an explicit state backend (or use Flujo's backend factory).
+
+**Postgres note:** Flujo 0.6.4 fixes the pgvector migration (uses `vector(1536)`) and timestamp handling for Postgres. Earlier versions required a shim to avoid `column does not have dimensions` and ISO timestamp binding errors.
 
 ### 2.2 Files Using Flujo
 
@@ -122,7 +126,7 @@ completion_tokens_per_1k = 0.0006
 | `system_state` | General-purpose key-value store for internal state |
 | `flujo_schema_versions` | Migration tracking table |
 | `evaluations` | Scores, feedback, and metadata for workflow evaluations |
-| `memories` | Vector storage/RAG (requires `pgvector` extension; migration runs even if indexing is disabled) |
+| `memories` | Vector storage/RAG (requires `pgvector` extension; created when memory indexing is enabled) |
 
 **Note:** No naming conflicts exist with our 24 existing tables in the `public` schema.
 
@@ -154,7 +158,7 @@ prompt_tokens_per_1k = 0.00015
 completion_tokens_per_1k = 0.0006
 ```
 
-**Important:** Flujo reads `FLUJO_STATE_URI` (env) and/or `state_uri` in `flujo.toml`. If you remove `state_uri` and do not set `FLUJO_STATE_URI`, Flujo falls back to `sqlite:///.../flujo_ops.db`, not `flujo_state.db`.
+**Important:** `FLUJO_STATE_URI`/`state_uri` are only honored when a state backend is created via Flujo's backend factory or explicitly passed into `Flujo`. The current integration uses the default backend, which always writes to `flujo_ops.db`. If you remove `state_uri` and do not set `FLUJO_STATE_URI`, Flujo falls back to `sqlite:///.../flujo_ops.db`, not `flujo_state.db`.
 
 #### 4.1.2 Environment Variable Configuration
 
@@ -258,14 +262,40 @@ def _add_flujo_schema(postgres_url: str) -> str:
 
 **File:** `src/infrastructure/llm/flujo_agent_adapter.py`
 
-Set `FLUJO_STATE_URI` before Flujo initializes. Avoid `flujo.configure()`-style placeholders unless confirmed by Flujo docs.
+Set `FLUJO_STATE_URI`, build a state backend, and pass it into `Flujo`. Flujo defaults to `flujo_ops.db` if no backend is supplied. Avoid `flujo.configure()`-style placeholders unless confirmed by Flujo docs.
 
 ```python
-# Add import at top
+import os
+
+from flujo.application.core.runtime.factories import BackendFactory
+from flujo.state.backends.base import StateBackend
+
 from src.infrastructure.llm.flujo_config import resolve_flujo_state_uri
 
-# In __init__ or module-level initialization, configure Flujo's state backend
-os.environ.setdefault("FLUJO_STATE_URI", resolve_flujo_state_uri())
+_STATE_BACKEND_FACTORY = BackendFactory()
+_STATE_BACKEND: StateBackend | None = None
+
+
+def _build_state_backend() -> StateBackend:
+    os.environ["FLUJO_STATE_URI"] = resolve_flujo_state_uri()
+    return _STATE_BACKEND_FACTORY.create_state_backend()
+
+
+def _get_state_backend() -> StateBackend:
+    global _STATE_BACKEND
+    if _STATE_BACKEND is None:
+        _STATE_BACKEND = _build_state_backend()
+    return _STATE_BACKEND
+
+
+# In __init__
+self._state_backend = _get_state_backend()
+
+# When constructing pipelines
+self._pipelines["pubmed"] = Flujo(
+    Step(...),
+    state_backend=self._state_backend,
+)
 ```
 
 #### 4.2.3 Create Schema Migration Script
@@ -288,8 +318,13 @@ Usage:
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
 from sqlalchemy import create_engine, text
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from src.database.url_resolver import resolve_sync_database_url
 
@@ -305,20 +340,21 @@ def init_flujo_schema() -> None:
     engine = create_engine(db_url)
 
     with engine.connect() as conn:
-        # Create schema if not exists
         conn.execute(text("CREATE SCHEMA IF NOT EXISTS flujo"))
         conn.commit()
-        print("✓ Schema 'flujo' created or already exists.")
+        print("Schema 'flujo' created or already exists.")
 
         # Verify schema
-        result = conn.execute(text(
-            "SELECT schema_name FROM information_schema.schemata "
-            "WHERE schema_name = 'flujo'"
-        ))
+        result = conn.execute(
+            text(
+                "SELECT schema_name FROM information_schema.schemata "
+                "WHERE schema_name = 'flujo'"
+            )
+        )
         if result.fetchone():
-            print("✓ Schema 'flujo' verified.")
+            print("Schema 'flujo' verified.")
         else:
-            print("✗ Failed to verify schema creation.")
+            print("Failed to verify schema creation.")
             sys.exit(1)
 
 
@@ -352,8 +388,11 @@ services:
 -- Create flujo schema for AI orchestration state
 CREATE SCHEMA IF NOT EXISTS flujo;
 
+-- Enable pgvector extension for Flujo vector store migrations
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Grant permissions (adjust user as needed)
-GRANT ALL PRIVILEGES ON SCHEMA flujo TO med13_dev;
+GRANT ALL PRIVILEGES ON SCHEMA flujo TO CURRENT_USER;
 ```
 
 **Note:** The default `postgres:16-alpine` image does not include `pgvector`. Use a pgvector-enabled image (e.g., `pgvector/pgvector:pg16`) or install the extension in your Postgres instance so migration `003_vector_store.sql` can run.
@@ -549,7 +588,7 @@ def postgres_required():
 
 ### 6.1 Pre-Migration Checklist
 
-- [ ] Backup existing `flujo_state.db` file (if any valuable audit data)
+- [ ] Backup existing SQLite state (`flujo_ops.db` and/or `flujo_state.db`) if any valuable audit data exists
 - [ ] Verify PostgreSQL is running and accessible
 - [ ] Confirm `DATABASE_URL` points to PostgreSQL (and pgvector is available)
 - [ ] Decide whether to keep `state_uri` in `flujo.toml` as SQLite fallback
@@ -560,7 +599,7 @@ def postgres_required():
 | Step | Action | Command/File | Verification |
 |:-----|:-------|:-------------|:-------------|
 | 1 | Create feature branch | `git checkout -b feat/flujo-postgres-migration` | Branch exists |
-| 2 | Add `flujo_config.py` | Create file per spec | File exists |
+| 2 | Add `flujo_config.py` + wire adapter | Ensure `FlujoAgentAdapter` passes a state backend | File exists |
 | 3 | Add init script | Create `scripts/init_flujo_schema.py` | Script runs |
 | 4 | Update Makefile | Add `init-flujo-schema` target | `make init-flujo-schema` works |
 | 5 | Update `flujo.toml` | Keep `state_uri` for SQLite fallback or set `FLUJO_STATE_URI` for Postgres | Config valid |
@@ -568,14 +607,14 @@ def postgres_required():
 | 7 | Initialize schema | `make init-flujo-schema` | Schema exists in DB |
 | 8 | Test AI features | Trigger AI query generation | Flujo tables created |
 | 9 | Verify audit trail | Check `flujo.runs` table | Records present |
-| 10 | Remove old SQLite | Delete `flujo_state.db` from `.gitignore` note | Clean state |
+| 10 | Remove old SQLite | Remove `flujo_ops.db`/`flujo_state.db` if no longer needed | Clean state |
 
 ### 6.3 Rollback Plan
 
 If issues arise:
 
 1. Set `FLUJO_STATE_URI=sqlite:///flujo_state.db` or restore `state_uri` in `flujo.toml`
-2. Flujo will auto-create the SQLite file on next run (default is `flujo_ops.db` if `state_uri` is removed)
+2. Alternatively, omit the explicit backend to revert to Flujo's default `flujo_ops.db`
 3. No data migration needed (new runs will create new records)
 
 ---
@@ -585,6 +624,7 @@ If issues arise:
 ### 7.1 Functional Requirements
 
 - [ ] Flujo state persists in PostgreSQL `flujo` schema
+- [ ] `flujo_ops.db` is no longer updated when Postgres mode is enabled
 - [ ] AI query generation works identically to before
 - [ ] Audit trail (runs, steps) queryable via SQL
 - [ ] Multiple app instances can run without conflicts
@@ -620,7 +660,7 @@ If issues arise:
 
 | Question | Owner | Status |
 |:---------|:------|:-------|
-| Should we set `FLUJO_STATE_URI` in app startup or keep `state_uri` in `flujo.toml`? | Developer | To decide |
+| Should we set `FLUJO_STATE_URI` in app startup or keep `state_uri` in `flujo.toml`? | Developer | Resolved: set `FLUJO_STATE_URI` in app startup and pass `state_backend`; keep `state_uri` as fallback |
 | Is `DATABASE_URL` always `postgresql://` or can it include SQLAlchemy driver suffixes? | Developer | To confirm |
 | Should we enable `pgvector` for the `memories` table (future RAG)? | Tech Lead | Deferred |
 | Do we need to migrate existing SQLite data, or is fresh state acceptable? | Product | Fresh state OK |
