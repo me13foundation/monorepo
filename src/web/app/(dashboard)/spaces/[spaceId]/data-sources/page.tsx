@@ -1,13 +1,10 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { QueryClient, dehydrate } from '@tanstack/react-query'
-import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
-import { fetchResearchSpace, fetchSpaceMembers } from '@/lib/api/research-spaces'
-import { HydrationBoundary } from '@tanstack/react-query'
 import SpaceDataSourcesClient from '../space-data-sources-client'
-import { dataSourceKeys } from '@/lib/query-keys/data-sources'
 import { fetchDataSourcesBySpace } from '@/lib/api/data-sources'
+import type { DataSourceListResponse } from '@/lib/api/data-sources'
+import { fetchSpaceDiscoveryState } from '@/app/actions/space-discovery'
 
 interface SpaceDataSourcesPageProps {
   params: {
@@ -23,26 +20,30 @@ export default async function SpaceDataSourcesPage({ params }: SpaceDataSourcesP
     redirect('/auth/login?error=SessionExpired')
   }
 
-  const queryClient = new QueryClient()
+  let dataSources: DataSourceListResponse | null = null
+  let dataSourcesError: string | null = null
 
-  await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.detail(params.spaceId),
-      queryFn: () => fetchResearchSpace(params.spaceId, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.members(params.spaceId),
-      queryFn: () => fetchSpaceMembers(params.spaceId, undefined, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: dataSourceKeys.space(params.spaceId),
-      queryFn: () => fetchDataSourcesBySpace(params.spaceId, {}, token),
-    }),
-  ])
+  try {
+    dataSources = await fetchDataSourcesBySpace(params.spaceId, {}, token)
+  } catch (error) {
+    dataSourcesError =
+      error instanceof Error ? error.message : 'Unable to load data sources for this space.'
+    console.error('[SpaceDataSourcesPage] Failed to fetch data sources', error)
+  }
+
+  const discoveryResult = await fetchSpaceDiscoveryState(params.spaceId)
+  const discoveryState = discoveryResult.success ? discoveryResult.data.orchestratedState : null
+  const discoveryCatalog = discoveryResult.success ? discoveryResult.data.catalog : []
+  const discoveryError = discoveryResult.success ? null : discoveryResult.error
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <SpaceDataSourcesClient spaceId={params.spaceId} />
-    </HydrationBoundary>
+    <SpaceDataSourcesClient
+      spaceId={params.spaceId}
+      dataSources={dataSources}
+      dataSourcesError={dataSourcesError}
+      discoveryState={discoveryState}
+      discoveryCatalog={discoveryCatalog}
+      discoveryError={discoveryError}
+    />
   )
 }

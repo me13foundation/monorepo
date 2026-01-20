@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, TypedDict
+from typing import TYPE_CHECKING, Protocol
 
 from src.models.database.review import ReviewRecord
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
+
+    from src.type_definitions.curation import ReviewRecordLike
 
 
 @dataclass(frozen=True)
@@ -15,18 +17,6 @@ class ReviewFilter:
     status: str | None = None
     priority: str | None = None
     research_space_id: str | None = None
-
-
-class ReviewRecordLike(TypedDict, total=False):
-    id: int
-    entity_type: str
-    entity_id: str
-    status: str
-    priority: str
-    quality_score: float | None
-    issues: int
-    research_space_id: str | None
-    last_updated: object | None
 
 
 class ReviewRepository(Protocol):

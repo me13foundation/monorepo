@@ -14,7 +14,6 @@ import {
   EllipsisVertical,
   Network,
 } from 'lucide-react'
-import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,17 +26,11 @@ interface NavItem {
   href: string
   icon: React.ComponentType<{ className?: string }>
   description?: string
-  prefetch?: (spaceId: string) => void
 }
 
 export function SpaceNavigation() {
   const { currentSpaceId } = useSpaceContext()
   const pathname = usePathname()
-  const {
-    prefetchSpaceDetail,
-    prefetchSpaceMembers,
-    prefetchSpaceCuration,
-  } = usePrefetchOnHover()
   const [isMounted, setIsMounted] = useState(false)
 
   useEffect(() => {
@@ -56,28 +49,24 @@ export function SpaceNavigation() {
       href: basePath,
       icon: LayoutDashboard,
       description: 'Space details and information',
-      prefetch: prefetchSpaceDetail,
     },
     {
       label: 'Data Sources',
       href: `${basePath}/data-sources`,
       icon: CloudDownload,
       description: 'Manage data sources and discover new ones',
-      prefetch: prefetchSpaceDetail,
     },
     {
       label: 'Data Curation',
       href: `${basePath}/curation`,
       icon: ListChecks,
       description: 'Curate and review data',
-      prefetch: prefetchSpaceCuration,
     },
     {
       label: 'Knowledge Graph',
       href: `${basePath}/knowledge-graph`,
       icon: Network,
       description: 'Explore knowledge graph',
-      prefetch: prefetchSpaceDetail,
     },
   ]
 
@@ -87,14 +76,12 @@ export function SpaceNavigation() {
       href: `${basePath}/members`,
       icon: Users,
       description: 'Manage team members',
-      prefetch: prefetchSpaceMembers,
     },
     {
       label: 'Settings',
       href: `${basePath}/settings`,
       icon: Settings,
       description: 'Space configuration',
-      prefetch: prefetchSpaceDetail,
     },
   ]
 
@@ -124,16 +111,6 @@ export function SpaceNavigation() {
                       : 'text-muted-foreground hover:text-foreground'
                   )}
                   title={item.description}
-                  onMouseEnter={() => {
-                    if (item.prefetch && currentSpaceId) {
-                      item.prefetch(currentSpaceId)
-                    }
-                  }}
-                  onFocus={() => {
-                    if (item.prefetch && currentSpaceId) {
-                      item.prefetch(currentSpaceId)
-                    }
-                  }}
                   prefetch={true}
                 >
                   <Icon className="size-4 shrink-0" />
@@ -174,11 +151,6 @@ export function SpaceNavigation() {
                           'hover:bg-accent/50 hover:text-foreground',
                           isActive && 'bg-accent/50 text-foreground'
                         )}
-                        onMouseEnter={() => {
-                          if (item.prefetch && currentSpaceId) {
-                            item.prefetch(currentSpaceId)
-                          }
-                        }}
                         prefetch={true}
                       >
                         <Icon className="size-4" />

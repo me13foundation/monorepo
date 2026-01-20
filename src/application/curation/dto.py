@@ -1,7 +1,7 @@
 """
 Typed data transfer objects for the curator-facing detail workflow.
 
-These lightweight dataclasses keep the Dash presentation layer decoupled
+These lightweight dataclasses keep the curation presentation layer decoupled
 from SQLAlchemy models and domain entities while retaining rich typing for
 back-end orchestration.
 """
@@ -105,7 +105,7 @@ class AuditInfoDTO:
 @dataclass(frozen=True)
 class CuratedRecordDetailDTO:
     """
-    Aggregate payload consumed by the Dash interface.
+    Aggregate payload consumed by the curation interface.
 
     The shape mirrors the contract described in docs/curator.md and can be
     serialized directly for the API response.

@@ -22,7 +22,7 @@ interface SourceParameterConfiguratorProps {
 const PARAMETER_LABELS: Record<SourceCatalogEntry['param_type'], string> = {
   gene: 'Gene-only',
   term: 'Phenotype-only',
-  geneAndTerm: 'Gene & Phenotype',
+  gene_and_term: 'Gene & Phenotype',
   none: 'No Parameters',
   api: 'API-Driven',
 }
@@ -30,7 +30,7 @@ const PARAMETER_LABELS: Record<SourceCatalogEntry['param_type'], string> = {
 const PARAMETER_DESCRIPTIONS: Record<SourceCatalogEntry['param_type'], string> = {
   gene: 'Provide a valid HGNC symbol before running queries.',
   term: 'Provide a phenotype, ontology ID, or search keyword.',
-  geneAndTerm: 'Both the gene symbol and phenotype term are required.',
+  gene_and_term: 'Both the gene symbol and phenotype term are required.',
   none: 'This catalog entry cannot be queried directly from the workbench.',
   api: 'Parameters depend on the upstream API. Provide the values documented for this integration.',
 }
@@ -65,10 +65,18 @@ export function SourceParameterConfigurator({
           )
         }
         const params = sourceParameters[sourceId] ?? defaultParameters
-        const showGeneInput = entry.param_type === 'gene' || entry.param_type === 'geneAndTerm' || entry.param_type === 'api'
-        const showTermInput = entry.param_type === 'term' || entry.param_type === 'geneAndTerm' || entry.param_type === 'api'
-        const geneRequired = entry.param_type === 'gene' || entry.param_type === 'geneAndTerm'
-        const termRequired = entry.param_type === 'term' || entry.param_type === 'geneAndTerm'
+        const showGeneInput =
+          entry.param_type === 'gene' ||
+          entry.param_type === 'gene_and_term' ||
+          entry.param_type === 'api'
+        const showTermInput =
+          entry.param_type === 'term' ||
+          entry.param_type === 'gene_and_term' ||
+          entry.param_type === 'api'
+        const geneRequired =
+          entry.param_type === 'gene' || entry.param_type === 'gene_and_term'
+        const termRequired =
+          entry.param_type === 'term' || entry.param_type === 'gene_and_term'
         const requiresParameters = entry.param_type !== 'none'
 
         return (

@@ -8,9 +8,6 @@ from sqlalchemy.orm import Session
 
 from src.application.services.audit_service import AuditTrailService
 from src.application.services.data_discovery_service import DataDiscoveryService
-from src.application.services.data_discovery_service.requests import (
-    ExecuteQueryTestRequest,
-)
 from src.database.session import get_session
 from src.domain.entities.user import User
 from src.infrastructure.dependency_injection.dependencies import (
@@ -53,14 +50,7 @@ async def execute_query_test(
         require_session_for_user(session_id, service, current_user)
         owner_filter = owner_filter_for_user(current_user)
 
-        test_request = ExecuteQueryTestRequest(
-            session_id=session_id,
-            catalog_entry_id=request.catalog_entry_id,
-            timeout_seconds=request.timeout_seconds,
-            parameters=(
-                request.parameters.to_domain_model() if request.parameters else None
-            ),
-        )
+        test_request = request.to_domain_request(session_id)
 
         result = await service.execute_query_test(
             test_request,

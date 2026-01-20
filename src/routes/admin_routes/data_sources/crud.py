@@ -110,6 +110,7 @@ async def update_data_source(
         update_request = UpdateSourceRequest(
             name=request.name,
             description=request.description,
+            status=request.status,
             configuration=(request.config.model_copy() if request.config else None),
             ingestion_schedule=(
                 request.ingestion_schedule.model_copy()
@@ -120,7 +121,7 @@ async def update_data_source(
         data_source = service.update_source(
             source_id,
             update_request,
-            DEFAULT_OWNER_ID,
+            owner_id=None,
         )
         if not data_source:
             raise HTTPException(
@@ -152,7 +153,7 @@ async def delete_data_source(
 ) -> None:
     """Delete a data source."""
     try:
-        success = service.delete_source(source_id, DEFAULT_OWNER_ID)
+        success = service.delete_source(source_id, owner_id=None)
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

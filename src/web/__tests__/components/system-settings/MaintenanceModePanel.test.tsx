@@ -1,9 +1,15 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MaintenanceModePanel } from '@/components/system-settings/MaintenanceModePanel'
+import type { MaintenanceModeResponse } from '@/types/system-status'
 
-const mockUseMaintenanceState = jest.fn()
-const mockUseMaintenanceMutations = jest.fn()
+const mockEnableMaintenanceAction = jest.fn()
+const mockDisableMaintenanceAction = jest.fn()
+
+jest.mock('@/app/actions/system-status', () => ({
+  enableMaintenanceAction: (...args: unknown[]) => mockEnableMaintenanceAction(...args),
+  disableMaintenanceAction: (...args: unknown[]) => mockDisableMaintenanceAction(...args),
+}))
 
 jest.mock('sonner', () => ({
   toast: {
@@ -12,49 +18,59 @@ jest.mock('sonner', () => ({
   },
 }))
 
-jest.mock('@/lib/queries/system-status', () => ({
-  useMaintenanceState: () => mockUseMaintenanceState(),
-  useMaintenanceMutations: () => mockUseMaintenanceMutations(),
-}))
+const inactiveState: MaintenanceModeResponse = {
+  state: {
+    is_active: false,
+    message: null,
+    activated_at: null,
+    activated_by: null,
+    last_updated_by: null,
+    last_updated_at: null,
+  },
+}
+
+const activeState: MaintenanceModeResponse = {
+  state: {
+    is_active: true,
+    message: 'Maintenance in progress',
+    activated_at: new Date().toISOString(),
+    activated_by: 'admin',
+    last_updated_by: 'admin',
+    last_updated_at: new Date().toISOString(),
+  },
+}
 
 describe('MaintenanceModePanel', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    mockUseMaintenanceState.mockReturnValue({
-      data: { state: { is_active: false } },
-      isLoading: false,
-    })
-    mockUseMaintenanceMutations.mockReturnValue({
-      enable: { mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false },
-      disable: { mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false },
-    })
+    mockEnableMaintenanceAction.mockResolvedValue({ success: true, data: inactiveState })
+    mockDisableMaintenanceAction.mockResolvedValue({ success: true, data: inactiveState })
   })
 
   it('renders maintenance controls', () => {
-    render(<MaintenanceModePanel />)
+    render(<MaintenanceModePanel maintenanceState={inactiveState} />)
     expect(screen.getByRole('heading', { name: /Maintenance Mode/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Enable Maintenance Mode/i })).toBeInTheDocument()
   })
 
-  it('invokes enable mutation', async () => {
+  it('invokes enable action', async () => {
     const user = userEvent.setup()
-    render(<MaintenanceModePanel />)
+    render(<MaintenanceModePanel maintenanceState={inactiveState} />)
 
-    await user.click(screen.getByRole('switch', { name: /force logout/i }))
     await user.click(screen.getByRole('button', { name: /Enable Maintenance Mode/i }))
 
-    expect(mockUseMaintenanceMutations().enable.mutateAsync).toHaveBeenCalled()
+    expect(mockEnableMaintenanceAction).toHaveBeenCalledWith({
+      message: null,
+      force_logout_users: true,
+    })
   })
 
-  it('invokes disable mutation when active', async () => {
+  it('invokes disable action when active', async () => {
     const user = userEvent.setup()
-    mockUseMaintenanceState.mockReturnValue({
-      data: { state: { is_active: true } },
-      isLoading: false,
-    })
-    render(<MaintenanceModePanel />)
+    render(<MaintenanceModePanel maintenanceState={activeState} />)
 
     await user.click(screen.getByRole('button', { name: /Disable Maintenance Mode/i }))
-    expect(mockUseMaintenanceMutations().disable.mutateAsync).toHaveBeenCalled()
+
+    expect(mockDisableMaintenanceAction).toHaveBeenCalled()
   })
 })

@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { QueryClient, dehydrate } from '@tanstack/react-query'
-import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
-import { fetchResearchSpace, fetchSpaceMembers } from '@/lib/api/research-spaces'
-import { HydrationBoundary } from '@tanstack/react-query'
+import { fetchMyMembership, fetchResearchSpace, fetchSpaceMembers } from '@/lib/api/research-spaces'
+import { canManageMembers } from '@/components/research-spaces/role-utils'
+import { MembershipRole, type ResearchSpace, type ResearchSpaceMembership } from '@/types/research-space'
+import { UserRole } from '@/types/auth'
 import SpaceMembersClient from '../space-members-client'
 
 interface SpaceMembersPageProps {
@@ -21,22 +21,59 @@ export default async function SpaceMembersPage({ params }: SpaceMembersPageProps
     redirect('/auth/login?error=SessionExpired')
   }
 
-  const queryClient = new QueryClient()
+  let space: ResearchSpace | null = null
+  let memberships: ResearchSpaceMembership[] = []
+  let membersError: string | null = null
+  let currentMembership: ResearchSpaceMembership | null = null
 
-  await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.detail(params.spaceId),
-      queryFn: () => fetchResearchSpace(params.spaceId, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.members(params.spaceId),
-      queryFn: () => fetchSpaceMembers(params.spaceId, undefined, token),
-    }),
-  ])
+  try {
+    space = await fetchResearchSpace(params.spaceId, token)
+  } catch (error) {
+    console.error('[SpaceMembersPage] Failed to fetch research space', error)
+  }
+
+  try {
+    const membershipResponse = await fetchSpaceMembers(params.spaceId, undefined, token)
+    memberships = membershipResponse.memberships
+  } catch (error) {
+    membersError =
+      error instanceof Error ? error.message : 'Unable to load members for this space.'
+    console.error('[SpaceMembersPage] Failed to fetch members', error)
+  }
+
+  try {
+    currentMembership = await fetchMyMembership(params.spaceId, token)
+  } catch (error) {
+    console.error('[SpaceMembersPage] Failed to fetch membership', error)
+  }
+
+  const isPlatformAdmin = session.user.role === UserRole.ADMIN
+  const hasSpaceAccess = isPlatformAdmin || Boolean(currentMembership)
+  const matchedMembership = memberships.find(
+    (membership) => membership.user_id === session.user.id,
+  )
+  const effectiveRole =
+    matchedMembership?.role ??
+    currentMembership?.role ??
+    (isPlatformAdmin ? MembershipRole.ADMIN : MembershipRole.VIEWER)
+  const canManageMembersFlag = isPlatformAdmin || canManageMembers(effectiveRole)
+  const isOwner = effectiveRole === MembershipRole.OWNER
+  const canEditSpace = isOwner || isPlatformAdmin
+  const showMembershipNotice = !currentMembership && !isPlatformAdmin
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <SpaceMembersClient spaceId={params.spaceId} />
-    </HydrationBoundary>
+    <SpaceMembersClient
+      spaceId={params.spaceId}
+      space={space}
+      memberships={memberships}
+      membersError={membersError}
+      access={{
+        hasSpaceAccess,
+        canManageMembers: canManageMembersFlag,
+        canEditSpace,
+        isOwner,
+        showMembershipNotice,
+      }}
+    />
   )
 }

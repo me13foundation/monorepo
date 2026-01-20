@@ -8,6 +8,23 @@ from typing import ClassVar
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+class AiAgentConfig(BaseModel):
+    """Configuration for steering AI agent behavior for a data source."""
+
+    is_ai_managed: bool = Field(
+        default=False,
+        description="Whether this source is managed by an AI agent",
+    )
+    agent_prompt: str = Field(
+        default="",
+        description="Custom instructions to steer the agent's behavior",
+    )
+    use_research_space_context: bool = Field(
+        default=True,
+        description="Whether to use the research space description as context",
+    )
+
+
 class PubMedQueryConfig(BaseModel):
     """PubMed-specific configuration stored in SourceConfiguration.metadata."""
 
@@ -16,7 +33,7 @@ class PubMedQueryConfig(BaseModel):
     query: str = Field(
         ...,
         min_length=1,
-        description="PubMed search query string",
+        description="PubMed search query string (can be overridden by AI)",
     )
     date_from: str | None = Field(
         None,
@@ -41,6 +58,10 @@ class PubMedQueryConfig(BaseModel):
         ge=0,
         le=10,
         description="Relevance score threshold for filtering articles",
+    )
+    agent_config: AiAgentConfig = Field(
+        default_factory=AiAgentConfig,
+        description="AI agent steering configuration",
     )
 
     @field_validator("date_from", "date_to")

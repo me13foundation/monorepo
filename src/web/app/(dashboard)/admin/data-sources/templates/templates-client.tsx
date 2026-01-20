@@ -13,22 +13,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { useTemplates } from '@/hooks/use-templates'
+import { createTemplateAction, deleteTemplateAction, updateTemplateAction } from '@/app/actions/templates'
 import type { TemplateResponse, TemplateScope } from '@/types/template'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Plus, Trash2, Pencil, ExternalLink } from 'lucide-react'
 import { TemplateDialog } from '@/components/templates/TemplateDialog'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
-export default function TemplatesClient() {
+interface TemplatesClientProps {
+  templatesByScope: Record<TemplateScope, TemplateResponse[]>
+  errorsByScope: Record<TemplateScope, string | null>
+}
+
+export default function TemplatesClient({ templatesByScope, errorsByScope }: TemplatesClientProps) {
+  const router = useRouter()
   const [scope, setScope] = useState<TemplateScope>('available')
-  const templatesQuery = useTemplates(scope)
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [activeTemplate, setActiveTemplate] = useState<TemplateResponse | undefined>(undefined)
   const [deleteTarget, setDeleteTarget] = useState<TemplateResponse | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
 
-  const templates = templatesQuery.data?.templates ?? []
+  const templates = templatesByScope[scope] ?? []
+  const scopeError = errorsByScope[scope]
 
   return (
     <div className="space-y-6">
@@ -59,10 +67,12 @@ export default function TemplatesClient() {
           <TabsTrigger value="mine">My Templates</TabsTrigger>
         </TabsList>
         <TabsContent value={scope} className="mt-4">
-          {templatesQuery.isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="size-8 animate-spin text-muted-foreground" />
-            </div>
+          {scopeError ? (
+            <Card>
+              <CardContent className="py-12 text-center text-destructive">
+                {scopeError}
+              </CardContent>
+            </Card>
           ) : templates.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center text-muted-foreground">
@@ -93,12 +103,28 @@ export default function TemplatesClient() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         template={activeTemplate}
-        onCreate={(payload) => templatesQuery.create?.(payload)}
-        onUpdate={(data) =>
-          activeTemplate
-            ? templatesQuery.update?.({ templateId: activeTemplate.id, data })
-            : undefined
-        }
+        onCreate={async (payload) => {
+          const result = await createTemplateAction(payload)
+          if (!result.success) {
+            throw new Error(result.error)
+          }
+          toast.success('Template created')
+          router.refresh()
+        }}
+        onUpdate={async (data) => {
+          if (!activeTemplate) {
+            return
+          }
+          const result = await updateTemplateAction({
+            templateId: activeTemplate.id,
+            data,
+          })
+          if (!result.success) {
+            throw new Error(result.error)
+          }
+          toast.success('Template updated')
+          router.refresh()
+        }}
       />
 
       <ConfirmDeleteDialog
@@ -110,12 +136,15 @@ export default function TemplatesClient() {
         onConfirm={async () => {
           if (deleteTarget) {
             setDeleteLoading(true)
-            try {
-              await templatesQuery.remove?.({ templateId: deleteTarget.id })
-            } finally {
-              setDeleteLoading(false)
-              setDeleteTarget(null)
+            const result = await deleteTemplateAction(deleteTarget.id)
+            if (!result.success) {
+              toast.error(result.error)
+            } else {
+              toast.success('Template deleted')
+              router.refresh()
             }
+            setDeleteLoading(false)
+            setDeleteTarget(null)
           }
         }}
         isPending={deleteLoading}

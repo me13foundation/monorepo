@@ -1,10 +1,9 @@
 "use client"
 
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useCreateDataSourceInSpace } from '@/lib/queries/data-sources'
+import { createDataSourceInSpaceAction } from '@/app/actions/data-sources'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +31,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 const dataSourceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200, 'Name must be less than 200 characters'),
@@ -47,14 +49,17 @@ interface CreateDataSourceDialogProps {
   spaceId: string
   open: boolean
   onOpenChange: (open: boolean) => void
+  onCreated?: () => void
 }
 
 export function CreateDataSourceDialog({
   spaceId,
   open,
   onOpenChange,
+  onCreated,
 }: CreateDataSourceDialogProps) {
-  const createMutation = useCreateDataSourceInSpace(spaceId)
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const form = useForm<DataSourceFormValues>({
     resolver: zodResolver(dataSourceSchema),
     defaultValues: {
@@ -68,98 +73,113 @@ export function CreateDataSourceDialog({
 
   const onSubmit = async (values: DataSourceFormValues) => {
     try {
-      await createMutation.mutateAsync({
+      setIsSubmitting(true)
+      const config = values.config ?? {}
+
+      const result = await createDataSourceInSpaceAction(spaceId, {
         name: values.name,
         description: values.description,
         source_type: values.source_type,
-        config: values.config || {},
+        config,
         tags: values.tags || [],
       })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       form.reset()
       onOpenChange(false)
+      onCreated?.()
+      if (!onCreated) {
+        router.refresh()
+      }
+      toast.success('Data source created')
     } catch (error) {
       // Error handling is done in the mutation
       console.error('Failed to create data source:', error)
+      toast.error('Failed to create data source')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Create Data Source</DialogTitle>
+          <DialogTitle>Create Custom Source</DialogTitle>
           <DialogDescription>
-            Add a new data source to this research space.
+            Add a custom data source to this research space.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="My Data Source" {...field} />
-                  </FormControl>
-                  <FormDescription>
-                    A descriptive name for this data source
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Optional description" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="source_type"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Source Type</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="api">REST API</SelectItem>
-                        <SelectItem value="database">Database Connection</SelectItem>
-                        <SelectItem value="file_upload">File Upload</SelectItem>
-                        <SelectItem value="web_scraping">Web Scraping</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormDescription>
-                    Choose the type of custom data source to create
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="My Data Source" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional description" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="source_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Source Type</FormLabel>
+                    <FormControl>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select source type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="api">REST API</SelectItem>
+                          <SelectItem value="database">Database Connection</SelectItem>
+                          <SelectItem value="file_upload">File Upload</SelectItem>
+                          <SelectItem value="web_scraping">Web Scraping</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormDescription>
+                      Choose the type of custom data source to create
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={createMutation.isPending}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending && (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 )}
                 Create

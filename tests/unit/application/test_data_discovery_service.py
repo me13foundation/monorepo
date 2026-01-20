@@ -10,7 +10,10 @@ from uuid import uuid4
 
 import pytest
 
-from src.application.services.data_discovery_service import DataDiscoveryService
+from src.application.services.data_discovery_service import (
+    DataDiscoveryService,
+    DataDiscoveryServiceDependencies,
+)
 from src.application.services.data_discovery_service.requests import (
     AddSourceToSpaceRequest,
     CreateDataDiscoverySessionRequest,
@@ -48,7 +51,7 @@ class TestDataDiscoveryService:
             query_result_repository=mock_repos["query_repo"],
             source_query_client=mock_client,
             source_management_service=Mock(),
-            source_template_repository=Mock(),
+            dependencies=DataDiscoveryServiceDependencies(),
         )
 
     def test_create_session(self, service: DataDiscoveryService) -> None:

@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: med13-postgres
     restart: unless-stopped
     environment:
@@ -11,6 +11,7 @@ services:
       - "${MED13_POSTGRES_PORT:-5432}:5432"
     volumes:
       - med13-postgres-data:/var/lib/postgresql/data
+      - ./scripts/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test:
         [

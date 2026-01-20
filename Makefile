@@ -98,7 +98,18 @@ define run_with_postgres_env
 	@/bin/bash -lc 'set -a; source "$(POSTGRES_ENV_FILE)"; set +a; $(1)'
 endef
 
-.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
+define ensure_web_deps
+	@if [ ! -d "src/web/node_modules" ]; then \
+		echo "Installing Next.js dependencies..."; \
+		if [ -f "src/web/package-lock.json" ]; then \
+			(cd src/web && npm ci); \
+		else \
+			(cd src/web && npm install); \
+		fi; \
+	fi
+endef
+
+.PHONY: help venv venv-check install install-dev test test-verbose test-cov test-watch test-architecture test-contract lint lint-strict format format-check type-check type-check-strict type-check-report security-audit security-full clean clean-all docker-build docker-run docker-push docker-stop docker-postgres-up docker-postgres-down docker-postgres-destroy docker-postgres-logs docker-postgres-status postgres-disable postgres-migrate init-flujo-schema setup-postgres dev-postgres run-local-postgres run-web-postgres test-postgres postgres-cmd backend-status start-local db-migrate db-create db-reset db-seed deploy-staging deploy-prod setup-dev setup-gcp cloud-logs cloud-secrets-list all all-report ci check-env docs-serve backup-db restore-db activate deactivate stop-local stop-web stop-all web-install web-build web-clean web-lint web-type-check web-test web-test-architecture web-test-integration web-test-all web-test-coverage web-visual-test
 
 # Default target
 help: ## Show this help message
@@ -284,10 +295,10 @@ security-audit: ## Run comprehensive security audit (pip-audit, bandit) [blockin
 	@echo "Running pip-audit..."
 	$(USE_PIP) install pip-audit --quiet || true
 	pip-audit --format json | tee pip-audit-results.json || true
-	@echo "Running safety..."
-	@echo "⚠️  Safety CLI now requires authentication. Using pip-audit for vulnerability scanning instead."
-	@echo "   To enable Safety CLI in the future, set SAFETY_API_KEY environment variable."
-	# SAFETY_API_KEY="" safety --stage development scan --save-as json safety-results.json --use-server-matching || true
+	@if [ -n "$$SAFETY_API_KEY" ]; then \
+		echo "Running safety..."; \
+		SAFETY_API_KEY="$$SAFETY_API_KEY" safety --stage development scan --save-as json safety-results.json --use-server-matching || true; \
+	fi
 	@echo "Running bandit (blocking on MEDIUM/HIGH)..."
 	$(USE_PYTHON) -m bandit -r src --severity-level medium -f json -o bandit-results.json 2>&1 | grep -vE "(WARNING.*Test in comment|WARNING.*Unknown test found)" || true
 
@@ -307,10 +318,20 @@ run-all-postgres: ## Restart Postgres, run migrations, seed admin, start backend
 	@$(MAKE) -s stop-all
 	@$(MAKE) -s docker-postgres-up
 	@$(MAKE) -s postgres-migrate
+	@$(MAKE) -s init-flujo-schema
 	@$(call run_with_postgres_env,$(MAKE) -s db-seed-admin)
-	@$(MAKE) -s start-local
+	@$(MAKE) -s start-local SKIP_POSTGRES_MIGRATE=1
 	@echo "Backend running in background. Starting Next.js..."
-	@$(MAKE) -s start-web
+	@$(MAKE) -s web-clean
+	@$(MAKE) -s start-web SKIP_POSTGRES_MIGRATE=1
+	@echo "All services running. FastAPI logs: $(BACKEND_LOG) | Next.js logs: $(WEB_LOG)"
+
+dev-postgres: ## Start Postgres (if needed) + services for local development
+	@$(MAKE) -s setup-postgres
+	@$(call run_with_postgres_env,$(MAKE) -s db-seed-admin)
+	@$(MAKE) -s start-local SKIP_POSTGRES_MIGRATE=1
+	@echo "Backend running in background. Starting Next.js..."
+	@$(MAKE) -s start-web SKIP_POSTGRES_MIGRATE=1
 	@echo "All services running. FastAPI logs: $(BACKEND_LOG) | Next.js logs: $(WEB_LOG)"
 start-local: ## Run FastAPI backend in the background (logs/backend.log)
 	$(call check_venv)
@@ -327,7 +348,9 @@ ifeq ($(POSTGRES_ACTIVE),)
 	@nohup $(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 >> "$(BACKEND_LOG)" 2>&1 &
 	@echo $$! > "$(BACKEND_PID_FILE)"
 else
+ifneq ($(SKIP_POSTGRES_MIGRATE),1)
 	@$(MAKE) postgres-migrate
+endif
 	@/bin/bash -lc "set -a; source \"$(POSTGRES_ENV_FILE)\"; set +a; nohup $(USE_PYTHON) -m uvicorn main:app --host 0.0.0.0 --port 8080 >> \"$(BACKEND_LOG)\" 2>&1 & echo \$$! > \"$(BACKEND_PID_FILE)\""
 endif
 	@i=0; while [ ! -f "$(BACKEND_PID_FILE)" ] && [ $$i -lt 10 ]; do sleep 0.5; i=$$((i+1)); done
@@ -355,6 +378,7 @@ run-local-postgres: ## Run the FastAPI backend with Postgres env vars loaded
 
 
 run-web: ## Run the Next.js admin interface locally (seeds admin user if needed)
+	$(call ensure_web_deps)
 	@echo "Ensuring admin user exists..."
 ifeq ($(POSTGRES_ACTIVE),)
 	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
@@ -368,6 +392,7 @@ else
 endif
 
 run-web-postgres: ## Run the Next.js admin interface with Postgres env vars loaded
+	$(call ensure_web_deps)
 	@echo "Ensuring admin user exists (Postgres)..."
 	$(call run_with_postgres_env,$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)")
 	@echo "Starting Next.js admin interface (Postgres)..."
@@ -375,6 +400,7 @@ run-web-postgres: ## Run the Next.js admin interface with Postgres env vars load
 
 start-web: ## Run Next.js admin interface in the background (logs/web.log)
 	$(call check_venv)
+	$(call ensure_web_deps)
 	@mkdir -p $(dir $(WEB_LOG))
 	@if lsof -ti tcp:3000 >/dev/null 2>&1; then \
 		echo "Port 3000 already in use. Run 'make stop-web' or free the port before starting in background."; \
@@ -389,7 +415,9 @@ ifeq ($(POSTGRES_ACTIVE),)
 	@$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)"
 	@/bin/bash -lc "cd src/web && $(NEXT_DEV_ENV) nohup npm run dev >> \"$(WEB_LOG_ABS)\" 2>&1 & echo \$$! > \"$(WEB_PID_FILE_ABS)\""
 else
+ifneq ($(SKIP_POSTGRES_MIGRATE),1)
 	@$(MAKE) postgres-migrate
+endif
 	$(call run_with_postgres_env,$(MAKE) db-seed-admin || echo "Warning: Could not seed admin user (backend may not be running)")
 	@/bin/bash -lc "set -a; source \"$(POSTGRES_ENV_FILE)\"; set +a; cd src/web && $(NEXT_DEV_ENV) nohup npm run dev >> \"$(WEB_LOG_ABS)\" 2>&1 & echo \$$! > \"$(WEB_PID_FILE_ABS)\""
 endif
@@ -561,6 +589,22 @@ else
 	$(call run_with_postgres_env,$(ALEMBIC_BIN) upgrade heads)
 endif
 
+init-flujo-schema: ## Initialize the flujo schema in Postgres
+	$(call check_venv)
+	@echo "Creating flujo schema..."
+ifeq ($(POSTGRES_ACTIVE),)
+	$(USE_PYTHON) scripts/init_flujo_schema.py
+else
+	$(call run_with_postgres_env,$(USE_PYTHON) scripts/init_flujo_schema.py)
+endif
+
+setup-postgres: ## Full PostgreSQL setup including flujo schema
+	@$(MAKE) -s docker-postgres-up
+	@$(MAKE) -s postgres-wait
+	@$(MAKE) -s postgres-migrate
+	@$(MAKE) -s init-flujo-schema
+	@echo "PostgreSQL setup complete with flujo schema."
+
 # Database
 db-migrate: ## Run database migrations
 ifeq ($(POSTGRES_ACTIVE),)
@@ -690,6 +734,9 @@ web-install: ## Install Next.js dependencies
 
 web-build: ## Build Next.js admin interface
 	cd src/web && npm run build
+
+web-clean: ## Remove Next.js build artifacts
+	rm -rf src/web/.next
 
 web-lint: ## Lint Next.js code
 	cd src/web && npm run lint

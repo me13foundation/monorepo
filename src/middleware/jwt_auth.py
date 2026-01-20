@@ -18,6 +18,7 @@ from src.application.services.authentication_service import (
     AuthenticationService,
 )
 from src.infrastructure.dependency_injection.container import container
+from src.infrastructure.security.cors import get_allowed_origins
 
 SKIP_JWT_VALIDATION = os.getenv("MED13_BYPASS_JWT_FOR_TESTS") == "1"
 
@@ -64,15 +65,8 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         """Get CORS headers for the request origin."""
         origin = request.headers.get("origin")
         cors_headers = {"WWW-Authenticate": "Bearer"}
-        allowed_origins = [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:8080",
-            "https://med13foundation.org",
-            "https://curate.med13foundation.org",
-            "https://admin.med13foundation.org",
-        ]
-        if origin and origin in allowed_origins:
+        allowed_origins = get_allowed_origins()
+        if origin and origin.rstrip("/") in allowed_origins:
             cors_headers.update(
                 {
                     "Access-Control-Allow-Origin": origin,
@@ -93,6 +87,23 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
         if "offset-naive" in error_lower or "offset-aware" in error_lower:
             return "AUTH_TOKEN_DATETIME_ERROR"
         return "AUTH_TOKEN_INVALID"
+
+    @staticmethod
+    def _should_bypass_test_headers(request: Request) -> bool:
+        allow_test_headers = (
+            os.getenv("TESTING") == "true"
+            or os.getenv("MED13_BYPASS_TEST_AUTH_HEADERS") == "1"
+        )
+        if not allow_test_headers:
+            return False
+        return all(
+            request.headers.get(key)
+            for key in (
+                "X-TEST-USER-ID",
+                "X-TEST-USER-EMAIL",
+                "X-TEST-USER-ROLE",
+            )
+        )
 
     async def dispatch(
         self,
@@ -197,6 +208,9 @@ class JWTAuthMiddleware(BaseHTTPMiddleware):
             return True
 
         if self._should_skip_auth(request.url.path):
+            return True
+
+        if self._should_bypass_test_headers(request):
             return True
 
         # Check if user is already authenticated by previous middleware

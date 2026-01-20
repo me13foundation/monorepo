@@ -15,7 +15,6 @@ from src.application.services.source_management_service import (
 )
 from src.domain.entities.user_data_source import IngestionSchedule
 from src.routes.admin_routes.dependencies import (
-    DEFAULT_OWNER_ID,
     get_ingestion_scheduling_service,
     get_source_service,
 )
@@ -56,7 +55,7 @@ async def configure_ingestion_schedule(
     updated_source = source_service.update_source(
         source_id,
         update_request,
-        DEFAULT_OWNER_ID,
+        owner_id=None,
     )
     if not updated_source:
         raise HTTPException(
@@ -122,6 +121,7 @@ async def trigger_ingestion_run(
         parsed_publications=summary.parsed_publications,
         created_publications=summary.created_publications,
         updated_publications=summary.updated_publications,
+        executed_query=summary.executed_query,
     )
 
 

@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.application.packaging.packaging_types import (
+    from src.models.value_objects.provenance import Provenance
+    from src.type_definitions.common import JSONObject
+    from src.type_definitions.packaging import (
         ProvenanceMetadata,
         ProvenanceSourceEntry,
     )
-    from src.models.value_objects.provenance import Provenance
-    from src.type_definitions.common import JSONObject
 
 
 class ProvenanceTracker:

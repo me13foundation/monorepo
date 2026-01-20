@@ -12,12 +12,9 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
-from src.application.packaging.packaging_types import (
-    ProvenanceMetadata,
-    ROCrateFileEntry,
-)
 from src.type_definitions.common import JSONObject, JSONValue
 from src.type_definitions.json_utils import to_json_value
+from src.type_definitions.packaging import ProvenanceMetadata, ROCrateFileEntry
 
 JSONMetadata = JSONObject
 

@@ -36,7 +36,9 @@ urllib3>=2.6.3
 werkzeug>=3.1.5
 PyJWT>=2.8.0
 psutil>=5.9.0
-flujo
+filelock>=3.20.3
+pyasn1>=0.6.2
+flujo>=0.6.4
 
 # Google Cloud (uncomment when gcloud SDK is set up)
 # google-cloud-secret-manager>=2.16.0

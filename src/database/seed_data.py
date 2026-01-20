@@ -4,24 +4,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TypedDict, TypeGuard
+from typing import TYPE_CHECKING, TypeGuard
 
-
-class SourceCatalogEntrySeed(TypedDict, total=False):
-    """Typed seed data for source catalog entries."""
-
-    id: str
-    name: str
-    description: str
-    category: str
-    param_type: str
-    url_template: str
-    api_endpoint: str
-    tags: list[str]
-    is_active: bool
-    requires_auth: bool
-    source_type: str
-
+if TYPE_CHECKING:
+    from src.type_definitions.data_sources import SourceCatalogEntrySeed
 
 CATALOG_ENTRIES_PATH = Path(__file__).with_name("catalog_entries_seed.json")
 

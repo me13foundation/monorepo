@@ -25,8 +25,8 @@ This document provides essential context and instructions for AI agents building
 
 ### Code Generation Guidelines
 - **STRICT TYPE SAFETY**: Never use `Any` - always provide proper type annotations
-- **Clean Architecture layers**: Domain logic goes in `/domain`, UI logic in `/presentation`
-- **Pydantic models**: All data structures should be Pydantic BaseModel subclasses
+- **Clean Architecture layers**: Domain logic in `src/domain`, application services in `src/application`, API endpoints in `src/routes`, UI in `src/web` (Next.js); `src/presentation` is reserved
+- **Pydantic models**: Use Pydantic BaseModel for domain entities and API schemas; use TypedDicts from `src/type_definitions/` for updates, JSON payloads, and API response shapes
 - **Type definitions**: Use existing types from `src/type_definitions/` instead of creating new ones
 - **Follow biomedical domain rules**: Respect MED13-specific validation and business logic
 - **Implement proper error handling**: Use domain-specific exceptions and validation
@@ -34,11 +34,11 @@ This document provides essential context and instructions for AI agents building
 ### Type Management Rules
 - **NEVER USE `Any`**: This is a strict requirement - use proper union types, generics, or specific types
 - **Use existing types**: Check `src/type_definitions/` for existing TypedDict, Protocol, and union types
-- **JSON types**: Use `JSONObject`, `JSONValue`, `JSONArray` for JSON-compatible data
+- **JSON types**: Use `JSONObject` and `JSONValue` (use `list[JSONValue]` for arrays)
 - **External APIs**: Use validation results from `src/type_definitions/external_apis.py`
 - **Update operations**: Use TypedDict classes like `GeneUpdate`, `VariantUpdate`, etc.
 - **Test fixtures**: Use `tests/test_types/fixtures.py` and `tests/test_types/mocks.py` for typed test data
-- **API responses**: Use `ApiResponse<T>`, `PaginatedResponse<T>` from `src/type_definitions/common.py`
+- **API responses**: Use `APIResponse` and `PaginatedResponse` from `src/type_definitions/common.py`
 
 #### Type Definition Locations
 - **Common types**: `src/type_definitions/common.py` (JSON, API responses, pagination)
@@ -74,6 +74,10 @@ This document provides essential context and instructions for AI agents building
 make setup-dev          # Create Python 3.12 venv + install dependencies
 source venv/bin/activate # Activate virtual environment
 ```
+
+### Flujo State Backend
+- `FLUJO_STATE_URI` overrides `flujo.toml` `state_uri`; use `search_path=flujo,public` for schema isolation.
+- Run `make init-flujo-schema` (or `make setup-postgres`) to create the `flujo` schema before first use.
 
 ### Development Servers
 ```bash
@@ -255,7 +259,7 @@ make test-cov          # Coverage report
 ### Test Writing Guidelines
 - **File naming**: `test_<feature>.py`
 - **Test isolation**: Each test independent, no shared state
-- **Mock external deps**: Use `tests/types/mocks.py` for repositories
+- **Mock external deps**: Use `tests/test_types/mocks.py` for repositories
 - **Type safety**: All test fixtures properly typed
 - **Coverage target**: >85% for business logic
 
@@ -349,7 +353,7 @@ The MED13 Resource Library implements **100% MyPy compliance** with strict type 
 
 **1. JSON-Compatible Types** (from `src/type_definitions/common.py`):
 ```python
-from src.type_definitions.common import JSONObject, JSONValue, JSONArray
+from src.type_definitions.common import JSONObject, JSONValue
 
 # For JSON data structures
 def process_api_response(data: JSONObject) -> JSONValue:
@@ -357,30 +361,34 @@ def process_api_response(data: JSONObject) -> JSONValue:
 
 # For external API responses
 def validate_external_data(raw: dict[str, JSONValue]) -> JSONObject:
-    # Validation logic here
-    pass
+    return dict(raw)
 ```
 
 **2. API Response Types**:
 ```python
-from src.type_definitions.common import ApiResponse, PaginatedResponse
+from src.type_definitions.common import APIResponse, PaginatedResponse, JSONObject
 
 # Type-safe API responses
-def get_users() -> ApiResponse[User[]]:
+def get_users() -> APIResponse:
+    users: list[JSONObject] = [{"id": "user-1", "email": "user@example.com"}]
     return {
-        success: true,
-        data: users,
-        meta: { timestamp: "...", requestId: "..." }
+        "data": users,
+        "total": len(users),
+        "page": 1,
+        "per_page": 50,
     }
 
 # Paginated responses
-def get_paginated_genes(page: int) -> PaginatedResponse[Gene]:
+def get_paginated_genes(page: int) -> PaginatedResponse:
+    genes: list[JSONObject] = [{"id": "gene-1", "symbol": "MED13"}]
     return {
-        success: true,
-        data: genes,
-        meta: {
-            pagination: { page, limit, total, hasNext: true }
-        }
+        "items": genes,
+        "total": len(genes),
+        "page": page,
+        "per_page": 50,
+        "total_pages": 1,
+        "has_next": False,
+        "has_prev": False,
     }
 ```
 
@@ -403,17 +411,20 @@ updates: GeneUpdate = {
 
 **4. External API Validation** (from `src/type_definitions/external_apis.py`):
 ```python
-from src.type_definitions.external_apis import ClinVarSearchValidationResult
+from src.infrastructure.validation.api_response_validator import APIResponseValidator
+from src.type_definitions.common import JSONValue
+from src.type_definitions.external_apis import (
+    ClinVarSearchResponse,
+    ClinVarSearchValidationResult,
+)
 
-def process_clinvar_data(raw_data: dict[str, JSONValue]) -> ClinVarVariant[]:
-    validation: ClinVarSearchValidationResult =
+def process_clinvar_data(raw_data: dict[str, JSONValue]) -> ClinVarSearchResponse:
+    validation: ClinVarSearchValidationResult = (
         APIResponseValidator.validate_clinvar_search_response(raw_data)
-
-    if (!validation.is_valid) {
-        throw new Error(`Validation failed: ${validation.issues}`)
-    }
-
-    return validation.sanitized_data?.variants || []
+    )
+    if not validation["is_valid"] or validation["sanitized_data"] is None:
+        raise ValueError(f"Validation failed: {validation['issues']}")
+    return validation["sanitized_data"]
 ```
 
 **5. Typed Test Fixtures** (from `tests/test_types/fixtures.py`):
@@ -434,13 +445,16 @@ def test_gene_operations():
 
     # Full type safety throughout test
     result = service.get_gene_by_symbol("TEST")
-    assert result.symbol === "TEST"
+    assert result.symbol == "TEST"
 ```
 
 #### **Common Type Pitfalls to Avoid**
 
 ❌ **NEVER DO THIS:**
 ```python
+# Wrong: Using Any
+from typing import Any
+
 # Wrong: Using Any
 def process_data(data: Any) -> Any:
     return data.get("result")
@@ -450,29 +464,33 @@ def create_user(data: dict[str, Any]) -> User:
     return User(data)
 
 # Wrong: Untyped external API responses
-def fetch_clinvar_data(query: str) -> any[]:
-    response = await fetch(`/api/clinvar?q=${query}`)
-    return response.json()  # No validation!
+def fetch_clinvar_data(raw_response: Any) -> list[Any]:
+    return raw_response.get("esearchresult", {}).get("idlist", [])
 ```
 
 ✅ **DO THIS INSTEAD:**
 ```python
 # Correct: Use proper types
-from src.type_definitions.common import JSONObject, ApiResponse
-from src.type_definitions.external_apis import ClinVarSearchResponse
+from src.infrastructure.validation.api_response_validator import APIResponseValidator
+from src.type_definitions.common import JSONObject, JSONValue
+from src.type_definitions.external_apis import (
+    ClinVarSearchResponse,
+    ClinVarSearchValidationResult,
+)
 
-async def process_data(data: JSONObject) -> JSONValue:
+def process_data(data: JSONObject) -> JSONValue:
     return data.get("result")
 
-async def create_user(data: UserCreate) -> User:
-    return await user_service.create(data)
+def create_user(data: UserCreate) -> User:
+    return user_service.create(data)
 
-async def fetch_clinvar_data(query: str) -> ClinVarVariant[]:
-    validation = await APIResponseValidator.validate_clinvar_search(query)
-    if (!validation.is_valid) {
-        throw new Error(`Invalid response: ${validation.issues}`)
-    }
-    return validation.sanitized_data?.variants || []
+def fetch_clinvar_data(raw_data: JSONValue) -> ClinVarSearchResponse:
+    validation: ClinVarSearchValidationResult = (
+        APIResponseValidator.validate_clinvar_search_response(raw_data)
+    )
+    if not validation["is_valid"] or validation["sanitized_data"] is None:
+        raise ValueError(f"Invalid response: {validation['issues']}")
+    return validation["sanitized_data"]
 ```
 
 ### **Type Safety Benefits**
@@ -596,8 +614,8 @@ make all                    # Complete quality gate
 **Type Management Quick Reference:**
 - **Never use `Any`** - strict policy for healthcare software
 - **Use existing types** from `src/type_definitions/` instead of creating new ones
-- **JSON types**: `JSONObject`, `JSONValue`, `JSONArray` for JSON-compatible data
-- **API responses**: `ApiResponse<T>`, `PaginatedResponse<T>` for type-safe responses
+- **JSON types**: `JSONObject`, `JSONValue` (use `list[JSONValue]` for arrays)
+- **API responses**: `APIResponse`, `PaginatedResponse` for type-safe responses
 - **Update operations**: `GeneUpdate`, `VariantUpdate`, etc. for partial updates
 - **Test fixtures**: Always use `tests/test_types/fixtures.py` and `tests/test_types/mocks.py`
 
@@ -621,8 +639,8 @@ make all                    # Complete quality gate
 - **🚨 TYPE SAFETY FIRST**: Never use `Any` - this is a strict requirement for healthcare software
 - **Context Awareness**: Always consider MED13's biomedical domain constraints
 - **Type Management**: Use existing types from `src/type_definitions/` instead of creating new ones
-- **JSON Handling**: Always use `JSONObject`, `JSONValue`, `JSONArray` for JSON data
-- **API Responses**: Use `ApiResponse<T>`, `PaginatedResponse<T>` for type-safe responses
+- **JSON Handling**: Always use `JSONObject`, `JSONValue` (use `list[JSONValue]` for arrays)
+- **API Responses**: Use `APIResponse`, `PaginatedResponse` for type-safe responses
 - **Update Operations**: Use `GeneUpdate`, `VariantUpdate`, etc. TypedDict classes
 - **Test Fixtures**: Always use `tests/test_types/fixtures.py` and `tests/test_types/mocks.py`
 - **External APIs**: Validate responses using `src/infrastructure/validation/`

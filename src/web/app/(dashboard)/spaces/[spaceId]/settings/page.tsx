@@ -1,10 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { QueryClient, dehydrate } from '@tanstack/react-query'
-import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
-import { fetchResearchSpace, fetchSpaceMembers } from '@/lib/api/research-spaces'
-import { HydrationBoundary } from '@tanstack/react-query'
+import { fetchResearchSpace } from '@/lib/api/research-spaces'
 import SpaceSettingsClient from '../space-settings-client'
 
 interface SpaceSettingsPageProps {
@@ -21,22 +18,13 @@ export default async function SpaceSettingsPage({ params }: SpaceSettingsPagePro
     redirect('/auth/login?error=SessionExpired')
   }
 
-  const queryClient = new QueryClient()
+  let space = null
 
-  await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.detail(params.spaceId),
-      queryFn: () => fetchResearchSpace(params.spaceId, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.members(params.spaceId),
-      queryFn: () => fetchSpaceMembers(params.spaceId, undefined, token),
-    }),
-  ])
+  try {
+    space = await fetchResearchSpace(params.spaceId, token)
+  } catch (error) {
+    console.error('[SpaceSettingsPage] Failed to fetch research space', error)
+  }
 
-  return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <SpaceSettingsClient spaceId={params.spaceId} />
-    </HydrationBoundary>
-  )
+  return <SpaceSettingsClient spaceId={params.spaceId} space={space} />
 }

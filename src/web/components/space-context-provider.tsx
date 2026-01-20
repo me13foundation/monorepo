@@ -9,19 +9,14 @@ import {
   type ReactNode,
 } from 'react'
 import { usePathname } from 'next/navigation'
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import type { ResearchSpace } from '@/types/research-space'
-
-const AUTH_PATHS = new Set(['/auth', '/login', '/register', '/forgot-password', '/'])
-
-function isAuthPage(pathname: string): boolean {
-  return AUTH_PATHS.has(pathname) || pathname.startsWith('/auth/')
-}
 
 export interface SpaceContextValue {
   currentSpaceId: string | null
   setCurrentSpaceId: (spaceId: string | null) => void
   isLoading: boolean
+  spaces: ResearchSpace[]
+  spaceTotal: number
 }
 
 const SpaceContext = createContext<SpaceContextValue | undefined>(undefined)
@@ -31,6 +26,7 @@ interface SpaceContextProviderProps {
   initialSpaces?: ResearchSpace[]
   initialSpaceId?: string | null
   initialTotal?: number
+  isLoading?: boolean
 }
 
 export function useSpaceContext() {
@@ -46,33 +42,11 @@ export function SpaceContextProvider({
   initialSpaces = [],
   initialSpaceId = null,
   initialTotal,
+  isLoading = false,
 }: SpaceContextProviderProps) {
   const pathname = usePathname()
-  const onAuthPage = isAuthPage(pathname)
-
-  const hasInitialSpaces = initialSpaces.length > 0
-  const initialData = hasInitialSpaces
-    ? {
-        spaces: initialSpaces,
-        total: initialTotal ?? initialSpaces.length,
-        skip: 0,
-        limit: initialSpaces.length,
-      }
-    : undefined
-
-  const { data, isLoading: queryLoading } = useResearchSpaces(undefined, {
-    enabled: !hasInitialSpaces && !onAuthPage,
-    initialData,
-  })
-
-  const spaces = useMemo<ResearchSpace[]>(() => {
-    if (onAuthPage) {
-      return []
-    }
-    return data?.spaces ?? initialSpaces
-  }, [data?.spaces, initialSpaces, onAuthPage])
-
-  const isLoading = onAuthPage ? false : queryLoading
+  const spaces = useMemo<ResearchSpace[]>(() => initialSpaces, [initialSpaces])
+  const spaceTotal = initialTotal ?? spaces.length
 
   const [currentSpaceId, setCurrentSpaceIdState] = useState<string | null>(() => {
     if (initialSpaceId) {
@@ -85,11 +59,6 @@ export function SpaceContextProvider({
   })
 
   useEffect(() => {
-    if (onAuthPage) {
-      setCurrentSpaceIdState(null)
-      return
-    }
-
     const spaceMatch = pathname.match(/\/spaces\/([^/]+)/)
     if (spaceMatch) {
       const spaceIdFromUrl = spaceMatch[1]
@@ -125,7 +94,7 @@ export function SpaceContextProvider({
       setCurrentSpaceIdState(null)
       localStorage.removeItem('currentSpaceId')
     }
-  }, [pathname, spaces, onAuthPage, currentSpaceId])
+  }, [pathname, spaces, currentSpaceId])
 
   const setCurrentSpaceId = (spaceId: string | null) => {
     setCurrentSpaceIdState(spaceId)
@@ -142,6 +111,8 @@ export function SpaceContextProvider({
         currentSpaceId,
         setCurrentSpaceId,
         isLoading,
+        spaces,
+        spaceTotal,
       }}
     >
       {children}

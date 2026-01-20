@@ -2,7 +2,7 @@
 
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCreateResearchSpace } from '@/lib/queries/research-spaces'
+import { createResearchSpaceAction } from '@/app/actions/research-spaces'
 import { createSpaceSchema, type CreateSpaceFormData } from '@/lib/schemas/research-space'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,12 +20,11 @@ import { Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { useSession, signOut } from 'next-auth/react'
 
 export function CreateSpaceForm() {
   const router = useRouter()
-  const createMutation = useCreateResearchSpace()
   const [slugError, setSlugError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<CreateSpaceFormData>({
     resolver: zodResolver(createSpaceSchema),
@@ -56,37 +55,30 @@ export function CreateSpaceForm() {
     }
   }
 
-  const { data: session } = useSession()
-
   const onSubmit = async (data: CreateSpaceFormData) => {
     setSlugError(null)
 
-    // Check if user is authenticated
-    if (!session?.user?.access_token) {
-      toast.error('Your session has expired. Please log in again.')
-      signOut({ callbackUrl: '/auth/login' })
-      return
-    }
-
     try {
-      const space = await createMutation.mutateAsync(data)
+      setIsSubmitting(true)
+      const result = await createResearchSpaceAction(data)
+      if (!result.success) {
+        if (result.error.toLowerCase().includes('slug')) {
+          setSlugError('This slug is already taken. Please choose another.')
+        }
+        toast.error(result.error)
+        return
+      }
       toast.success('Research space created successfully!')
-      router.push(`/spaces/${space.id}`)
+      router.push(`/spaces/${result.data.id}`)
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-          toast.error('Your session has expired. Please log in again.')
-          signOut({ callbackUrl: '/auth/login?error=SessionExpired' })
-        } else if (error.message.includes('slug') || error.message.includes('Slug')) {
-          setSlugError('This slug is already taken. Please choose another.')
-          toast.error('This slug is already taken. Please choose another.')
-        } else {
-          setSlugError(error.message)
-          toast.error(`Failed to create space: ${error.message}`)
-        }
+        setSlugError(error.message)
+        toast.error(`Failed to create space: ${error.message}`)
       } else {
         toast.error('An unexpected error occurred. Please try again.')
       }
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -165,12 +157,12 @@ export function CreateSpaceForm() {
             type="button"
             variant="outline"
             onClick={() => router.back()}
-            disabled={createMutation.isPending}
+            disabled={isSubmitting}
           >
             Cancel
           </Button>
-          <Button type="submit" disabled={createMutation.isPending}>
-            {createMutation.isPending && (
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && (
               <Loader2 className="mr-2 size-4 animate-spin" />
             )}
             Create Space

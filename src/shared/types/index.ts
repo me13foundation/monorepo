@@ -1,5 +1,5 @@
 // Shared Type Definitions for MED13 Resource Library
-// These types are used across FastAPI backend, Next.js admin, and Dash UI
+// These types are used across FastAPI backend and the Next.js admin interface
 
 export * from './data-source'
 export * from './user'

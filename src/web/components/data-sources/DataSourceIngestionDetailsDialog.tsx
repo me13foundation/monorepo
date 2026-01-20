@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import type { DataSource, IngestionJobHistoryItem } from '@/types/data-source'
@@ -13,7 +14,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useIngestionJobHistory } from '@/lib/queries/data-sources'
+import { fetchIngestionJobHistoryAction } from '@/app/actions/data-sources'
+import { toast } from 'sonner'
 
 export type ManualIngestionSummary = {
   source_id: string
@@ -22,6 +24,7 @@ export type ManualIngestionSummary = {
   created_publications: number
   updated_publications: number
   completedAt: string
+  executed_query?: string | null
 }
 
 interface DataSourceIngestionDetailsDialogProps {
@@ -55,8 +58,40 @@ export function DataSourceIngestionDetailsDialog({
   open,
   onOpenChange,
 }: DataSourceIngestionDetailsDialogProps) {
-  const historyQuery = useIngestionJobHistory(source?.id ?? null, open && Boolean(source))
-  const historyItems: IngestionJobHistoryItem[] = historyQuery.data?.items || []
+  const [historyItems, setHistoryItems] = useState<IngestionJobHistoryItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !source) {
+      return
+    }
+
+    let isMounted = true
+
+    const loadHistory = async () => {
+      setIsLoading(true)
+      setHistoryError(null)
+      const result = await fetchIngestionJobHistoryAction(source.id, 10)
+      if (!isMounted) {
+        return
+      }
+      if (!result.success) {
+        setHistoryError(result.error)
+        toast.error(result.error)
+        setHistoryItems([])
+      } else {
+        setHistoryItems(result.data.items)
+      }
+      setIsLoading(false)
+    }
+
+    void loadHistory()
+
+    return () => {
+      isMounted = false
+    }
+  }, [open, source])
 
   if (!source) {
     return null
@@ -98,6 +133,12 @@ export function DataSourceIngestionDetailsDialog({
             {summary ? (
               <div className="space-y-1 rounded-md border p-3">
                 <InfoRow label="Completed" value={formatTimestamp(summary.completedAt)} />
+                {summary.executed_query && (
+                  <div className="mb-2 mt-1 space-y-1 border-b pb-2">
+                    <span className="text-xs text-muted-foreground">Executed Query:</span>
+                    <p className="rounded bg-muted p-2 font-mono text-xs">{summary.executed_query}</p>
+                  </div>
+                )}
                 <InfoRow label="Fetched records" value={summary.fetched_records.toString()} />
                 <InfoRow label="Parsed publications" value={summary.parsed_publications.toString()} />
                 <InfoRow label="New publications" value={summary.created_publications.toString()} />
@@ -112,10 +153,12 @@ export function DataSourceIngestionDetailsDialog({
 
           <section className="space-y-2">
             <h3 className="text-sm font-semibold">Recent ingestion jobs</h3>
-            {historyQuery.isLoading ? (
+            {isLoading ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="size-5 animate-spin text-muted-foreground" />
               </div>
+            ) : historyError ? (
+              <p className="text-sm text-destructive">{historyError}</p>
             ) : historyItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">No ingestion jobs recorded yet.</p>
             ) : (
@@ -131,17 +174,39 @@ export function DataSourceIngestionDetailsDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {historyItems.map((job) => (
-                      <TableRow key={job.id}>
-                        <TableCell className="font-medium capitalize">{job.status}</TableCell>
-                        <TableCell className="capitalize">{job.trigger}</TableCell>
-                        <TableCell>{formatTimestamp(job.started_at)}</TableCell>
-                        <TableCell>{formatTimestamp(job.completed_at)}</TableCell>
-                        <TableCell className="text-right">
-                          {job.records_processed} (+{job.records_failed}/{job.records_skipped})
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {historyItems.map((job) => {
+                      const executedQuery =
+                        typeof job.metadata?.executed_query === 'string'
+                          ? job.metadata.executed_query
+                          : null
+                      return (
+                        <TableRow
+                          key={job.id}
+                          className="cursor-help"
+                          title={executedQuery ? `Query: ${executedQuery}` : undefined}
+                        >
+                          <TableCell className="font-medium capitalize">
+                            <div className="flex flex-col">
+                              <span>{job.status}</span>
+                              {executedQuery && (
+                                <span
+                                  className="line-clamp-1 max-w-[100px] text-[10px] text-muted-foreground"
+                                  title={executedQuery}
+                                >
+                                  {executedQuery}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="capitalize">{job.trigger}</TableCell>
+                          <TableCell>{formatTimestamp(job.started_at)}</TableCell>
+                          <TableCell>{formatTimestamp(job.completed_at)}</TableCell>
+                          <TableCell className="text-right">
+                            {job.records_processed} (+{job.records_failed}/{job.records_skipped})
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               </div>

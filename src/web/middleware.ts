@@ -1,4 +1,17 @@
 import { withAuth } from "next-auth/middleware"
+import type { JWT } from "next-auth/jwt"
+
+function hasValidTokenExpiry(token: JWT): boolean {
+  const now = Date.now()
+  if (Number.isFinite(token.expires_at)) {
+    return now < token.expires_at
+  }
+  const exp = token.exp
+  if (typeof exp === "number" && Number.isFinite(exp)) {
+    return now < exp * 1000
+  }
+  return false
+}
 
 export default withAuth(
   function middleware(req) {
@@ -6,7 +19,7 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token }) => !!token,
+      authorized: ({ token }) => (token ? hasValidTokenExpiry(token) : false),
     },
   }
 )

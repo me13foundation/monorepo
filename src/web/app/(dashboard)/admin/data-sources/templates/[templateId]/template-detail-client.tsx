@@ -8,10 +8,12 @@ import { Badge } from '@/components/ui/badge'
 import { TemplateDialog } from '@/components/templates/TemplateDialog'
 import { ValidationRulesDialog } from '@/components/templates/ValidationRulesDialog'
 import { useState } from 'react'
-import { useTemplate } from '@/lib/queries/templates'
-import { approveTemplate, deleteTemplate, publishTemplate, updateTemplate } from '@/lib/api/templates'
-import { useQueryClient } from '@tanstack/react-query'
-import { useSession } from 'next-auth/react'
+import {
+  approveTemplateAction,
+  deleteTemplateAction,
+  publishTemplateAction,
+  updateTemplateAction,
+} from '@/app/actions/templates'
 import { Loader2, ArrowLeft, Pencil, Trash2, ShieldCheck, Eye } from 'lucide-react'
 import {
   Dialog,
@@ -21,18 +23,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import type { TemplateUpdatePayload, TemplateValidationRule } from '@/types/template'
+import type { TemplateResponse, TemplateUpdatePayload, TemplateValidationRule } from '@/types/template'
 
 interface TemplateDetailClientProps {
   templateId: string
+  template: TemplateResponse | null
 }
 
-export default function TemplateDetailClient({ templateId }: TemplateDetailClientProps) {
+export default function TemplateDetailClient({ templateId, template }: TemplateDetailClientProps) {
   const router = useRouter()
-  const queryClient = useQueryClient()
-  const { data: session } = useSession()
-  const token = session?.user?.access_token
-  const { data, isLoading, error } = useTemplate(templateId)
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteLoading, setDeleteLoading] = useState(false)
@@ -41,19 +40,13 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
   const [approvalLoading, setApprovalLoading] = useState(false)
   const [publishLoading, setPublishLoading] = useState(false)
 
-  const invalidateTemplateQueries = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['templates'] })
-    await queryClient.invalidateQueries({ queryKey: ['template', templateId] })
-  }
-
   const handleDelete = async () => {
-    if (!token) {
-      throw new Error('No authentication token available')
-    }
     setDeleteLoading(true)
     try {
-      await deleteTemplate(templateId, token)
-      await invalidateTemplateQueries()
+      const result = await deleteTemplateAction(templateId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
       router.push('/admin/data-sources/templates')
     } finally {
       setDeleteLoading(false)
@@ -62,62 +55,54 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
   }
 
   const handleUpdate = async (payload: TemplateUpdatePayload['data']) => {
-    if (!token) {
-      throw new Error('No authentication token available')
+    const result = await updateTemplateAction({ templateId, data: payload })
+    if (!result.success) {
+      throw new Error(result.error)
     }
-    await updateTemplate({ templateId, data: payload }, token)
-    await invalidateTemplateQueries()
+    router.refresh()
     setEditOpen(false)
   }
 
   const handleValidationRulesSave = async (rules: TemplateValidationRule[]) => {
-    if (!token) {
-      throw new Error('No authentication token available')
-    }
     setRulesSaving(true)
     try {
-      await updateTemplate({ templateId, data: { validation_rules: rules } }, token)
-      await invalidateTemplateQueries()
+      const result = await updateTemplateAction({ templateId, data: { validation_rules: rules } })
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      router.refresh()
     } finally {
       setRulesSaving(false)
     }
   }
 
   const handleApprove = async () => {
-    if (!token) {
-      throw new Error('No authentication token available')
-    }
     setApprovalLoading(true)
     try {
-      await approveTemplate(templateId, token)
-      await invalidateTemplateQueries()
+      const result = await approveTemplateAction(templateId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      router.refresh()
     } finally {
       setApprovalLoading(false)
     }
   }
 
   const handlePublish = async () => {
-    if (!token) {
-      throw new Error('No authentication token available')
-    }
     setPublishLoading(true)
     try {
-      await publishTemplate(templateId, token)
-      await invalidateTemplateQueries()
+      const result = await publishTemplateAction(templateId)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      router.refresh()
     } finally {
       setPublishLoading(false)
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (error || !data) {
+  if (!template) {
     return (
       <Card>
         <CardContent className="py-12 text-center text-muted-foreground">
@@ -137,8 +122,8 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
               Back to Templates
             </Link>
           </Button>
-          <h1 className="font-heading text-2xl font-bold">{data.name}</h1>
-          <p className="text-muted-foreground">{data.description || 'No description provided.'}</p>
+          <h1 className="font-heading text-2xl font-bold">{template.name}</h1>
+          <p className="text-muted-foreground">{template.description || 'No description provided.'}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setEditOpen(true)}>
@@ -159,14 +144,14 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
             <CardDescription>Template classification and usage</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            <DetailRow label="Category" value={data.category} />
-            <DetailRow label="Source Type" value={data.source_type} />
-            <DetailRow label="Usage Count" value={String(data.usage_count)} />
-            <DetailRow label="Success Rate" value={`${Math.round(data.success_rate * 100)}%`} />
-            <DetailRow label="Visibility" value={data.is_public ? 'Public' : 'Private'} />
-            {data.tags.length > 0 && (
+            <DetailRow label="Category" value={template.category} />
+            <DetailRow label="Source Type" value={template.source_type} />
+            <DetailRow label="Usage Count" value={String(template.usage_count)} />
+            <DetailRow label="Success Rate" value={`${Math.round(template.success_rate * 100)}%`} />
+            <DetailRow label="Visibility" value={template.is_public ? 'Public' : 'Private'} />
+            {template.tags.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {data.tags.map((tag) => (
+                {template.tags.map((tag) => (
                   <Badge key={tag} variant="outline">
                     {tag}
                   </Badge>
@@ -183,7 +168,7 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
           </CardHeader>
           <CardContent>
             <pre className="overflow-auto rounded-md bg-muted p-4 text-xs">
-              {JSON.stringify(data.schema_definition, null, 2)}
+              {JSON.stringify(template.schema_definition, null, 2)}
             </pre>
           </CardContent>
         </Card>
@@ -201,11 +186,11 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
             </Button>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
-            {data.validation_rules.length === 0 ? (
+            {template.validation_rules.length === 0 ? (
               <p className="text-muted-foreground">No validation rules defined.</p>
             ) : (
               <div className="space-y-3">
-                {data.validation_rules.map((rule) => (
+                {template.validation_rules.map((rule) => (
                   <div key={`${rule.field}-${rule.rule_type}`} className="rounded-md border p-3">
                     <div className="flex items-center justify-between text-sm font-medium">
                       <span>{rule.field}</span>
@@ -231,20 +216,20 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             <div className="space-y-1">
-              <DetailRow label="Approval Required" value={data.approval_required ? 'Yes' : 'No'} />
-              <DetailRow label="Approval Status" value={data.is_approved ? 'Approved' : 'Pending review'} />
-              <DetailRow label="Approved At" value={formatDate(data.approved_at)} />
-              <DetailRow label="Created" value={formatDate(data.created_at)} />
-              <DetailRow label="Updated" value={formatDate(data.updated_at)} />
-              <DetailRow label="Visibility" value={data.is_public ? 'Public' : 'Private'} />
+              <DetailRow label="Approval Required" value={template.approval_required ? 'Yes' : 'No'} />
+              <DetailRow label="Approval Status" value={template.is_approved ? 'Approved' : 'Pending review'} />
+              <DetailRow label="Approved At" value={formatDate(template.approved_at)} />
+              <DetailRow label="Created" value={formatDate(template.created_at)} />
+              <DetailRow label="Updated" value={formatDate(template.updated_at)} />
+              <DetailRow label="Visibility" value={template.is_public ? 'Public' : 'Private'} />
             </div>
             <div className="flex flex-col gap-3">
-              <Button onClick={handleApprove} disabled={data.is_approved || approvalLoading} variant="secondary">
+              <Button onClick={handleApprove} disabled={template.is_approved || approvalLoading} variant="secondary">
                 {approvalLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
                 <ShieldCheck className="mr-2 size-4" />
                 Approve
               </Button>
-              <Button onClick={handlePublish} disabled={data.is_public || publishLoading}>
+              <Button onClick={handlePublish} disabled={template.is_public || publishLoading}>
                 {publishLoading && <Loader2 className="mr-2 size-4 animate-spin" />}
                 <Eye className="mr-2 size-4" />
                 Make Public
@@ -254,12 +239,12 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
         </Card>
       </div>
 
-      <TemplateDialog mode="edit" open={editOpen} onOpenChange={setEditOpen} template={data} onUpdate={handleUpdate} />
+      <TemplateDialog mode="edit" open={editOpen} onOpenChange={setEditOpen} template={template} onUpdate={handleUpdate} />
 
       <ValidationRulesDialog
         open={rulesDialogOpen}
         onOpenChange={setRulesDialogOpen}
-        rules={data.validation_rules}
+        rules={template.validation_rules}
         onSave={handleValidationRulesSave}
         isSaving={rulesSaving}
       />
@@ -269,7 +254,7 @@ export default function TemplateDetailClient({ templateId }: TemplateDetailClien
           <DialogHeader>
             <DialogTitle>Delete Template</DialogTitle>
             <DialogDescription>
-              This cannot be undone. This will permanently delete <strong>{data.name}</strong>.
+              This cannot be undone. This will permanently delete <strong>{template.name}</strong>.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

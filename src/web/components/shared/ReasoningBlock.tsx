@@ -28,15 +28,15 @@ export function ReasoningBlock({
       )}
       {...props}
     >
-      <div className="flex items-center gap-2 mb-2">
+      <div className="mb-2 flex items-center gap-2">
         <div className="flex size-6 items-center justify-center rounded-full bg-brand-primary/10 text-brand-primary">
           {icon}
         </div>
-        <span className="text-xs font-bold uppercase tracking-widest text-brand-primary/80 font-heading">
+        <span className="font-heading text-xs font-bold uppercase tracking-widest text-brand-primary/80">
           {title}
         </span>
       </div>
-      <div className="text-sm leading-relaxed text-foreground/90 font-sans">
+      <div className="font-sans text-sm leading-relaxed text-foreground/90">
         {children}
       </div>
     </div>

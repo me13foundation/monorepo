@@ -3,10 +3,15 @@ Value object for confidence scores and evidence levels.
 Immutable objects that quantify the strength of evidence in MED13.
 """
 
+from __future__ import annotations
+
 from enum import Enum
-from typing import TypedDict, Unpack
+from typing import TYPE_CHECKING, Unpack
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
+
+if TYPE_CHECKING:
+    from src.type_definitions.confidence import ConfidenceScoreOptions
 
 # Threshold constants for evidence levels
 LEVEL_DEFINITIVE: float = 0.9
@@ -110,8 +115,8 @@ class ConfidenceScore(BaseModel):
         score: float,
         *,
         level_override: EvidenceLevel | None = None,
-        **options: Unpack["ConfidenceScoreOptions"],
-    ) -> "ConfidenceScore":
+        **options: Unpack[ConfidenceScoreOptions],
+    ) -> ConfidenceScore:
         """Create ConfidenceScore from numeric score with automatic level
         classification."""
         mutable_options: ConfidenceScoreOptions = {**options}
@@ -157,13 +162,3 @@ class ConfidenceScore(BaseModel):
     def __str__(self) -> str:
         """String representation of confidence score."""
         return f"{self.level.value} ({self.score:.2f})"
-
-
-class ConfidenceScoreOptions(TypedDict, total=False):
-    """Optional parameters for constructing a confidence score."""
-
-    sample_size: int | None
-    p_value: float | None
-    study_count: int | None
-    peer_reviewed: bool
-    replicated: bool

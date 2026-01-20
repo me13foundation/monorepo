@@ -6,9 +6,17 @@ from __future__ import annotations
 
 from enum import Enum
 from pathlib import Path
-from typing import ClassVar, TypedDict
+from typing import TYPE_CHECKING, ClassVar
 
 import yaml
+
+if TYPE_CHECKING:
+    from src.type_definitions.packaging import (
+        LicenseInfo,
+        LicenseManifest,
+        LicenseRecord,
+        LicenseValidationResult,
+    )
 
 
 class LicenseCompatibility(str, Enum):
@@ -30,47 +38,6 @@ class LicenseType(str, Enum):
     GPL_3_0 = "GPL-3.0"
     PROPRIETARY = "proprietary"
     UNKNOWN = "unknown"
-
-
-class LicenseRecord(TypedDict, total=False):
-    """Structured representation of a source license entry."""
-
-    source: str
-    license: str
-    license_url: str
-    attribution: str
-
-
-class LicenseValidationResult(TypedDict):
-    """Result of validating a license identifier."""
-
-    valid: bool
-    license: str
-    message: str
-
-
-class ComplianceSection(TypedDict, total=False):
-    """Compliance block embedded in license manifests."""
-
-    status: str
-    issues: list[str]
-    warnings: list[str]
-
-
-class LicenseManifest(TypedDict):
-    """License manifest structure."""
-
-    package_license: str
-    sources: list[LicenseRecord]
-    compliance: ComplianceSection
-
-
-class LicenseInfo(TypedDict):
-    """Basic license information."""
-
-    id: str
-    url: str
-    name: str
 
 
 class LicenseManager:

@@ -1,63 +1,44 @@
 "use client"
 
-import * as React from "react"
-import { useSession } from "next-auth/react"
-import { usePathname } from "next/navigation"
-import { Loader2 } from "lucide-react"
+import * as React from 'react'
+import { useSession } from 'next-auth/react'
+import { usePathname } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
-import { AppSidebar } from "./AppSidebar"
-import { CollaborativeSidebar } from "./CollaborativeSidebar"
-import { GlobalHeader } from "../GlobalHeader"
-import { useResearchSpaces, useSpaceMembership } from "@/lib/queries/research-spaces"
-import { extractSpaceIdFromPath } from "@/types/navigation"
-import type { SidebarUserInfo } from "@/types/navigation"
-import { UserRole } from "@/types/auth"
-import { MembershipRole, type ResearchSpace } from "@/types/research-space"
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
+import { useSpaceContext } from '@/components/space-context-provider'
+import { AppSidebar } from './AppSidebar'
+import { CollaborativeSidebar } from './CollaborativeSidebar'
+import { GlobalHeader } from '../GlobalHeader'
+import { extractSpaceIdFromPath } from '@/types/navigation'
+import type { SidebarUserInfo } from '@/types/navigation'
+import { UserRole } from '@/types/auth'
+import { MembershipRole, type ResearchSpaceMembership } from '@/types/research-space'
 
 interface SidebarWrapperProps {
   children: React.ReactNode
-  initialSpaces?: ResearchSpace[]
-  initialTotal?: number
+  currentMembership?: ResearchSpaceMembership | null
 }
 
-export function SidebarWrapper({ children, initialSpaces, initialTotal }: SidebarWrapperProps) {
+export function SidebarWrapper({ children, currentMembership }: SidebarWrapperProps) {
   const { data: session, status } = useSession()
-
-  const hasInitialSpaces = Boolean(initialSpaces && initialSpaces.length > 0)
-  const { data: spacesData, isLoading: spacesLoading } = useResearchSpaces(undefined, {
-    enabled: !hasInitialSpaces,
-    initialData: hasInitialSpaces
-      ? {
-          spaces: initialSpaces ?? [],
-          total: initialTotal ?? initialSpaces?.length ?? 0,
-          skip: 0,
-          limit: initialSpaces?.length ?? 0,
-        }
-      : undefined,
-  })
+  const { spaces, isLoading: spacesLoading } = useSpaceContext()
   const pathname = usePathname()
 
   // Extract current space from URL if we're in a space context
   const spaceIdFromUrl = extractSpaceIdFromPath(pathname)
-  const isValidSpaceId = Boolean(spaceIdFromUrl && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spaceIdFromUrl))
-  const spaces = spacesData?.spaces ?? []
   const currentSpace = spaceIdFromUrl
     ? spaces.find((s) => s.id === spaceIdFromUrl) ?? null
     : null
-  const { data: membership } = useSpaceMembership(
-    isValidSpaceId ? spaceIdFromUrl : null,
-    session?.user?.id ?? null
-  )
 
   // Build user info for sidebar
   const userInfo: SidebarUserInfo | null = React.useMemo(() => {
     if (!session?.user) return null
 
     return {
-      id: session.user.id || "",
-      name: session.user.full_name || session.user.email || "User",
-      email: session.user.email || "",
+      id: session.user.id || '',
+      name: session.user.full_name || session.user.email || 'User',
+      email: session.user.email || '',
       avatar: undefined, // Add avatar URL if available
       role: (session.user.role as UserRole) || UserRole.VIEWER,
     }
@@ -67,7 +48,7 @@ export function SidebarWrapper({ children, initialSpaces, initialTotal }: Sideba
     if (!currentSpace || !userInfo) {
       return undefined
     }
-    const membershipRole = membership?.role
+    const membershipRole = currentMembership?.role
 
     if (membershipRole) {
       return membershipRole
@@ -79,10 +60,10 @@ export function SidebarWrapper({ children, initialSpaces, initialTotal }: Sideba
       return MembershipRole.ADMIN
     }
     return undefined
-  }, [currentSpace, membership?.role, userInfo])
+  }, [currentSpace, currentMembership?.role, userInfo])
 
   // Show loading state while session/spaces are loading
-  if (status === "loading" || spacesLoading) {
+  if (status === 'loading' || spacesLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -110,9 +91,9 @@ export function SidebarWrapper({ children, initialSpaces, initialTotal }: Sideba
         currentSpace={currentSpace}
         userSpaceRole={userSpaceRole}
       />
-      <SidebarInset className="rounded-3xl shadow-brand-md relative h-svh md:h-[calc(100svh-theme(spacing.4))] overflow-y-auto overflow-x-hidden flex flex-col">
+      <SidebarInset className="relative flex h-svh flex-col overflow-y-auto overflow-x-hidden">
         <GlobalHeader currentSpace={currentSpace} />
-        <div className="mx-auto w-full max-w-[1200px] p-brand-sm md:p-brand-md lg:p-brand-lg pt-0 md:pt-0 lg:pt-0 flex-1">
+        <div className="mx-auto w-full max-w-[1200px] flex-1 p-brand-sm pt-0 md:p-brand-md md:pt-0 lg:p-brand-lg lg:pt-0">
           {children}
         </div>
       </SidebarInset>

@@ -8,36 +8,58 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { useMaintenanceMutations, useMaintenanceState } from '@/lib/queries/system-status'
+import { disableMaintenanceAction, enableMaintenanceAction } from '@/app/actions/system-status'
+import type { MaintenanceModeResponse } from '@/types/system-status'
+import { useRouter } from 'next/navigation'
 
-export function MaintenanceModePanel() {
-  const maintenanceQuery = useMaintenanceState()
-  const mutations = useMaintenanceMutations()
+interface MaintenanceModePanelProps {
+  maintenanceState: MaintenanceModeResponse | null
+}
+
+export function MaintenanceModePanel({ maintenanceState }: MaintenanceModePanelProps) {
+  const router = useRouter()
   const [message, setMessage] = useState('')
   const [forceLogout, setForceLogout] = useState(true)
+  const [isUpdating, setIsUpdating] = useState(false)
 
-  const isActive = maintenanceQuery.data?.state.is_active ?? false
-  const isLoading = maintenanceQuery.isLoading || mutations.enable.isPending || mutations.disable.isPending
+  const isActive = maintenanceState?.state.is_active ?? false
+  const isLoading = isUpdating
 
   const handleEnable = async () => {
     try {
-      await mutations.enable.mutateAsync({
+      setIsUpdating(true)
+      const result = await enableMaintenanceAction({
         message: message || null,
         force_logout_users: forceLogout,
       })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success('Maintenance mode enabled')
+      router.refresh()
     } catch {
       toast.error('Unable to enable maintenance mode')
+    } finally {
+      setIsUpdating(false)
     }
   }
 
   const handleDisable = async () => {
     try {
-      await mutations.disable.mutateAsync()
+      setIsUpdating(true)
+      const result = await disableMaintenanceAction()
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success('Maintenance mode disabled')
       setMessage('')
+      router.refresh()
     } catch {
       toast.error('Unable to disable maintenance mode')
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -100,7 +122,7 @@ export function MaintenanceModePanel() {
             disabled={isLoading || isActive}
             onClick={handleEnable}
           >
-            {mutations.enable.isPending ? (
+            {isUpdating ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
                 Enabling...
@@ -118,7 +140,7 @@ export function MaintenanceModePanel() {
             disabled={isLoading || !isActive}
             onClick={handleDisable}
           >
-            {mutations.disable.isPending ? (
+            {isUpdating ? (
               <>
                 <Loader2 className="mr-2 size-4 animate-spin" />
                 Disabling...

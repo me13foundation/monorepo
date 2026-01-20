@@ -5,12 +5,14 @@ Tests API routes, authentication, authorization, and data persistence.
 """
 
 import os
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
+from src.database import session as session_module
 from src.domain.entities.user import UserRole
 from src.infrastructure.security.jwt_provider import JWTProvider
 from src.main import create_app
@@ -20,6 +22,22 @@ from src.models.database.research_space import (
     ResearchSpaceModel,
 )
 from src.models.database.user import UserModel
+
+
+def _using_postgres() -> bool:
+    return os.getenv("DATABASE_URL", "").startswith("postgresql")
+
+
+@contextmanager
+def _session_for_api(db_session):
+    if _using_postgres():
+        session = session_module.SessionLocal()
+        try:
+            yield session
+        finally:
+            session.close()
+    else:
+        yield db_session
 
 
 def _auth_headers(user: UserModel) -> dict[str, str]:
@@ -33,12 +51,13 @@ def _auth_headers(user: UserModel) -> dict[str, str]:
         "test-jwt-secret-0123456789abcdefghijklmnopqrstuvwxyz",
     )
     provider = JWTProvider(secret_key=secret)
-    token = provider.create_access_token(user_id=user.id, role=user.role)
+    role_value = user.role.value if isinstance(user.role, UserRole) else user.role
+    token = provider.create_access_token(user_id=user.id, role=role_value)
     return {
         "Authorization": f"Bearer {token}",
         "X-TEST-USER-ID": str(user.id),
         "X-TEST-USER-EMAIL": user.email,
-        "X-TEST-USER-ROLE": user.role,
+        "X-TEST-USER-ROLE": role_value,
     }
 
 
@@ -60,31 +79,38 @@ def test_client(test_engine):
 @pytest.fixture
 def test_user(db_session):
     """Create a test user for authentication."""
-    user = UserModel(
-        email="test@example.com",
-        username="testuser",
-        full_name="Test User",
-        hashed_password="hashed_password",
-        role=UserRole.RESEARCHER.value,
-        status="active",
-    )
-    db_session.add(user)
-    db_session.commit()
+    unique_suffix = uuid4().hex
+    with _session_for_api(db_session) as session:
+        user = UserModel(
+            email=f"test-{unique_suffix}@example.com",
+            username=f"testuser-{unique_suffix}",
+            full_name="Test User",
+            hashed_password="hashed_password",
+            role=UserRole.RESEARCHER.value,
+            status="active",
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        session.expunge(user)
     return user
 
 
 @pytest.fixture
 def test_space(db_session, test_user):
     """Create a test research space."""
-    space = ResearchSpaceModel(
-        slug="test-space",
-        name="Test Space",
-        description="Test research space",
-        owner_id=test_user.id,
-        status="active",
-    )
-    db_session.add(space)
-    db_session.commit()
+    unique_suffix = uuid4().hex
+    with _session_for_api(db_session) as session:
+        space = ResearchSpaceModel(
+            slug=f"test-space-{unique_suffix}",
+            name="Test Space",
+            description="Test research space",
+            owner_id=test_user.id,
+            status="active",
+        )
+        session.add(space)
+        session.commit()
+        session.refresh(space)
     return space
 
 
@@ -148,25 +174,27 @@ class TestMembershipAPI:
         test_user,
     ):
         """Current user should get 404 if not a member of the space."""
-        other_owner = UserModel(
-            email="owner@example.com",
-            username="owner",
-            full_name="Owner User",
-            hashed_password="hashed_password",
-            role=UserRole.RESEARCHER.value,
-            status="active",
-        )
-        db_session.add(other_owner)
-        db_session.flush()
-        other_space = ResearchSpaceModel(
-            slug="other-space",
-            name="Other Space",
-            description="Another test space",
-            owner_id=other_owner.id,
-            status="active",
-        )
-        db_session.add(other_space)
-        db_session.commit()
+        with _session_for_api(db_session) as session:
+            other_suffix = uuid4().hex
+            other_owner = UserModel(
+                email=f"owner-{other_suffix}@example.com",
+                username=f"owner-{other_suffix}",
+                full_name="Owner User",
+                hashed_password="hashed_password",
+                role=UserRole.RESEARCHER.value,
+                status="active",
+            )
+            session.add(other_owner)
+            session.flush()
+            other_space = ResearchSpaceModel(
+                slug=f"other-space-{other_suffix}",
+                name="Other Space",
+                description="Another test space",
+                owner_id=other_owner.id,
+                status="active",
+            )
+            session.add(other_space)
+            session.commit()
 
         response = test_client.get(
             f"/research-spaces/{other_space.id}/membership/me",
@@ -184,22 +212,23 @@ class TestMembershipAPI:
         """Current user should receive their active membership with role."""
         # Seed an active membership for the user as admin
         membership_id = uuid4()
-        db_session.execute(
-            ResearchSpaceMembershipModel.__table__.insert(),
-            {
-                "id": membership_id,
-                "space_id": test_space.id,
-                "user_id": test_user.id,
-                "role": "admin",
-                "invited_by": test_user.id,
-                "invited_at": datetime.now(UTC),
-                "joined_at": datetime.now(UTC),
-                "is_active": True,
-                "created_at": datetime.now(UTC),
-                "updated_at": datetime.now(UTC),
-            },
-        )
-        db_session.commit()
+        with _session_for_api(db_session) as session:
+            session.execute(
+                ResearchSpaceMembershipModel.__table__.insert(),
+                {
+                    "id": membership_id,
+                    "space_id": test_space.id,
+                    "user_id": test_user.id,
+                    "role": "admin",
+                    "invited_by": test_user.id,
+                    "invited_at": datetime.now(UTC),
+                    "joined_at": datetime.now(UTC),
+                    "is_active": True,
+                    "created_at": datetime.now(UTC),
+                    "updated_at": datetime.now(UTC),
+                },
+            )
+            session.commit()
 
         response = test_client.get(
             f"/research-spaces/{test_space.id}/membership/me",

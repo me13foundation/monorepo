@@ -16,9 +16,16 @@ from src.application.services.data_discovery_service.dtos import (
     ValidationResultDTO,
     ViewContextDTO,
 )
+from src.application.services.data_discovery_service.requests import (
+    ExecuteQueryTestRequest,
+)
+from src.application.services.discovery_configuration_requests import (
+    CreatePubmedPresetRequest,
+)
 from src.domain.entities.data_discovery_parameters import (
     AdvancedQueryParameters,
     PubMedSortOption,
+    QueryParameterCapabilities,
     TestResultStatus,
 )
 from src.domain.entities.discovery_preset import DiscoveryProvider, PresetScope
@@ -42,6 +49,7 @@ __all__ = [
     "QueryTestResultResponse",
     "RunPubmedSearchRequestModel",
     "SourceCatalogResponse",
+    "QueryParameterCapabilities",
     "StorageOperationResponse",
     "UpdateParametersRequest",
     "UpdateSelectionRequest",
@@ -51,6 +59,8 @@ __all__ = [
     "ViewContextDTO",
     "OrchestratedSessionState",
 ]
+
+_QUERY_PARAMETER_CAPABILITIES = QueryParameterCapabilities
 
 
 class CreateSessionRequest(BaseModel):
@@ -96,6 +106,15 @@ class ExecuteTestRequest(BaseModel):
         None,
         description="Optional parameters to override session defaults",
     )
+
+    def to_domain_request(self, session_id: UUID) -> ExecuteQueryTestRequest:
+        """Convert request payload into a domain test request."""
+        return ExecuteQueryTestRequest(
+            session_id=session_id,
+            catalog_entry_id=self.catalog_entry_id,
+            timeout_seconds=self.timeout_seconds,
+            parameters=self.parameters.to_domain_model() if self.parameters else None,
+        )
 
 
 class AddToSpaceRequest(BaseModel):
@@ -170,6 +189,16 @@ class CreatePubmedPresetRequestModel(BaseModel):
     def to_advanced_parameters(self) -> AdvancedQueryParameters:
         """Convert request payload into domain advanced parameters."""
         return self.parameters.to_domain_model()
+
+    def to_domain_request(self) -> CreatePubmedPresetRequest:
+        """Build the domain preset request from the API payload."""
+        return CreatePubmedPresetRequest(
+            name=self.name,
+            description=self.description,
+            scope=self.scope,
+            research_space_id=self.research_space_id,
+            parameters=self.to_advanced_parameters(),
+        )
 
 
 class DiscoverySearchJobResponse(BaseModel):

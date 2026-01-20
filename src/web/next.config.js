@@ -1,40 +1,42 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 const WS_BASE_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080'
-const isDevelopment = process.env.NODE_ENV === 'development'
-const connectSources = ["'self'", API_BASE_URL]
-if (WS_BASE_URL) {
-  connectSources.push(WS_BASE_URL)
-}
-// Allow Next.js HMR WebSocket in development
-if (isDevelopment) {
-  connectSources.push('ws://localhost:3000')
-}
-// Enhanced CSP for better security
-// Note: 'unsafe-inline' and 'unsafe-eval' are required for Next.js HMR and some features
-// In production, consider using nonces or hashes for stricter CSP
-const cspDirectives = [
-  "default-src 'self'",
-  "frame-ancestors 'none'",
-  "img-src 'self' data: https:",
-  "object-src 'none'",
-  // Next.js requires 'unsafe-inline' for styles and 'unsafe-eval' for HMR
-  // Consider using nonces in production for stricter security
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  `connect-src ${connectSources.join(' ')}`,
-  "style-src 'self' 'unsafe-inline'",
-  "font-src 'self' data:",
-  // Prevent base tag injection attacks
-  "base-uri 'self'",
-  // Prevent form action hijacking
-  "form-action 'self'",
-]
+const buildCspHeader = () => {
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  const connectSources = ["'self'", API_BASE_URL]
+  if (WS_BASE_URL) {
+    connectSources.push(WS_BASE_URL)
+  }
+  // Allow Next.js HMR WebSocket in development
+  if (isDevelopment) {
+    connectSources.push('ws://localhost:3000')
+  }
+  // Enhanced CSP for better security
+  // Note: 'unsafe-inline' and 'unsafe-eval' are required for Next.js HMR and some features
+  // In production, consider using nonces or hashes for stricter CSP
+  const cspDirectives = [
+    "default-src 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data: https:",
+    "object-src 'none'",
+    // Next.js requires 'unsafe-inline' for styles and 'unsafe-eval' for HMR
+    // Consider using nonces in production for stricter security
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    `connect-src ${connectSources.join(' ')}`,
+    "style-src 'self' 'unsafe-inline'",
+    "font-src 'self' data:",
+    // Prevent base tag injection attacks
+    "base-uri 'self'",
+    // Prevent form action hijacking
+    "form-action 'self'",
+  ]
 
-// Upgrade insecure requests only in production
-if (!isDevelopment) {
-  cspDirectives.push("upgrade-insecure-requests")
-}
+  // Upgrade insecure requests only in production
+  if (!isDevelopment) {
+    cspDirectives.push("upgrade-insecure-requests")
+  }
 
-const cspHeader = cspDirectives.join('; ')
+  return cspDirectives.join('; ')
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -65,6 +67,7 @@ const nextConfig = {
   },
   // Configure headers for security
   async headers() {
+    const cspHeader = buildCspHeader()
     return [
       {
         source: '/(.*)',

@@ -100,7 +100,7 @@ def catalog_entry_to_response(entry: SourceCatalogEntry) -> SourceCatalogRespons
         usage_count=entry.usage_count,
         success_rate=entry.success_rate,
         tags=entry.tags,
-        capabilities=entry.capabilities.model_dump(),
+        capabilities=entry.capabilities,
     )
 
 

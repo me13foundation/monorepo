@@ -12,6 +12,7 @@ from .gene_repository import GeneRepository
 from .ingestion_job_repository import IngestionJobRepository
 from .phenotype_repository import PhenotypeRepository
 from .publication_repository import PublicationRepository
+from .research_space_repository import ResearchSpaceRepository
 from .source_template_repository import SourceTemplateRepository
 from .storage_repository import (
     StorageConfigurationRepository,
@@ -29,6 +30,7 @@ __all__ = [
     "IngestionJobRepository",
     "PhenotypeRepository",
     "PublicationRepository",
+    "ResearchSpaceRepository",
     "QuerySpecification",
     "Repository",
     "SourceTemplateRepository",

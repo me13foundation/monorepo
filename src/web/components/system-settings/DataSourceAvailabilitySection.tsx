@@ -22,16 +22,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  useAdminCatalogEntries,
-  useCatalogAvailability,
-  useCatalogAvailabilitySummaries,
-  useSetCatalogGlobalAvailability,
-  useSetCatalogProjectAvailability,
-  useClearCatalogGlobalAvailability,
-  useClearCatalogProjectAvailability,
-  useBulkSetCatalogGlobalAvailability,
-} from '@/lib/queries/data-sources'
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
+  bulkUpdateGlobalAvailabilityAction,
+  clearGlobalAvailabilityAction,
+  clearProjectAvailabilityAction,
+  updateGlobalAvailabilityAction,
+  updateProjectAvailabilityAction,
+} from '@/app/actions/data-source-availability'
 import { Loader2, SlidersHorizontal, ShieldOff, Search } from 'lucide-react'
 import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
 import type {
@@ -39,9 +35,8 @@ import type {
   PermissionLevel,
 } from '@/lib/api/data-source-activation'
 import { toast } from 'sonner'
-
-const EMPTY_CATALOG_ENTRIES: SourceCatalogEntry[] = []
-const EMPTY_AVAILABILITY_SUMMARIES: DataSourceAvailability[] = []
+import type { ResearchSpace } from '@/types/research-space'
+import { useRouter } from 'next/navigation'
 
 const PERMISSION_LABELS: Record<PermissionLevel, string> = {
   available: 'Available',
@@ -79,28 +74,32 @@ function getEffectivePermissionForSpace(
   return summary.global_rule?.permission_level ?? 'available'
 }
 
-export function DataSourceAvailabilitySection() {
+interface DataSourceAvailabilitySectionProps {
+  catalogEntries: SourceCatalogEntry[]
+  availabilitySummaries: DataSourceAvailability[]
+  spaces: ResearchSpace[]
+}
+
+const createDefaultAvailability = (catalogEntryId: string): DataSourceAvailability => ({
+  catalog_entry_id: catalogEntryId,
+  effective_permission_level: 'available',
+  effective_is_active: true,
+  global_rule: null,
+  project_rules: [],
+})
+
+export function DataSourceAvailabilitySection({
+  catalogEntries,
+  availabilitySummaries,
+  spaces,
+}: DataSourceAvailabilitySectionProps) {
+  const router = useRouter()
   const [selectedSource, setSelectedSource] = useState<SourceCatalogEntry | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-
-  const catalogQuery = useAdminCatalogEntries()
-  const catalogEntries = catalogQuery.data ?? EMPTY_CATALOG_ENTRIES
-
-  const availabilitySummariesQuery = useCatalogAvailabilitySummaries()
-  const availabilitySummaries =
-    availabilitySummariesQuery.data ?? EMPTY_AVAILABILITY_SUMMARIES
-
-  const availabilityQuery = useCatalogAvailability(dialogOpen ? selectedSource?.id ?? null : null)
-  const spacesQuery = useResearchSpaces({ limit: 100 })
-  const spaces = spacesQuery.data?.spaces ?? []
+  const [selectedAvailability, setSelectedAvailability] = useState<DataSourceAvailability | null>(null)
+  const [isApplying, setIsApplying] = useState(false)
   const totalSpaces = spaces.length
-
-  const setGlobalAvailability = useSetCatalogGlobalAvailability()
-  const clearGlobalAvailability = useClearCatalogGlobalAvailability()
-  const setProjectAvailability = useSetCatalogProjectAvailability()
-  const clearProjectAvailability = useClearCatalogProjectAvailability()
-  const bulkGlobalAvailability = useBulkSetCatalogGlobalAvailability()
 
   const availabilitySummaryMap = useMemo(() => {
     const entries = new Map<string, NonNullable<typeof availabilitySummaries>[number]>()
@@ -109,6 +108,13 @@ export function DataSourceAvailabilitySection() {
     })
     return entries
   }, [availabilitySummaries])
+
+  const activeAvailability =
+    selectedSource
+      ? selectedAvailability ??
+        availabilitySummaryMap.get(selectedSource.id) ??
+        createDefaultAvailability(selectedSource.id)
+      : null
 
   const filteredEntries = useMemo(() => {
     if (!searchTerm.trim()) {
@@ -128,24 +134,22 @@ export function DataSourceAvailabilitySection() {
 
   const selectedOverrides = useMemo(() => {
     const overrides = new Map<string, PermissionLevel>()
-    availabilityQuery.data?.project_rules.forEach((rule) => {
+    activeAvailability?.project_rules.forEach((rule) => {
       if (rule.research_space_id) {
         overrides.set(rule.research_space_id, rule.permission_level)
       }
     })
     return overrides
-  }, [availabilityQuery.data])
+  }, [activeAvailability])
 
   const getStatusMeta = (sourceId: string) => {
     const summary = availabilitySummaryMap.get(sourceId)
     if (!summary) {
       return {
-        label: availabilitySummariesQuery.isLoading ? 'Loading policies…' : 'Defaults to Available',
-        description: availabilitySummariesQuery.isLoading
-          ? 'Fetching latest availability rules'
-          : 'No overrides configured',
-        variant: availabilitySummariesQuery.isLoading ? ('outline' as const) : ('secondary' as const),
-        isLoading: availabilitySummariesQuery.isLoading,
+        label: 'Defaults to Available',
+        description: 'No overrides configured',
+        variant: 'secondary' as const,
+        isLoading: false,
       }
     }
 
@@ -182,53 +186,89 @@ export function DataSourceAvailabilitySection() {
 
   const handleManage = (source: SourceCatalogEntry) => {
     setSelectedSource(source)
+    setSelectedAvailability(
+      availabilitySummaryMap.get(source.id) ?? createDefaultAvailability(source.id),
+    )
     setDialogOpen(true)
   }
 
   const handleGlobalPermissionChange = async (permissionLevel: PermissionLevel) => {
     if (!selectedSource) return
     try {
-      await setGlobalAvailability.mutateAsync({ catalogEntryId: selectedSource.id, permissionLevel })
+      setIsApplying(true)
+      const result = await updateGlobalAvailabilityAction(selectedSource.id, permissionLevel)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSelectedAvailability(result.data)
       toast.success(`Global permission set to ${PERMISSION_LABELS[permissionLevel]}`)
+      router.refresh()
     } catch (error) {
       toast.error('Failed to update global permission')
+    } finally {
+      setIsApplying(false)
     }
   }
 
   const handleGlobalReset = async () => {
     if (!selectedSource) return
     try {
-      await clearGlobalAvailability.mutateAsync({ catalogEntryId: selectedSource.id })
+      setIsApplying(true)
+      const result = await clearGlobalAvailabilityAction(selectedSource.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSelectedAvailability(result.data)
       toast.success('Global override removed')
+      router.refresh()
     } catch (error) {
       toast.error('Failed to reset global availability')
+    } finally {
+      setIsApplying(false)
     }
   }
 
   const handleProjectPermissionChange = async (researchSpaceId: string, permissionLevel: PermissionLevel) => {
     if (!selectedSource) return
     try {
-      await setProjectAvailability.mutateAsync({
-        catalogEntryId: selectedSource.id,
+      setIsApplying(true)
+      const result = await updateProjectAvailabilityAction(
+        selectedSource.id,
         researchSpaceId,
         permissionLevel,
-      })
+      )
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSelectedAvailability(result.data)
       toast.success('Permission updated for research space')
+      router.refresh()
     } catch (error) {
       toast.error('Failed to update research space permission')
+    } finally {
+      setIsApplying(false)
     }
   }
 
   const handleProjectReset = async (researchSpaceId: string) => {
     if (!selectedSource) return
     try {
-      await clearProjectAvailability.mutateAsync({
-        catalogEntryId: selectedSource.id,
-        researchSpaceId,
-      })
+      setIsApplying(true)
+      const result = await clearProjectAvailabilityAction(selectedSource.id, researchSpaceId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      setSelectedAvailability(result.data)
       toast.success('Project override removed')
+      router.refresh()
     } catch (error) {
       toast.error('Failed to remove project override')
+    } finally {
+      setIsApplying(false)
     }
   }
 
@@ -240,18 +280,26 @@ export function DataSourceAvailabilitySection() {
     const ids = filteredEntries.map((entry) => entry.id)
     const payloadIds = ids.length === totalCount ? undefined : ids
     try {
-      await bulkGlobalAvailability.mutateAsync({
-        permissionLevel,
-        catalogEntryIds: payloadIds,
+      setIsApplying(true)
+      const result = await bulkUpdateGlobalAvailabilityAction({
+        permission_level: permissionLevel,
+        catalog_entry_ids: payloadIds,
       })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       const affectedCount = payloadIds ? ids.length : totalCount
       toast.success(
         `Applied ${PERMISSION_LABELS[permissionLevel]} to ${affectedCount} data source${
           affectedCount === 1 ? '' : 's'
         } globally`,
       )
+      router.refresh()
     } catch (error) {
       toast.error('Failed to apply bulk update')
+    } finally {
+      setIsApplying(false)
     }
   }
 
@@ -264,14 +312,7 @@ export function DataSourceAvailabilitySection() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {catalogQuery.isLoading ? (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Loader2 className="size-4 animate-spin" />
-            Loading data catalog…
-          </div>
-        ) : catalogQuery.isError ? (
-          <p className="text-sm text-destructive">Unable to load catalog entries.</p>
-        ) : catalogEntries.length === 0 ? (
+        {catalogEntries.length === 0 ? (
           <p className="text-sm text-muted-foreground">No data sources found.</p>
         ) : (
           <>
@@ -293,29 +334,29 @@ export function DataSourceAvailabilitySection() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                    disabled={bulkGlobalAvailability.isPending || visibleCount === 0}
-                    onClick={() => handleBulkPermissionChange('available')}
+                  disabled={isApplying || visibleCount === 0}
+                  onClick={() => handleBulkPermissionChange('available')}
                 >
-                  {bulkGlobalAvailability.isPending && (
+                  {isApplying && (
                     <Loader2 className="mr-2 size-4 animate-spin" />
                   )}
-                    Set Available
+                  Set Available
                 </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={bulkGlobalAvailability.isPending || visibleCount === 0}
-                    onClick={() => handleBulkPermissionChange('visible')}
-                  >
-                    Set Visible
-                  </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={isApplying || visibleCount === 0}
+                  onClick={() => handleBulkPermissionChange('visible')}
+                >
+                  Set Visible
+                </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  disabled={bulkGlobalAvailability.isPending || visibleCount === 0}
-                    onClick={() => handleBulkPermissionChange('blocked')}
+                  disabled={isApplying || visibleCount === 0}
+                  onClick={() => handleBulkPermissionChange('blocked')}
                 >
-                    Set Blocked
+                  Set Blocked
                 </Button>
               </div>
             </div>
@@ -385,10 +426,16 @@ export function DataSourceAvailabilitySection() {
         )}
       </CardContent>
 
-      <Dialog open={dialogOpen} onOpenChange={(open) => {
-        setDialogOpen(open)
-        if (!open) setSelectedSource(null)
-      }}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open)
+          if (!open) {
+            setSelectedSource(null)
+            setSelectedAvailability(null)
+          }
+        }}
+      >
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Manage availability</DialogTitle>
@@ -397,10 +444,9 @@ export function DataSourceAvailabilitySection() {
             </DialogDescription>
           </DialogHeader>
 
-          {availabilityQuery.isLoading || !selectedSource ? (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" />
-              Loading availability…
+          {!selectedSource || !activeAvailability ? (
+            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              Select a data source to review availability rules.
             </div>
           ) : (
             <div className="space-y-6">
@@ -409,9 +455,9 @@ export function DataSourceAvailabilitySection() {
                   <div>
                     <p className="font-medium">Global availability</p>
                     <p className="text-sm text-muted-foreground">
-                      {availabilityQuery.data?.global_rule
+                      {activeAvailability?.global_rule
                         ? `Global override: ${
-                            PERMISSION_LABELS[availabilityQuery.data.global_rule.permission_level]
+                            PERMISSION_LABELS[activeAvailability.global_rule.permission_level]
                           }`
                         : 'No global override. Defaults to Available.'}
                     </p>
@@ -420,9 +466,9 @@ export function DataSourceAvailabilitySection() {
                     <Button
                       size="sm"
                       onClick={() => handleGlobalPermissionChange('available')}
-                      disabled={setGlobalAvailability.isPending}
+                      disabled={isApplying}
                     >
-                      {setGlobalAvailability.isPending && (
+                      {isApplying && (
                         <Loader2 className="mr-2 size-4 animate-spin" />
                       )}
                       Set Available
@@ -431,7 +477,7 @@ export function DataSourceAvailabilitySection() {
                       size="sm"
                       variant="secondary"
                       onClick={() => handleGlobalPermissionChange('visible')}
-                      disabled={setGlobalAvailability.isPending}
+                      disabled={isApplying}
                     >
                       Set Visible
                     </Button>
@@ -439,17 +485,17 @@ export function DataSourceAvailabilitySection() {
                       size="sm"
                       variant="destructive"
                       onClick={() => handleGlobalPermissionChange('blocked')}
-                      disabled={setGlobalAvailability.isPending}
+                      disabled={isApplying}
                     >
                       <ShieldOff className="mr-2 size-4" />
                       Set Blocked
                     </Button>
-                    {availabilityQuery.data?.global_rule && (
+                    {activeAvailability?.global_rule && (
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={handleGlobalReset}
-                        disabled={clearGlobalAvailability.isPending}
+                        disabled={isApplying}
                       >
                         Reset
                       </Button>
@@ -460,21 +506,16 @@ export function DataSourceAvailabilitySection() {
 
               <section>
                 <p className="mb-2 font-medium">Project-specific overrides</p>
-                {spacesQuery.isLoading ? (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="size-4 animate-spin" />
-                    Loading research spaces…
-                  </div>
-                ) : spacesQuery.data?.spaces?.length ? (
+                {spaces.length ? (
                   <div className="space-y-3">
-                    {spacesQuery.data.spaces.map((space) => {
+                    {spaces.map((space) => {
                       const override = selectedOverrides.get(space.id)
                       const effectivePermission = getEffectivePermissionForSpace(
-                        availabilityQuery.data,
+                        activeAvailability ?? undefined,
                         space.id,
                       )
                       const inheritedPermission =
-                        availabilityQuery.data?.global_rule?.permission_level ?? 'available'
+                        activeAvailability?.global_rule?.permission_level ?? 'available'
                       const selectValue = override ?? 'inherit'
                       return (
                         <div key={space.id} className="rounded-lg border p-3">
@@ -503,9 +544,7 @@ export function DataSourceAvailabilitySection() {
                                       handleProjectPermissionChange(space.id, permissionValue)
                                     }
                                   }}
-                                  disabled={
-                                    setProjectAvailability.isPending || clearProjectAvailability.isPending
-                                  }
+                                  disabled={isApplying}
                                 >
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select permission" />

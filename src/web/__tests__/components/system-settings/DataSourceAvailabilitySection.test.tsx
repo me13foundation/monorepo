@@ -1,118 +1,122 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DataSourceAvailabilitySection } from '@/components/system-settings/DataSourceAvailabilitySection'
+import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
+import type { DataSourceAvailability } from '@/lib/api/data-source-activation'
+import type { ResearchSpace } from '@/types/research-space'
+import { SpaceStatus } from '@/types/research-space'
 
-const mockUseAdminCatalogEntries = jest.fn()
-const mockUseCatalogAvailability = jest.fn()
-const mockUseCatalogAvailabilitySummaries = jest.fn()
-const mockUseSetCatalogGlobalAvailability = jest.fn()
-const mockUseSetCatalogProjectAvailability = jest.fn()
-const mockUseClearCatalogGlobalAvailability = jest.fn()
-const mockUseClearCatalogProjectAvailability = jest.fn()
-const mockUseBulkSetCatalogGlobalAvailability = jest.fn()
-const mockUseResearchSpaces = jest.fn()
+const mockUpdateGlobalAvailabilityAction = jest.fn()
+const mockUpdateProjectAvailabilityAction = jest.fn()
+const mockClearGlobalAvailabilityAction = jest.fn()
+const mockClearProjectAvailabilityAction = jest.fn()
+const mockBulkUpdateGlobalAvailabilityAction = jest.fn()
 
-jest.mock('@/lib/queries/data-sources', () => ({
-  useAdminCatalogEntries: (...args: unknown[]) => mockUseAdminCatalogEntries(...args),
-  useCatalogAvailability: (...args: unknown[]) => mockUseCatalogAvailability(...args),
-  useCatalogAvailabilitySummaries: (...args: unknown[]) => mockUseCatalogAvailabilitySummaries(...args),
-  useSetCatalogGlobalAvailability: () => mockUseSetCatalogGlobalAvailability(),
-  useSetCatalogProjectAvailability: () => mockUseSetCatalogProjectAvailability(),
-  useClearCatalogGlobalAvailability: () => mockUseClearCatalogGlobalAvailability(),
-  useClearCatalogProjectAvailability: () => mockUseClearCatalogProjectAvailability(),
-  useBulkSetCatalogGlobalAvailability: () => mockUseBulkSetCatalogGlobalAvailability(),
+jest.mock('@/app/actions/data-source-availability', () => ({
+  updateGlobalAvailabilityAction: (...args: unknown[]) =>
+    mockUpdateGlobalAvailabilityAction(...args),
+  updateProjectAvailabilityAction: (...args: unknown[]) =>
+    mockUpdateProjectAvailabilityAction(...args),
+  clearGlobalAvailabilityAction: (...args: unknown[]) =>
+    mockClearGlobalAvailabilityAction(...args),
+  clearProjectAvailabilityAction: (...args: unknown[]) =>
+    mockClearProjectAvailabilityAction(...args),
+  bulkUpdateGlobalAvailabilityAction: (...args: unknown[]) =>
+    mockBulkUpdateGlobalAvailabilityAction(...args),
 }))
 
-jest.mock('@/lib/queries/research-spaces', () => ({
-  useResearchSpaces: (...args: unknown[]) => mockUseResearchSpaces(...args),
+jest.mock('sonner', () => ({
+  toast: {
+    success: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+  },
 }))
 
-function setupDefaults() {
-  mockUseAdminCatalogEntries.mockReturnValue({
-    data: [
-      {
-        id: 'catalog-1',
-        name: 'Global API',
-        description: 'Primary API source',
-        category: 'Genomic Variant Databases',
-        subcategory: null,
-        tags: [],
-        param_type: 'none',
-        source_type: 'api',
-        is_active: true,
-        requires_auth: false,
-        usage_count: 0,
-        success_rate: 0,
-      },
-    ],
-    isLoading: false,
-  })
-  mockUseCatalogAvailability.mockReturnValue({
-    data: {
-      catalog_entry_id: 'catalog-1',
-      effective_permission_level: 'available',
-      effective_is_active: true,
-      global_rule: null,
-      project_rules: [],
-    },
-    isLoading: false,
-  })
-  mockUseCatalogAvailabilitySummaries.mockReturnValue({
-    data: [
-      {
-        catalog_entry_id: 'catalog-1',
-        effective_permission_level: 'available',
-        effective_is_active: true,
-        global_rule: null,
-        project_rules: [],
-      },
-    ],
-    isLoading: false,
-  })
-  mockUseResearchSpaces.mockReturnValue({
-    data: {
-      spaces: [
-        {
-          id: 'space-1',
-          name: 'Space Alpha',
-          slug: 'space-alpha',
-          description: 'Test space',
-          owner_id: 'user-1',
-          status: 'active',
-          settings: {},
-          tags: [],
-          created_at: '',
-          updated_at: '',
-        },
-      ],
-      total: 1,
-      skip: 0,
-      limit: 50,
-    },
-    isLoading: false,
-  })
-  const defaultMutation = () => ({ mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false })
-  mockUseSetCatalogGlobalAvailability.mockImplementation(defaultMutation)
-  mockUseSetCatalogProjectAvailability.mockImplementation(defaultMutation)
-  mockUseClearCatalogGlobalAvailability.mockImplementation(defaultMutation)
-  mockUseClearCatalogProjectAvailability.mockImplementation(defaultMutation)
-  mockUseBulkSetCatalogGlobalAvailability.mockImplementation(defaultMutation)
+const baseCatalogEntry: SourceCatalogEntry = {
+  id: 'catalog-1',
+  name: 'Global API',
+  description: 'Primary API source',
+  category: 'Genomic Variant Databases',
+  subcategory: null,
+  tags: [],
+  param_type: 'none',
+  source_type: 'api',
+  is_active: true,
+  requires_auth: false,
+  usage_count: 0,
+  success_rate: 0,
+  capabilities: {},
 }
+
+const baseAvailability: DataSourceAvailability = {
+  catalog_entry_id: 'catalog-1',
+  effective_permission_level: 'available',
+  effective_is_active: true,
+  global_rule: null,
+  project_rules: [],
+}
+
+const baseSpaces: ResearchSpace[] = [
+  {
+    id: 'space-1',
+    name: 'Space Alpha',
+    slug: 'space-alpha',
+    description: 'Test space',
+    owner_id: 'user-1',
+    status: SpaceStatus.ACTIVE,
+    settings: {},
+    tags: [],
+    created_at: '',
+    updated_at: '',
+  },
+]
 
 describe('DataSourceAvailabilitySection', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    setupDefaults()
+    mockUpdateGlobalAvailabilityAction.mockResolvedValue({
+      success: true,
+      data: baseAvailability,
+    })
+    mockUpdateProjectAvailabilityAction.mockResolvedValue({
+      success: true,
+      data: baseAvailability,
+    })
+    mockClearGlobalAvailabilityAction.mockResolvedValue({
+      success: true,
+      data: baseAvailability,
+    })
+    mockClearProjectAvailabilityAction.mockResolvedValue({
+      success: true,
+      data: baseAvailability,
+    })
+    mockBulkUpdateGlobalAvailabilityAction.mockResolvedValue({
+      success: true,
+      data: [baseAvailability],
+    })
   })
 
   it('renders list of data sources', () => {
-    render(<DataSourceAvailabilitySection />)
+    render(
+      <DataSourceAvailabilitySection
+        catalogEntries={[baseCatalogEntry]}
+        availabilitySummaries={[baseAvailability]}
+        spaces={baseSpaces}
+      />,
+    )
     expect(screen.getByText('Global API')).toBeInTheDocument()
   })
 
   it('opens manage dialog when button is clicked', async () => {
     const user = userEvent.setup()
-    render(<DataSourceAvailabilitySection />)
+    render(
+      <DataSourceAvailabilitySection
+        catalogEntries={[baseCatalogEntry]}
+        availabilitySummaries={[baseAvailability]}
+        spaces={baseSpaces}
+      />,
+    )
 
     await user.click(screen.getByRole('button', { name: /manage availability/i }))
     expect(await screen.findByText(/Global availability/i)).toBeInTheDocument()
@@ -120,150 +124,83 @@ describe('DataSourceAvailabilitySection', () => {
 
   it('calls mutation when activating globally', async () => {
     const user = userEvent.setup()
-    const mutateAsync = jest.fn().mockResolvedValue(undefined)
-    mockUseSetCatalogGlobalAvailability.mockReturnValue({ mutateAsync, isPending: false })
-
-    render(<DataSourceAvailabilitySection />)
+    render(
+      <DataSourceAvailabilitySection
+        catalogEntries={[baseCatalogEntry]}
+        availabilitySummaries={[baseAvailability]}
+        spaces={baseSpaces}
+      />,
+    )
 
     await user.click(screen.getByRole('button', { name: /manage availability/i }))
-    await user.click(await screen.findByRole('button', { name: /Set Available/i }))
+    const dialog = await screen.findByRole('dialog')
+    const dialogSetAvailable = within(dialog).getByRole('button', { name: /Set Available/i })
+    await user.click(dialogSetAvailable)
 
-    expect(mutateAsync).toHaveBeenCalledWith({
-      catalogEntryId: 'catalog-1',
-      permissionLevel: 'available',
-    })
+    expect(mockUpdateGlobalAvailabilityAction).toHaveBeenCalledWith('catalog-1', 'available')
   })
 
   it('filters data sources based on search input', async () => {
     const user = userEvent.setup()
-    mockUseAdminCatalogEntries.mockReturnValue({
-      data: [
-        {
-          id: 'catalog-1',
-          name: 'Alpha Source',
-          description: 'Primary alpha data',
-          category: 'Genomic',
-          subcategory: null,
-          tags: [],
-          param_type: 'none',
-          source_type: 'api',
-          is_active: true,
-          requires_auth: false,
-          usage_count: 0,
-          success_rate: 0,
-        },
-        {
-          id: 'catalog-2',
-          name: 'Beta Source',
-          description: 'Secondary beta data',
-          category: 'Clinical',
-          subcategory: null,
-          tags: [],
-          param_type: 'none',
-          source_type: 'api',
-          is_active: true,
-          requires_auth: false,
-          usage_count: 0,
-          success_rate: 0,
-        },
-      ],
-      isLoading: false,
-    })
-    mockUseCatalogAvailabilitySummaries.mockReturnValue({
-      data: [
-        {
-          catalog_entry_id: 'catalog-1',
-          effective_permission_level: 'available',
-          effective_is_active: true,
-          global_rule: null,
-          project_rules: [],
-        },
-        {
-          catalog_entry_id: 'catalog-2',
-          effective_permission_level: 'available',
-          effective_is_active: true,
-          global_rule: null,
-          project_rules: [],
-        },
-      ],
-      isLoading: false,
-    })
-
-    render(<DataSourceAvailabilitySection />)
+    const secondEntry: SourceCatalogEntry = {
+      ...baseCatalogEntry,
+      id: 'catalog-2',
+      name: 'Beta Source',
+      description: 'Secondary beta data',
+    }
+    render(
+      <DataSourceAvailabilitySection
+        catalogEntries={[baseCatalogEntry, secondEntry]}
+        availabilitySummaries={[
+          baseAvailability,
+          {
+            ...baseAvailability,
+            catalog_entry_id: 'catalog-2',
+          },
+        ]}
+        spaces={baseSpaces}
+      />,
+    )
 
     const input = screen.getByPlaceholderText(/search by name/i)
     await user.clear(input)
     await user.type(input, 'Beta')
 
     expect(screen.getByText('Beta Source')).toBeInTheDocument()
-    expect(screen.queryByText('Alpha Source')).not.toBeInTheDocument()
+    expect(screen.queryByText('Global API')).not.toBeInTheDocument()
   })
 
   it('applies bulk enable to filtered results', async () => {
     const user = userEvent.setup()
-    const mutateAsync = jest.fn().mockResolvedValue(undefined)
-    mockUseBulkSetCatalogGlobalAvailability.mockReturnValue({ mutateAsync, isPending: false })
-    mockUseAdminCatalogEntries.mockReturnValue({
-      data: [
-        {
-          id: 'catalog-1',
-          name: 'Alpha Source',
-          description: 'Primary alpha data',
-          category: 'Genomic',
-          subcategory: null,
-          tags: [],
-          param_type: 'none',
-          source_type: 'api',
-          is_active: true,
-          requires_auth: false,
-          usage_count: 0,
-          success_rate: 0,
-        },
-        {
-          id: 'catalog-2',
-          name: 'Beta Source',
-          description: 'Secondary beta data',
-          category: 'Clinical',
-          subcategory: null,
-          tags: [],
-          param_type: 'none',
-          source_type: 'api',
-          is_active: true,
-          requires_auth: false,
-          usage_count: 0,
-          success_rate: 0,
-        },
-      ],
-      isLoading: false,
-    })
-    mockUseCatalogAvailabilitySummaries.mockReturnValue({
-      data: [
-        {
-          catalog_entry_id: 'catalog-1',
-          effective_is_active: true,
-          global_rule: null,
-          project_rules: [],
-        },
-        {
-          catalog_entry_id: 'catalog-2',
-          effective_is_active: true,
-          global_rule: null,
-          project_rules: [],
-        },
-      ],
-      isLoading: false,
-    })
-
-    render(<DataSourceAvailabilitySection />)
+    const secondEntry: SourceCatalogEntry = {
+      ...baseCatalogEntry,
+      id: 'catalog-2',
+      name: 'Beta Source',
+      description: 'Secondary beta data',
+    }
+    render(
+      <DataSourceAvailabilitySection
+        catalogEntries={[baseCatalogEntry, secondEntry]}
+        availabilitySummaries={[
+          baseAvailability,
+          {
+            ...baseAvailability,
+            catalog_entry_id: 'catalog-2',
+          },
+        ]}
+        spaces={baseSpaces}
+      />,
+    )
 
     const input = screen.getByPlaceholderText(/search by name/i)
     await user.clear(input)
     await user.type(input, 'Beta')
 
     await user.click(screen.getByRole('button', { name: /Set Available/i }))
-    expect(mutateAsync).toHaveBeenCalledWith({
-      permissionLevel: 'available',
-      catalogEntryIds: ['catalog-2'],
+
+    expect(mockBulkUpdateGlobalAvailabilityAction).toHaveBeenCalledWith({
+      permission_level: 'available',
+      catalog_entry_ids: ['catalog-2'],
     })
   })
 })

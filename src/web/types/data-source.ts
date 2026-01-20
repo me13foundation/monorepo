@@ -63,4 +63,5 @@ export interface IngestionJobHistoryItem {
   records_failed: number
   records_skipped: number
   bytes_processed: number
+  metadata?: Record<string, unknown>
 }

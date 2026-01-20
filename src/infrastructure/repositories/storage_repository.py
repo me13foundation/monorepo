@@ -216,13 +216,13 @@ class SqlAlchemyStorageOperationRepository(StorageOperationRepository):
             id=str(uuid4()),
             configuration_id=str(result.configuration_id),
             user_id=None,
-            operation_type=StorageOperationTypeEnum.TEST,
+            operation_type=StorageOperationTypeEnum.TEST.value,
             key="connection_test",
             file_size_bytes=None,
             status=(
-                StorageOperationStatusEnum.SUCCESS
+                StorageOperationStatusEnum.SUCCESS.value
                 if result.success
-                else StorageOperationStatusEnum.FAILED
+                else StorageOperationStatusEnum.FAILED.value
             ),
             error_message=None if result.success else result.message,
             metadata_payload={
@@ -250,7 +250,7 @@ class SqlAlchemyStorageOperationRepository(StorageOperationRepository):
                     case(
                         (
                             StorageOperationModel.operation_type
-                            == StorageOperationTypeEnum.STORE,
+                            == StorageOperationTypeEnum.STORE.value,
                             1,
                         ),
                         else_=0,
@@ -264,9 +264,9 @@ class SqlAlchemyStorageOperationRepository(StorageOperationRepository):
                         (
                             and_(
                                 StorageOperationModel.operation_type
-                                == StorageOperationTypeEnum.STORE,
+                                == StorageOperationTypeEnum.STORE.value,
                                 StorageOperationModel.status
-                                == StorageOperationStatusEnum.SUCCESS,
+                                == StorageOperationStatusEnum.SUCCESS.value,
                             ),
                             StorageOperationModel.file_size_bytes,
                         ),
@@ -281,7 +281,7 @@ class SqlAlchemyStorageOperationRepository(StorageOperationRepository):
                     case(
                         (
                             StorageOperationModel.status
-                            == StorageOperationStatusEnum.FAILED,
+                            == StorageOperationStatusEnum.FAILED.value,
                             1,
                         ),
                         else_=0,

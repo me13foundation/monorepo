@@ -48,23 +48,25 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import {
-  useStorageConfigurations,
-  useStorageHealth,
-  useStorageMetrics,
-  useStorageMutations,
-  useStorageOverview,
-} from '@/lib/queries/storage'
-import { useMaintenanceState } from '@/lib/queries/system-status'
+  createStorageConfigurationAction,
+  deleteStorageConfigurationAction,
+  testStorageConfigurationAction,
+  updateStorageConfigurationAction,
+} from '@/app/actions/storage'
 import type {
   CreateStorageConfigurationRequest,
   StorageConfiguration,
   StorageConfigurationStats,
   StorageOverviewResponse,
   StorageProviderConfig,
+  StorageHealthReport,
+  StorageUsageMetrics,
   StorageUseCase,
 } from '@/types/storage'
 import { STORAGE_PROVIDERS, STORAGE_USE_CASES } from '@/types/storage'
 import { cn } from '@/lib/utils'
+import type { StorageConfigurationListResponse } from '@/types/storage'
+import type { MaintenanceModeResponse } from '@/types/system-status'
 
 const storageUseCaseEnum = z.enum(STORAGE_USE_CASES)
 const STORAGE_DASHBOARD_BETA =
@@ -127,6 +129,8 @@ const formatBytes = (bytes: number): string => {
 
 interface StorageConfigurationCardProps {
   configuration: StorageConfiguration
+  usage: StorageUsageMetrics | null
+  health: StorageHealthReport | null
   isToggling: boolean
   onToggleEnabled: (
     configuration: StorageConfiguration,
@@ -144,6 +148,8 @@ interface StorageConfigurationCardProps {
 
 function StorageConfigurationCard({
   configuration,
+  usage,
+  health,
   onToggleEnabled,
   isToggling,
   onTestConnection,
@@ -154,9 +160,7 @@ function StorageConfigurationCard({
   isDeleting,
   enableSelection,
 }: StorageConfigurationCardProps) {
-  const metricsQuery = useStorageMetrics(configuration.id)
-  const healthQuery = useStorageHealth(configuration.id)
-  const totalFiles = metricsQuery.data?.total_files ?? 0
+  const totalFiles = usage?.total_files ?? 0
 
   const handleToggle = async (checked: boolean) => {
     await onToggleEnabled(configuration, checked, totalFiles > 0)
@@ -225,12 +229,12 @@ function StorageConfigurationCard({
             <p className="flex items-center gap-2 font-medium">
               <ShieldCheck
                 className={cn('size-4', {
-                  'text-emerald-500': healthQuery.data?.status === 'healthy',
-                  'text-amber-500': healthQuery.data?.status === 'degraded',
-                  'text-destructive': healthQuery.data?.status === 'offline',
+                  'text-emerald-500': health?.status === 'healthy',
+                  'text-amber-500': health?.status === 'degraded',
+                  'text-destructive': health?.status === 'offline',
                 })}
               />
-              {healthQuery.data?.status ?? 'Unknown'}
+              {health?.status ?? 'Unknown'}
             </p>
           </div>
           <div>
@@ -240,8 +244,8 @@ function StorageConfigurationCard({
           <div>
             <p className="text-xs text-muted-foreground">Error Rate</p>
             <p className="font-medium">
-              {metricsQuery.data?.error_rate
-                ? `${(metricsQuery.data.error_rate * 100).toFixed(1)}%`
+              {usage?.error_rate
+                ? `${(usage.error_rate * 100).toFixed(1)}%`
                 : '0%'}
             </p>
           </div>
@@ -475,20 +479,28 @@ function BulkActionBar({
   )
 }
 
-export function StorageConfigurationManager() {
+interface StorageConfigurationManagerProps {
+  configurations: StorageConfigurationListResponse | null
+  overview: StorageOverviewResponse | null
+  maintenanceState: MaintenanceModeResponse | null
+}
+
+export function StorageConfigurationManager({
+  configurations: configurationResponse,
+  overview,
+  maintenanceState,
+}: StorageConfigurationManagerProps) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [testingId, setTestingId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkAction, setBulkAction] = useState<'enable' | 'disable' | 'delete' | null>(null)
-  const storageQuery = useStorageConfigurations()
-  const overviewQuery = useStorageOverview()
-  const storageMutations = useStorageMutations()
-  const maintenanceQuery = useMaintenanceState()
-  const isMaintenanceActive = maintenanceQuery.data?.state.is_active ?? false
+  const isMaintenanceActive = maintenanceState?.state.is_active ?? false
+  const maintenanceStateLoading = maintenanceState === null
   const [pendingCreate, setPendingCreate] = useState<StorageFormValues | null>(null)
   const [maintenanceModalOpen, setMaintenanceModalOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const showDashboardBeta = STORAGE_DASHBOARD_BETA
 
   const form = useForm<StorageFormValues>({
@@ -506,17 +518,17 @@ export function StorageConfigurationManager() {
 
   const selectedProvider = form.watch('provider')
   const configurations = useMemo(
-    () => storageQuery.data?.data ?? [],
-    [storageQuery.data?.data],
+    () => configurationResponse?.data ?? [],
+    [configurationResponse?.data],
   )
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
   const overviewMap = useMemo(() => {
     const map = new Map<string, StorageConfigurationStats>()
-    overviewQuery.data?.configurations.forEach((entry) => {
+    overview?.configurations.forEach((entry) => {
       map.set(entry.configuration.id, entry)
     })
     return map
-  }, [overviewQuery.data])
+  }, [overview])
 
   useEffect(() => {
     if (!configurations.length && selectedIds.length) {
@@ -530,18 +542,25 @@ export function StorageConfigurationManager() {
   const submitConfiguration = async (values: StorageFormValues) => {
     const payload = convertFormToPayload(values)
     try {
-      await storageMutations.createConfiguration.mutateAsync(payload)
+      setIsCreating(true)
+      const result = await createStorageConfigurationAction(payload)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success(`Created storage configuration "${values.name}"`)
       form.reset()
       setDialogOpen(false)
     } catch (error) {
       console.error('[StorageConfigurationManager] Failed to create configuration', error)
       toast.error('Unable to create storage configuration')
+    } finally {
+      setIsCreating(false)
     }
   }
 
   const requireMaintenance = (): boolean => {
-    if (maintenanceQuery.isLoading) {
+    if (maintenanceStateLoading) {
       toast.error('Maintenance status is still loading. Please try again.')
       return true
     }
@@ -562,10 +581,11 @@ export function StorageConfigurationManager() {
     }
     setTogglingId(configuration.id)
     try {
-      await storageMutations.updateConfiguration.mutateAsync({
-        configurationId: configuration.id,
-        payload: { enabled },
-      })
+      const result = await updateStorageConfigurationAction(configuration.id, { enabled })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success(`${configuration.name} ${enabled ? 'enabled' : 'disabled'}`)
     } catch (error) {
       console.error('[StorageConfigurationManager] Failed to toggle configuration', error)
@@ -594,13 +614,16 @@ export function StorageConfigurationManager() {
   const handleTestConnection = async (configuration: StorageConfiguration) => {
     setTestingId(configuration.id)
     try {
-      const result = await storageMutations.testConfiguration.mutateAsync({
-        configurationId: configuration.id,
-      })
-      if (result.success) {
-        toast.success(result.message ?? 'Connection successful')
+      const result = await testStorageConfigurationAction(configuration.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      const response = result.data
+      if (response.success) {
+        toast.success(response.message ?? 'Connection successful')
       } else {
-        toast.error(result.message ?? 'Connection failed')
+        toast.error(response.message ?? 'Connection failed')
       }
     } catch (error) {
       console.error('[StorageConfigurationManager] Failed to test storage configuration', error)
@@ -624,10 +647,11 @@ export function StorageConfigurationManager() {
     }
     setDeletingId(configuration.id)
     try {
-      await storageMutations.deleteConfiguration.mutateAsync({
-        configurationId: configuration.id,
-        force,
-      })
+      const result = await deleteStorageConfigurationAction(configuration.id, force)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success(force ? 'Configuration deleted' : 'Configuration disabled')
     } catch (error) {
       console.error('[StorageConfigurationManager] Failed to delete configuration', error)
@@ -696,13 +720,11 @@ export function StorageConfigurationManager() {
         <Button onClick={() => setDialogOpen(true)}>Add Configuration</Button>
       </div>
 
-      {overviewQuery.isLoading ? (
-        <Skeleton className="h-48 w-full" />
-      ) : overviewQuery.data ? (
-        <StorageOverviewSection overview={overviewQuery.data} showBeta={showDashboardBeta} />
+      {overview ? (
+        <StorageOverviewSection overview={overview} showBeta={showDashboardBeta} />
       ) : null}
 
-      {storageQuery.isLoading ? (
+      {configurationResponse === null ? (
         <div className="space-y-4">
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
@@ -713,10 +735,12 @@ export function StorageConfigurationManager() {
             <StorageConfigurationCard
               key={configuration.id}
               configuration={configuration}
+              usage={overviewMap.get(configuration.id)?.usage ?? null}
+              health={overviewMap.get(configuration.id)?.health ?? null}
               onToggleEnabled={updateConfigurationEnabled}
               onTestConnection={handleTestConnection}
-              isTesting={testingId === configuration.id && storageMutations.testConfiguration.isPending}
-              isToggling={togglingId === configuration.id && storageMutations.updateConfiguration.isPending}
+              isTesting={testingId === configuration.id}
+              isToggling={togglingId === configuration.id}
               isSelected={selectedSet.has(configuration.id)}
               onSelectionChange={(id, selected) => {
                 setSelectedIds((current) =>
@@ -724,7 +748,7 @@ export function StorageConfigurationManager() {
                 )
               }}
               onDelete={handleDeleteConfiguration}
-              isDeleting={deletingId === configuration.id && storageMutations.deleteConfiguration.isPending}
+              isDeleting={deletingId === configuration.id}
               enableSelection={showDashboardBeta}
             />
           ))}
@@ -962,8 +986,8 @@ export function StorageConfigurationManager() {
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={storageMutations.createConfiguration.isPending}>
-                  {storageMutations.createConfiguration.isPending && (
+                <Button type="submit" disabled={isCreating}>
+                  {isCreating && (
                     <Loader2 className="mr-2 size-4 animate-spin" />
                   )}
                   Create Configuration

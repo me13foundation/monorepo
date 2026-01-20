@@ -26,3 +26,4 @@ class PubMedIngestionSummary:
     parsed_publications: int
     created_publications: int
     updated_publications: int
+    executed_query: str | None = None

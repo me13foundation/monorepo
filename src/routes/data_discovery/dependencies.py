@@ -11,6 +11,7 @@ from src.application.services.audit_service import AuditTrailService
 from src.application.services.data_discovery_service import DataDiscoveryService
 from src.domain.entities.data_discovery_session import DataDiscoverySession
 from src.domain.entities.user import User, UserRole
+from src.infrastructure.observability.request_context import get_audit_context
 
 _audit_trail_service = AuditTrailService(SqlAlchemyAuditRepository())
 
@@ -18,6 +19,9 @@ _audit_trail_service = AuditTrailService(SqlAlchemyAuditRepository())
 def get_audit_trail_service() -> AuditTrailService:
     """Provide a singleton audit service instance for route handlers."""
     return _audit_trail_service
+
+
+get_audit_context_dependency = get_audit_context
 
 
 def owner_filter_for_user(current_user: User) -> UUID | None:
@@ -56,7 +60,9 @@ def require_session_for_user(
 
 
 __all__ = [
+    "get_audit_context_dependency",
     "get_audit_trail_service",
+    "get_audit_context",
     "owner_filter_for_user",
     "require_session_for_user",
 ]

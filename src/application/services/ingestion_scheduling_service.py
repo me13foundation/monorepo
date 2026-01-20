@@ -147,7 +147,14 @@ class IngestionSchedulingService:
                 duration_seconds=None,
                 records_per_second=None,
             )
-            completed = running.complete_successfully(metrics)
+            # Record executed query in metadata if available
+            metadata = dict(running.metadata or {})
+            if hasattr(summary, "executed_query") and summary.executed_query:
+                metadata["executed_query"] = summary.executed_query
+
+            completed = running.model_copy(
+                update={"metadata": metadata},
+            ).complete_successfully(metrics)
         except Exception as exc:  # pragma: no cover - defensive
             error = ingestion_job.IngestionError(
                 error_type="scheduler_failure",

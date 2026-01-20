@@ -2,33 +2,26 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useSession } from 'next-auth/react'
 import { Plus, FolderPlus, Settings } from 'lucide-react'
 import { useSpaceContext } from '@/components/space-context-provider'
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { useRouter } from 'next/navigation'
-import type { ResearchSpaceListResponse } from '@/types/research-space'
 import { DashboardSection, PageHero } from '@/components/ui/composition-patterns'
 import { getThemeVariant } from '@/lib/theme/variants'
 import { ResearchSpaceCard } from '@/components/research-spaces/ResearchSpaceCard'
 import { UserRole } from '@/types/auth'
 
-export default function DashboardClient() {
-  return <DashboardContent />
+interface DashboardClientProps {
+  userRole: UserRole
 }
 
-function DashboardContent() {
-  const { data: session } = useSession()
-  const { currentSpaceId } = useSpaceContext()
-  const { data, isLoading: spacesLoading } = useResearchSpaces()
+export default function DashboardClient({ userRole }: DashboardClientProps) {
+  const { currentSpaceId, spaces, isLoading: spacesLoading } = useSpaceContext()
   const router = useRouter()
   const theme = getThemeVariant('research')
 
-  const spacesResponse = data as ResearchSpaceListResponse | undefined
-  const spaces = spacesResponse?.spaces ?? []
   const hasSpaces = spaces.length > 0
-  const canCreateSpace = session?.user?.role === UserRole.ADMIN
-  const canAccessSystemSettings = session?.user?.role === UserRole.ADMIN
+  const canCreateSpace = userRole === UserRole.ADMIN
+  const canAccessSystemSettings = userRole === UserRole.ADMIN
   const currentSpaceName = currentSpaceId
     ? spaces.find((space) => space.id === currentSpaceId)?.name || currentSpaceId
     : null
@@ -103,7 +96,7 @@ function DashboardContent() {
               <div className="mb-6 rounded-full bg-brand-primary/10 p-4 sm:p-6">
                 <FolderPlus className="size-8 text-brand-primary sm:size-10" />
               </div>
-              <h3 className="mb-2 text-xl font-bold font-heading">No research spaces yet</h3>
+              <h3 className="mb-2 font-heading text-xl font-bold">No research spaces yet</h3>
               <p className="mb-8 max-w-md text-base text-muted-foreground">
                 Create a space to organize MED13 research work. Data sources, records, and activity
                 will live inside each space.

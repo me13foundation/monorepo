@@ -14,6 +14,7 @@ from . import (
     dashboard_service,
     data_discovery_service,
     data_source_activation_service,
+    data_source_ai_test_service,
     data_source_authorization_service,
     discovery_configuration_service,
     evidence_service,
@@ -41,6 +42,12 @@ AuthorizationService = authorization_service.AuthorizationService
 AuditTrailService = audit_service.AuditTrailService
 DashboardService = dashboard_service.DashboardService
 DataDiscoveryService = data_discovery_service.DataDiscoveryService
+DataDiscoveryServiceDependencies = (
+    data_discovery_service.DataDiscoveryServiceDependencies
+)
+DataSourceAiTestService = data_source_ai_test_service.DataSourceAiTestService
+DataSourceAiTestDependencies = data_source_ai_test_service.DataSourceAiTestDependencies
+DataSourceAiTestSettings = data_source_ai_test_service.DataSourceAiTestSettings
 DataSourceActivationService = data_source_activation_service.DataSourceActivationService
 DataSourceAuthorizationService = (
     data_source_authorization_service.DataSourceAuthorizationService
@@ -96,6 +103,10 @@ __all__ = [
     "CreateTemplateRequest",
     "DashboardService",
     "DataDiscoveryService",
+    "DataDiscoveryServiceDependencies",
+    "DataSourceAiTestService",
+    "DataSourceAiTestDependencies",
+    "DataSourceAiTestSettings",
     "DataSourceActivationService",
     "DataSourceAuthorizationService",
     "DataSourceAvailabilitySummary",

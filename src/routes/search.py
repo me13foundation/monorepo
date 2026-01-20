@@ -5,7 +5,6 @@ Provides cross-entity search capabilities with relevance scoring.
 """
 
 from collections.abc import Mapping, Sequence
-from typing import TypedDict
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -23,26 +22,6 @@ from src.infrastructure.dependency_injection.dependencies import (
 from src.type_definitions.common import JSONObject
 
 router = APIRouter(prefix="/search", tags=["search"])
-
-
-class RawSearchResult(TypedDict):
-    """Raw search result payload from the service."""
-
-    entity_type: str
-    entity_id: int | str
-    title: str
-    description: str
-    relevance_score: float
-    metadata: JSONObject
-
-
-class UnifiedSearchPayload(TypedDict, total=False):
-    """Typed representation of the unified search payload."""
-
-    query: str
-    total_results: int
-    entity_breakdown: dict[str, int]
-    results: list[RawSearchResult]
 
 
 class SearchResultItem(BaseModel):

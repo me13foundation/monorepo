@@ -16,9 +16,9 @@ export function AuthShell({ title, description, children, footer, isLoading = fa
     <div className="from-brand-primary/8 to-brand-secondary/8 flex min-h-screen items-center justify-center bg-gradient-to-br via-background px-4 py-8">
       <div className="w-full max-w-md space-y-6">
         <div className="text-center">
-          <p className="text-xs uppercase tracking-[0.4em] text-muted-foreground/70 font-semibold">MED13 Foundation</p>
-          <h1 className="mt-3 section-heading">{title}</h1>
-          <p className="mt-3 text-muted-foreground body-large">{description}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.4em] text-muted-foreground/70">MED13 Foundation</p>
+          <h1 className="section-heading mt-3">{title}</h1>
+          <p className="body-large mt-3 text-muted-foreground">{description}</p>
         </div>
 
         <Card className="border-border/60 bg-card/95 shadow-brand-lg backdrop-blur">

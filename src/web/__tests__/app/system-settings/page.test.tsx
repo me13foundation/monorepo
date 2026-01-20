@@ -1,10 +1,14 @@
-import React from 'react'
 import type { ReactElement } from 'react'
 import SystemSettingsPage from '@/app/(dashboard)/system-settings/page'
 import { INITIAL_USER_PARAMS } from '@/app/(dashboard)/system-settings/constants'
 import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
 import { fetchStorageConfigurations, fetchStorageOverview } from '@/lib/api/storage'
 import { fetchMaintenanceState } from '@/lib/api/system-status'
+import { fetchResearchSpaces } from '@/lib/api/research-spaces'
+import {
+  fetchAdminCatalogEntries,
+  fetchCatalogAvailabilitySummaries,
+} from '@/lib/api/data-source-activation'
 import { getServerSession } from 'next-auth'
 
 jest.mock('next-auth', () => ({
@@ -27,6 +31,13 @@ jest.mock('@/lib/api/storage', () => ({
 }))
 jest.mock('@/lib/api/system-status', () => ({
   fetchMaintenanceState: jest.fn(),
+}))
+jest.mock('@/lib/api/research-spaces', () => ({
+  fetchResearchSpaces: jest.fn(),
+}))
+jest.mock('@/lib/api/data-source-activation', () => ({
+  fetchAdminCatalogEntries: jest.fn(),
+  fetchCatalogAvailabilitySummaries: jest.fn(),
 }))
 
 const ADMIN_SESSION = {
@@ -78,7 +89,7 @@ describe('SystemSettingsPage (server)', () => {
 
   it('prefetches data and renders when admin session is valid', async () => {
     ;(getServerSession as jest.Mock).mockResolvedValue(ADMIN_SESSION)
-    ;(fetchUsers as jest.Mock).mockResolvedValue({ users: [], total: 0 })
+    ;(fetchUsers as jest.Mock).mockResolvedValue({ users: [], total: 0, skip: 0, limit: 25 })
     ;(fetchUserStatistics as jest.Mock).mockResolvedValue({
       total_users: 0,
       active_users: 0,
@@ -110,7 +121,24 @@ describe('SystemSettingsPage (server)', () => {
       },
       configurations: [],
     })
-    ;(fetchMaintenanceState as jest.Mock).mockResolvedValue({ state: { is_active: false } })
+    ;(fetchMaintenanceState as jest.Mock).mockResolvedValue({
+      state: {
+        is_active: false,
+        message: null,
+        activated_at: null,
+        activated_by: null,
+        last_updated_by: null,
+        last_updated_at: null,
+      },
+    })
+    ;(fetchAdminCatalogEntries as jest.Mock).mockResolvedValue([])
+    ;(fetchCatalogAvailabilitySummaries as jest.Mock).mockResolvedValue([])
+    ;(fetchResearchSpaces as jest.Mock).mockResolvedValue({
+      spaces: [],
+      total: 0,
+      skip: 0,
+      limit: 100,
+    })
     redirectMock.mockImplementation(() => undefined)
 
     const result = (await SystemSettingsPage()) as ReactElement
@@ -124,6 +152,9 @@ describe('SystemSettingsPage (server)', () => {
     )
     expect(fetchStorageOverview).toHaveBeenCalledWith('admin-token')
     expect(fetchMaintenanceState).toHaveBeenCalledWith('admin-token')
+    expect(fetchAdminCatalogEntries).toHaveBeenCalledWith('admin-token')
+    expect(fetchCatalogAvailabilitySummaries).toHaveBeenCalledWith('admin-token')
+    expect(fetchResearchSpaces).toHaveBeenCalledWith({ limit: 100 }, 'admin-token')
     expect(result).toBeTruthy()
   })
 })

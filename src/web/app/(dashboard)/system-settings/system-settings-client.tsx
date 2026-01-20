@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import {
   AlertTriangle,
@@ -38,25 +38,42 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  useAdminUserList,
-  useAdminUserMutations,
-  useAdminUserStats,
-  useSystemAdminAccess,
-} from '@/lib/queries/users'
+  createUserAction,
+  deleteUserAction,
+  lockUserAction,
+  unlockUserAction,
+} from '@/app/actions/users'
 import type {
   CreateUserRequest,
   UserListParams,
   UserPublic,
   UserListResponse,
+  UserStatisticsResponse,
 } from '@/lib/api/users'
 import { DataSourceAvailabilitySection } from '@/components/system-settings/DataSourceAvailabilitySection'
 import { MaintenanceModePanel } from '@/components/system-settings/MaintenanceModePanel'
 import { SpaceSourcePermissionsManager } from '@/components/system-settings/SpaceSourcePermissionsManager'
 import { StorageConfigurationManager } from '@/components/system-settings/StorageConfigurationManager'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useRouter } from 'next/navigation'
+import type { StorageConfigurationListResponse, StorageOverviewResponse } from '@/types/storage'
+import type { MaintenanceModeResponse } from '@/types/system-status'
+import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
+import type { DataSourceAvailability } from '@/lib/api/data-source-activation'
+import type { ResearchSpace } from '@/types/research-space'
 
 interface SystemSettingsClientProps {
   initialParams: UserListParams
+  users: UserListResponse | null
+  userStats: UserStatisticsResponse | null
+  storageConfigurations: StorageConfigurationListResponse | null
+  storageOverview: StorageOverviewResponse | null
+  maintenanceState: MaintenanceModeResponse | null
+  catalogEntries: SourceCatalogEntry[]
+  availabilitySummaries: DataSourceAvailability[]
+  spaces: ResearchSpace[]
+  currentUserId: string
+  isAdmin: boolean
 }
 
 const ROLE_FILTERS = [
@@ -104,49 +121,57 @@ const initialCreateForm: CreateUserRequest = {
   role: 'researcher',
 }
 
-export default function SystemSettingsClient({ initialParams }: SystemSettingsClientProps) {
+export default function SystemSettingsClient({
+  initialParams,
+  users,
+  userStats,
+  storageConfigurations,
+  storageOverview,
+  maintenanceState,
+  catalogEntries,
+  availabilitySummaries,
+  spaces,
+  currentUserId,
+  isAdmin,
+}: SystemSettingsClientProps) {
+  const router = useRouter()
   const [filters, setFilters] = useState<UserListParams>(initialParams)
   const [search, setSearch] = useState('')
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null)
   const [pendingUserId, setPendingUserId] = useState<string | null>(null)
+  const [isRefreshing, startRefresh] = useTransition()
+  const [isCreatingUser, setIsCreatingUser] = useState(false)
+  const [isDeletingUser, setIsDeletingUser] = useState(false)
 
-  const adminAccess = useSystemAdminAccess()
-  const { status, isAdmin, isReady, session } = adminAccess
-
-  const statsQuery = useAdminUserStats()
-  const userListQuery = useAdminUserList(filters)
-  const mutations = useAdminUserMutations()
-
-  const currentUserId = session?.user?.id
-  const listData = userListQuery.data as UserListResponse | undefined
+  const listData: UserListResponse = users ?? {
+    users: [],
+    total: 0,
+    skip: 0,
+    limit: 0,
+  }
+  const statsLoading = userStats === null
+  const userListError = users === null ? 'Unable to load user inventory. Please retry.' : null
 
   const filteredUsers = useMemo(() => {
-    const users = listData?.users ?? []
+    let filtered = listData.users
+    if (filters.role) {
+      filtered = filtered.filter((user) => user.role === filters.role)
+    }
+    if (filters.status_filter) {
+      filtered = filtered.filter((user) => user.status === filters.status_filter)
+    }
     if (!search.trim()) {
-      return users
+      return filtered
     }
     const query = search.trim().toLowerCase()
-    return users.filter(
+    return filtered.filter(
       (user) =>
         user.full_name.toLowerCase().includes(query) ||
         user.email.toLowerCase().includes(query) ||
         user.username.toLowerCase().includes(query),
     )
-  }, [listData, search])
-
-  const isLoading = userListQuery.isLoading || !isReady
-
-  if (status === 'loading') {
-    return (
-      <Card>
-        <CardContent className="flex items-center gap-3 py-12 text-muted-foreground">
-          <Loader2 className="size-5 animate-spin" />
-          Preparing secure admin workspace...
-        </CardContent>
-      </Card>
-    )
-  }
+  }, [filters.role, filters.status_filter, listData.users, search])
 
   if (!isAdmin) {
     return (
@@ -182,12 +207,20 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
 
   const handleCreateUser = async (payload: CreateUserRequest) => {
     try {
-      await mutations.createUser.mutateAsync(payload)
+      setIsCreatingUser(true)
+      const result = await createUserAction(payload)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success(`User ${payload.full_name || payload.email} created`)
       setIsCreateOpen(false)
+      router.refresh()
     } catch (error) {
       console.error('Failed to create user', error)
       toast.error('Failed to create user')
+    } finally {
+      setIsCreatingUser(false)
     }
   }
 
@@ -195,12 +228,21 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
     setPendingUserId(user.id)
     try {
       if (user.status === 'suspended') {
-        await mutations.unlockUser.mutateAsync({ userId: user.id })
+        const result = await unlockUserAction(user.id)
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
         toast.success(`Reactivated ${user.full_name}`)
       } else {
-        await mutations.lockUser.mutateAsync({ userId: user.id })
+        const result = await lockUserAction(user.id)
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
         toast.success(`Suspended ${user.full_name}`)
       }
+      router.refresh()
     } catch (error) {
       console.error('Failed to update user status', error)
       toast.error('Unable to update user status')
@@ -215,14 +257,21 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
     }
     setPendingUserId(deleteTarget.id)
     try {
-      await mutations.deleteUser.mutateAsync({ userId: deleteTarget.id })
+      setIsDeletingUser(true)
+      const result = await deleteUserAction(deleteTarget.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success(`Removed ${deleteTarget.full_name}`)
       setDeleteTarget(null)
+      router.refresh()
     } catch (error) {
       console.error('Failed to delete user', error)
       toast.error('Unable to delete user')
     } finally {
       setPendingUserId(null)
+      setIsDeletingUser(false)
     }
   }
 
@@ -251,31 +300,31 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
               title="Total Users"
-              value={statsQuery.data?.total_users?.toLocaleString() ?? 0}
+              value={userStats?.total_users?.toLocaleString() ?? 0}
               description="Across all roles"
               icon={<Shield className="size-4 text-muted-foreground" />}
-              isLoading={statsQuery.isLoading}
+              isLoading={statsLoading}
             />
             <StatCard
               title="Active"
-              value={statsQuery.data?.active_users ?? 0}
+              value={userStats?.active_users ?? 0}
               description="Currently enabled accounts"
               icon={<CheckCircle className="size-4 text-emerald-500" />}
-              isLoading={statsQuery.isLoading}
+              isLoading={statsLoading}
             />
             <StatCard
               title="Suspended"
-              value={statsQuery.data?.suspended_users ?? 0}
+              value={userStats?.suspended_users ?? 0}
               description="Locked for review"
               icon={<Ban className="size-4 text-amber-500" />}
-              isLoading={statsQuery.isLoading}
+              isLoading={statsLoading}
             />
             <StatCard
               title="Pending Verification"
-              value={statsQuery.data?.pending_verification ?? 0}
+              value={userStats?.pending_verification ?? 0}
               description="Awaiting onboarding"
               icon={<AlertTriangle className="size-4 text-blue-500" />}
-              isLoading={statsQuery.isLoading}
+              isLoading={statsLoading}
             />
           </div>
 
@@ -291,10 +340,10 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button
                 variant="outline"
-                onClick={() => userListQuery.refetch()}
-                disabled={userListQuery.isRefetching}
+                onClick={() => startRefresh(() => router.refresh())}
+                disabled={isRefreshing}
               >
-                {userListQuery.isRefetching ? (
+                {isRefreshing ? (
                   <>
                     <Loader2 className="mr-2 size-4 animate-spin" />
                     Refreshing…
@@ -361,19 +410,14 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
           </div>
         </CardHeader>
         <CardContent>
-          {userListQuery.isError && (
+          {userListError && (
             <div className="mb-4 flex items-center gap-2 rounded border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               <ShieldAlert className="size-4" />
-              Unable to load user inventory. Please retry.
+              {userListError}
             </div>
           )}
 
-          {isLoading ? (
-            <div className="flex items-center gap-3 py-12 text-muted-foreground">
-              <Loader2 className="size-5 animate-spin" />
-              Fetching users…
-            </div>
-          ) : filteredUsers.length === 0 ? (
+          {filteredUsers.length === 0 ? (
             <div className="flex items-center gap-2 rounded border border-dashed px-4 py-10 text-muted-foreground">
               <UserMinus className="size-5" />
               No users matched the current filters.
@@ -420,9 +464,7 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
                             onClick={() => handleToggleSuspension(user)}
                             disabled={
                               user.id === currentUserId ||
-                              pendingUserId === user.id ||
-                              mutations.lockUser.isPending ||
-                              mutations.unlockUser.isPending
+                              pendingUserId === user.id
                             }
                           >
                             {pendingUserId === user.id ? (
@@ -442,7 +484,7 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
                             disabled={
                               user.id === currentUserId ||
                               pendingUserId === user.id ||
-                              mutations.deleteUser.isPending
+                              isDeletingUser
                             }
                           >
                             <Trash2 className="mr-2 size-4" />
@@ -455,39 +497,51 @@ export default function SystemSettingsClient({ initialParams }: SystemSettingsCl
                 </TableBody>
               </Table>
               <p className="mt-3 text-sm text-muted-foreground">
-                Showing {filteredUsers.length} of {listData?.total ?? filteredUsers.length} users
+                Showing {filteredUsers.length} of {listData.total ?? filteredUsers.length} users
               </p>
             </div>
           )}
         </CardContent>
-        </Card>
-          <RoleDistributionCard isLoading={statsQuery.isLoading} roles={statsQuery.data?.by_role ?? {}} />
+      </Card>
+      <RoleDistributionCard isLoading={statsLoading} roles={userStats?.by_role ?? {}} />
 
-          <CreateUserDialog
-            open={isCreateOpen}
-            onOpenChange={setIsCreateOpen}
-            onSubmit={handleCreateUser}
-            isSubmitting={mutations.createUser.isPending}
-          />
+      <CreateUserDialog
+        open={isCreateOpen}
+        onOpenChange={setIsCreateOpen}
+        onSubmit={handleCreateUser}
+        isSubmitting={isCreatingUser}
+      />
 
-          <DeleteUserDialog
-            user={deleteTarget}
-            onCancel={() => setDeleteTarget(null)}
-            onConfirm={handleDeleteUser}
-            isPending={mutations.deleteUser.isPending && pendingUserId === deleteTarget?.id}
-          />
-        </TabsContent>
-        <TabsContent value="permissions" className="space-y-6">
-          <DataSourceAvailabilitySection />
-          <SpaceSourcePermissionsManager />
-        </TabsContent>
-        <TabsContent value="storage" className="space-y-6">
-          <StorageConfigurationManager />
-        </TabsContent>
-        <TabsContent value="maintenance" className="space-y-6">
-          <MaintenanceModePanel />
-        </TabsContent>
-      </Tabs>
+      <DeleteUserDialog
+        user={deleteTarget}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDeleteUser}
+        isPending={isDeletingUser && pendingUserId === deleteTarget?.id}
+      />
+    </TabsContent>
+    <TabsContent value="permissions" className="space-y-6">
+      <DataSourceAvailabilitySection
+        catalogEntries={catalogEntries}
+        availabilitySummaries={availabilitySummaries}
+        spaces={spaces}
+      />
+      <SpaceSourcePermissionsManager
+        catalogEntries={catalogEntries}
+        availabilitySummaries={availabilitySummaries}
+        spaces={spaces}
+      />
+    </TabsContent>
+    <TabsContent value="storage" className="space-y-6">
+      <StorageConfigurationManager
+        configurations={storageConfigurations}
+        overview={storageOverview}
+        maintenanceState={maintenanceState}
+      />
+    </TabsContent>
+    <TabsContent value="maintenance" className="space-y-6">
+      <MaintenanceModePanel maintenanceState={maintenanceState} />
+    </TabsContent>
+  </Tabs>
     </div>
   )
 }

@@ -4,14 +4,21 @@ Factory mixin for building application services used by the dependency container
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING
 
-from src.application.curation import CurationService, SqlAlchemyReviewRepository
-from src.application.export.export_service import BulkExportService
-from src.application.search.search_service import UnifiedSearchService
+from src.application import export as export_module
+from src.application import search as search_module
+from src.application.curation import (
+    ConflictDetector,
+    CurationDetailService,
+    CurationService,
+    SqlAlchemyReviewRepository,
+)
 from src.application.services import (
     DashboardService,
     DataDiscoveryService,
+    DataDiscoveryServiceDependencies,
     DataSourceActivationService,
     DiscoveryConfigurationService,
     EvidenceApplicationService,
@@ -23,6 +30,7 @@ from src.application.services import (
     SourceManagementService,
     StorageConfigurationService,
     StorageOperationCoordinator,
+    SystemStatusService,
     VariantApplicationService,
 )
 from src.domain.services import (
@@ -34,6 +42,7 @@ from src.infrastructure.data_sources import (
     DeterministicPubMedSearchGateway,
     SimplePubMedPdfGateway,
 )
+from src.infrastructure.llm.flujo_agent_adapter import FlujoAgentAdapter
 from src.infrastructure.queries.source_query_client import HTTPQueryClient
 from src.infrastructure.repositories import (
     SQLAlchemyDataDiscoverySessionRepository,
@@ -56,19 +65,27 @@ from src.infrastructure.repositories import (
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
-    from src.application.services.system_status_service import SystemStatusService
-    from src.domain.services.storage_metrics import StorageMetricsRecorder
-    from src.domain.services.storage_providers import StoragePluginRegistry
+    from src.application.services.ports.ai_agent_port import AiAgentPort
+    from src.domain.services import storage_metrics, storage_providers
 
 
 class ApplicationServiceFactoryMixin:
     """Provides helper factory methods shared by the dependency container."""
 
     if TYPE_CHECKING:
-        _storage_plugin_registry: StoragePluginRegistry
-        _storage_metrics_recorder: StorageMetricsRecorder
+        _storage_plugin_registry: storage_providers.StoragePluginRegistry
+        _storage_metrics_recorder: storage_metrics.StorageMetricsRecorder
+        _ai_agent_port: AiAgentPort | None
 
         def get_system_status_service(self) -> SystemStatusService: ...
+        def get_variant_domain_service(self) -> VariantDomainService: ...
+        def get_evidence_domain_service(self) -> EvidenceDomainService: ...
+
+    def get_ai_agent_port(self) -> AiAgentPort:
+        if self._ai_agent_port is None:
+            model = os.getenv("MED13_AI_AGENT_MODEL", "openai:gpt-4o-mini")
+            self._ai_agent_port = FlujoAgentAdapter(model=model)
+        return self._ai_agent_port
 
     def create_gene_application_service(
         self,
@@ -186,8 +203,29 @@ class ApplicationServiceFactoryMixin:
             phenotype_service=self.create_phenotype_application_service(session),
         )
 
-    def create_export_service(self, session: Session) -> BulkExportService:
-        return BulkExportService(
+    def create_curation_detail_service(
+        self,
+        session: Session,
+    ) -> CurationDetailService:
+        conflict_detector = ConflictDetector(
+            variant_domain_service=self.get_variant_domain_service(),
+            evidence_domain_service=self.get_evidence_domain_service(),
+        )
+
+        return CurationDetailService(
+            variant_service=self.create_variant_application_service(session),
+            evidence_service=self.create_evidence_application_service(session),
+            phenotype_repository=SqlAlchemyPhenotypeRepository(session),
+            conflict_detector=conflict_detector,
+            review_repository=SqlAlchemyReviewRepository(),
+            db_session=session,
+        )
+
+    def create_export_service(
+        self,
+        session: Session,
+    ) -> export_module.BulkExportService:
+        return export_module.BulkExportService(
             gene_service=self.create_gene_application_service(session),
             variant_service=self.create_variant_application_service(session),
             phenotype_service=self.create_phenotype_application_service(session),
@@ -195,8 +233,11 @@ class ApplicationServiceFactoryMixin:
             storage_service=self.create_storage_configuration_service(session),
         )
 
-    def create_search_service(self, session: Session) -> UnifiedSearchService:
-        return UnifiedSearchService(
+    def create_search_service(
+        self,
+        session: Session,
+    ) -> search_module.UnifiedSearchService:
+        return search_module.UnifiedSearchService(
             gene_service=self.create_gene_application_service(session),
             variant_service=self.create_variant_application_service(session),
             phenotype_service=self.create_phenotype_application_service(session),
@@ -241,8 +282,10 @@ class ApplicationServiceFactoryMixin:
             query_result_repository=query_repo,
             source_query_client=query_client,
             source_management_service=source_service,
-            source_template_repository=template_repo,
-            activation_service=activation_service,
+            dependencies=DataDiscoveryServiceDependencies(
+                source_template_repository=template_repo,
+                activation_service=activation_service,
+            ),
         )
 
 

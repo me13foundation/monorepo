@@ -1,13 +1,13 @@
 "use client"
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Loader2 } from 'lucide-react'
 
-import { useConfigureDataSourceSchedule } from '@/lib/queries/data-sources'
-import type { DataSource, ScheduleFrequency } from '@/types/data-source'
+import { configureDataSourceScheduleAction, updateDataSourceAction } from '@/app/actions/data-sources'
+import type { DataSource } from '@/types/data-source'
 import {
   Dialog,
   DialogContent,
@@ -17,24 +17,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import {
-  Form,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormControl,
-  FormDescription,
-  FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Form, FormDescription, FormLabel } from '@/components/ui/form'
+import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+
+import { DataSourceScheduleFields } from './DataSourceScheduleFields'
 
 const scheduleSchema = z.object({
   enabled: z.boolean().default(false),
@@ -44,16 +32,7 @@ const scheduleSchema = z.object({
   cronExpression: z.string().optional(),
 })
 
-type ScheduleFormValues = z.infer<typeof scheduleSchema>
-
-const frequencyOptions: { label: string; value: ScheduleFrequency }[] = [
-  { label: 'Manual', value: 'manual' },
-  { label: 'Hourly', value: 'hourly' },
-  { label: 'Daily', value: 'daily' },
-  { label: 'Weekly', value: 'weekly' },
-  { label: 'Monthly', value: 'monthly' },
-  { label: 'Cron expression', value: 'cron' },
-]
+export type ScheduleFormValues = z.infer<typeof scheduleSchema>
 
 interface DataSourceScheduleDialogProps {
   source: DataSource | null
@@ -82,7 +61,9 @@ export function DataSourceScheduleDialog({
   open,
   onOpenChange,
 }: DataSourceScheduleDialogProps) {
-  const configureSchedule = useConfigureDataSourceSchedule(spaceId)
+  const router = useRouter()
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const schedule = source?.ingestion_schedule
 
   const defaultValues = useMemo<ScheduleFormValues>(
@@ -118,14 +99,58 @@ export function DataSourceScheduleDialog({
       cron_expression:
         values.frequency === 'cron' ? values.cronExpression?.trim() || null : null,
     }
-    await configureSchedule.mutateAsync({
-      sourceId: source.id,
-      payload,
-    })
-    onOpenChange(false)
+
+    try {
+      setIsSavingSchedule(true)
+      const result = await configureDataSourceScheduleAction(source.id, payload, spaceId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Schedule updated')
+      onOpenChange(false)
+      router.refresh()
+    } catch (error) {
+      console.error('Failed to update schedule', error)
+      toast.error('Failed to update schedule')
+    } finally {
+      setIsSavingSchedule(false)
+    }
   }
 
-  const isCron = form.watch('frequency') === 'cron'
+  const enabled = form.watch('enabled')
+  const frequency = form.watch('frequency')
+  const timezone = form.watch('timezone')
+  const cronExpression = form.watch('cronExpression')
+  const isCron = frequency === 'cron'
+  const hasScheduleBasics =
+    typeof timezone === 'string' &&
+    timezone.trim().length > 0 &&
+    (!isCron || (cronExpression ?? '').trim().length > 0)
+  const canEnableSchedule = hasScheduleBasics
+  const statusToggleDisabled =
+    isUpdatingStatus || source.status === 'archived' || !hasScheduleBasics
+  const statusLabel = source.status === 'active' ? 'Enabled' : 'Disabled'
+
+  const handleStatusToggle = async (enabled: boolean) => {
+    try {
+      setIsUpdatingStatus(true)
+      const result = await updateDataSourceAction(
+        source.id,
+        { status: enabled ? 'active' : 'inactive' },
+        spaceId,
+      )
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      router.refresh()
+    } catch (error) {
+      // Error toast is handled by the mutation
+    } finally {
+      setIsUpdatingStatus(false)
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -138,120 +163,43 @@ export function DataSourceScheduleDialog({
         </DialogHeader>
         <Form {...form}>
           <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-            <FormField
+            <DataSourceScheduleFields
               control={form.control}
-              name="enabled"
-              render={({ field }) => (
-                <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                  <div className="space-y-0.5">
-                    <FormLabel>Enable scheduling</FormLabel>
-                    <FormDescription>
-                      When disabled, the source only ingests when manually triggered.
-                    </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
+              enabled={enabled}
+              canEnableSchedule={canEnableSchedule}
+              isCron={isCron}
             />
 
-            <FormField
-              control={form.control}
-              name="frequency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Frequency</FormLabel>
-                  <FormControl>
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={!form.watch('enabled')}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select frequency" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {frequencyOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
+            <div className="rounded-lg border p-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <FormLabel>Source status</FormLabel>
                   <FormDescription>
-                    Choose how often MED13 should attempt ingestion.
+                    Enable the source after all configuration is complete.
                   </FormDescription>
-                  <FormMessage />
-                </FormItem>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium">{statusLabel}</span>
+                  <Switch
+                    checked={source.status === 'active'}
+                    onCheckedChange={handleStatusToggle}
+                    disabled={statusToggleDisabled}
+                  />
+                </div>
+              </div>
+              {statusToggleDisabled && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Complete configuration before enabling this source.
+                </p>
               )}
-            />
-
-            <FormField
-              control={form.control}
-              name="startTime"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Start time</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="datetime-local"
-                      {...field}
-                      disabled={!form.watch('enabled')}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Optional. Defaults to immediately running on the next interval.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="timezone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Timezone</FormLabel>
-                  <FormControl>
-                    <Input {...field} disabled={!form.watch('enabled')} />
-                  </FormControl>
-                  <FormDescription>Specify the timezone for scheduler calculations.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {isCron && (
-              <FormField
-                control={form.control}
-                name="cronExpression"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cron expression</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="0 2 * * *" disabled={!form.watch('enabled')} />
-                    </FormControl>
-                    <FormDescription>
-                      Cron support requires a dedicated scheduler backend; use with caution.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={configureSchedule.isPending}>
-                {configureSchedule.isPending && (
+              <Button type="submit" disabled={isSavingSchedule}>
+                {isSavingSchedule && (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 )}
                 Save schedule

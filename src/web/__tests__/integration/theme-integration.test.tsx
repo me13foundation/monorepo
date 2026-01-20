@@ -1,30 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import DashboardClient from '@/app/(dashboard)/dashboard/dashboard-client'
 import { SpaceStatus } from '@/types/research-space'
-
-// Mock NextAuth session
-const mockSession = {
-  user: {
-    id: 'test-user-id',
-    email: 'admin@med13.org',
-    name: 'Test Admin',
-    username: 'admin',
-    full_name: 'Test Admin',
-    role: 'admin',
-    email_verified: true,
-    access_token: 'test-access-token',
-    expires_at: Date.now() + 3600000, // 1 hour from now
-  },
-  expires: '2025-12-31T00:00:00.000Z'
-}
-
-jest.mock('next-auth/react', () => ({
-  useSession: () => ({
-    data: mockSession,
-    status: 'authenticated'
-  }),
-  signOut: jest.fn()
-}))
+import { UserRole } from '@/types/auth'
 
 // Mock space context
 jest.mock('@/components/space-context-provider', () => ({
@@ -32,27 +9,23 @@ jest.mock('@/components/space-context-provider', () => ({
     currentSpaceId: null,
     setCurrentSpaceId: jest.fn(),
     isLoading: false,
+    spaces: [
+      {
+        id: 'space-1',
+        name: 'Space One',
+        slug: 'space-one',
+        description: 'Space description',
+        status: SpaceStatus.ACTIVE,
+        tags: [],
+        owner_id: 'user-1',
+        settings: {},
+        created_at: '',
+        updated_at: '',
+      },
+    ],
+    spaceTotal: 1,
   }),
   SpaceContextProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}))
-
-// Mock research spaces query
-jest.mock('@/lib/queries/research-spaces', () => ({
-  useResearchSpaces: () => ({
-    data: {
-      spaces: [
-        {
-          id: 'space-1',
-          name: 'Space One',
-          slug: 'space-one',
-          description: 'Space description',
-          status: SpaceStatus.ACTIVE,
-          tags: [],
-        },
-      ],
-    },
-    isLoading: false,
-  }),
 }))
 
 // Mock next-themes for integration testing
@@ -76,7 +49,7 @@ describe('Theme Integration', () => {
   })
 
   it('dashboard maintains functionality with theme system', () => {
-    render(<DashboardClient />)
+    render(<DashboardClient userRole={UserRole.ADMIN} />)
 
     // Verify all dashboard elements are present
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Admin Console')

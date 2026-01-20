@@ -8,33 +8,11 @@ import hashlib
 import re
 import secrets
 import string
-from typing import TypedDict
 
 import bcrypt
 
 from src.domain.services.security.password_hasher import PasswordHasherService
-
-
-class PasswordAnalysis(TypedDict):
-    """Type definition for password complexity analysis."""
-
-    length: int
-    has_lowercase: bool
-    has_uppercase: bool
-    has_digit: bool
-    has_special: bool
-    is_strong: bool
-    score: int
-    issues: list[str]
-
-
-class HashInfo(TypedDict, total=False):
-    """Metadata returned from hash inspection."""
-
-    scheme: str | None
-    needs_update: bool
-    is_valid: bool
-    error: str
+from src.type_definitions.security import HashInfo, PasswordAnalysis
 
 
 class PasswordHasher(PasswordHasherService):

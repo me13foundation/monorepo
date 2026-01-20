@@ -1,0 +1,17 @@
+# Flujo configuration for MED13 Resource Library
+# FLUJO_STATE_URI overrides this fallback.
+state_uri = "sqlite:///flujo_state.db"
+
+[settings]
+test_mode = false
+memory_indexing_enabled = false
+
+[architect]
+state_machine_default = false
+
+[cost]
+strict = false
+
+[cost.providers.openai."gpt-4o-mini"]
+prompt_tokens_per_1k = 0.00015
+completion_tokens_per_1k = 0.0006

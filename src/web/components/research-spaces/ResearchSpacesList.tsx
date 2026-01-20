@@ -1,40 +1,23 @@
 "use client"
 
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { ResearchSpaceCard } from './ResearchSpaceCard'
 import { Button } from '@/components/ui/button'
-import { Plus, Loader2, Sparkles, FolderKanban } from 'lucide-react'
+import { Plus, Sparkles, FolderKanban } from 'lucide-react'
 import Link from 'next/link'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
-import { Skeleton } from '@/components/ui/skeleton'
 import type { ResearchSpace } from '@/types/research-space'
-import type { ResearchSpaceListResponse } from '@/types/research-space'
 
 interface ResearchSpacesListProps {
-  initialSpaces?: ResearchSpace[]
-  initialTotal?: number
+  spaces: ResearchSpace[]
+  total: number
+  errorMessage?: string | null
 }
 
-export function ResearchSpacesList({ initialSpaces, initialTotal }: ResearchSpacesListProps) {
+export function ResearchSpacesList({ spaces, total, errorMessage }: ResearchSpacesListProps) {
   const [searchQuery, setSearchQuery] = useState('')
-  const hasInitial = Boolean(initialSpaces && initialSpaces.length > 0)
-  const initialData: ResearchSpaceListResponse | undefined = hasInitial
-    ? {
-        spaces: initialSpaces ?? [],
-        total: initialTotal ?? initialSpaces?.length ?? 0,
-        skip: 0,
-        limit: initialSpaces?.length ?? 0,
-      }
-    : undefined
-
-  const { data, isLoading, error } = useResearchSpaces(undefined, {
-    enabled: !hasInitial,
-    initialData,
-  })
-
-  const resolvedSpaces = data?.spaces ?? initialSpaces ?? []
-  const resolvedTotal = data?.total ?? initialTotal ?? resolvedSpaces.length
+  const resolvedSpaces = spaces
+  const resolvedTotal = total
 
   const filteredSpaces = resolvedSpaces.filter((space) => {
     if (!searchQuery) return true
@@ -46,38 +29,7 @@ export function ResearchSpacesList({ initialSpaces, initialTotal }: ResearchSpac
     )
   })
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-heading text-3xl font-bold tracking-tight">Research Spaces</h1>
-            <p className="mt-1 text-muted-foreground">
-              Manage your research workspaces and teams
-            </p>
-          </div>
-          <Button asChild disabled>
-            <span className="inline-flex items-center gap-2">
-              <Loader2 className="size-4 animate-spin" />
-              Loading...
-            </span>
-          </Button>
-        </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <div key={idx} className="rounded-lg border p-4">
-              <Skeleton className="mb-3 h-6 w-2/3" />
-              <Skeleton className="mb-2 h-4 w-full" />
-              <Skeleton className="mb-2 h-4 w-5/6" />
-              <Skeleton className="h-8 w-24" />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
+  if (errorMessage) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -101,8 +53,7 @@ export function ResearchSpacesList({ initialSpaces, initialTotal }: ResearchSpac
             </div>
             <div className="space-y-2">
               <p className="text-sm text-destructive">
-                We couldn&apos;t load your research spaces. Please retry or create a new
-                one to get started.
+                {errorMessage}
               </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={() => window.location.reload()}>

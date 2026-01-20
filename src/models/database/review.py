@@ -28,7 +28,7 @@ class ReviewRecord(Base):
     )
     last_updated: Mapped[datetime] = mapped_column(
         DateTime,
-        default=lambda: datetime.now(UTC),
+        default=lambda: datetime.now(UTC).replace(tzinfo=None),
     )
 
 

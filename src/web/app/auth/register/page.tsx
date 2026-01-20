@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { RegisterForm } from "@/components/auth/RegisterForm"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle } from "lucide-react"
-import { AuthShell } from "@/components/auth/AuthShell"
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { RegisterForm } from '@/components/auth/RegisterForm'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, CheckCircle } from 'lucide-react'
+import { AuthShell } from '@/components/auth/AuthShell'
+import type { RegisterRequest } from '@/types/auth'
+import { registerUser } from '@/app/actions/auth'
 
 export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null)
@@ -14,35 +16,22 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
 
-  const handleRegister = async (data: {
-    email: string
-    username: string
-    full_name: string
-    password: string
-  }) => {
+  const handleRegister = async (data: RegisterRequest) => {
     setIsLoading(true)
     setError(null)
     setSuccess(null)
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.detail || 'Registration failed')
+      const result = await registerUser(data)
+      if (!result.success) {
+        throw new Error(result.error)
       }
 
-      setSuccess("Account created successfully! Please check your email for verification instructions.")
+      setSuccess(result.message)
 
       // Redirect to login after a delay
       setTimeout(() => {
-        router.push("/auth/login")
+        router.push('/auth/login')
       }, 3000)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An unexpected error occurred')

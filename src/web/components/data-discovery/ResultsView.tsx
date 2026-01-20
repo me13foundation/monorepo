@@ -108,7 +108,7 @@ const STORAGE_TARGET_SUMMARY: Record<
 const PARAMETER_LABELS = {
   gene: 'Gene-only',
   term: 'Phenotype-only',
-  geneAndTerm: 'Gene & Phenotype',
+  gene_and_term: 'Gene & Phenotype',
   none: 'No Parameters',
   api: 'API-Driven',
 } as const
@@ -116,7 +116,7 @@ const PARAMETER_LABELS = {
 const PARAMETER_DESCRIPTIONS = {
   gene: 'Provide a valid HGNC symbol before running queries.',
   term: 'Provide a phenotype, ontology ID, or search keyword.',
-  geneAndTerm: 'Both the gene symbol and phenotype term are required.',
+  gene_and_term: 'Both the gene symbol and phenotype term are required.',
   none: 'This catalog entry cannot be queried directly from the workbench.',
   api: 'Parameters depend on the upstream API. Provide the values documented for this integration.',
 } as const
@@ -681,11 +681,15 @@ export function SourceParameterModal({
   const normalizedType = normalizeParamType(entry.param_type)
   const typeLabel = SOURCE_TYPE_LABELS[entry.source_type]
   const showGeneInput =
-    normalizedType === 'gene' || normalizedType === 'geneAndTerm' || normalizedType === 'api'
+    normalizedType === 'gene' ||
+    normalizedType === 'gene_and_term' ||
+    normalizedType === 'api'
   const showTermInput =
-    normalizedType === 'term' || normalizedType === 'geneAndTerm' || normalizedType === 'api'
-  const geneRequired = normalizedType === 'gene' || normalizedType === 'geneAndTerm'
-  const termRequired = normalizedType === 'term' || normalizedType === 'geneAndTerm'
+    normalizedType === 'term' ||
+    normalizedType === 'gene_and_term' ||
+    normalizedType === 'api'
+  const geneRequired = normalizedType === 'gene' || normalizedType === 'gene_and_term'
+  const termRequired = normalizedType === 'term' || normalizedType === 'gene_and_term'
   const requiresParameters = normalizedType !== 'none'
   const storageSummary = STORAGE_TARGET_SUMMARY[entry.source_type] ?? STORAGE_TARGET_SUMMARY.api
   const capabilityFlags = CAPABILITY_ORDER.map((flag) => ({
@@ -1140,17 +1144,19 @@ export function SourceParameterModal({
   )
 }
 
-function normalizeParamType(paramType: string): 'gene' | 'term' | 'geneAndTerm' | 'none' | 'api' {
+function normalizeParamType(
+  paramType: string,
+): 'gene' | 'term' | 'gene_and_term' | 'none' | 'api' {
   switch (paramType) {
     case 'gene_and_term':
-      return 'geneAndTerm'
+    case 'geneAndTerm':
+      return 'gene_and_term'
     case 'gene':
     case 'term':
     case 'none':
     case 'api':
-    case 'geneAndTerm':
-      return paramType as 'gene' | 'term' | 'geneAndTerm' | 'none' | 'api'
+      return paramType as 'gene' | 'term' | 'none' | 'api'
     default:
-      return 'geneAndTerm'
+      return 'gene_and_term'
   }
 }
