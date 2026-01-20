@@ -261,7 +261,7 @@ Governance must exist **inside** the execution loop, not after it.
 
 ---
 
-### 3.1 Granular Durability (Defense Against Drift)
+### 3.1 Execution Primitives: Durability by Default
 
 For multi-turn or complex reasoning, prefer `Step.granular(...)`.
 It wraps a `GranularStep` in a `LoopStep` and persists each turn.
@@ -288,7 +288,67 @@ A durable, inspectable execution trail suitable for audits and post-hoc analysis
 
 ---
 
-### 3.2 Confidence-Based Escalation (Human-in-the-Loop)
+### 3.2 Reasoning Patterns: CoT vs ToT
+
+Flujo does not have a specific primitive named `ReasoningStep`. Instead, reasoning is implemented through structural patterns that provide the desired level of depth and auditability.
+
+#### 1. `GranularStep` (For Chain of Thought / ReAct)
+Use `GranularStep` for linear, multi-turn reasoning where the agent needs to "think out loud" or use tools iteratively. This pattern persists every individual "thought" or tool call to the database.
+
+```python
+from flujo.domain.dsl import GranularStep
+from flujo.agents import make_agent_async
+
+# Standard CoT / ReAct agent
+agent = make_agent_async(
+    "openai:gpt-4o",
+    "Think step-by-step before answering. Use tools to verify assumptions."
+)
+
+step = GranularStep(
+    name="step_by_step_reasoning",
+    agent=agent,
+    history_max_tokens=8192,
+    enforce_idempotency=True
+)
+```
+
+#### 2. `TreeSearchStep` (For Deep Search / Tree of Thoughts)
+This is the heavy-lifting reasoning primitive. It implements algorithms like **Beam Search** or **Best-First Search** to explore multiple reasoning paths, evaluate them, and select the best one.
+
+Use this when the problem requires exploring multiple possibilities (e.g., code generation, complex planning).
+
+```python
+from flujo.domain.dsl import TreeSearchStep
+from flujo.agents import make_agent_async
+
+# 1. Proposer: Generates N possible next steps
+proposer = make_agent_async("openai:gpt-4o", "Propose 3 possible next steps...")
+
+# 2. Evaluator: Scores each step (0.0 to 1.0)
+evaluator = make_agent_async("openai:gpt-4o", "Rate this step from 0.0 to 1.0...")
+
+# 3. The Reasoning Step
+step = TreeSearchStep(
+    name="deep_reasoning",
+    proposer=proposer,
+    evaluator=evaluator,
+    branching_factor=3,  # Generate 3 thoughts per step
+    beam_width=3,        # Keep the top 3 thoughts
+    max_depth=5,         # Look 5 steps ahead
+    require_goal=True,   # Fail if no solution found
+    goal_score_threshold=0.9
+)
+```
+
+#### Summary
+*   **Sequential Reasoning (CoT):** Use `GranularStep`.
+*   **Branching Reasoning (ToT):** Use `TreeSearchStep`.
+*   **Implicit Reasoning:** Use a standard `Step` with a reasoning model like `openai:o1`.
+
+---
+
+### 3.3 Confidence-Based Escalation (Human-in-the-Loop)
 
 Confidence is a **routing signal**, not proof of correctness.
 
@@ -389,7 +449,8 @@ This enables:
 
 * [ ] Output contract separates decision, rationale, and evidence
 * [ ] Agents created via factories (`make_agent_async`)
-* [ ] `Step.granular` used for multi-turn reasoning
+* [ ] `Step.granular` used for multi-turn reasoning (CoT)
+* [ ] `TreeSearchStep` used for complex, branching exploration (ToT)
 
 ### Skills
 
@@ -420,3 +481,13 @@ If an agent cannot:
 then it does not belong in production.
 
 **Contracts first. Capabilities second. Prompts last.**
+
+---
+
+## Related Documentation
+
+- **[Agent Architecture](./agent_architecture.md)**: MED13-specific implementation guide
+- **[Reasoning Techniques](./reasoning.md)**: GranularStep, TreeSearchStep patterns
+- **[Production Guide](./prod_guide.md)**: Deployment and infrastructure configuration
+- **[Engineering Architecture](../EngineeringArchitecture.md)**: Overall system architecture
+- **[AGENTS.md](../../AGENTS.md)**: AI coding agent guidelines

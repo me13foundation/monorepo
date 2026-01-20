@@ -303,3 +303,12 @@ class FlujoProductionAdapter:
     async def close(self):
         await self._runner.aclose()
 ```
+
+---
+
+## Related Documentation
+
+- **[Agent Architecture](./agent_architecture.md)**: MED13-specific implementation guide
+- **[Reasoning Techniques](./reasoning.md)**: GranularStep, TreeSearchStep patterns
+- **[Contract-Oriented AI](./contract_oriented_ai.md)**: Evidence-first contract design
+- **[Engineering Architecture](../EngineeringArchitecture.md)**: Overall system architecture

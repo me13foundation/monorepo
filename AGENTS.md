@@ -698,7 +698,7 @@ make all                    # Complete quality gate
 
 - `docs/flujo/agent_architecture.md`: **Complete agent implementation guide** - patterns, examples, adding new agents
 - `docs/flujo/reasoning.md`: Reasoning techniques (TreeSearchStep, GranularStep, A* search)
-- `docs/flujo/contract_orianted_ai.md`: Contract-first AI development patterns
+- `docs/flujo/contract_oriented_ai.md`: Contract-first AI development patterns
 - `docs/flujo/prod_guide.md`: Production deployment and configuration
 
 **Domain & UI:**

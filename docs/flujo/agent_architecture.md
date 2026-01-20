@@ -606,7 +606,7 @@ await manager.shutdown()
 ## Related Documentation
 
 - **[Reasoning Techniques](./reasoning.md)**: TreeSearchStep examples and A* search patterns
-- **[Contract-Oriented AI](./contract_orianted_ai.md)**: Deep dive into contract-first patterns
+- **[Contract-Oriented AI](./contract_oriented_ai.md)**: Deep dive into contract-first patterns
 - **[Production Guide](./prod_guide.md)**: Deployment and production configuration
 - **[Engineering Architecture](../EngineeringArchitecture.md)**: Overall system architecture
 - **[AGENTS.md](../../AGENTS.md)**: AI agent coding guidelines
