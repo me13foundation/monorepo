@@ -1,0 +1,58 @@
+import type { AxiosError } from 'axios'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+
+type IssueObject = {
+  msg: string
+  loc?: unknown
+}
+
+function isIssueObject(value: unknown): value is IssueObject {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'msg' in value &&
+    typeof (value as IssueObject).msg === 'string'
+  )
+}
+
+function formatErrorDetail(detail: unknown): string | null {
+  if (typeof detail === 'string') {
+    return detail
+  }
+  if (isIssueObject(detail)) {
+    const location = Array.isArray(detail.loc) ? detail.loc.join('.') : ''
+    return location ? `${location}: ${detail.msg}` : detail.msg
+  }
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((issue) => formatErrorDetail(issue))
+      .filter((value): value is string => Boolean(value))
+    return messages.length > 0 ? messages.join('; ') : null
+  }
+  return null
+}
+
+export function getActionErrorMessage(error: unknown, fallback: string): string {
+  const axiosError = error as AxiosError<{ detail?: unknown }>
+  const detail = axiosError.response?.data?.detail
+  const formatted = formatErrorDetail(detail)
+  if (formatted) {
+    return formatted
+  }
+  if (axiosError?.message) {
+    return axiosError.message
+  }
+  if (error instanceof Error) {
+    return error.message
+  }
+  return fallback
+}
+
+export async function requireAccessToken(): Promise<string> {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.access_token) {
+    throw new Error('Authentication required')
+  }
+  return session.user.access_token
+}

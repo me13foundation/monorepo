@@ -295,10 +295,10 @@ security-audit: ## Run comprehensive security audit (pip-audit, bandit) [blockin
 	@echo "Running pip-audit..."
 	$(USE_PIP) install pip-audit --quiet || true
 	pip-audit --format json | tee pip-audit-results.json || true
-	@echo "Running safety..."
-	@echo "Safety CLI requires authentication. Using pip-audit for vulnerability scanning instead."
-	@echo "   To enable Safety CLI in the future, set SAFETY_API_KEY environment variable."
-	# SAFETY_API_KEY="" safety --stage development scan --save-as json safety-results.json --use-server-matching || true
+	@if [ -n "$$SAFETY_API_KEY" ]; then \
+		echo "Running safety..."; \
+		SAFETY_API_KEY="$$SAFETY_API_KEY" safety --stage development scan --save-as json safety-results.json --use-server-matching || true; \
+	fi
 	@echo "Running bandit (blocking on MEDIUM/HIGH)..."
 	$(USE_PYTHON) -m bandit -r src --severity-level medium -f json -o bandit-results.json 2>&1 | grep -vE "(WARNING.*Test in comment|WARNING.*Unknown test found)" || true
 

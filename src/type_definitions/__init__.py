@@ -5,6 +5,12 @@ This module contains all type definitions used throughout the application,
 organized by domain and usage pattern.
 """
 
+from .authorization import (
+    AccessCheckResponse,
+    RoleCapabilitiesResponse,
+    RolePermissionsSummary,
+    SystemPermissionsSummary,
+)
 from .common import (
     APIResponse,
     EvidenceUpdate,
@@ -16,11 +22,14 @@ from .common import (
     ValidationResult,
     VariantUpdate,
 )
+from .confidence import ConfidenceExtras, ConfidenceScoreOptions
+from .curation import ReviewRecordLike
 from .data_sources import (
     DataSourceAiTestFinding,
     DataSourceAiTestLink,
     DataSourceAiTestResult,
     FlujoTableSummary,
+    SourceCatalogEntrySeed,
 )
 from .external_apis import (
     ClinVarSearchResponse,
@@ -29,6 +38,33 @@ from .external_apis import (
     PubMedArticleResponse,
     PubMedSearchResponse,
     UniProtEntryResponse,
+)
+from .packaging import (
+    ComplianceSection,
+    DatasetMetadataOptions,
+    LicenseInfo,
+    LicenseManifest,
+    LicenseRecord,
+    LicenseSourceEntry,
+    LicenseValidationResult,
+    ProvenanceMetadata,
+    ProvenanceSourceEntry,
+    ROCrateFileEntry,
+    ROCrateFileEntryRequired,
+)
+from .publishing import DOIMintResult
+from .repositories import (
+    GeneStatistics,
+    SourceTemplateStatistics,
+    UserDataSourceStatistics,
+)
+from .search import RawSearchResult, UnifiedSearchPayload
+from .security import (
+    DecodedTokenPayload,
+    HashInfo,
+    PasswordAnalysis,
+    RefreshResult,
+    TokenPayload,
 )
 from .storage import (
     GoogleCloudStorageConfig,
@@ -58,24 +94,50 @@ from .system_status import (
 
 __all__ = [
     "APIResponse",
+    "AccessCheckResponse",
     "ClinVarSearchResponse",
     "ClinVarVariantResponse",
+    "ComplianceSection",
+    "ConfidenceExtras",
+    "ConfidenceScoreOptions",
     "DataSourceAiTestFinding",
     "DataSourceAiTestLink",
     "DataSourceAiTestResult",
+    "DatasetMetadataOptions",
+    "DecodedTokenPayload",
+    "DOIMintResult",
     "FlujoTableSummary",
     "EvidenceUpdate",
     "GeneUpdate",
+    "GeneStatistics",
     "GoogleCloudStorageConfig",
+    "HashInfo",
     "HPOOntologyResponse",
+    "LicenseInfo",
+    "LicenseManifest",
+    "LicenseRecord",
+    "LicenseSourceEntry",
+    "LicenseValidationResult",
     "LocalFilesystemConfig",
     "PaginatedResponse",
+    "PasswordAnalysis",
     "PhenotypeUpdate",
+    "ProvenanceMetadata",
+    "ProvenanceSourceEntry",
     "PubMedArticleResponse",
     "PubMedSearchResponse",
     "PublicationUpdate",
+    "RawSearchResult",
     "RawRecord",
+    "RefreshResult",
+    "ReviewRecordLike",
+    "RoleCapabilitiesResponse",
+    "RolePermissionsSummary",
+    "ROCrateFileEntry",
+    "ROCrateFileEntryRequired",
     "SignedUrlRequest",
+    "SourceCatalogEntrySeed",
+    "SourceTemplateStatistics",
     "StorageConfigurationModel",
     "StorageHealthReport",
     "StorageHealthStatus",
@@ -91,10 +153,14 @@ __all__ = [
     "StorageUrlModel",
     "StorageUsageMetrics",
     "StorageUseCase",
+    "SystemPermissionsSummary",
     "EnableMaintenanceRequest",
     "MaintenanceModeResponse",
     "MaintenanceModeState",
+    "TokenPayload",
     "UniProtEntryResponse",
+    "UnifiedSearchPayload",
+    "UserDataSourceStatistics",
     "ValidationResult",
     "VariantUpdate",
 ]

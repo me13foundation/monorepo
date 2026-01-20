@@ -1,15 +1,27 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import type { Session } from 'next-auth'
-import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query'
 import { authOptions } from '@/lib/auth'
 import SystemSettingsClient from './system-settings-client'
-import { fetchUsers, fetchUserStatistics } from '@/lib/api/users'
+import {
+  fetchUsers,
+  fetchUserStatistics,
+  type UserListResponse,
+  type UserStatisticsResponse,
+} from '@/lib/api/users'
 import { fetchStorageConfigurations, fetchStorageOverview } from '@/lib/api/storage'
 import { fetchMaintenanceState } from '@/lib/api/system-status'
-import { userKeys } from '@/lib/query-keys/users'
-import { storageKeys } from '@/lib/query-keys/storage'
+import { fetchResearchSpaces } from '@/lib/api/research-spaces'
+import {
+  fetchAdminCatalogEntries,
+  fetchCatalogAvailabilitySummaries,
+  type DataSourceAvailability,
+} from '@/lib/api/data-source-activation'
 import { INITIAL_USER_PARAMS } from './constants'
+import type { StorageConfigurationListResponse, StorageOverviewResponse } from '@/types/storage'
+import type { MaintenanceModeResponse } from '@/types/system-status'
+import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
+import type { ResearchSpace } from '@/types/research-space'
 
 type AdminSession = Session & {
   user?: Session['user'] & {
@@ -52,45 +64,70 @@ export default async function SystemSettingsPage() {
     redirect('/auth/login?error=SessionExpired')
   }
 
-  const queryClient = new QueryClient()
+  let users: UserListResponse | null = null
+  let userStats: UserStatisticsResponse | null = null
+  let storageConfigurations: StorageConfigurationListResponse | null = null
+  let storageOverview: StorageOverviewResponse | null = null
+  let maintenanceState: MaintenanceModeResponse | null = null
+  let catalogEntries: SourceCatalogEntry[] = []
+  let availabilitySummaries: DataSourceAvailability[] = []
+  let spaces: ResearchSpace[] = []
 
-  const prefetched = await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: userKeys.list(INITIAL_USER_PARAMS, token),
-      queryFn: () => fetchUsers(INITIAL_USER_PARAMS, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: userKeys.stats(token),
-      queryFn: () => fetchUserStatistics(token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: storageKeys.list(token, 1, 100, true),
-      queryFn: () =>
-        fetchStorageConfigurations(
-          { page: 1, per_page: 100, include_disabled: true },
-          token,
-        ),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: storageKeys.stats(token),
-      queryFn: () => fetchStorageOverview(token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: ['system-status', 'maintenance', token] as const,
-      queryFn: () => fetchMaintenanceState(token),
-    }),
-  ])
+  try {
+    users = await fetchUsers(INITIAL_USER_PARAMS, token)
+  } catch (error) {
+    console.error('[SystemSettingsPage] Failed to fetch users:', error)
+  }
 
-  prefetched.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      const target = ['user list', 'user stats', 'storage configurations', 'maintenance state'][index] ?? 'system setting'
-      console.error(`[SystemSettingsPage] Failed to prefetch ${target}: `, result.reason)
-    }
-  })
+  try {
+    userStats = await fetchUserStatistics(token)
+  } catch (error) {
+    console.error('[SystemSettingsPage] Failed to fetch user stats:', error)
+  }
+
+  try {
+    storageConfigurations = await fetchStorageConfigurations(
+      { page: 1, per_page: 100, include_disabled: true },
+      token,
+    )
+    storageOverview = await fetchStorageOverview(token)
+  } catch (error) {
+    console.error('[SystemSettingsPage] Failed to fetch storage data:', error)
+  }
+
+  try {
+    maintenanceState = await fetchMaintenanceState(token)
+  } catch (error) {
+    console.error('[SystemSettingsPage] Failed to fetch maintenance state:', error)
+  }
+
+  try {
+    catalogEntries = await fetchAdminCatalogEntries(token)
+    availabilitySummaries = await fetchCatalogAvailabilitySummaries(token)
+  } catch (error) {
+    console.error('[SystemSettingsPage] Failed to fetch catalog availability:', error)
+  }
+
+  try {
+    const spaceResponse = await fetchResearchSpaces({ limit: 100 }, token)
+    spaces = spaceResponse.spaces
+  } catch (error) {
+    console.error('[SystemSettingsPage] Failed to fetch research spaces:', error)
+  }
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <SystemSettingsClient initialParams={INITIAL_USER_PARAMS} />
-    </HydrationBoundary>
+    <SystemSettingsClient
+      initialParams={INITIAL_USER_PARAMS}
+      users={users}
+      userStats={userStats}
+      storageConfigurations={storageConfigurations}
+      storageOverview={storageOverview}
+      maintenanceState={maintenanceState}
+      catalogEntries={catalogEntries}
+      availabilitySummaries={availabilitySummaries}
+      spaces={spaces}
+      currentUserId={session.user?.id ?? ''}
+      isAdmin={session.user?.role === 'admin'}
+    />
   )
 }

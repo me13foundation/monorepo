@@ -7,6 +7,7 @@ Provides typed contracts for data source testing results.
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TC003
+from typing import TypedDict
 from uuid import UUID  # noqa: TC003
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -67,9 +68,26 @@ class DataSourceAiTestResult(BaseModel):
     flujo_tables: list[FlujoTableSummary] = Field(default_factory=list)
 
 
+class SourceCatalogEntrySeed(TypedDict, total=False):
+    """Typed seed data for source catalog entries."""
+
+    id: str
+    name: str
+    description: str
+    category: str
+    param_type: str
+    url_template: str
+    api_endpoint: str
+    tags: list[str]
+    is_active: bool
+    requires_auth: bool
+    source_type: str
+
+
 __all__ = [
     "DataSourceAiTestFinding",
     "DataSourceAiTestLink",
     "DataSourceAiTestResult",
     "FlujoTableSummary",
+    "SourceCatalogEntrySeed",
 ]

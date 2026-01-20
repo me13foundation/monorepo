@@ -16,7 +16,6 @@ from src.application.curation.repositories.review_repository import (
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
-    from src.application.curation.repositories.review_repository import ReviewRecordLike
     from src.application.services import (
         EvidenceApplicationService,
         PhenotypeApplicationService,
@@ -24,6 +23,7 @@ if TYPE_CHECKING:
     )
     from src.domain.entities.evidence import Evidence
     from src.domain.entities.variant import Variant
+    from src.type_definitions.curation import ReviewRecordLike
 from src.type_definitions.common import FilterValue, JSONObject, QueryFilters
 from src.type_definitions.json_utils import to_json_value
 

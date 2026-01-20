@@ -5,7 +5,7 @@ Data access layer for gene entities with specialized queries.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 from sqlalchemy import asc, delete, desc, func, or_, select, update
 
@@ -14,6 +14,7 @@ from src.domain.repositories.gene_repository import (
 )
 from src.infrastructure.mappers.gene_mapper import GeneMapper
 from src.models.database import GeneModel
+from src.type_definitions.repositories import GeneStatistics
 
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
@@ -22,12 +23,6 @@ if TYPE_CHECKING:
     from src.domain.repositories.base import QuerySpecification
     from src.domain.value_objects.identifiers import GeneIdentifier
     from src.type_definitions.common import GeneUpdate, JSONObject
-
-
-class GeneStatistics(TypedDict):
-    total_genes: int
-    genes_with_variants: int
-    genes_with_phenotypes: int
 
 
 class SqlAlchemyGeneRepository(GeneRepositoryInterface):

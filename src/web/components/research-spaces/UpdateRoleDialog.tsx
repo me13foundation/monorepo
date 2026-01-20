@@ -1,8 +1,9 @@
 "use client"
 
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useUpdateMemberRole } from '@/lib/queries/research-spaces'
+import { updateMemberRoleAction } from '@/app/actions/research-spaces'
 import { updateMemberRoleSchema, type UpdateMemberRoleFormData } from '@/lib/schemas/research-space'
 import {
   Dialog,
@@ -32,6 +33,8 @@ import {
 import { Loader2 } from 'lucide-react'
 import { MembershipRole } from '@/types/research-space'
 import { roleLabels } from './role-utils'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 interface UpdateRoleDialogProps {
   spaceId: string
@@ -50,7 +53,8 @@ export function UpdateRoleDialog({
   onOpenChange,
   onSuccess,
 }: UpdateRoleDialogProps) {
-  const updateMutation = useUpdateMemberRole()
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<UpdateMemberRoleFormData>({
     resolver: zodResolver(updateMemberRoleSchema),
@@ -61,17 +65,25 @@ export function UpdateRoleDialog({
 
   const onSubmit = async (data: UpdateMemberRoleFormData) => {
     try {
-      await updateMutation.mutateAsync({
-        spaceId,
-        membershipId,
-        data: {
-          role: data.role as MembershipRole,
-        },
+      setIsSubmitting(true)
+      const result = await updateMemberRoleAction(spaceId, membershipId, {
+        role: data.role as MembershipRole,
       })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       onOpenChange(false)
       onSuccess?.()
+      if (!onSuccess) {
+        router.refresh()
+      }
+      toast.success('Member role updated')
     } catch (error) {
       console.error('Failed to update role:', error)
+      toast.error('Failed to update role')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -124,12 +136,12 @@ export function UpdateRoleDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={updateMutation.isPending}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending && (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 )}
                 Update Role

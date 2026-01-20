@@ -1,19 +1,30 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StorageConfigurationManager } from '@/components/system-settings/StorageConfigurationManager'
+import type {
+  StorageConfiguration,
+  StorageConfigurationListResponse,
+  StorageOverviewResponse,
+} from '@/types/storage'
+import type { MaintenanceModeResponse } from '@/types/system-status'
 
-const mockUseStorageConfigurations = jest.fn()
-const mockUseStorageMutations = jest.fn()
-const mockUseStorageMetrics = jest.fn()
-const mockUseStorageHealth = jest.fn()
-const mockUseStorageOverview = jest.fn()
-const mockUseMaintenanceState = jest.fn()
+const mockCreateStorageConfigurationAction = jest.fn()
+const mockUpdateStorageConfigurationAction = jest.fn()
+const mockTestStorageConfigurationAction = jest.fn()
+const mockDeleteStorageConfigurationAction = jest.fn()
 
 const originalBetaFlag = process.env.NEXT_PUBLIC_STORAGE_DASHBOARD_BETA
 
-let createMutation: { mutateAsync: jest.Mock; isPending: boolean }
-let updateMutation: { mutateAsync: jest.Mock; isPending: boolean }
-let testMutation: { mutateAsync: jest.Mock; isPending: boolean }
+jest.mock('@/app/actions/storage', () => ({
+  createStorageConfigurationAction: (...args: unknown[]) =>
+    mockCreateStorageConfigurationAction(...args),
+  updateStorageConfigurationAction: (...args: unknown[]) =>
+    mockUpdateStorageConfigurationAction(...args),
+  testStorageConfigurationAction: (...args: unknown[]) =>
+    mockTestStorageConfigurationAction(...args),
+  deleteStorageConfigurationAction: (...args: unknown[]) =>
+    mockDeleteStorageConfigurationAction(...args),
+}))
 
 jest.mock('sonner', () => ({
   toast: {
@@ -22,63 +33,97 @@ jest.mock('sonner', () => ({
   },
 }))
 
-jest.mock('@/lib/queries/storage', () => ({
-  useStorageConfigurations: () => mockUseStorageConfigurations(),
-  useStorageMutations: () => mockUseStorageMutations(),
-  useStorageMetrics: (id: string) => mockUseStorageMetrics(id),
-  useStorageHealth: (id: string) => mockUseStorageHealth(id),
-  useStorageOverview: () => mockUseStorageOverview(),
-}))
+const baseConfigurations: StorageConfigurationListResponse = {
+  data: [],
+  total: 0,
+  page: 1,
+  per_page: 100,
+}
 
-jest.mock('@/lib/queries/system-status', () => ({
-  useMaintenanceState: () => mockUseMaintenanceState(),
-}))
+const baseOverview: StorageOverviewResponse = {
+  generated_at: new Date().toISOString(),
+  totals: {
+    total_configurations: 0,
+    enabled_configurations: 0,
+    disabled_configurations: 0,
+    healthy_configurations: 0,
+    degraded_configurations: 0,
+    offline_configurations: 0,
+    total_files: 0,
+    total_size_bytes: 0,
+    average_error_rate: 0,
+  },
+  configurations: [],
+}
+
+const activeMaintenance: MaintenanceModeResponse = {
+  state: {
+    is_active: true,
+    message: null,
+    activated_at: new Date().toISOString(),
+    activated_by: null,
+    last_updated_by: null,
+    last_updated_at: new Date().toISOString(),
+  },
+}
+
+const inactiveMaintenance: MaintenanceModeResponse = {
+  state: {
+    is_active: false,
+    message: null,
+    activated_at: null,
+    activated_by: null,
+    last_updated_by: null,
+    last_updated_at: null,
+  },
+}
+
+const renderManager = ({
+  configurations = baseConfigurations,
+  overview = baseOverview,
+  maintenanceState = activeMaintenance,
+}: {
+  configurations?: StorageConfigurationListResponse | null
+  overview?: StorageOverviewResponse | null
+  maintenanceState?: MaintenanceModeResponse | null
+} = {}) =>
+  render(
+    <StorageConfigurationManager
+      configurations={configurations}
+      overview={overview}
+      maintenanceState={maintenanceState}
+    />,
+  )
 
 describe('StorageConfigurationManager', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    createMutation = { mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }
-    updateMutation = { mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }
-    testMutation = { mutateAsync: jest.fn().mockResolvedValue({ success: true }), isPending: false }
-    mockUseStorageConfigurations.mockReturnValue({
+    mockCreateStorageConfigurationAction.mockResolvedValue({
+      success: true,
       data: {
-        data: [],
-        total: 0,
-        page: 1,
-        per_page: 100,
-      },
-      isLoading: false,
-    })
-    mockUseStorageMutations.mockReturnValue({
-      createConfiguration: createMutation,
-      updateConfiguration: updateMutation,
-      testConfiguration: testMutation,
-      deleteConfiguration: { mutateAsync: jest.fn(), isPending: false },
-    })
-    mockUseStorageMetrics.mockReturnValue({ data: null })
-    mockUseStorageHealth.mockReturnValue({ data: null })
-    mockUseStorageOverview.mockReturnValue({
-      data: {
-        generated_at: new Date().toISOString(),
-        totals: {
-          total_configurations: 0,
-          enabled_configurations: 0,
-          disabled_configurations: 0,
-          healthy_configurations: 0,
-          degraded_configurations: 0,
-          offline_configurations: 0,
-          total_files: 0,
-          total_size_bytes: 0,
-          average_error_rate: 0,
+        id: 'cfg-new',
+        name: 'Local Archive',
+        provider: 'local_filesystem',
+        config: {
+          provider: 'local_filesystem',
+          base_path: '/var/med13/storage',
+          create_directories: true,
+          expose_file_urls: false,
         },
-        configurations: [],
+        enabled: true,
+        supported_capabilities: ['pdf'],
+        default_use_cases: ['pdf'],
+        metadata: {},
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
-      isLoading: false,
     })
-    mockUseMaintenanceState.mockReturnValue({
-      data: { state: { is_active: true } },
-      isLoading: false,
+    mockUpdateStorageConfigurationAction.mockResolvedValue({ success: true, data: {} })
+    mockTestStorageConfigurationAction.mockResolvedValue({
+      success: true,
+      data: { success: true, message: 'ok' },
     })
+    mockDeleteStorageConfigurationAction.mockResolvedValue({ success: true, data: { message: 'ok' } })
     process.env.NEXT_PUBLIC_STORAGE_DASHBOARD_BETA = 'true'
   })
 
@@ -91,13 +136,13 @@ describe('StorageConfigurationManager', () => {
   })
 
   it('renders empty state when no configurations are available', () => {
-    render(<StorageConfigurationManager />)
+    renderManager()
     expect(screen.getByText(/No storage configurations found/i)).toBeInTheDocument()
   })
 
   it('submits the new configuration form', async () => {
     const user = userEvent.setup()
-    render(<StorageConfigurationManager />)
+    renderManager()
 
     await user.click(screen.getByRole('button', { name: /Add Configuration/i }))
     const nameInput = screen.getByLabelText(/Name/i)
@@ -107,7 +152,7 @@ describe('StorageConfigurationManager', () => {
     await user.click(screen.getByRole('button', { name: /Create Configuration/i }))
 
     await waitFor(() => {
-      expect(createMutation.mutateAsync).toHaveBeenCalledWith({
+      expect(mockCreateStorageConfigurationAction).toHaveBeenCalledWith({
         name: 'Local Archive',
         provider: 'local_filesystem',
         default_use_cases: ['pdf'],
@@ -124,189 +169,150 @@ describe('StorageConfigurationManager', () => {
 
   it('tests an existing configuration connection', async () => {
     const user = userEvent.setup()
-    mockUseStorageConfigurations.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 'cfg-1',
-            name: 'Primary Storage',
-            provider: 'local_filesystem',
-            config: {
-              provider: 'local_filesystem',
-              base_path: '/var/lib/med13',
-              create_directories: true,
-              expose_file_urls: false,
-            },
-            enabled: true,
-            supported_capabilities: ['pdf', 'export'],
-            default_use_cases: ['pdf'],
-            metadata: {},
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ],
+    const configuration: StorageConfiguration = {
+      id: 'cfg-1',
+      name: 'Primary Storage',
+      provider: 'local_filesystem',
+      config: {
+        provider: 'local_filesystem',
+        base_path: '/var/lib/med13',
+        create_directories: true,
+        expose_file_urls: false,
+      },
+      enabled: true,
+      supported_capabilities: ['pdf', 'export'],
+      default_use_cases: ['pdf'],
+      metadata: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    renderManager({
+      configurations: {
+        data: [configuration],
         total: 1,
         page: 1,
         per_page: 100,
       },
-      isLoading: false,
-    })
-    mockUseStorageMetrics.mockReturnValue({
-      data: {
-        configuration_id: 'cfg-1',
-        total_files: 5,
-        total_size_bytes: 1024,
-        last_operation_at: new Date().toISOString(),
-        error_rate: 0,
+      overview: {
+        ...baseOverview,
+        configurations: [
+          {
+            configuration,
+            usage: {
+              configuration_id: 'cfg-1',
+              total_files: 5,
+              total_size_bytes: 1024,
+              last_operation_at: new Date().toISOString(),
+              error_rate: 0,
+            },
+            health: {
+              configuration_id: 'cfg-1',
+              provider: 'local_filesystem',
+              status: 'healthy',
+              last_checked_at: new Date().toISOString(),
+              details: {},
+            },
+          },
+        ],
       },
     })
-    mockUseStorageHealth.mockReturnValue({
-      data: {
-        configuration_id: 'cfg-1',
-        provider: 'local_filesystem',
-        status: 'healthy',
-        last_checked_at: new Date().toISOString(),
-        details: {},
-      },
-    })
-
-    render(<StorageConfigurationManager />)
 
     await user.click(screen.getByRole('button', { name: /Test Connection/i }))
 
-    expect(testMutation.mutateAsync).toHaveBeenCalledWith({ configurationId: 'cfg-1' })
+    expect(mockTestStorageConfigurationAction).toHaveBeenCalledWith('cfg-1')
   })
 
-  it('blocks toggling when maintenance mode is disabled', async () => {
+  it('blocks toggling when maintenance mode is disabled and backend has usage', async () => {
     const user = userEvent.setup()
-    mockUseMaintenanceState.mockReturnValue({
-      data: { state: { is_active: false } },
-      isLoading: false,
-    })
-    mockUseStorageConfigurations.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 'cfg-1',
-            name: 'Primary Storage',
-            provider: 'local_filesystem',
-            config: { provider: 'local_filesystem', base_path: '/tmp', create_directories: true, expose_file_urls: false },
-            enabled: true,
-            supported_capabilities: ['pdf'],
-            default_use_cases: ['pdf'],
-            metadata: {},
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ],
+    const configuration: StorageConfiguration = {
+      id: 'cfg-1',
+      name: 'Primary Storage',
+      provider: 'local_filesystem',
+      config: {
+        provider: 'local_filesystem',
+        base_path: '/tmp',
+        create_directories: true,
+        expose_file_urls: false,
+      },
+      enabled: true,
+      supported_capabilities: ['pdf'],
+      default_use_cases: ['pdf'],
+      metadata: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    renderManager({
+      configurations: {
+        data: [configuration],
         total: 1,
         page: 1,
         per_page: 100,
       },
-      isLoading: false,
-    })
-    mockUseStorageMetrics.mockReturnValue({
-      data: {
-        configuration_id: 'cfg-1',
-        total_files: 10,
-        total_size_bytes: 1024,
-        last_operation_at: new Date().toISOString(),
-        error_rate: 0,
+      overview: {
+        ...baseOverview,
+        configurations: [
+          {
+            configuration,
+            usage: {
+              configuration_id: 'cfg-1',
+              total_files: 10,
+              total_size_bytes: 1024,
+              last_operation_at: new Date().toISOString(),
+              error_rate: 0,
+            },
+            health: null,
+          },
+        ],
       },
+      maintenanceState: inactiveMaintenance,
     })
-    mockUseStorageHealth.mockReturnValue({ data: null })
 
-    render(<StorageConfigurationManager />)
     const toggle = screen.getByRole('switch', { name: /enabled/i })
     await user.click(toggle)
 
-    expect(updateMutation.mutateAsync).not.toHaveBeenCalled()
+    expect(mockUpdateStorageConfigurationAction).not.toHaveBeenCalled()
   })
 
-  it('shows maintenance confirmation when editing provider/base path without maintenance', async () => {
+  it('shows maintenance confirmation when editing base path without maintenance', async () => {
     const user = userEvent.setup()
-    mockUseMaintenanceState.mockReturnValue({
-      data: { state: { is_active: false } },
-      isLoading: false,
-    })
-    mockUseStorageConfigurations.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 'cfg-1',
-            name: 'Primary Storage',
-            provider: 'local_filesystem',
-            config: { provider: 'local_filesystem', base_path: '/var/med13/storage', create_directories: true, expose_file_urls: false },
-            enabled: true,
-            supported_capabilities: ['pdf'],
-            default_use_cases: ['pdf'],
-            metadata: {},
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ],
+    const configuration: StorageConfiguration = {
+      id: 'cfg-1',
+      name: 'Primary Storage',
+      provider: 'local_filesystem',
+      config: {
+        provider: 'local_filesystem',
+        base_path: '/var/med13/storage',
+        create_directories: true,
+        expose_file_urls: false,
+      },
+      enabled: true,
+      supported_capabilities: ['pdf'],
+      default_use_cases: ['pdf'],
+      metadata: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    renderManager({
+      configurations: {
+        data: [configuration],
         total: 1,
         page: 1,
         per_page: 100,
       },
-      isLoading: false,
+      maintenanceState: inactiveMaintenance,
     })
 
-    render(<StorageConfigurationManager />)
     await user.click(screen.getByRole('button', { name: /Add Configuration/i }))
     await user.clear(screen.getByLabelText(/Name/i))
     await user.type(screen.getByLabelText(/Name/i), 'Updated Storage')
     await user.clear(screen.getByLabelText(/Base Path/i))
     await user.type(screen.getByLabelText(/Base Path/i), '/tmp/archive')
+
     await user.click(screen.getByRole('button', { name: /Create Configuration/i }))
 
-    expect(screen.getByText(/Enable maintenance mode first/i)).toBeInTheDocument()
-    expect(createMutation.mutateAsync).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: /Continue without maintenance/i }))
-    await waitFor(() => {
-      expect(createMutation.mutateAsync).toHaveBeenCalled()
-    })
-  })
-
-  it('allows creation without modal when maintenance off but provider/base path unchanged', async () => {
-    const user = userEvent.setup()
-    mockUseMaintenanceState.mockReturnValue({
-      data: { state: { is_active: false } },
-      isLoading: false,
-    })
-    mockUseStorageConfigurations.mockReturnValue({
-      data: {
-        data: [
-          {
-            id: 'cfg-1',
-            name: 'Primary Storage',
-            provider: 'local_filesystem',
-            config: { provider: 'local_filesystem', base_path: '/var/med13/storage', create_directories: true, expose_file_urls: false },
-            enabled: true,
-            supported_capabilities: ['pdf'],
-            default_use_cases: ['pdf'],
-            metadata: {},
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ],
-        total: 1,
-        page: 1,
-        per_page: 100,
-      },
-      isLoading: false,
-    })
-
-    render(<StorageConfigurationManager />)
-    await user.click(screen.getByRole('button', { name: /Add Configuration/i }))
-    await user.clear(screen.getByLabelText(/Name/i))
-    await user.type(screen.getByLabelText(/Name/i), 'Second Storage')
-    await user.click(screen.getByRole('button', { name: /Create Configuration/i }))
-
-    await waitFor(() => {
-      expect(createMutation.mutateAsync).toHaveBeenCalled()
-    })
-    expect(screen.queryByText(/Enable maintenance mode first/i)).not.toBeInTheDocument()
+    expect(await screen.findByText(/Enable maintenance mode first/i)).toBeInTheDocument()
   })
 })

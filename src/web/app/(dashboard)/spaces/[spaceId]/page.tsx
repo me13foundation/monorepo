@@ -1,13 +1,20 @@
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { fetchResearchSpace, fetchSpaceMembers, fetchSpaceCurationStats, fetchSpaceCurationQueue } from '@/lib/api/research-spaces'
-import { researchSpaceKeys } from '@/lib/query-keys/research-spaces'
-import { QueryClient, dehydrate } from '@tanstack/react-query'
-import { HydrationBoundary } from '@tanstack/react-query'
-import SpaceDetailClient from './space-detail-client'
+import {
+  fetchMyMembership,
+  fetchResearchSpace,
+  fetchSpaceCurationQueue,
+  fetchSpaceCurationStats,
+  fetchSpaceMembers,
+} from '@/lib/api/research-spaces'
 import { fetchDataSourcesBySpace } from '@/lib/api/data-sources'
-import { dataSourceKeys } from '@/lib/query-keys/data-sources'
+import { canManageMembers } from '@/components/research-spaces/role-utils'
+import { MembershipRole, type ResearchSpace, type ResearchSpaceMembership } from '@/types/research-space'
+import { UserRole } from '@/types/auth'
+import SpaceDetailClient from './space-detail-client'
+import type { DataSourceListResponse } from '@/lib/api/data-sources'
+import type { CurationQueueResponse, CurationStats } from '@/lib/api/research-spaces'
 
 interface SpaceDetailPageProps {
   params: {
@@ -23,34 +30,81 @@ export default async function SpaceDetailPage({ params }: SpaceDetailPageProps) 
     redirect('/auth/login?error=SessionExpired')
   }
 
-  const queryClient = new QueryClient()
+  let space: ResearchSpace | null = null
+  let memberships: ResearchSpaceMembership[] = []
+  let membersError: string | null = null
+  let dataSources: DataSourceListResponse | null = null
+  let curationStats: CurationStats | null = null
+  let curationQueue: CurationQueueResponse | null = null
+  let currentMembership: ResearchSpaceMembership | null = null
 
-  await Promise.allSettled([
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.detail(params.spaceId),
-      queryFn: () => fetchResearchSpace(params.spaceId, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.members(params.spaceId),
-      queryFn: () => fetchSpaceMembers(params.spaceId, undefined, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: dataSourceKeys.space(params.spaceId, { page: 1, limit: 5 }),
-      queryFn: () => fetchDataSourcesBySpace(params.spaceId, { page: 1, limit: 5 }, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.curationStats(params.spaceId),
-      queryFn: () => fetchSpaceCurationStats(params.spaceId, token),
-    }),
-    queryClient.prefetchQuery({
-      queryKey: researchSpaceKeys.curationQueue(params.spaceId, { limit: 5 }),
-      queryFn: () => fetchSpaceCurationQueue(params.spaceId, { limit: 5 }, token),
-    }),
-  ])
+  try {
+    space = await fetchResearchSpace(params.spaceId, token)
+  } catch (error) {
+    console.error('[SpaceDetailPage] Failed to fetch research space', error)
+  }
+
+  try {
+    const membershipResponse = await fetchSpaceMembers(params.spaceId, undefined, token)
+    memberships = membershipResponse.memberships
+  } catch (error) {
+    membersError =
+      error instanceof Error ? error.message : 'Unable to load members for this space.'
+    console.error('[SpaceDetailPage] Failed to fetch members', error)
+  }
+
+  try {
+    currentMembership = await fetchMyMembership(params.spaceId, token)
+  } catch (error) {
+    console.error('[SpaceDetailPage] Failed to fetch membership', error)
+  }
+
+  const isPlatformAdmin = session.user.role === UserRole.ADMIN
+  const hasSpaceAccess = isPlatformAdmin || Boolean(currentMembership)
+
+  if (hasSpaceAccess) {
+    try {
+      dataSources = await fetchDataSourcesBySpace(params.spaceId, { page: 1, limit: 5 }, token)
+    } catch (error) {
+      console.error('[SpaceDetailPage] Failed to fetch data sources', error)
+    }
+
+    try {
+      curationStats = await fetchSpaceCurationStats(params.spaceId, token)
+      curationQueue = await fetchSpaceCurationQueue(params.spaceId, { limit: 5 }, token)
+    } catch (error) {
+      console.error('[SpaceDetailPage] Failed to fetch curation data', error)
+    }
+  }
+
+  const matchedMembership = memberships.find(
+    (membership) => membership.user_id === session.user.id,
+  )
+  const effectiveRole =
+    matchedMembership?.role ??
+    currentMembership?.role ??
+    (isPlatformAdmin ? MembershipRole.ADMIN : MembershipRole.VIEWER)
+  const canManageMembersFlag = isPlatformAdmin || canManageMembers(effectiveRole)
+  const isOwner = effectiveRole === MembershipRole.OWNER
+  const canEditSpace = isOwner || isPlatformAdmin
+  const showMembershipNotice = !currentMembership && !isPlatformAdmin
 
   return (
-    <HydrationBoundary state={dehydrate(queryClient)}>
-      <SpaceDetailClient spaceId={params.spaceId} />
-    </HydrationBoundary>
+    <SpaceDetailClient
+      spaceId={params.spaceId}
+      space={space}
+      memberships={memberships}
+      membersError={membersError}
+      dataSources={dataSources}
+      curationStats={curationStats}
+      curationQueue={curationQueue}
+      access={{
+        hasSpaceAccess,
+        canManageMembers: canManageMembersFlag,
+        canEditSpace,
+        isOwner,
+        showMembershipNotice,
+      }}
+    />
   )
 }

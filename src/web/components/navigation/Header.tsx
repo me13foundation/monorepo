@@ -5,11 +5,9 @@ import { useSpaceContext } from '@/components/space-context-provider'
 import { UserMenu } from './UserMenu'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePrefetchOnHover } from '@/hooks/use-prefetch'
 
 export function Header() {
   const { currentSpaceId } = useSpaceContext()
-  const { prefetchDashboard, prefetchResearchSpaces } = usePrefetchOnHover()
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-card shadow-sm">
@@ -19,8 +17,6 @@ export function Header() {
             <Link
               href="/dashboard"
               className="flex shrink-0 items-center gap-2"
-              onMouseEnter={prefetchDashboard}
-              onFocus={prefetchDashboard}
               prefetch={true}
             >
               <Image

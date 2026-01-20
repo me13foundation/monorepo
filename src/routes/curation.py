@@ -266,7 +266,7 @@ async def get_curated_detail(
     Retrieve enriched detail payload for a queued entity.
 
     Currently supports variant entities and returns a structure compatible
-    with the Dash curation interface.
+    with the curation interface.
     """
     await _require_permission(
         current_user,

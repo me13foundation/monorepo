@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useResearchSpace, useUpdateResearchSpace, useDeleteResearchSpace, useRemoveMember, useSpaceMembers, useSpaceCurationStats, useSpaceCurationQueue, useSpaceMembership } from '@/lib/queries/research-spaces'
+import { deleteResearchSpaceAction, removeMemberAction, updateResearchSpaceAction } from '@/app/actions/research-spaces'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,22 +12,32 @@ import { InviteMemberDialog } from './InviteMemberDialog'
 import { UpdateRoleDialog } from './UpdateRoleDialog'
 import { Loader2, Settings, Trash2, Users, Database, BarChart3, FileText } from 'lucide-react'
 import { SpaceStatus, MembershipRole } from '@/types/research-space'
-import type { ResearchSpace } from '@/types/research-space'
+import type { ResearchSpace, ResearchSpaceMembership } from '@/types/research-space'
 import { useRouter } from 'next/navigation'
-import { canManageMembers } from './role-utils'
 import { cn } from '@/lib/utils'
-import { useSession } from 'next-auth/react'
-import { UserRole } from '@/types/auth'
-import { useSpaceDataSources } from '@/lib/queries/data-sources'
 import type { DataSourceListResponse } from '@/lib/api/data-sources'
-import type { CurationQueueResponse } from '@/lib/api/research-spaces'
+import type { CurationQueueResponse, CurationStats } from '@/lib/api/research-spaces'
 import { DashboardSection, SectionGrid, StatCard } from '@/components/ui/composition-patterns'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { toast } from 'sonner'
-import type { AxiosError } from 'axios'
+
+interface ResearchSpaceAccess {
+  hasSpaceAccess: boolean
+  canManageMembers: boolean
+  canEditSpace: boolean
+  isOwner: boolean
+  showMembershipNotice: boolean
+}
 
 interface ResearchSpaceDetailProps {
   spaceId: string
+  space: ResearchSpace | null
+  memberships: ResearchSpaceMembership[]
+  membersError?: string | null
+  dataSources: DataSourceListResponse | null
+  curationStats: CurationStats | null
+  curationQueue: CurationQueueResponse | null
+  access: ResearchSpaceAccess
   defaultTab?: string
 }
 
@@ -45,76 +55,43 @@ const statusLabels: Record<SpaceStatus, string> = {
   [SpaceStatus.SUSPENDED]: 'Suspended',
 }
 
-export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: ResearchSpaceDetailProps) {
+export function ResearchSpaceDetail({
+  spaceId,
+  space,
+  memberships,
+  membersError,
+  dataSources,
+  curationStats,
+  curationQueue,
+  access,
+  defaultTab = 'overview',
+}: ResearchSpaceDetailProps) {
   const router = useRouter()
-  const { data: session } = useSession()
-  const hasValidSpaceId = isValidUuid(spaceId)
-  const { data: space, isLoading } = useResearchSpace(spaceId)
-  const deleteMutation = useDeleteResearchSpace()
-  const removeMutation = useRemoveMember()
-  const isPlatformAdmin = session?.user?.role === UserRole.ADMIN
-  const { data: sessionMembership, isLoading: membershipLoading } = useSpaceMembership(
-    hasValidSpaceId ? spaceId : null,
-    session?.user?.id ?? null,
-  )
-  const shouldLoadSpaceData = Boolean(sessionMembership || isPlatformAdmin)
-  const shouldLoadCuration = shouldLoadSpaceData
-  const { data: curationStats, isLoading: curationLoading } = useSpaceCurationStats(spaceId, {
-    enabled: shouldLoadCuration,
-  })
-  const { data: curationQueue, isLoading: curationQueueLoading } = useSpaceCurationQueue(
-    spaceId,
-    {
-      limit: 5,
-    },
-    { enabled: shouldLoadCuration },
-  )
-  const { data: dataSources, isLoading: dataSourcesLoading } = useSpaceDataSources(
-    spaceId,
-    {
-      limit: 5,
-      page: 1,
-    },
-    { enabled: shouldLoadSpaceData },
-  )
-  const {
-    data: membersData,
-    isLoading: membersLoading,
-    error: membersErrorRaw,
-  } = useSpaceMembers(spaceId)
-
-  const spaceData = space as ResearchSpace | undefined
-  const dataSourcesResponse = dataSources as DataSourceListResponse | undefined
+  const spaceData = space
+  const dataSourcesResponse = dataSources ?? null
   const totalDataSources = dataSourcesResponse?.total ?? 0
   const recentSources = dataSourcesResponse?.items ?? []
-  const curationQueueData = curationQueue as CurationQueueResponse | undefined
-  const showOnboarding = shouldLoadSpaceData && !dataSourcesLoading && totalDataSources === 0
-  const hasDataSources = shouldLoadSpaceData && totalDataSources > 0
-  const dataSourceStatusCounts =
-    recentSources.reduce<Record<string, number>>((acc, source) => {
-      const status = source.status || 'unknown'
-      acc[status] = (acc[status] ?? 0) + 1
-      return acc
-    }, {}) ?? {}
+  const curationQueueData = curationQueue ?? null
+  const showOnboarding = access.hasSpaceAccess && totalDataSources === 0
+  const hasDataSources = access.hasSpaceAccess && totalDataSources > 0
+  const dataSourceStatusCounts = recentSources.reduce<Record<string, number>>((acc, source) => {
+    const status = source.status || 'unknown'
+    acc[status] = (acc[status] ?? 0) + 1
+    return acc
+  }, {})
 
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
   const [updateRoleDialogOpen, setUpdateRoleDialogOpen] = useState(false)
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
   const [selectedCurrentRole, setSelectedCurrentRole] = useState<MembershipRole | null>(null)
+  const [pendingMembershipId, setPendingMembershipId] = useState<string | null>(null)
+  const [isDeletingSpace, setIsDeletingSpace] = useState(false)
 
-  const membershipList = membersData?.memberships ?? []
-  const matchedMembership = membershipList.find(
-    (membership) => membership.user_id === session?.user?.id,
-  )
-  const effectiveRole =
-    matchedMembership?.role ??
-    sessionMembership?.role ??
-    (session?.user?.role === UserRole.ADMIN ? MembershipRole.ADMIN : MembershipRole.VIEWER)
-  const canManage = canManageMembers(effectiveRole) || session?.user?.role === UserRole.ADMIN
-  const isOwner = effectiveRole === MembershipRole.OWNER
-  const canEditSpace = isOwner || isPlatformAdmin
-  const membersError = membersErrorRaw instanceof Error ? membersErrorRaw : null
-  const showMembershipNotice = !membershipLoading && !sessionMembership && !isPlatformAdmin
+  const membershipList = memberships
+  const canManage = access.canManageMembers
+  const isOwner = access.isOwner
+  const canEditSpace = access.canEditSpace
+  const showMembershipNotice = access.showMembershipNotice
 
   const handleUpdateRole = (membershipId: string, currentRole: MembershipRole) => {
     setSelectedMembershipId(membershipId)
@@ -125,9 +102,19 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
   const handleRemoveMember = async (membershipId: string) => {
     if (confirm('Are you sure you want to remove this member?')) {
       try {
-        await removeMutation.mutateAsync({ spaceId, membershipId })
+        setPendingMembershipId(membershipId)
+        const result = await removeMemberAction(spaceId, membershipId)
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
+        toast.success('Member removed')
+        router.refresh()
       } catch (error) {
         console.error('Failed to remove member:', error)
+        toast.error('Failed to remove member')
+      } finally {
+        setPendingMembershipId(null)
       }
     }
   }
@@ -135,20 +122,21 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
   const handleDeleteSpace = async () => {
     if (confirm('Are you sure you want to delete this space? This action cannot be undone.')) {
       try {
-        await deleteMutation.mutateAsync(spaceId)
+        setIsDeletingSpace(true)
+        const result = await deleteResearchSpaceAction(spaceId)
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
+        toast.success('Space deleted')
         router.push('/dashboard')
       } catch (error) {
         console.error('Failed to delete space:', error)
+        toast.error('Failed to delete space')
+      } finally {
+        setIsDeletingSpace(false)
       }
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
   }
 
   if (!spaceData) {
@@ -187,7 +175,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
                 variant="destructive"
                 size="sm"
                 onClick={handleDeleteSpace}
-                disabled={deleteMutation.isPending}
+                disabled={isDeletingSpace}
               >
                 <Trash2 className="mr-2 size-4" />
                 Delete
@@ -281,7 +269,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
             </Card>
           )}
 
-          {hasDataSources && shouldLoadCuration && (
+          {hasDataSources && (
             <>
               <SectionGrid>
                 <StatCard
@@ -289,21 +277,21 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
                   value={totalDataSources}
                   description={`Active ${dataSourceStatusCounts['active'] ?? 0} • Pending ${dataSourceStatusCounts['pending_review'] ?? 0}`}
                   icon={<Database className="size-4 text-muted-foreground" />}
-                  isLoading={dataSourcesLoading}
+                  isLoading={false}
                 />
                 <StatCard
                   title="Pending Curation"
                   value={curationStats?.pending ?? 0}
                   description={`Approved ${curationStats?.approved ?? 0} • Rejected ${curationStats?.rejected ?? 0}`}
                   icon={<FileText className="size-4 text-muted-foreground" />}
-                  isLoading={curationLoading}
+                  isLoading={false}
                 />
                 <StatCard
                   title="Total Records"
                   value={(curationStats?.total ?? 0) + totalDataSources}
                   description="Curation items + data sources"
                   icon={<BarChart3 className="size-4 text-muted-foreground" />}
-                  isLoading={curationLoading || dataSourcesLoading}
+                  isLoading={false}
                 />
               </SectionGrid>
 
@@ -311,72 +299,51 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
                 title="Recent Data Sources"
                 description="Latest sources configured in this space"
               >
-                {dataSourcesLoading ? (
-                  <div className="space-y-3 text-sm text-muted-foreground">
-                    <div className="h-4 w-40 rounded bg-muted" />
-                    <div className="h-4 w-48 rounded bg-muted" />
-                    <div className="h-4 w-36 rounded bg-muted" />
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {recentSources.map((source) => (
-                      <div
-                        key={source.id}
-                        className="flex flex-col gap-1 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{source.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {source.source_type} • Status: {source.status}
-                          </p>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Last updated {source.updated_at ? new Date(source.updated_at).toLocaleString() : '—'}
-                        </div>
+                <div className="space-y-3">
+                  {recentSources.map((source) => (
+                    <div
+                      key={source.id}
+                      className="flex flex-col gap-1 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{source.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {source.source_type} • Status: {source.status}
+                        </p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="text-xs text-muted-foreground">
+                        Last updated {source.updated_at ? new Date(source.updated_at).toLocaleString() : '—'}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </DashboardSection>
 
               <DashboardSection
                 title="Curation Activity"
                 description="Review workload within this research space"
               >
-                {curationLoading ? (
-                  <div className="space-y-3 text-sm text-muted-foreground">
-                    <div className="h-4 w-36 rounded bg-muted" />
-                    <div className="h-4 w-48 rounded bg-muted" />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending review</p>
+                    <p className="text-2xl font-semibold text-foreground">{curationStats?.pending ?? 0}</p>
                   </div>
-                ) : (
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <div className="rounded-lg border p-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Pending review</p>
-                      <p className="text-2xl font-semibold text-foreground">{curationStats?.pending ?? 0}</p>
-                    </div>
-                    <div className="rounded-lg border p-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Approved</p>
-                      <p className="text-2xl font-semibold text-foreground">{curationStats?.approved ?? 0}</p>
-                    </div>
-                    <div className="rounded-lg border p-3">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Rejected</p>
-                      <p className="text-2xl font-semibold text-foreground">{curationStats?.rejected ?? 0}</p>
-                    </div>
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Approved</p>
+                    <p className="text-2xl font-semibold text-foreground">{curationStats?.approved ?? 0}</p>
                   </div>
-                )}
+                  <div className="rounded-lg border p-3">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Rejected</p>
+                    <p className="text-2xl font-semibold text-foreground">{curationStats?.rejected ?? 0}</p>
+                  </div>
+                </div>
               </DashboardSection>
 
               <DashboardSection
                 title="Activity Feed"
                 description="Latest curation queue activity for this space"
               >
-                {curationQueueLoading ? (
-                  <div className="space-y-3 text-sm text-muted-foreground">
-                    <div className="h-4 w-48 rounded bg-muted" />
-                    <div className="h-4 w-36 rounded bg-muted" />
-                    <div className="h-4 w-40 rounded bg-muted" />
-                  </div>
-                ) : (curationQueueData?.items.length ?? 0) === 0 ? (
+                {(curationQueueData?.items.length ?? 0) === 0 ? (
                   <p className="text-sm text-muted-foreground">No recent activity yet.</p>
                 ) : (
                   <div className="space-y-3">
@@ -433,14 +400,14 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
 
         <TabsContent value="members" className="space-y-4">
           <SpaceMembersList
-            spaceId={spaceId}
             memberships={membershipList}
-            isLoading={membersLoading}
-            error={membersError}
+            isLoading={false}
+            errorMessage={membersError ?? null}
             onInvite={() => setInviteDialogOpen(true)}
             onUpdateRole={handleUpdateRole}
             onRemove={handleRemoveMember}
             canManage={canManage}
+            pendingMembershipId={pendingMembershipId}
           />
         </TabsContent>
 
@@ -461,6 +428,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
         spaceId={spaceId}
         open={inviteDialogOpen}
         onOpenChange={setInviteDialogOpen}
+        onSuccess={() => router.refresh()}
       />
 
       {selectedMembershipId && selectedCurrentRole && (
@@ -470,6 +438,7 @@ export function ResearchSpaceDetail({ spaceId, defaultTab = 'overview' }: Resear
           currentRole={selectedCurrentRole}
           open={updateRoleDialogOpen}
           onOpenChange={setUpdateRoleDialogOpen}
+          onSuccess={() => router.refresh()}
         />
       )}
     </div>
@@ -483,16 +452,16 @@ interface SpaceDescriptionCardProps {
 }
 
 function SpaceDescriptionCard({ spaceId, description, canEdit }: SpaceDescriptionCardProps) {
-  const updateMutation = useUpdateResearchSpace()
+  const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState<string>(description ?? '')
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     setDraft(description ?? '')
   }, [description])
 
   const initialDescription = description ?? ''
-  const isSaving = updateMutation.isPending
   const hasChanges = draft !== initialDescription
   const displayDescription =
     initialDescription.trim() === '' ? 'No description provided yet.' : initialDescription
@@ -509,24 +478,20 @@ function SpaceDescriptionCard({ spaceId, description, canEdit }: SpaceDescriptio
     }
 
     try {
-      await updateMutation.mutateAsync({
-        spaceId,
-        data: { description: draft },
-      })
+      setIsSaving(true)
+      const result = await updateResearchSpaceAction(spaceId, { description: draft })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success('Description updated')
       setIsEditing(false)
+      router.refresh()
     } catch (error) {
-      const axiosError = error as AxiosError<{ detail?: string }>
       console.error('Failed to update description', error)
-
-      if (axiosError.response?.status === 403) {
-        toast.error('Only the space owner can edit the description.')
-      } else if (axiosError.response?.status === 404) {
-        toast.error('Space not found or access denied.')
-      } else {
-        const detail = axiosError.response?.data?.detail
-        toast.error(detail ?? 'Unable to update description. Please try again.')
-      }
+      toast.error('Unable to update description. Please try again.')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -581,8 +546,4 @@ function SpaceDescriptionCard({ spaceId, description, canEdit }: SpaceDescriptio
       </CardContent>
     </Card>
   )
-}
-
-function isValidUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }

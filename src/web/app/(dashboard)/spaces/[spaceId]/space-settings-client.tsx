@@ -3,8 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useResearchSpace, useUpdateResearchSpace } from '@/lib/queries/research-spaces'
-import { Loader2, Settings } from 'lucide-react'
+import { updateResearchSpaceAction } from '@/app/actions/research-spaces'
+import { Settings } from 'lucide-react'
 import type { ResearchSpace } from '@/types/research-space'
 import {
   SpaceStatus,
@@ -25,9 +25,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 
 interface SpaceSettingsClientProps {
   spaceId: string
+  space: ResearchSpace | null
 }
 
 interface SpaceFormState {
@@ -70,15 +72,15 @@ const toAdvancedState = (settings?: ResearchSpaceSettings): AdvancedSettingsStat
   notificationFrequency: settings?.notification_frequency ?? 'weekly',
 })
 
-export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProps) {
+export default function SpaceSettingsClient({ spaceId, space }: SpaceSettingsClientProps) {
+  const router = useRouter()
   const { setCurrentSpaceId } = useSpaceContext()
-  const { data: space, isLoading } = useResearchSpace(spaceId)
-  const spaceData = space as ResearchSpace | undefined
-  const [formState, setFormState] = useState<SpaceFormState>(() => toFormState(spaceData))
+  const spaceData = space
+  const [formState, setFormState] = useState<SpaceFormState>(() => toFormState(spaceData ?? undefined))
   const [advancedSettings, setAdvancedSettings] = useState<AdvancedSettingsState>(() =>
     toAdvancedState(spaceData?.settings as ResearchSpaceSettings | undefined),
   )
-  const updateMutation = useUpdateResearchSpace()
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     if (spaceId) {
@@ -87,7 +89,7 @@ export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProp
   }, [spaceId, setCurrentSpaceId])
 
   useEffect(() => {
-    setFormState(toFormState(spaceData))
+    setFormState(toFormState(spaceData ?? undefined))
     setAdvancedSettings(toAdvancedState(spaceData?.settings as ResearchSpaceSettings | undefined))
   }, [spaceData])
 
@@ -146,7 +148,7 @@ export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProp
   }
 
   const handleReset = () => {
-    setFormState(toFormState(spaceData))
+    setFormState(toFormState(spaceData ?? undefined))
     setAdvancedSettings(toAdvancedState(spaceData?.settings as ResearchSpaceSettings | undefined))
   }
 
@@ -182,20 +184,20 @@ export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProp
     }
 
     try {
-      await updateMutation.mutateAsync({ spaceId, data: payload })
+      setIsSaving(true)
+      const result = await updateResearchSpaceAction(spaceId, payload)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       toast.success('Space settings updated')
+      router.refresh()
     } catch (error) {
       console.error(error)
       toast.error('Failed to update space settings')
+    } finally {
+      setIsSaving(false)
     }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
   }
 
   if (!spaceData) {
@@ -396,14 +398,14 @@ export default function SpaceSettingsClient({ spaceId }: SpaceSettingsClientProp
             </Card>
 
             <div className="flex flex-wrap gap-3">
-              <Button type="submit" disabled={!isDirty || updateMutation.isPending}>
-                {updateMutation.isPending ? 'Saving…' : 'Save Changes'}
+              <Button type="submit" disabled={!isDirty || isSaving}>
+                {isSaving ? 'Saving…' : 'Save Changes'}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={handleReset}
-                disabled={!isDirty || updateMutation.isPending}
+                disabled={!isDirty || isSaving}
                 className={cn(!isDirty && 'cursor-not-allowed opacity-50')}
               >
                 Reset

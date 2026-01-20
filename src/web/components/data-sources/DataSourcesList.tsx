@@ -1,15 +1,13 @@
 "use client"
 
 import { useState } from 'react'
-import { isAxiosError } from 'axios'
 import { toast } from 'sonner'
 import {
-  useSpaceDataSources,
-  useTriggerDataSourceIngestion,
-  useTestDataSourceAiConfiguration,
-  useUpdateDataSource,
-  useDeleteDataSource,
-} from '@/lib/queries/data-sources'
+  deleteDataSourceAction,
+  testDataSourceAiConfigurationAction,
+  triggerDataSourceIngestionAction,
+  updateDataSourceAction,
+} from '@/app/actions/data-sources'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,10 +44,13 @@ import { DataSourceAiTestDialog } from './DataSourceAiTestDialog'
 import type { OrchestratedSessionState, SourceCatalogEntry } from '@/types/generated'
 import type { DataSource } from '@/types/data-source'
 import { componentRegistry } from '@/lib/components/registry'
-import type { DataSourceAiTestResult } from '@/lib/api/data-sources'
+import type { DataSourceAiTestResult, DataSourceListResponse } from '@/lib/api/data-sources'
+import { useRouter } from 'next/navigation'
 
 interface DataSourcesListProps {
   spaceId: string
+  dataSources: DataSourceListResponse | null
+  dataSourcesError?: string | null
   discoveryState: OrchestratedSessionState | null
   discoveryCatalog: SourceCatalogEntry[]
   discoveryError?: string | null
@@ -57,77 +58,63 @@ interface DataSourcesListProps {
 
 export function DataSourcesList({
   spaceId,
+  dataSources,
+  dataSourcesError,
   discoveryState,
   discoveryCatalog,
   discoveryError,
 }: DataSourcesListProps) {
-  const { data, isLoading, error, refetch } = useSpaceDataSources(spaceId)
+  const router = useRouter()
   const [lastSummaries, setLastSummaries] = useState<Record<string, ManualIngestionSummary>>({})
   const [detailSourceId, setDetailSourceId] = useState<string | null>(null)
-  const triggerIngestion = useTriggerDataSourceIngestion(spaceId)
-  const testAiConfiguration = useTestDataSourceAiConfiguration()
-  const updateDataSource = useUpdateDataSource(spaceId)
-  const deleteDataSource = useDeleteDataSource(spaceId)
   const [isDiscoverDialogOpen, setIsDiscoverDialogOpen] = useState(false)
   const [scheduleDialogSource, setScheduleDialogSource] = useState<DataSource | null>(null)
   const [aiConfigDialogSource, setAiConfigDialogSource] = useState<DataSource | null>(null)
   const [runningSourceId, setRunningSourceId] = useState<string | null>(null)
   const [testingSourceId, setTestingSourceId] = useState<string | null>(null)
+  const [retiringSourceId, setRetiringSourceId] = useState<string | null>(null)
   const [deleteSourceId, setDeleteSourceId] = useState<string | null>(null)
+  const [isDeletingSource, setIsDeletingSource] = useState(false)
   const [aiTestDialogSource, setAiTestDialogSource] = useState<DataSource | null>(null)
   const [aiTestResult, setAiTestResult] = useState<DataSourceAiTestResult | null>(null)
   const [isAiTestDialogOpen, setIsAiTestDialogOpen] = useState(false)
   const StatusBadge = componentRegistry.get<{ status: string }>('dataSource.statusBadge')
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
-  const getErrorMessage = (error: unknown): string => {
-    if (isAxiosError(error)) {
-      const data = error.response?.data
-      if (isRecord(data) && typeof data.detail === 'string') {
-        return data.detail
-      }
-    }
-    if (error instanceof Error) {
-      return error.message
-    }
-    return 'Unable to test AI configuration'
-  }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="size-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (error) {
+  if (dataSourcesError) {
     return (
       <Card>
         <CardContent className="pt-6">
           <p className="text-destructive">
-            Failed to load data sources: {error instanceof Error ? error.message : 'Unknown error'}
+            Failed to load data sources: {dataSourcesError}
           </p>
         </CardContent>
       </Card>
     )
   }
 
-  const dataSources = data?.items || []
+  const resolvedDataSources = dataSources?.items ?? []
 
   const detailSource =
-    dataSources.find((source) => source.id === detailSourceId) ?? null
+    resolvedDataSources.find((source) => source.id === detailSourceId) ?? null
 
   const handleRunNow = async (source: DataSource) => {
     try {
       setRunningSourceId(source.id)
-      const summary = await triggerIngestion.mutateAsync(source.id)
+      const result = await triggerDataSourceIngestionAction(source.id, spaceId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      const summary = result.data
       const completedAt = new Date().toISOString()
       const enrichedSummary: ManualIngestionSummary = { ...summary, completedAt }
       setLastSummaries((prev) => ({ ...prev, [source.id]: enrichedSummary }))
       toast.success(`Ingestion completed for ${source.name}`, {
         description: `${summary.created_publications} new, ${summary.updated_publications} updated publications.`,
       })
+      router.refresh()
     } finally {
       setRunningSourceId(null)
     }
@@ -136,12 +123,16 @@ export function DataSourcesList({
   const handleTestAiConfiguration = async (source: DataSource) => {
     try {
       setTestingSourceId(source.id)
-      const result = await testAiConfiguration.mutateAsync(source.id)
+      const result = await testDataSourceAiConfigurationAction(source.id)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       setAiTestDialogSource(source)
-      setAiTestResult(result)
+      setAiTestResult(result.data)
       setIsAiTestDialogOpen(true)
     } catch (error) {
-      toast.error(getErrorMessage(error))
+      toast.error('Unable to test AI configuration')
     } finally {
       setTestingSourceId(null)
     }
@@ -149,24 +140,41 @@ export function DataSourcesList({
 
   const handleRetire = async (source: DataSource) => {
     try {
-      await updateDataSource.mutateAsync({
-        sourceId: source.id,
-        payload: {
+      setRetiringSourceId(source.id)
+      const result = await updateDataSourceAction(
+        source.id,
+        {
           status: 'archived',
         },
-      })
+        spaceId,
+      )
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      router.refresh()
     } catch (error) {
       // Error toast is handled by the mutation
+    } finally {
+      setRetiringSourceId(null)
     }
   }
 
   const handleDelete = async () => {
     if (!deleteSourceId) return
     try {
-      await deleteDataSource.mutateAsync(deleteSourceId)
+      setIsDeletingSource(true)
+      const result = await deleteDataSourceAction(deleteSourceId, spaceId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       setDeleteSourceId(null)
+      router.refresh()
     } catch (error) {
       // Error toast is handled by the mutation
+    } finally {
+      setIsDeletingSource(false)
     }
   }
 
@@ -221,7 +229,7 @@ export function DataSourcesList({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            {data?.total || 0} data source{data?.total !== 1 ? 's' : ''} in this space
+            {dataSources?.total || 0} data source{dataSources?.total !== 1 ? 's' : ''} in this space
           </p>
         </div>
         <div className="flex gap-2">
@@ -232,7 +240,7 @@ export function DataSourcesList({
         </div>
       </div>
 
-      {dataSources.length === 0 ? (
+      {resolvedDataSources.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="py-12 text-center">
@@ -252,7 +260,7 @@ export function DataSourcesList({
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {dataSources.map((source: DataSource) => (
+          {resolvedDataSources.map((source: DataSource) => (
             <Card key={source.id}>
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -359,9 +367,9 @@ export function DataSourcesList({
                           variant="secondary"
                           size="sm"
                           onClick={() => handleTestAiConfiguration(source)}
-                          disabled={testAiConfiguration.isPending && testingSourceId === source.id}
+                          disabled={testingSourceId === source.id}
                         >
-                          {testAiConfiguration.isPending && testingSourceId === source.id ? (
+                          {testingSourceId === source.id ? (
                             <Loader2 className="mr-2 size-4 animate-spin" />
                           ) : (
                             <TestTube className="mr-2 size-4" />
@@ -374,9 +382,9 @@ export function DataSourcesList({
                           type="button"
                           size="sm"
                           onClick={() => handleRunNow(source)}
-                          disabled={triggerIngestion.isPending && runningSourceId === source.id}
+                          disabled={runningSourceId === source.id}
                         >
-                          {triggerIngestion.isPending && runningSourceId === source.id ? (
+                          {runningSourceId === source.id ? (
                             <Loader2 className="mr-2 size-4 animate-spin" />
                           ) : (
                             <RefreshCw className="mr-2 size-4" />
@@ -407,7 +415,7 @@ export function DataSourcesList({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            disabled={source.status === 'archived' || updateDataSource.isPending}
+                            disabled={source.status === 'archived' || retiringSourceId === source.id}
                             onClick={() => handleRetire(source)}
                           >
                             Retire source
@@ -479,10 +487,7 @@ export function DataSourcesList({
         discoveryState={discoveryState}
         discoveryCatalog={discoveryCatalog}
         discoveryError={discoveryError}
-        onSourceAdded={async () => {
-          // Explicitly refetch the data sources list when a source is added
-          await refetch()
-        }}
+        onSourceAdded={() => router.refresh()}
       />
       <Dialog open={Boolean(deleteSourceId)} onOpenChange={(open) => !open && setDeleteSourceId(null)}>
         <DialogContent>
@@ -498,7 +503,7 @@ export function DataSourcesList({
               type="button"
               variant="outline"
               onClick={() => setDeleteSourceId(null)}
-              disabled={deleteDataSource.isPending}
+              disabled={isDeletingSource}
             >
               Cancel
             </Button>
@@ -506,9 +511,9 @@ export function DataSourcesList({
               type="button"
               variant="destructive"
               onClick={handleDelete}
-              disabled={deleteDataSource.isPending}
+              disabled={isDeletingSource}
             >
-              {deleteDataSource.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+              {isDeletingSource && <Loader2 className="mr-2 size-4 animate-spin" />}
               Remove
             </Button>
           </DialogFooter>

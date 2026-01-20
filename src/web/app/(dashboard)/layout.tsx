@@ -3,35 +3,61 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { SidebarWrapper } from '@/components/navigation/sidebar/SidebarWrapper'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { fetchResearchSpaces } from '@/lib/api/research-spaces'
+import { SpaceContextProvider } from '@/components/space-context-provider'
+import { fetchMyMembership, fetchResearchSpaces } from '@/lib/api/research-spaces'
+import type { ResearchSpaceMembership } from '@/types/research-space'
 
-export default async function DashboardLayout({
-  children,
-}: {
+type DashboardLayoutProps = {
   children: React.ReactNode
-}) {
+  params?: {
+    spaceId?: string
+  }
+}
+
+function isValidUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
+export default async function DashboardLayout({ children, params }: DashboardLayoutProps) {
   const session = await getServerSession(authOptions)
   const token = session?.user?.access_token
 
-  let initialSpaces: Awaited<ReturnType<typeof fetchResearchSpaces>>["spaces"] = []
+  let initialSpaces: Awaited<ReturnType<typeof fetchResearchSpaces>>['spaces'] = []
   let initialTotal = 0
+  let initialSpaceId: string | null = null
+  let currentMembership: ResearchSpaceMembership | null = null
 
   if (token) {
     try {
       const response = await fetchResearchSpaces(undefined, token)
       initialSpaces = response.spaces
       initialTotal = response.total
+      const spaceIdFromParams =
+        typeof params?.spaceId === 'string' && isValidUuid(params.spaceId)
+          ? params.spaceId
+          : null
+      initialSpaceId = spaceIdFromParams ?? initialSpaces[0]?.id ?? null
+
+      if (spaceIdFromParams) {
+        currentMembership = await fetchMyMembership(spaceIdFromParams, token)
+      }
     } catch (error) {
-      console.error("[DashboardLayout] Failed to fetch research spaces", error)
+      console.error('[DashboardLayout] Failed to fetch research spaces', error)
     }
   }
 
   return (
     <ErrorBoundary>
       <ProtectedRoute>
-        <SidebarWrapper initialSpaces={initialSpaces} initialTotal={initialTotal}>
-          {children}
-        </SidebarWrapper>
+        <SpaceContextProvider
+          initialSpaces={initialSpaces}
+          initialSpaceId={initialSpaceId}
+          initialTotal={initialTotal}
+        >
+          <SidebarWrapper currentMembership={currentMembership}>
+            {children}
+          </SidebarWrapper>
+        </SpaceContextProvider>
       </ProtectedRoute>
     </ErrorBoundary>
   )

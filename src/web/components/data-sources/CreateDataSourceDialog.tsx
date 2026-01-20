@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { useCreateDataSourceInSpace } from '@/lib/queries/data-sources'
+import { createDataSourceInSpaceAction } from '@/app/actions/data-sources'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 
 const dataSourceSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200, 'Name must be less than 200 characters'),
@@ -55,7 +58,8 @@ export function CreateDataSourceDialog({
   onOpenChange,
   onCreated,
 }: CreateDataSourceDialogProps) {
-  const createMutation = useCreateDataSourceInSpace(spaceId)
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const form = useForm<DataSourceFormValues>({
     resolver: zodResolver(dataSourceSchema),
     defaultValues: {
@@ -69,21 +73,33 @@ export function CreateDataSourceDialog({
 
   const onSubmit = async (values: DataSourceFormValues) => {
     try {
+      setIsSubmitting(true)
       const config = values.config ?? {}
 
-      await createMutation.mutateAsync({
+      const result = await createDataSourceInSpaceAction(spaceId, {
         name: values.name,
         description: values.description,
         source_type: values.source_type,
         config,
         tags: values.tags || [],
       })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       form.reset()
       onOpenChange(false)
       onCreated?.()
+      if (!onCreated) {
+        router.refresh()
+      }
+      toast.success('Data source created')
     } catch (error) {
       // Error handling is done in the mutation
       console.error('Failed to create data source:', error)
+      toast.error('Failed to create data source')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -158,12 +174,12 @@ export function CreateDataSourceDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={createMutation.isPending}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending && (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 )}
                 Create

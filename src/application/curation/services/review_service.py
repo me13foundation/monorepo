@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from src.application.curation.repositories.review_repository import (
     ReviewFilter,
-    ReviewRecordLike,
     ReviewRepository,
 )
 
@@ -14,6 +13,7 @@ if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
     from src.type_definitions.common import JSONObject
+    from src.type_definitions.curation import ReviewRecordLike
 
 
 @dataclass(frozen=True)

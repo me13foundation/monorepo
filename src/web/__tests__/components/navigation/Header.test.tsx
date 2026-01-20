@@ -1,10 +1,8 @@
 import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
 import { Header } from '@/components/navigation/Header'
 import { useSignOut } from '@/hooks/use-sign-out'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { SpaceSelector } from '@/components/research-spaces/SpaceSelector'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 // Mock dependencies
 jest.mock('next-auth/react', () => ({
@@ -34,13 +32,6 @@ import type { Session } from 'next-auth'
 import type { SessionContextValue } from 'next-auth/react'
 
 describe('Header Component', () => {
-  const renderWithClient = (ui: React.ReactElement) =>
-    render(
-      <QueryClientProvider client={new QueryClient()}>
-        {ui}
-      </QueryClientProvider>,
-    )
-
   const mockUseSession = useSession as jest.MockedFunction<typeof useSession>
   const mockUseSignOut = useSignOut as jest.MockedFunction<typeof useSignOut>
   const mockUseSpaceContext = useSpaceContext as jest.MockedFunction<typeof useSpaceContext>
@@ -92,12 +83,14 @@ describe('Header Component', () => {
       currentSpaceId: null,
       setCurrentSpaceId: jest.fn(),
       isLoading: false,
+      spaces: [],
+      spaceTotal: 0,
     })
   })
 
   describe('Rendering', () => {
     it('renders all navigation elements', () => {
-      renderWithClient(<Header />)
+      render(<Header />)
 
       expect(screen.getByText('MED13 Admin')).toBeInTheDocument()
       expect(screen.getByTestId('space-selector')).toBeInTheDocument()
@@ -109,22 +102,24 @@ describe('Header Component', () => {
         currentSpaceId: 'space-123',
         setCurrentSpaceId: jest.fn(),
         isLoading: false,
+        spaces: [],
+        spaceTotal: 0,
       })
 
-      renderWithClient(<Header />)
+      render(<Header />)
 
       // Data Sources button is no longer in the header
       expect(screen.queryByRole('link', { name: /data sources/i })).not.toBeInTheDocument()
     })
 
     it('renders UserMenu component', () => {
-      renderWithClient(<Header />)
+      render(<Header />)
 
       expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
 
     it('renders dashboard logo link', () => {
-      renderWithClient(<Header />)
+      render(<Header />)
 
       const logoLink = screen.getByRole('link', { name: /med13 admin/i })
       expect(logoLink).toBeInTheDocument()
@@ -134,7 +129,7 @@ describe('Header Component', () => {
 
   describe('UserMenu Integration', () => {
     it('renders UserMenu component', () => {
-      renderWithClient(<Header />)
+      render(<Header />)
 
       expect(screen.getByTestId('user-menu')).toBeInTheDocument()
     })
@@ -146,9 +141,11 @@ describe('Header Component', () => {
         currentSpaceId: 'space-456',
         setCurrentSpaceId: jest.fn(),
         isLoading: false,
+        spaces: [],
+        spaceTotal: 0,
       })
 
-      renderWithClient(<Header />)
+      render(<Header />)
 
       expect(SpaceSelector).toHaveBeenCalledWith(
         { currentSpaceId: 'space-456' },
@@ -161,9 +158,11 @@ describe('Header Component', () => {
         currentSpaceId: null,
         setCurrentSpaceId: jest.fn(),
         isLoading: false,
+        spaces: [],
+        spaceTotal: 0,
       })
 
-      renderWithClient(<Header />)
+      render(<Header />)
 
       expect(SpaceSelector).toHaveBeenCalledWith(
         { currentSpaceId: undefined },
@@ -176,7 +175,7 @@ describe('Header Component', () => {
     it('handles missing session gracefully', () => {
       mockUseSession.mockReturnValue(buildSessionValue(null, 'unauthenticated'))
 
-      renderWithClient(<Header />)
+      render(<Header />)
 
       // Should still render, but role might not be visible
       expect(screen.getByText('MED13 Admin')).toBeInTheDocument()
@@ -196,7 +195,7 @@ describe('Header Component', () => {
       }
       mockUseSession.mockReturnValue(buildSessionValue(researcherSession, 'authenticated'))
 
-      renderWithClient(<Header />)
+      render(<Header />)
 
       // UserMenu component handles role display now
       expect(screen.getByTestId('user-menu')).toBeInTheDocument()

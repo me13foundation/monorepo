@@ -2,7 +2,7 @@
 Conflict detection utilities tailored for the curator workflow.
 
 Wraps existing domain services to produce structured summaries that the
-front-end can render without embedding business logic in Dash callbacks.
+front-end can render without embedding business logic in UI callbacks.
 """
 
 from __future__ import annotations

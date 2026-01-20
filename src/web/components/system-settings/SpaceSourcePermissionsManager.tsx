@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
@@ -11,16 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Loader2 } from 'lucide-react'
 import {
-  useAdminCatalogEntries,
-  useCatalogAvailabilitySummaries,
-  useSetCatalogProjectAvailability,
-  useClearCatalogProjectAvailability,
-} from '@/lib/queries/data-sources'
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
+  clearProjectAvailabilityAction,
+  updateProjectAvailabilityAction,
+} from '@/app/actions/data-source-availability'
 import type { PermissionLevel, DataSourceAvailability } from '@/lib/api/data-source-activation'
+import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
+import type { ResearchSpace } from '@/types/research-space'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 const PERMISSION_LABELS: Record<PermissionLevel, string> = {
   available: 'Available',
@@ -56,35 +56,49 @@ function getEffectivePermission(
   return summary.global_rule?.permission_level ?? summary.effective_permission_level ?? 'available'
 }
 
-export function SpaceSourcePermissionsManager() {
-  const catalogQuery = useAdminCatalogEntries()
-  const spacesQuery = useResearchSpaces({ limit: 100 })
-  const availabilitySummariesQuery = useCatalogAvailabilitySummaries()
-  const setPermissionMutation = useSetCatalogProjectAvailability()
-  const clearPermissionMutation = useClearCatalogProjectAvailability()
+interface SpaceSourcePermissionsManagerProps {
+  catalogEntries: SourceCatalogEntry[]
+  availabilitySummaries: DataSourceAvailability[]
+  spaces: ResearchSpace[]
+}
 
-  const catalogEntries = catalogQuery.data ?? []
-  const spaces = spacesQuery.data?.spaces ?? []
+export function SpaceSourcePermissionsManager({
+  catalogEntries,
+  availabilitySummaries,
+  spaces,
+}: SpaceSourcePermissionsManagerProps) {
+  const router = useRouter()
+  const [isApplying, setIsApplying] = useState(false)
 
   const summaryMap = useMemo(() => {
-    const data = availabilitySummariesQuery.data ?? []
+    const data = availabilitySummaries ?? []
     return new Map(data.map((summary) => [summary.catalog_entry_id, summary]))
-  }, [availabilitySummariesQuery.data])
+  }, [availabilitySummaries])
 
   const handlePermissionChange = async (
     sourceId: string,
     spaceId: string,
     value: PermissionLevel | 'inherit',
   ) => {
-    if (value === 'inherit') {
-      await clearPermissionMutation.mutateAsync({ catalogEntryId: sourceId, researchSpaceId: spaceId })
-      return
+    try {
+      setIsApplying(true)
+      if (value === 'inherit') {
+        const result = await clearProjectAvailabilityAction(sourceId, spaceId)
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
+      } else {
+        const result = await updateProjectAvailabilityAction(sourceId, spaceId, value)
+        if (!result.success) {
+          toast.error(result.error)
+          return
+        }
+      }
+      router.refresh()
+    } finally {
+      setIsApplying(false)
     }
-    await setPermissionMutation.mutateAsync({
-      catalogEntryId: sourceId,
-      researchSpaceId: spaceId,
-      permissionLevel: value,
-    })
   }
 
   return (
@@ -96,13 +110,7 @@ export function SpaceSourcePermissionsManager() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {catalogQuery.isLoading || spacesQuery.isLoading || availabilitySummariesQuery.isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : catalogEntries.length === 0 ? (
+        {catalogEntries.length === 0 ? (
           <p className="text-sm text-muted-foreground">No catalog entries available.</p>
         ) : spaces.length === 0 ? (
           <p className="text-sm text-muted-foreground">No research spaces available.</p>
@@ -154,9 +162,7 @@ export function SpaceSourcePermissionsManager() {
                                     value as PermissionLevel | 'inherit',
                                   )
                                 }
-                                disabled={
-                                  setPermissionMutation.isPending || clearPermissionMutation.isPending
-                                }
+                                disabled={isApplying}
                               >
                                 <SelectTrigger className="w-full">
                                   <SelectValue placeholder="Select permission" />
@@ -183,7 +189,7 @@ export function SpaceSourcePermissionsManager() {
             </Table>
           </div>
         )}
-        {(setPermissionMutation.isPending || clearPermissionMutation.isPending) && (
+        {isApplying && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
             Applying permission change…

@@ -1,11 +1,51 @@
 'use client'
 
 import { ResearchSpaceDetail } from '@/components/research-spaces/ResearchSpaceDetail'
+import type { DataSourceListResponse } from '@/lib/api/data-sources'
+import type { CurationQueueResponse, CurationStats } from '@/lib/api/research-spaces'
+import type { ResearchSpace, ResearchSpaceMembership } from '@/types/research-space'
 
-export default function SpaceDetailClient({ spaceId }: { spaceId: string }) {
+type SpaceAccess = {
+  hasSpaceAccess: boolean
+  canManageMembers: boolean
+  canEditSpace: boolean
+  isOwner: boolean
+  showMembershipNotice: boolean
+}
+
+interface SpaceDetailClientProps {
+  spaceId: string
+  space: ResearchSpace | null
+  memberships: ResearchSpaceMembership[]
+  membersError?: string | null
+  dataSources: DataSourceListResponse | null
+  curationStats: CurationStats | null
+  curationQueue: CurationQueueResponse | null
+  access: SpaceAccess
+}
+
+export default function SpaceDetailClient({
+  spaceId,
+  space,
+  memberships,
+  membersError,
+  dataSources,
+  curationStats,
+  curationQueue,
+  access,
+}: SpaceDetailClientProps) {
   return (
     <div>
-      <ResearchSpaceDetail spaceId={spaceId} />
+      <ResearchSpaceDetail
+        spaceId={spaceId}
+        space={space}
+        memberships={memberships}
+        membersError={membersError}
+        dataSources={dataSources}
+        curationStats={curationStats}
+        curationQueue={curationQueue}
+        access={access}
+      />
     </div>
   )
 }

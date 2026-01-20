@@ -8,37 +8,17 @@ import secrets
 import string
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from typing import Literal, TypedDict
+from typing import Literal
 from uuid import UUID
 
 import jwt
 
 from src.domain.services.security.jwt_provider import JWTProviderService
-
-
-class TokenPayload(TypedDict, total=False):
-    sub: str
-    role: str
-    type: Literal["access", "refresh"]
-    exp: datetime
-    iat: datetime
-    iss: str
-
-
-class DecodedTokenPayload(TypedDict, total=False):
-    sub: str
-    role: str
-    type: Literal["access", "refresh"]
-    exp: int
-    iat: int
-    iss: str
-
-
-class RefreshResult(TypedDict):
-    access_token: str
-    expires_at: datetime
-    user_id: str
-    role: str
+from src.type_definitions.security import (
+    DecodedTokenPayload,
+    RefreshResult,
+    TokenPayload,
+)
 
 
 class JWTProvider(JWTProviderService):

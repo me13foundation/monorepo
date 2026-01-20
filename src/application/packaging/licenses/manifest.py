@@ -5,16 +5,18 @@ License manifest generation utilities.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 
-from .manager import (
-    LicenseCompatibility,
-    LicenseInfo,
-    LicenseManager,
-    LicenseManifest,
-    LicenseRecord,
-)
+if TYPE_CHECKING:
+    from src.type_definitions.packaging import (
+        LicenseInfo,
+        LicenseManifest,
+        LicenseRecord,
+    )
+
+from .manager import LicenseCompatibility, LicenseManager
 
 
 class LicenseManifestGenerator:

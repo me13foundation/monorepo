@@ -2,33 +2,26 @@
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { useSession } from 'next-auth/react'
 import { Plus, FolderPlus, Settings } from 'lucide-react'
 import { useSpaceContext } from '@/components/space-context-provider'
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { useRouter } from 'next/navigation'
-import type { ResearchSpaceListResponse } from '@/types/research-space'
 import { DashboardSection, PageHero } from '@/components/ui/composition-patterns'
 import { getThemeVariant } from '@/lib/theme/variants'
 import { ResearchSpaceCard } from '@/components/research-spaces/ResearchSpaceCard'
 import { UserRole } from '@/types/auth'
 
-export default function DashboardClient() {
-  return <DashboardContent />
+interface DashboardClientProps {
+  userRole: UserRole
 }
 
-function DashboardContent() {
-  const { data: session } = useSession()
-  const { currentSpaceId } = useSpaceContext()
-  const { data, isLoading: spacesLoading } = useResearchSpaces()
+export default function DashboardClient({ userRole }: DashboardClientProps) {
+  const { currentSpaceId, spaces, isLoading: spacesLoading } = useSpaceContext()
   const router = useRouter()
   const theme = getThemeVariant('research')
 
-  const spacesResponse = data as ResearchSpaceListResponse | undefined
-  const spaces = spacesResponse?.spaces ?? []
   const hasSpaces = spaces.length > 0
-  const canCreateSpace = session?.user?.role === UserRole.ADMIN
-  const canAccessSystemSettings = session?.user?.role === UserRole.ADMIN
+  const canCreateSpace = userRole === UserRole.ADMIN
+  const canAccessSystemSettings = userRole === UserRole.ADMIN
   const currentSpaceName = currentSpaceId
     ? spaces.find((space) => space.id === currentSpaceId)?.name || currentSpaceId
     : null

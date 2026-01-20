@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Loader2 } from 'lucide-react'
 
-import { useUpdateDataSource } from '@/lib/queries/data-sources'
+import { updateDataSourceAction } from '@/app/actions/data-sources'
 import type { DataSource } from '@/types/data-source'
 import {
   Dialog,
@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/form'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 const aiConfigSchema = z.object({
   is_ai_managed: z.boolean().default(false),
@@ -50,7 +52,8 @@ export function DataSourceAiConfigDialog({
   open,
   onOpenChange,
 }: DataSourceAiConfigDialogProps) {
-  const updateDataSource = useUpdateDataSource(spaceId)
+  const router = useRouter()
+  const [isSaving, setIsSaving] = useState(false)
 
   const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -98,11 +101,26 @@ export function DataSourceAiConfigDialog({
     }
     const updatedConfig = { ...config, metadata: updatedMetadata }
 
-    await updateDataSource.mutateAsync({
-      sourceId: source.id,
-      payload: { config: updatedConfig },
-    })
-    onOpenChange(false)
+    try {
+      setIsSaving(true)
+      const result = await updateDataSourceAction(
+        source.id,
+        { config: updatedConfig },
+        spaceId,
+      )
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('AI configuration updated')
+      onOpenChange(false)
+      router.refresh()
+    } catch (error) {
+      console.error('Failed to update AI configuration', error)
+      toast.error('Failed to update AI configuration')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const isAiManaged = form.watch('is_ai_managed')
@@ -182,8 +200,8 @@ export function DataSourceAiConfigDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={updateDataSource.isPending}>
-                {updateDataSource.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
+              <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="mr-2 size-4 animate-spin" />}
                 Save configuration
               </Button>
             </DialogFooter>

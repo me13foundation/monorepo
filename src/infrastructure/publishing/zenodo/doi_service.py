@@ -3,24 +3,13 @@ DOI minting service for Zenodo deposits.
 """
 
 import logging
-from typing import TypedDict
 
-from src.type_definitions.external_apis import (
-    ZenodoDepositResponse,
-    ZenodoMetadata,
-    ZenodoPublishResponse,
-)
+from src.type_definitions.external_apis import ZenodoDepositResponse, ZenodoMetadata
+from src.type_definitions.publishing import DOIMintResult
 
 from .client import ZenodoClient
 
 logger = logging.getLogger(__name__)
-
-
-class DOIMintResult(TypedDict):
-    deposit_id: int
-    doi: str
-    url: str
-    deposit: ZenodoPublishResponse
 
 
 class DOIService:

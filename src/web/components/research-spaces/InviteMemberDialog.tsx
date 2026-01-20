@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useInviteMember } from '@/lib/queries/research-spaces'
+import { inviteMemberAction } from '@/app/actions/research-spaces'
 import { inviteMemberSchema, type InviteMemberFormData } from '@/lib/schemas/research-space'
 import {
   Dialog,
@@ -34,6 +34,8 @@ import {
 import { Loader2 } from 'lucide-react'
 import { MembershipRole } from '@/types/research-space'
 import { roleLabels } from './role-utils'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 interface InviteMemberDialogProps {
   spaceId: string
@@ -48,7 +50,8 @@ export function InviteMemberDialog({
   onOpenChange,
   onSuccess,
 }: InviteMemberDialogProps) {
-  const inviteMutation = useInviteMember()
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<InviteMemberFormData>({
     resolver: zodResolver(inviteMemberSchema),
@@ -60,19 +63,28 @@ export function InviteMemberDialog({
 
   const onSubmit = async (data: InviteMemberFormData) => {
     try {
-      await inviteMutation.mutateAsync({
-        spaceId,
-        data: {
-          user_id: data.user_id,
-          role: data.role as MembershipRole,
-        },
+      setIsSubmitting(true)
+      const result = await inviteMemberAction(spaceId, {
+        user_id: data.user_id,
+        role: data.role as MembershipRole,
       })
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
       form.reset()
       onOpenChange(false)
       onSuccess?.()
+      if (!onSuccess) {
+        router.refresh()
+      }
+      toast.success('Invitation sent')
     } catch (error) {
       // Error handling is done by form validation
       console.error('Failed to invite member:', error)
+      toast.error('Failed to invite member')
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -144,12 +156,12 @@ export function InviteMemberDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={inviteMutation.isPending}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={inviteMutation.isPending}>
-                {inviteMutation.isPending && (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 )}
                 Send Invitation

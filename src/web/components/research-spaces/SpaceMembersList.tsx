@@ -1,6 +1,4 @@
 "use client"
-
-import { useRemoveMember } from '@/lib/queries/research-spaces'
 import { MembershipRole, type ResearchSpaceMembership } from '@/types/research-space'
 import {
   Table,
@@ -18,38 +16,31 @@ import { roleColors, roleLabels } from './role-utils'
 import { cn } from '@/lib/utils'
 
 interface SpaceMembersListProps {
-  spaceId: string
   memberships: ResearchSpaceMembership[]
   isLoading: boolean
-  error: Error | null
+  errorMessage: string | null
   onInvite?: () => void
   onUpdateRole?: (membershipId: string, currentRole: MembershipRole) => void
   onRemove?: (membershipId: string) => void
   canManage?: boolean
+  pendingMembershipId?: string | null
 }
 
 export function SpaceMembersList({
-  spaceId,
   memberships,
   isLoading,
-  error,
+  errorMessage,
   onInvite,
   onUpdateRole,
   onRemove,
   canManage = false,
+  pendingMembershipId = null,
 }: SpaceMembersListProps) {
-  const removeMutation = useRemoveMember()
-
   const handleRemove = async (membershipId: string) => {
-    if (onRemove) {
-      onRemove(membershipId)
-    } else if (confirm('Are you sure you want to remove this member?')) {
-      try {
-        await removeMutation.mutateAsync({ spaceId, membershipId })
-      } catch (removalError) {
-        console.error('Failed to remove member:', removalError)
-      }
+    if (!onRemove) {
+      return
     }
+    onRemove(membershipId)
   }
 
   if (isLoading) {
@@ -60,11 +51,11 @@ export function SpaceMembersList({
     )
   }
 
-  if (error) {
+  if (errorMessage) {
     return (
       <div className="rounded-lg border border-destructive bg-destructive/10 p-4">
         <p className="text-sm text-destructive">
-          Failed to load members: {error.message}
+          Failed to load members: {errorMessage}
         </p>
       </div>
     )
@@ -163,7 +154,7 @@ export function SpaceMembersList({
                               variant="ghost"
                               size="sm"
                               onClick={() => handleRemove(membership.id)}
-                              disabled={removeMutation.isPending}
+                              disabled={pendingMembershipId === membership.id}
                             >
                               Remove
                             </Button>

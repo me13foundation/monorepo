@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useMemo } from 'react'
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { useRouter } from 'next/navigation'
 import { useSpaceContext } from '@/components/space-context-provider'
 import {
@@ -29,13 +28,11 @@ export function SpaceSelectorModal({
   onSpaceChange,
 }: SpaceSelectorModalProps) {
   const router = useRouter()
-  const { data, isLoading } = useResearchSpaces()
-  const { currentSpaceId, setCurrentSpaceId } = useSpaceContext()
+  const { currentSpaceId, setCurrentSpaceId, spaces, isLoading } = useSpaceContext()
   const [searchQuery, setSearchQuery] = useState('')
 
   // Filter spaces based on search query
   const filteredSpaces = useMemo(() => {
-    const spaces = data?.spaces || []
     if (!searchQuery.trim()) {
       return spaces
     }
@@ -46,7 +43,7 @@ export function SpaceSelectorModal({
         space.slug.toLowerCase().includes(query) ||
         space.description?.toLowerCase().includes(query)
     )
-  }, [data?.spaces, searchQuery])
+  }, [spaces, searchQuery])
 
   const handleSpaceSelect = (spaceId: string) => {
     setCurrentSpaceId(spaceId)

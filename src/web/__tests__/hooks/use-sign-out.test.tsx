@@ -52,6 +52,8 @@ describe('useSignOut', () => {
       currentSpaceId: 'test-space-id',
       setCurrentSpaceId: mockSetCurrentSpaceId,
       isLoading: false,
+      spaces: [],
+      spaceTotal: 0,
     })
 
     mockNextAuthSignOut.mockResolvedValue(undefined)

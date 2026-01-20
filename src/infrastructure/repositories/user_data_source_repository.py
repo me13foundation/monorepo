@@ -8,7 +8,7 @@ and efficient database operations.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 from sqlalchemy import and_, delete, desc, func, select, update
 
@@ -32,14 +32,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.orm import Session
 
     from src.type_definitions.common import StatisticsResponse
-
-
-class UserDataSourceStatistics(TypedDict):
-    total_sources: int
-    status_counts: dict[str, int]
-    type_counts: dict[str, int]
-    average_quality_score: float | None
-    sources_with_quality_metrics: int
 
 
 class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):

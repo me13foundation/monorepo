@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 
 import type { DataSource, IngestionJobHistoryItem } from '@/types/data-source'
@@ -13,7 +14,8 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { useIngestionJobHistory } from '@/lib/queries/data-sources'
+import { fetchIngestionJobHistoryAction } from '@/app/actions/data-sources'
+import { toast } from 'sonner'
 
 export type ManualIngestionSummary = {
   source_id: string
@@ -56,8 +58,40 @@ export function DataSourceIngestionDetailsDialog({
   open,
   onOpenChange,
 }: DataSourceIngestionDetailsDialogProps) {
-  const historyQuery = useIngestionJobHistory(source?.id ?? null, open && Boolean(source))
-  const historyItems: IngestionJobHistoryItem[] = historyQuery.data?.items || []
+  const [historyItems, setHistoryItems] = useState<IngestionJobHistoryItem[]>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !source) {
+      return
+    }
+
+    let isMounted = true
+
+    const loadHistory = async () => {
+      setIsLoading(true)
+      setHistoryError(null)
+      const result = await fetchIngestionJobHistoryAction(source.id, 10)
+      if (!isMounted) {
+        return
+      }
+      if (!result.success) {
+        setHistoryError(result.error)
+        toast.error(result.error)
+        setHistoryItems([])
+      } else {
+        setHistoryItems(result.data.items)
+      }
+      setIsLoading(false)
+    }
+
+    void loadHistory()
+
+    return () => {
+      isMounted = false
+    }
+  }, [open, source])
 
   if (!source) {
     return null
@@ -119,10 +153,12 @@ export function DataSourceIngestionDetailsDialog({
 
           <section className="space-y-2">
             <h3 className="text-sm font-semibold">Recent ingestion jobs</h3>
-            {historyQuery.isLoading ? (
+            {isLoading ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="size-5 animate-spin text-muted-foreground" />
               </div>
+            ) : historyError ? (
+              <p className="text-sm text-destructive">{historyError}</p>
             ) : historyItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">No ingestion jobs recorded yet.</p>
             ) : (

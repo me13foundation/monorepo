@@ -1,12 +1,10 @@
 "use client"
 
 import { useState } from 'react'
-import { useResearchSpaces } from '@/lib/queries/research-spaces'
 import { Button } from '@/components/ui/button'
 import { Loader2, SquareMousePointer } from 'lucide-react'
 import { useSpaceContext } from '@/components/space-context-provider'
 import { SpaceSelectorModal } from './SpaceSelectorModal'
-import type { ResearchSpaceListResponse } from '@/types/research-space'
 
 interface SpaceSelectorProps {
   currentSpaceId?: string
@@ -14,13 +12,10 @@ interface SpaceSelectorProps {
 }
 
 export function SpaceSelector({ currentSpaceId, onSpaceChange }: SpaceSelectorProps) {
-  const { data, isLoading } = useResearchSpaces()
-  const { currentSpaceId: contextSpaceId } = useSpaceContext()
+  const { currentSpaceId: contextSpaceId, spaces, isLoading } = useSpaceContext()
   const [modalOpen, setModalOpen] = useState(false)
   const selectedSpaceId = currentSpaceId || contextSpaceId || ''
 
-  const spacesResponse = data as ResearchSpaceListResponse | undefined
-  const spaces = spacesResponse?.spaces ?? []
   const currentSpace = spaces.find((space) => space.id === selectedSpaceId)
 
   if (isLoading) {

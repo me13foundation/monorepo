@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Loader2 } from 'lucide-react'
 
-import { useConfigureDataSourceSchedule, useUpdateDataSource } from '@/lib/queries/data-sources'
+import { configureDataSourceScheduleAction, updateDataSourceAction } from '@/app/actions/data-sources'
 import type { DataSource } from '@/types/data-source'
 import {
   Dialog,
@@ -19,6 +19,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Form, FormDescription, FormLabel } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
+import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 import { DataSourceScheduleFields } from './DataSourceScheduleFields'
 
@@ -59,8 +61,9 @@ export function DataSourceScheduleDialog({
   open,
   onOpenChange,
 }: DataSourceScheduleDialogProps) {
-  const configureSchedule = useConfigureDataSourceSchedule(spaceId)
-  const updateDataSource = useUpdateDataSource(spaceId)
+  const router = useRouter()
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const schedule = source?.ingestion_schedule
 
   const defaultValues = useMemo<ScheduleFormValues>(
@@ -97,11 +100,22 @@ export function DataSourceScheduleDialog({
         values.frequency === 'cron' ? values.cronExpression?.trim() || null : null,
     }
 
-    await configureSchedule.mutateAsync({
-      sourceId: source.id,
-      payload,
-    })
-    onOpenChange(false)
+    try {
+      setIsSavingSchedule(true)
+      const result = await configureDataSourceScheduleAction(source.id, payload, spaceId)
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      toast.success('Schedule updated')
+      onOpenChange(false)
+      router.refresh()
+    } catch (error) {
+      console.error('Failed to update schedule', error)
+      toast.error('Failed to update schedule')
+    } finally {
+      setIsSavingSchedule(false)
+    }
   }
 
   const enabled = form.watch('enabled')
@@ -115,17 +129,26 @@ export function DataSourceScheduleDialog({
     (!isCron || (cronExpression ?? '').trim().length > 0)
   const canEnableSchedule = hasScheduleBasics
   const statusToggleDisabled =
-    updateDataSource.isPending || source.status === 'archived' || !hasScheduleBasics
+    isUpdatingStatus || source.status === 'archived' || !hasScheduleBasics
   const statusLabel = source.status === 'active' ? 'Enabled' : 'Disabled'
 
   const handleStatusToggle = async (enabled: boolean) => {
     try {
-      await updateDataSource.mutateAsync({
-        sourceId: source.id,
-        payload: { status: enabled ? 'active' : 'inactive' },
-      })
+      setIsUpdatingStatus(true)
+      const result = await updateDataSourceAction(
+        source.id,
+        { status: enabled ? 'active' : 'inactive' },
+        spaceId,
+      )
+      if (!result.success) {
+        toast.error(result.error)
+        return
+      }
+      router.refresh()
     } catch (error) {
       // Error toast is handled by the mutation
+    } finally {
+      setIsUpdatingStatus(false)
     }
   }
 
@@ -175,8 +198,8 @@ export function DataSourceScheduleDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={configureSchedule.isPending}>
-                {configureSchedule.isPending && (
+              <Button type="submit" disabled={isSavingSchedule}>
+                {isSavingSchedule && (
                   <Loader2 className="mr-2 size-4 animate-spin" />
                 )}
                 Save schedule

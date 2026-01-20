@@ -7,7 +7,7 @@ Provides persistence and query operations for reusable data source templates.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 
 from sqlalchemy import desc, func, or_, select
 
@@ -30,14 +30,6 @@ if TYPE_CHECKING:
     from src.domain.entities.source_template import SourceTemplate, TemplateCategory
     from src.domain.entities.user_data_source import SourceType
     from src.type_definitions.common import JSONObject
-
-
-class SourceTemplateStatistics(TypedDict):
-    total_templates: int
-    public_templates: int
-    approved_templates: int
-    total_usage: int
-    average_success_rate: float
 
 
 class SqlAlchemySourceTemplateRepository(SourceTemplateRepository):
