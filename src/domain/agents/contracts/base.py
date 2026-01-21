@@ -8,7 +8,7 @@ consistent auditability and governance patterns.
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EvidenceSourceType(str, Enum):
@@ -85,7 +85,4 @@ class BaseAgentContract(BaseModel):
         description="Structured, machine-checkable evidence supporting the decision",
     )
 
-    class Config:
-        """Pydantic configuration."""
-
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
