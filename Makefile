@@ -203,6 +203,12 @@ else
 	$(call run_with_postgres_env,MED13_ENABLE_DISTRIBUTED_RATE_LIMIT=0 $(USE_PYTHON) -m pytest tests/unit/architecture/test_architectural_compliance.py -v -m architecture)
 endif
 
+test-flujo-architecture: ## Run Flujo AI agent architecture compliance tests
+	$(call check_venv)
+	$(USE_PYTHON) -m pytest tests/unit/architecture/test_flujo_compliance.py -v -m architecture
+
+test-all-architecture: test-architecture test-flujo-architecture validate-architecture validate-dependencies ## Run all architecture tests
+
 validate-architecture: ## Validate architectural compliance
 	$(call check_venv)
 	@echo "🔍 Validating architectural compliance..."
