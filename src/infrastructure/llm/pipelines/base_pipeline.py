@@ -2,7 +2,7 @@
 Base pipeline patterns for AI agents.
 
 Provides common governance patterns including confidence-based
-routing and human-in-the-loop escalation.
+routing, human-in-the-loop escalation, and usage limits.
 
 Type Safety Note:
     This module uses `Any` types for Flujo library generic parameters.
@@ -21,21 +21,26 @@ Type Safety Note:
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from flujo import Pipeline, Step
 from flujo.domain.dsl import ConditionalStep, HumanInTheLoopStep
 
-from src.infrastructure.llm.config.governance import GovernanceConfig
+from src.infrastructure.llm.config.governance import GovernanceConfig, UsageLimits
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+logger = logging.getLogger(__name__)
 
 
 def check_confidence(
     output: object,
     _ctx: object,
     threshold: float = 0.85,
+    *,
+    require_evidence: bool = True,
 ) -> str:
     """
     Check if output confidence meets the threshold for auto-approval.
@@ -44,31 +49,49 @@ def check_confidence(
         output: Agent output with confidence_score
         _ctx: Pipeline context (unused)
         threshold: Minimum confidence for auto-approval
+        require_evidence: Whether evidence is required for approval
 
     Returns:
         "proceed" if confidence is sufficient, "escalate" otherwise
     """
     if not hasattr(output, "confidence_score"):
         return "escalate"
+
     confidence = getattr(output, "confidence_score", 0.0)
+
+    # Check evidence requirement
+    if require_evidence:
+        evidence = getattr(output, "evidence", [])
+        if not evidence:
+            logger.debug("Escalating: no evidence provided")
+            return "escalate"
+
     return "proceed" if confidence >= threshold else "escalate"
 
 
 def create_confidence_checker(
     threshold: float,
+    *,
+    require_evidence: bool = True,
 ) -> Callable[[object, object], str]:
     """
     Create a confidence checker with a specific threshold.
 
     Args:
         threshold: Minimum confidence for auto-approval
+        require_evidence: Whether evidence is required
 
     Returns:
         Callable for use with ConditionalStep
     """
 
     def _check(output: object, ctx: object) -> str:
-        return check_confidence(output, ctx, threshold)
+        return check_confidence(
+            output,
+            ctx,
+            threshold,
+            require_evidence=require_evidence,
+        )
 
     return _check
 
@@ -90,11 +113,13 @@ def create_governance_gate(
         ConditionalStep configured for confidence-based routing
     """
     config = governance_config or GovernanceConfig.from_environment()
-    threshold = config.confidence_threshold
 
     return ConditionalStep(
         name=name,
-        condition_callable=create_confidence_checker(threshold),
+        condition_callable=create_confidence_checker(
+            config.confidence_threshold,
+            require_evidence=config.require_evidence,
+        ),
         branches={
             "escalate": Pipeline(
                 steps=[
@@ -109,12 +134,35 @@ def create_governance_gate(
     )
 
 
+def get_usage_limits_dict(limits: UsageLimits | None = None) -> dict[str, float | int]:
+    """
+    Convert UsageLimits to a dict for Flujo runner configuration.
+
+    Args:
+        limits: Usage limits configuration
+
+    Returns:
+        Dict suitable for Flujo UsageLimits initialization
+    """
+    if limits is None:
+        limits = UsageLimits.from_environment()
+
+    result: dict[str, float | int] = {}
+    if limits.total_cost_usd is not None:
+        result["total_cost_usd_limit"] = limits.total_cost_usd
+    if limits.max_turns is not None:
+        result["max_turns"] = limits.max_turns
+    if limits.max_tokens is not None:
+        result["max_tokens"] = limits.max_tokens
+    return result
+
+
 class PipelineBuilder:
     """
     Builder for creating pipelines with standard governance patterns.
 
     Provides a fluent interface for constructing pipelines with
-    consistent governance and durability settings.
+    consistent governance, durability, and usage limit settings.
     """
 
     def __init__(
@@ -134,6 +182,7 @@ class PipelineBuilder:
         self._steps: list[Step[Any, Any] | ConditionalStep[Any]] = []
         self._use_granular: bool = True
         self._enforce_idempotency: bool = True
+        self._usage_limits: UsageLimits | None = None
 
     def with_agent_step(
         self,
@@ -194,6 +243,22 @@ class PipelineBuilder:
         self._steps.append(gate)
         return self
 
+    def with_usage_limits(
+        self,
+        limits: UsageLimits | None = None,
+    ) -> PipelineBuilder:
+        """
+        Set usage limits for the pipeline.
+
+        Args:
+            limits: Usage limits configuration (defaults to environment)
+
+        Returns:
+            Self for chaining
+        """
+        self._usage_limits = limits or UsageLimits.from_environment()
+        return self
+
     def build(self) -> Pipeline[Any, Any]:
         """
         Build the pipeline.
@@ -202,3 +267,13 @@ class PipelineBuilder:
             Configured Pipeline instance
         """
         return Pipeline(steps=self._steps)
+
+    @property
+    def usage_limits(self) -> UsageLimits | None:
+        """Get the configured usage limits."""
+        return self._usage_limits
+
+    @property
+    def governance(self) -> GovernanceConfig:
+        """Get the governance configuration."""
+        return self._governance

@@ -174,10 +174,10 @@ def register_all_skills() -> None:
     """
     registry = get_skill_registry()
 
-    # Register query-related skills
+    # --- Query Validation Skills ---
     registry.register(
         skill_id="query.validate_pubmed",
-        factory=lambda **_: _validate_pubmed_query,
+        factory=lambda **_: validate_pubmed_query,
         description="Validate a PubMed Boolean query syntax. Read-only.",
         side_effects=False,
         input_schema={
@@ -187,13 +187,22 @@ def register_all_skills() -> None:
             },
             "required": ["query"],
         },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "valid": {"type": "boolean"},
+                "query": {"type": "string"},
+                "issues": {"type": "array", "items": {"type": "string"}},
+                "suggestions": {"type": "array", "items": {"type": "string"}},
+            },
+        },
         tags=["query", "pubmed", "validation"],
     )
 
-    # Register search-related skills
+    # --- Search Skills ---
     registry.register(
         skill_id="search.pubmed",
-        factory=lambda **_: _search_pubmed_stub,
+        factory=lambda **_: search_pubmed_stub,
         description="Execute a PubMed search query. Read-only API call.",
         side_effects=False,
         input_schema={
@@ -208,39 +217,146 @@ def register_all_skills() -> None:
             },
             "required": ["query"],
         },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "max_results": {"type": "integer"},
+                "results": {"type": "array"},
+                "total_count": {"type": "integer"},
+            },
+        },
         tags=["search", "pubmed", "api"],
+    )
+
+    # --- Query Building Skills ---
+    registry.register(
+        skill_id="query.suggest_mesh_terms",
+        factory=lambda **_: suggest_mesh_terms,
+        description="Suggest MeSH terms for a given concept. Read-only.",
+        side_effects=False,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "concept": {
+                    "type": "string",
+                    "description": "Medical concept to look up",
+                },
+            },
+            "required": ["concept"],
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "concept": {"type": "string"},
+                "mesh_terms": {"type": "array", "items": {"type": "string"}},
+                "found": {"type": "boolean"},
+            },
+        },
+        tags=["query", "mesh", "vocabulary"],
+    )
+
+    # --- Evidence Skills ---
+    registry.register(
+        skill_id="evidence.extract_citations",
+        factory=lambda **_: extract_citations_stub,
+        description="Extract citations from text. Read-only.",
+        side_effects=False,
+        input_schema={
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "Text to extract citations from",
+                },
+            },
+            "required": ["text"],
+        },
+        output_schema={
+            "type": "object",
+            "properties": {
+                "citations": {"type": "array"},
+                "count": {"type": "integer"},
+            },
+        },
+        tags=["evidence", "citations", "extraction"],
     )
 
     logger.info("Registered %d skills", len(registry.list_skills()))
 
 
-def _validate_pubmed_query(payload: JSONObject) -> JSONObject:
-    """
-    Stub for PubMed query validation skill.
+# --- Skill Implementations ---
 
-    TODO: Implement actual validation logic.
+
+def validate_pubmed_query(payload: JSONObject) -> JSONObject:
+    """
+    Validate a PubMed Boolean query syntax.
+
+    Checks for:
+    - Balanced parentheses
+    - Valid field tags
+    - Proper Boolean operator usage
     """
     query = str(payload.get("query", ""))
+    issues: list[str] = []
+    suggestions: list[str] = []
 
-    # Basic validation - check for balanced parentheses
+    # Check balanced parentheses
     open_parens = query.count("(")
     close_parens = query.count(")")
-    balanced = open_parens == close_parens
+    if open_parens != close_parens:
+        issues.append(
+            f"Unbalanced parentheses: {open_parens} open, {close_parens} close",
+        )
 
-    issues: list[str] = [] if balanced else ["Unbalanced parentheses"]
+    # Check for valid field tags
+    valid_tags = {
+        "[Title]",
+        "[Abstract]",
+        "[Title/Abstract]",
+        "[MeSH Terms]",
+        "[Author]",
+        "[Journal]",
+        "[Publication Type]",
+        "[All Fields]",
+    }
+    # Simple pattern check for field tags
+    import re
+
+    found_tags = re.findall(r"\[[^\]]+\]", query)
+    for tag in found_tags:
+        if tag not in valid_tags:
+            issues.append(f"Unknown field tag: {tag}")
+            suggestions.append(
+                f"Consider using one of: {', '.join(sorted(valid_tags))}",
+            )
+
+    # Check for proper Boolean operators (should be uppercase)
+    lower_ops = ["and", "or", "not"]
+    suggestions.extend(
+        f"Use uppercase Boolean operator: {op.upper()}"
+        for op in lower_ops
+        if f" {op} " in query.lower() and f" {op.upper()} " not in query
+    )
+
+    # Check for empty query
+    if not query.strip():
+        issues.append("Query is empty")
 
     return {
-        "valid": balanced,
+        "valid": len(issues) == 0,
         "query": query,
         "issues": issues,
+        "suggestions": suggestions,
     }
 
 
-def _search_pubmed_stub(payload: JSONObject) -> JSONObject:
+def search_pubmed_stub(payload: JSONObject) -> JSONObject:
     """
-    Stub for PubMed search skill.
+    Execute a PubMed search query.
 
-    TODO: Connect to actual PubMed API.
+    Note: This is a stub implementation. Connect to the actual
+    PubMed E-utilities API or existing gateway for production use.
     """
     query = str(payload.get("query", ""))
     max_results_raw = payload.get("max_results", 10)
@@ -248,6 +364,8 @@ def _search_pubmed_stub(payload: JSONObject) -> JSONObject:
         int(max_results_raw) if isinstance(max_results_raw, int | float) else 10
     )
 
+    # Note: In production, connect to PubMedGateway from
+    # src.infrastructure.discovery for actual search functionality
     results: list[JSONValue] = []
 
     return {
@@ -255,5 +373,78 @@ def _search_pubmed_stub(payload: JSONObject) -> JSONObject:
         "max_results": max_results,
         "results": results,
         "total_count": 0,
-        "message": "PubMed search skill not yet implemented",
+        "status": "stub",
+        "message": "Connect to PubMedGateway for actual search results",
+    }
+
+
+def suggest_mesh_terms(payload: JSONObject) -> JSONObject:
+    """
+    Suggest MeSH terms for a given medical concept.
+
+    Note: This is a stub implementation. Connect to the NCBI
+    MeSH database or existing vocabulary service for production use.
+    """
+    concept = str(payload.get("concept", "")).lower()
+
+    # Common MeSH term mappings (stub data)
+    mesh_mappings: dict[str, list[str]] = {
+        "med13": ["MED13 protein, human", "Mediator Complex Subunit 13"],
+        "heart": ["Heart", "Myocardium", "Cardiovascular System"],
+        "cardiac": ["Heart", "Cardiac Output", "Cardiovascular Diseases"],
+        "variant": ["Genetic Variation", "Sequence Analysis, DNA", "Mutation"],
+        "mutation": ["Mutation", "Mutagenesis", "DNA Mutational Analysis"],
+        "gene": ["Genes", "Gene Expression", "Genetic Phenomena"],
+    }
+
+    # Find matching terms
+    mesh_terms: list[str] = []
+    for key, terms in mesh_mappings.items():
+        if key in concept:
+            mesh_terms.extend(terms)
+
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    unique_terms: list[str] = []
+    for term in mesh_terms:
+        if term not in seen:
+            seen.add(term)
+            unique_terms.append(term)
+
+    return {
+        "concept": concept,
+        "mesh_terms": unique_terms,
+        "found": len(unique_terms) > 0,
+        "status": "stub",
+        "message": "Connect to MeSH vocabulary service for complete mappings",
+    }
+
+
+def extract_citations_stub(payload: JSONObject) -> JSONObject:
+    """
+    Extract citations from text.
+
+    Note: This is a stub implementation. Use proper citation
+    extraction libraries for production use.
+    """
+    text = str(payload.get("text", ""))
+
+    # Simple DOI pattern matching (stub)
+    import re
+
+    doi_pattern = r"10\.\d{4,}/[^\s]+"
+    dois = re.findall(doi_pattern, text)
+
+    # Simple PMID pattern matching
+    pmid_pattern = r"PMID:\s*(\d+)"
+    pmids = re.findall(pmid_pattern, text)
+
+    citations: list[JSONObject] = [{"type": "doi", "value": doi} for doi in dois]
+    citations.extend({"type": "pmid", "value": pmid} for pmid in pmids)
+
+    return {
+        "citations": citations,
+        "count": len(citations),
+        "status": "stub",
+        "message": "Basic pattern matching only. Use proper citation extraction for production.",
     }

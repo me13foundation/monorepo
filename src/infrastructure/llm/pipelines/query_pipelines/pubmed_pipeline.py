@@ -2,7 +2,7 @@
 PubMed query generation pipeline.
 
 Creates a pipeline for generating PubMed Boolean queries with
-governance patterns for confidence-based routing.
+governance patterns for confidence-based routing and usage limits.
 
 Type Safety Note:
     This module uses `Any` types for Flujo Step/ConditionalStep generics.
@@ -14,13 +14,14 @@ Type Safety Note:
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from flujo import Flujo, Pipeline, Step
 from flujo.domain.dsl import ConditionalStep, HumanInTheLoopStep
 
 from src.domain.agents.contexts.query_context import QueryGenerationContext
-from src.infrastructure.llm.config.governance import GovernanceConfig
+from src.infrastructure.llm.config.governance import GovernanceConfig, UsageLimits
 from src.infrastructure.llm.factories.query_agent_factory import (
     create_pubmed_query_agent,
 )
@@ -29,6 +30,8 @@ if TYPE_CHECKING:
     from flujo.state.backends.base import StateBackend
 
     from src.domain.agents.contracts.query_generation import QueryGenerationContract
+
+logger = logging.getLogger(__name__)
 
 
 def _check_query_confidence(
@@ -42,6 +45,7 @@ def _check_query_confidence(
     - Confidence is below threshold
     - Decision is "escalate"
     - Decision is "fallback" with low confidence
+    - No evidence provided (if required)
     """
     governance = GovernanceConfig.from_environment()
     threshold = governance.confidence_threshold
@@ -49,17 +53,37 @@ def _check_query_confidence(
     # Get attributes safely for type checker
     decision = getattr(output, "decision", None)
     confidence_score = getattr(output, "confidence_score", 0.0)
+    evidence = getattr(output, "evidence", [])
 
     # Explicit escalation decision
     if decision == "escalate":
+        logger.debug("Escalating: explicit escalation decision")
         return "escalate"
 
     # Fallback with low confidence should escalate
     if decision == "fallback" and confidence_score < threshold:
+        logger.debug("Escalating: fallback with low confidence")
+        return "escalate"
+
+    # Check evidence requirement
+    if governance.require_evidence and not evidence:
+        logger.debug("Escalating: no evidence provided")
+        return "escalate"
+
+    # HITL threshold check
+    if governance.needs_human_review(confidence_score):
+        logger.debug("Escalating: below HITL threshold")
         return "escalate"
 
     # Normal confidence check
-    return "proceed" if confidence_score >= threshold else "escalate"
+    result = "proceed" if confidence_score >= threshold else "escalate"
+    logger.debug(
+        "Confidence check: %s (%.2f vs %.2f)",
+        result,
+        confidence_score,
+        threshold,
+    )
+    return result
 
 
 def create_pubmed_query_pipeline(
@@ -68,6 +92,7 @@ def create_pubmed_query_pipeline(
     model: str | None = None,
     use_governance: bool = True,
     use_granular: bool = True,
+    usage_limits: UsageLimits | None = None,
 ) -> Flujo[str, QueryGenerationContract, QueryGenerationContext]:
     """
     Create the PubMed query generation pipeline.
@@ -77,10 +102,13 @@ def create_pubmed_query_pipeline(
         model: Optional model ID override
         use_governance: Include confidence-based governance gate
         use_granular: Use granular step for per-turn durability
+        usage_limits: Optional usage limits (defaults to environment config)
 
     Returns:
         Configured Flujo runner for PubMed query generation
     """
+    governance = GovernanceConfig.from_environment()
+    limits = usage_limits or governance.usage_limits
     agent = create_pubmed_query_agent(model=model)
 
     # Build pipeline steps
@@ -125,9 +153,25 @@ def create_pubmed_query_pipeline(
         )
         steps.append(governance_gate)
 
+    # Build Flujo runner with usage limits
+    runner_kwargs: dict[str, object] = {
+        "context_model": QueryGenerationContext,
+        "state_backend": state_backend,
+        "persist_state": True,
+    }
+
+    # Add usage limits if configured
+    if limits.total_cost_usd is not None:
+        # Note: UsageLimits integration depends on Flujo version
+        # This prepares for future integration
+        logger.debug(
+            "Usage limits configured: cost=%.2f, turns=%s, tokens=%s",
+            limits.total_cost_usd,
+            limits.max_turns,
+            limits.max_tokens,
+        )
+
     return Flujo(
         Pipeline(steps=steps),
-        context_model=QueryGenerationContext,
-        state_backend=state_backend,
-        persist_state=True,
+        **runner_kwargs,  # type: ignore[arg-type]
     )
