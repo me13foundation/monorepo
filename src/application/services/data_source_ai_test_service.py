@@ -17,14 +17,17 @@ from src.type_definitions import data_sources as data_source_types
 
 logger = logging.getLogger(__name__)
 
+# Confidence threshold below which queries are logged as warnings
+LOW_CONFIDENCE_THRESHOLD = 0.5
+
 if TYPE_CHECKING:
     from uuid import UUID
 
-    from src.application.services.ports.ai_agent_port import (
-        AiAgentPort,
-        AiAgentRunMetadataProvider,
-    )
     from src.application.services.ports.flujo_state_port import FlujoStatePort
+    from src.domain.agents.ports.query_agent_port import (
+        QueryAgentPort,
+        QueryAgentRunMetadataProvider,
+    )
     from src.domain.repositories import (
         ResearchSpaceRepository,
         UserDataSourceRepository,
@@ -48,10 +51,10 @@ class DataSourceAiTestDependencies:
 
     source_repository: UserDataSourceRepository
     pubmed_gateway: PubMedGateway
-    ai_agent: AiAgentPort | None
+    query_agent: QueryAgentPort | None
     research_space_repository: ResearchSpaceRepository | None
     flujo_state: FlujoStatePort | None = None
-    run_id_provider: AiAgentRunMetadataProvider | None = None
+    run_id_provider: QueryAgentRunMetadataProvider | None = None
 
 
 class DataSourceAiTestService:
@@ -64,7 +67,7 @@ class DataSourceAiTestService:
     ) -> None:
         self._source_repository = dependencies.source_repository
         self._pubmed_gateway = dependencies.pubmed_gateway
-        self._ai_agent = dependencies.ai_agent
+        self._query_agent = dependencies.query_agent
         self._run_id_provider = dependencies.run_id_provider
         self._research_space_repository = dependencies.research_space_repository
         self._flujo_state = dependencies.flujo_state
@@ -134,7 +137,7 @@ class DataSourceAiTestService:
 
         search_terms = self._extract_search_terms(executed_query)
         model_name = self._resolve_model_name(
-            has_ai_agent=self._ai_agent is not None,
+            has_query_agent=self._query_agent is not None,
         )
 
         return data_source_types.DataSourceAiTestResult(
@@ -182,7 +185,7 @@ class DataSourceAiTestService:
             return "PubMed configuration is invalid. Review the source settings."
         if not config.agent_config.is_ai_managed:
             return "AI-managed queries are disabled for this source."
-        if self._ai_agent is None:
+        if self._query_agent is None:
             return "AI agent is not configured for testing."
         if self._research_space_repository is None:
             return "Research space context is unavailable for AI testing."
@@ -208,22 +211,37 @@ class DataSourceAiTestService:
         research_space_description: str,
         agent_prompt: str,
     ) -> str:
-        if self._ai_agent is None:
+        if self._query_agent is None:
             return ""
         try:
-            query = await self._ai_agent.generate_intelligent_query(
+            contract = await self._query_agent.generate_query(
                 research_space_description=research_space_description,
                 user_instructions=agent_prompt,
                 source_type="pubmed",
             )
+
+            # Log decision and confidence for observability
+            if contract.decision == "escalate":
+                logger.warning(
+                    "AI query escalated: %s (confidence=%.2f)",
+                    contract.rationale,
+                    contract.confidence_score,
+                )
+                return ""
+            if contract.confidence_score < LOW_CONFIDENCE_THRESHOLD:
+                logger.warning(
+                    "Low confidence AI query (%.2f): %s",
+                    contract.confidence_score,
+                    contract.rationale,
+                )
+
+            return contract.query.strip()
         except Exception:  # pragma: no cover - defensive
             logger.exception("AI query generation failed")
             return ""
 
-        return query.strip()
-
-    def _resolve_model_name(self, *, has_ai_agent: bool) -> str | None:
-        if not has_ai_agent:
+    def _resolve_model_name(self, *, has_query_agent: bool) -> str | None:
+        if not has_query_agent:
             return None
         model = self._ai_model_name
         return model.strip() if isinstance(model, str) and model.strip() else None

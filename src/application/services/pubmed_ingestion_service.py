@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,19 +16,24 @@ from src.domain.transform.transformers.pubmed_record_transformer import (
 )
 from src.type_definitions.storage import StorageUseCase
 
+# Confidence threshold below which queries are logged as warnings
+LOW_CONFIDENCE_THRESHOLD = 0.5
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from src.application.services.ports.ai_agent_port import AiAgentPort
     from src.application.services.storage_configuration_service import (
         StorageConfigurationService,
     )
+    from src.domain.agents.ports.query_agent_port import QueryAgentPort
     from src.domain.repositories import PublicationRepository, ResearchSpaceRepository
     from src.type_definitions.common import (
         PublicationUpdate,
         RawRecord,
         SourceMetadata,
     )
+
+logger = logging.getLogger(__name__)
 
 
 class PubMedIngestionService:
@@ -39,14 +45,14 @@ class PubMedIngestionService:
         publication_repository: PublicationRepository,
         transformer: PubMedRecordTransformer | None = None,
         storage_service: StorageConfigurationService | None = None,
-        ai_agent: AiAgentPort | None = None,
+        query_agent: QueryAgentPort | None = None,
         research_space_repository: ResearchSpaceRepository | None = None,
     ) -> None:
         self._gateway = gateway
         self._publication_repository = publication_repository
         self._transformer = transformer or PubMedRecordTransformer()
         self._storage_service = storage_service
-        self._ai_agent = ai_agent
+        self._query_agent = query_agent
         self._research_space_repository = research_space_repository
 
     async def ingest(
@@ -60,7 +66,7 @@ class PubMedIngestionService:
         # AI-Managed Logic
         if (
             config.agent_config.is_ai_managed
-            and self._ai_agent
+            and self._query_agent
             and self._research_space_repository
         ):
             research_space_description = ""
@@ -74,16 +80,28 @@ class PubMedIngestionService:
                 if space:
                     research_space_description = space.description
 
-            # Generate intelligent query
-            intelligent_query = await self._ai_agent.generate_intelligent_query(
+            # Generate intelligent query using the new contract-based interface
+            contract = await self._query_agent.generate_query(
                 research_space_description=research_space_description,
                 user_instructions=config.agent_config.agent_prompt,
                 source_type="pubmed",
             )
 
-            if intelligent_query:
+            if contract.decision == "generated" and contract.query:
                 # Override static query with AI-generated one
-                config = config.model_copy(update={"query": intelligent_query})
+                config = config.model_copy(update={"query": contract.query})
+            elif contract.decision == "escalate":
+                logger.warning(
+                    "AI query generation escalated: %s (confidence=%.2f)",
+                    contract.rationale,
+                    contract.confidence_score,
+                )
+            elif contract.confidence_score < LOW_CONFIDENCE_THRESHOLD:
+                logger.warning(
+                    "Low confidence AI query (%.2f): %s",
+                    contract.confidence_score,
+                    contract.rationale,
+                )
 
         raw_records = await self._gateway.fetch_records(config)
 

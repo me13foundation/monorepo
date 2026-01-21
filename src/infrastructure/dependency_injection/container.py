@@ -123,7 +123,7 @@ class DependencyContainer(ApplicationServiceFactoryMixin):
         )
         self._system_status_repository: SqlAlchemySystemStatusRepository | None = None
         self._system_status_service: app_services.SystemStatusService | None = None
-        self._ai_agent_port = None
+        self._query_agent = None
 
     def get_user_repository(self) -> SqlAlchemyUserRepository:
         if self._user_repository is None:

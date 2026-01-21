@@ -110,12 +110,61 @@ class OrchestratedSessionState(BaseModel):
 3.  **📦 Dumb Components**: Components should take data as props and emit events (or call actions). They should not calculate state.
 4.  **🛡️ Strict Types**: Always regenerate types after Backend changes. Never use `any`.
 
+### 🤖 **AI Agent Integration Pattern**
+
+The frontend interacts with AI agents through the same Server-Side Orchestration pattern:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              Frontend (Next.js)                             │
+│  • Server Action triggers AI query generation               │
+│  • Receives QueryGenerationContract from backend            │
+│  • Displays confidence scores and evidence                  │
+└─────────────────────────────────────────────────────────────┘
+                                 │
+                         Server Action
+                                 │
+┌─────────────────────────────────────────────────────────────┐
+│              Backend (FastAPI)                              │
+│  • QueryAgentService orchestrates agent                     │
+│  • FlujoQueryAgentAdapter executes pipeline                 │
+│  • Returns typed QueryGenerationContract                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Frontend Responsibilities:**
+- Display AI-generated queries with confidence indicators
+- Show evidence and rationale for transparency
+- Handle escalation states (when agent routes for human review)
+- Never duplicate AI logic - backend is source of truth
+
+**Contract Response Handling:**
+```typescript
+// Example: Displaying AI query results
+interface QueryGenerationContract {
+  decision: "generated" | "fallback" | "escalate";
+  confidence_score: number;  // 0.0-1.0
+  rationale: string;
+  evidence: EvidenceItem[];
+  query: string;
+  source_type: string;
+}
+
+// Display based on decision
+if (contract.decision === "escalate") {
+  showReviewRequired(contract.rationale);
+} else if (contract.confidence_score < 0.5) {
+  showLowConfidenceWarning(contract.confidence_score);
+}
+```
+
 ## Conclusion
 
 The MED13 Next.js admin interface stands on a **solid, modern frontend foundation** that enables **confident, sustainable growth**. Our **Server-Side Orchestration architecture** combines the best of backend domain logic and modern frontend rendering:
 
 - **Server Components** act as the "BFF" (Backend for Frontend) layer.
 - **Python Domain Services** remain the single source of truth for business rules.
+- **AI Agents** are accessed through the same pattern - backend handles all AI logic.
 - **Zero Logic Duplication** ensures robustness and maintainability.
 
 The foundation is built. The growth strategy is clear. The admin interface is architecturally sound with a production-ready Server-Side Orchestration implementation. 🚀

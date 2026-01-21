@@ -53,7 +53,10 @@ describe('Server-Side Orchestration Pattern Validation', () => {
     jest.clearAllMocks()
     const { getServerSession } = require('next-auth')
     getServerSession.mockResolvedValue({
-      user: { access_token: 'test-token' },
+      user: {
+        access_token: 'test-token',
+        expires_at: Date.now() + 3600 * 1000
+      },
     })
   })
 
@@ -72,7 +75,10 @@ describe('Server-Side Orchestration Pattern Validation', () => {
       const mockState = createMockOrchestratedState()
 
       getServerSession.mockResolvedValue({
-        user: { access_token: mockToken },
+        user: {
+          access_token: mockToken,
+          expires_at: Date.now() + 3600 * 1000
+        },
       })
 
       apiClient.get.mockResolvedValue({ data: mockState })
@@ -99,7 +105,10 @@ describe('Server-Side Orchestration Pattern Validation', () => {
       const testPath = '/data-discovery'
 
       getServerSession.mockResolvedValue({
-        user: { access_token: mockToken },
+        user: {
+          access_token: mockToken,
+          expires_at: Date.now() + 3600 * 1000
+        },
       })
 
       apiClient.post.mockResolvedValue({ data: mockState })
@@ -146,7 +155,10 @@ describe('Server-Side Orchestration Pattern Validation', () => {
       }
 
       getServerSession.mockResolvedValue({
-        user: { access_token: mockToken },
+        user: {
+          access_token: mockToken,
+          expires_at: Date.now() + 3600 * 1000
+        },
       })
 
       apiClient.post.mockRejectedValue(errorResponse)

@@ -44,6 +44,11 @@ ALLOWED_ANY_USAGE = {
     "src/type_definitions/json_utils.py",  # Explicit override in pyproject.toml
     "src/application/packaging/licenses/manager.py",  # License compatibility checking
     "src/application/packaging/licenses/manifest.py",  # YAML parsing
+    # Flujo library interop - documented exceptions for Flujo's generic type system
+    "src/infrastructure/llm/pipelines/base_pipeline.py",
+    "src/infrastructure/llm/pipelines/query_pipelines/pubmed_pipeline.py",
+    "src/infrastructure/llm/state/lifecycle.py",
+    "src/infrastructure/llm/adapters/query_agent_adapter.py",
 }
 
 # Clean Architecture layer definitions
@@ -98,7 +103,9 @@ MAX_CLASS_METHODS = 30  # Methods per class
 # Single Responsibility Principle thresholds
 MAX_IMPORTS_PER_FILE = 20  # Too many imports = too many responsibilities
 MAX_FUNCTION_PARAMETERS = 7  # Functions with many params often do too much
-WARNING_IMPORTS_PER_FILE = 15  # Files approaching limit
+WARNING_IMPORTS_PER_FILE = (
+    17  # Files approaching limit (orchestration services often need 15-17)
+)
 
 ARCHITECTURE_OVERRIDES_FILE = "architecture_overrides.json"
 

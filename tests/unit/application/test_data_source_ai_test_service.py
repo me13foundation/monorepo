@@ -12,7 +12,8 @@ from src.application.services.data_source_ai_test_service import (
     DataSourceAiTestService,
     DataSourceAiTestSettings,
 )
-from src.application.services.ports.ai_agent_port import AiAgentPort
+from src.domain.agents.contracts.query_generation import QueryGenerationContract
+from src.domain.agents.ports.query_agent_port import QueryAgentPort
 from src.domain.entities.research_space import ResearchSpace, SpaceStatus
 from src.domain.entities.user_data_source import (
     IngestionSchedule,
@@ -49,19 +50,34 @@ class StubPubMedGateway(PubMedGateway):
         return self._records
 
 
-class StubAiAgent(AiAgentPort):
-    """Stub AI agent returning a predetermined query."""
+class StubQueryAgent(QueryAgentPort):
+    """Stub query agent returning a predetermined contract."""
 
-    def __init__(self, query: str) -> None:
+    def __init__(self, query: str, confidence: float = 0.9) -> None:
         self._query = query
+        self._confidence = confidence
 
-    async def generate_intelligent_query(
+    async def generate_query(
         self,
         research_space_description: str,
         user_instructions: str,
         source_type: str,
-    ) -> str:
-        return self._query
+        *,
+        user_id: str | None = None,
+        correlation_id: str | None = None,
+    ) -> QueryGenerationContract:
+        return QueryGenerationContract(
+            decision="generated",
+            confidence_score=self._confidence,
+            rationale="Test query generated successfully",
+            evidence=[],
+            query=self._query,
+            source_type=source_type,
+            query_complexity="simple",
+        )
+
+    async def close(self) -> None:
+        pass
 
 
 class StubResearchSpaceRepository(ResearchSpaceRepository):
@@ -301,7 +317,7 @@ async def test_ai_test_success_returns_result() -> None:
                 },
             ],
         ),
-        ai_agent=StubAiAgent("MED13[Title/Abstract]"),
+        query_agent=StubQueryAgent("MED13[Title/Abstract]"),
         run_id_provider=None,
         research_space_repository=StubResearchSpaceRepository(space),
     )
@@ -338,7 +354,7 @@ async def test_ai_disabled_returns_failure() -> None:
     dependencies = DataSourceAiTestDependencies(
         source_repository=StubUserDataSourceRepository(source),
         pubmed_gateway=StubPubMedGateway([{"pubmed_id": "1"}]),
-        ai_agent=StubAiAgent("MED13"),
+        query_agent=StubQueryAgent("MED13"),
         run_id_provider=None,
         research_space_repository=StubResearchSpaceRepository(None),
     )
@@ -366,7 +382,7 @@ async def test_no_results_returns_failure() -> None:
     dependencies = DataSourceAiTestDependencies(
         source_repository=StubUserDataSourceRepository(source),
         pubmed_gateway=StubPubMedGateway([]),
-        ai_agent=StubAiAgent("MED13"),
+        query_agent=StubQueryAgent("MED13"),
         run_id_provider=None,
         research_space_repository=StubResearchSpaceRepository(None),
     )

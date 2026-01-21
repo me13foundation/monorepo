@@ -6,7 +6,7 @@ import os
 from unittest.mock import patch
 from urllib.parse import parse_qsl, urlsplit
 
-from src.infrastructure.llm.flujo_config import (
+from src.infrastructure.llm.config.flujo_config import (
     _add_flujo_schema,
     _normalize_postgres_dsn,
     resolve_flujo_state_uri,

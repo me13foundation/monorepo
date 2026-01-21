@@ -42,7 +42,7 @@ from src.infrastructure.data_sources import (
     DeterministicPubMedSearchGateway,
     SimplePubMedPdfGateway,
 )
-from src.infrastructure.llm.flujo_agent_adapter import FlujoAgentAdapter
+from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
 from src.infrastructure.queries.source_query_client import HTTPQueryClient
 from src.infrastructure.repositories import (
     SQLAlchemyDataDiscoverySessionRepository,
@@ -65,7 +65,7 @@ from src.infrastructure.repositories import (
 if TYPE_CHECKING:
     from sqlalchemy.orm import Session
 
-    from src.application.services.ports.ai_agent_port import AiAgentPort
+    from src.domain.agents.ports.query_agent_port import QueryAgentPort
     from src.domain.services import storage_metrics, storage_providers
 
 
@@ -75,17 +75,17 @@ class ApplicationServiceFactoryMixin:
     if TYPE_CHECKING:
         _storage_plugin_registry: storage_providers.StoragePluginRegistry
         _storage_metrics_recorder: storage_metrics.StorageMetricsRecorder
-        _ai_agent_port: AiAgentPort | None
+        _query_agent: QueryAgentPort | None
 
         def get_system_status_service(self) -> SystemStatusService: ...
         def get_variant_domain_service(self) -> VariantDomainService: ...
         def get_evidence_domain_service(self) -> EvidenceDomainService: ...
 
-    def get_ai_agent_port(self) -> AiAgentPort:
-        if self._ai_agent_port is None:
+    def get_query_agent(self) -> QueryAgentPort:
+        if self._query_agent is None:
             model = os.getenv("MED13_AI_AGENT_MODEL", "openai:gpt-4o-mini")
-            self._ai_agent_port = FlujoAgentAdapter(model=model)
-        return self._ai_agent_port
+            self._query_agent = FlujoQueryAgentAdapter(model=model)
+        return self._query_agent
 
     def create_gene_application_service(
         self,

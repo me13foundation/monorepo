@@ -52,7 +52,10 @@ describe('Frontend-Backend Endpoint Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks()
     require('next-auth').getServerSession.mockResolvedValue({
-      user: { access_token: 'test-token' },
+      user: {
+        access_token: 'test-token',
+        expires_at: Date.now() + 3600 * 1000
+      },
     })
   })
 
