@@ -64,7 +64,7 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
         model: str | None = None,
         *,
         use_governance: bool = True,
-        use_granular: bool = True,
+        use_granular: bool = False,
     ) -> None:
         """
         Initialize the Flujo query agent adapter.
@@ -72,7 +72,8 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
         Args:
             model: Optional model ID override
             use_governance: Enable confidence-based governance
-            use_granular: Use granular steps for durability
+            use_granular: Use granular steps for multi-turn durability (default False)
+                          Query generation is single-turn, so granular is not needed.
         """
         self._model = model
         self._use_governance = use_governance

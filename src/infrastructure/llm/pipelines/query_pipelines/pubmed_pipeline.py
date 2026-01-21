@@ -91,7 +91,7 @@ def create_pubmed_query_pipeline(
     *,
     model: str | None = None,
     use_governance: bool = True,
-    use_granular: bool = True,
+    use_granular: bool = False,  # Default to False - query gen is single-turn
     usage_limits: UsageLimits | None = None,
 ) -> Flujo[str, QueryGenerationContract, QueryGenerationContext]:
     """
@@ -101,7 +101,9 @@ def create_pubmed_query_pipeline(
         state_backend: Flujo state backend for persistence
         model: Optional model ID override
         use_governance: Include confidence-based governance gate
-        use_granular: Use granular step for per-turn durability
+        use_granular: Use granular step for multi-turn durability (default False)
+                      Note: Query generation is single-turn, so granular is not needed.
+                      GranularStep is intended for multi-turn tool-use workflows.
         usage_limits: Optional usage limits (defaults to environment config)
 
     Returns:
@@ -115,8 +117,11 @@ def create_pubmed_query_pipeline(
     steps: list[Step[Any, Any] | GranularStep | ConditionalStep[Any]] = []
 
     # Create the main agent step
+    # Note: Query generation is a single-turn task, so we use a regular Step.
+    # GranularStep is for multi-turn workflows with tool use where each turn
+    # needs to be persisted for crash recovery.
     if use_granular:
-        # Use GranularStep directly for per-turn durability and auditability
+        # Use GranularStep for multi-turn durability (not typical for query gen)
         steps.append(
             GranularStep(
                 name="generate_pubmed_query",
