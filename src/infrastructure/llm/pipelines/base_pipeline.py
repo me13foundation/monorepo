@@ -25,7 +25,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from flujo import Pipeline, Step
-from flujo.domain.dsl import ConditionalStep, HumanInTheLoopStep
+from flujo.domain.dsl import ConditionalStep, GranularStep, HumanInTheLoopStep
 
 from src.infrastructure.llm.config.governance import GovernanceConfig, UsageLimits
 
@@ -179,7 +179,7 @@ class PipelineBuilder:
         """
         self._name = name
         self._governance = governance_config or GovernanceConfig.from_environment()
-        self._steps: list[Step[Any, Any] | ConditionalStep[Any]] = []
+        self._steps: list[Step[Any, Any] | GranularStep | ConditionalStep[Any]] = []
         self._use_granular: bool = True
         self._enforce_idempotency: bool = True
         self._usage_limits: UsageLimits | None = None
@@ -205,12 +205,13 @@ class PipelineBuilder:
             Self for chaining
         """
         if granular:
-            # Step.granular returns a Pipeline wrapping a GranularStep
+            # Use GranularStep directly for per-turn durability
             self._steps.append(
-                Step.granular(  # type: ignore[arg-type]
+                GranularStep(
                     name=step_name,
                     agent=agent,
                     enforce_idempotency=idempotent,
+                    history_max_tokens=8192,
                 ),
             )
         else:

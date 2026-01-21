@@ -18,7 +18,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from flujo import Flujo, Pipeline, Step
-from flujo.domain.dsl import ConditionalStep, HumanInTheLoopStep
+from flujo.domain.dsl import ConditionalStep, GranularStep, HumanInTheLoopStep
 
 from src.domain.agents.contexts.query_context import QueryGenerationContext
 from src.infrastructure.llm.config.governance import GovernanceConfig, UsageLimits
@@ -112,16 +112,17 @@ def create_pubmed_query_pipeline(
     agent = create_pubmed_query_agent(model=model)
 
     # Build pipeline steps
-    steps: list[Step[Any, Any] | ConditionalStep[Any]] = []
+    steps: list[Step[Any, Any] | GranularStep | ConditionalStep[Any]] = []
 
     # Create the main agent step
     if use_granular:
-        # Step.granular returns a Pipeline wrapping a GranularStep
+        # Use GranularStep directly for per-turn durability and auditability
         steps.append(
-            Step.granular(  # type: ignore[arg-type]
+            GranularStep(
                 name="generate_pubmed_query",
                 agent=agent,
                 enforce_idempotency=True,
+                history_max_tokens=8192,
             ),
         )
     else:
