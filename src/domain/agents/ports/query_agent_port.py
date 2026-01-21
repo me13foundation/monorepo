@@ -21,12 +21,13 @@ class QueryAgentPort(ABC):
     """
 
     @abstractmethod
-    async def generate_query(
+    async def generate_query(  # noqa: PLR0913
         self,
         research_space_description: str,
         user_instructions: str,
         source_type: str,
         *,
+        model_id: str | None = None,
         user_id: str | None = None,
         correlation_id: str | None = None,
     ) -> QueryGenerationContract:
@@ -37,6 +38,7 @@ class QueryAgentPort(ABC):
             research_space_description: Description of the research space context
             user_instructions: User-provided prompting to steer the agent
             source_type: The type of data source (e.g., "pubmed", "clinvar")
+            model_id: Optional model ID override for this request (None = use default)
             user_id: Optional user ID for audit attribution
             correlation_id: Optional correlation ID for distributed tracing
 

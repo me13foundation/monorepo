@@ -232,10 +232,15 @@ export async function testDataSourceAiConfiguration(
     throw new Error('Authentication token is required for testDataSourceAiConfiguration')
   }
 
+  // AI test can take a while with reasoning models (GPT-5 has 180s backend timeout)
+  // Use a longer timeout than the default 15s
   const response = await apiClient.post<DataSourceAiTestResult>(
     `/admin/data-sources/${sourceId}/ai/test`,
     {},
-    authHeaders(token),
+    {
+      ...authHeaders(token),
+      timeout: 200000, // 200 seconds for AI reasoning models
+    },
   )
   return response.data
 }

@@ -51,11 +51,12 @@ class StubPubMedGateway(PubMedGateway):
 
 
 class StubQueryAgent(QueryAgentPort):
-    """Stub query agent returning a predetermined contract."""
+    """Stub query agent returning a predetermined contract and capturing calls."""
 
     def __init__(self, query: str, confidence: float = 0.9) -> None:
         self._query = query
         self._confidence = confidence
+        self.calls: list[dict[str, object]] = []
 
     async def generate_query(
         self,
@@ -63,9 +64,18 @@ class StubQueryAgent(QueryAgentPort):
         user_instructions: str,
         source_type: str,
         *,
+        model_id: str | None = None,
         user_id: str | None = None,
         correlation_id: str | None = None,
     ) -> QueryGenerationContract:
+        self.calls.append(
+            {
+                "research_space_description": research_space_description,
+                "user_instructions": user_instructions,
+                "source_type": source_type,
+                "model_id": model_id,
+            },
+        )
         return QueryGenerationContract(
             decision="generated",
             confidence_score=self._confidence,
@@ -263,6 +273,7 @@ def build_pubmed_source(
     source_id: UUID,
     research_space_id: UUID | None,
     ai_enabled: bool,
+    model_id: str | None = None,
 ) -> UserDataSource:
     metadata: SourceMetadata = {
         "query": "MED13",
@@ -271,6 +282,7 @@ def build_pubmed_source(
             "is_ai_managed": ai_enabled,
             "agent_prompt": "Focus on MED13 clinical studies.",
             "use_research_space_context": True,
+            "model_id": model_id,
         },
     }
     return UserDataSource(
@@ -396,3 +408,262 @@ async def test_no_results_returns_failure() -> None:
     assert result.success is False
     assert "no results" in result.message.lower()
     assert result.findings == []
+
+
+@pytest.mark.asyncio
+async def test_ai_test_passes_model_id_from_agent_config() -> None:
+    """Should pass model_id from agent_config to the query agent."""
+    source_id = uuid4()
+    space_id = uuid4()
+    space = ResearchSpace(
+        id=space_id,
+        slug="test-space",
+        name="Test Space",
+        description="Study MED13",
+        owner_id=uuid4(),
+        status=SpaceStatus.ACTIVE,
+    )
+    # Build source with specific model_id in agent_config
+    source = build_pubmed_source(
+        source_id=source_id,
+        research_space_id=space_id,
+        ai_enabled=True,
+        model_id="openai:gpt-5",
+    )
+
+    query_agent = StubQueryAgent("MED13[Title/Abstract]")
+
+    dependencies = DataSourceAiTestDependencies(
+        source_repository=StubUserDataSourceRepository(source),
+        pubmed_gateway=StubPubMedGateway(
+            [
+                {
+                    "pubmed_id": "1",
+                    "title": "MED13 findings",
+                    "doi": "10.1000/xyz",
+                    "pmc_id": None,
+                    "publication_date": "2024-01-01",
+                    "journal": {"title": "Nature"},
+                },
+            ],
+        ),
+        query_agent=query_agent,
+        run_id_provider=None,
+        research_space_repository=StubResearchSpaceRepository(space),
+    )
+    service = DataSourceAiTestService(
+        dependencies,
+        settings=DataSourceAiTestSettings(
+            sample_size=3,
+            ai_model_name="openai:gpt-test",
+        ),
+    )
+
+    result = await service.test_ai_configuration(source_id)
+
+    # Verify model_id was passed to the query agent
+    assert len(query_agent.calls) == 1
+    assert query_agent.calls[0]["model_id"] == "openai:gpt-5"
+    assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_result_model_shows_configured_model_id() -> None:
+    """Result.model should display the configured model_id, not the default."""
+    source_id = uuid4()
+    space_id = uuid4()
+    space = ResearchSpace(
+        id=space_id,
+        slug="test-space",
+        name="Test Space",
+        description="Study MED13",
+        owner_id=uuid4(),
+        status=SpaceStatus.ACTIVE,
+    )
+    # Configure a specific model for this source
+    configured_model = "openai:gpt-5"
+    source = build_pubmed_source(
+        source_id=source_id,
+        research_space_id=space_id,
+        ai_enabled=True,
+        model_id=configured_model,
+    )
+
+    dependencies = DataSourceAiTestDependencies(
+        source_repository=StubUserDataSourceRepository(source),
+        pubmed_gateway=StubPubMedGateway(
+            [
+                {
+                    "pubmed_id": "1",
+                    "title": "MED13 findings",
+                    "doi": "10.1000/xyz",
+                    "pmc_id": None,
+                    "publication_date": "2024-01-01",
+                    "journal": {"title": "Nature"},
+                },
+            ],
+        ),
+        query_agent=StubQueryAgent("MED13[Title/Abstract]"),
+        run_id_provider=None,
+        research_space_repository=StubResearchSpaceRepository(space),
+    )
+    # Default model is different from configured model
+    service = DataSourceAiTestService(
+        dependencies,
+        settings=DataSourceAiTestSettings(
+            sample_size=3,
+            ai_model_name="openai:gpt-4o-mini",  # Default model
+        ),
+    )
+
+    result = await service.test_ai_configuration(source_id)
+
+    # Result should show the configured model, not the default
+    assert result.model == configured_model
+    assert result.model != "openai:gpt-4o-mini"
+    assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_result_model_falls_back_to_default_when_not_configured() -> None:
+    """Result.model should display the default model when no model_id is configured."""
+    source_id = uuid4()
+    space_id = uuid4()
+    space = ResearchSpace(
+        id=space_id,
+        slug="test-space",
+        name="Test Space",
+        description="Study MED13",
+        owner_id=uuid4(),
+        status=SpaceStatus.ACTIVE,
+    )
+    # No model_id configured (None)
+    source = build_pubmed_source(
+        source_id=source_id,
+        research_space_id=space_id,
+        ai_enabled=True,
+        model_id=None,
+    )
+
+    dependencies = DataSourceAiTestDependencies(
+        source_repository=StubUserDataSourceRepository(source),
+        pubmed_gateway=StubPubMedGateway(
+            [
+                {
+                    "pubmed_id": "1",
+                    "title": "MED13 findings",
+                    "doi": "10.1000/xyz",
+                    "pmc_id": None,
+                    "publication_date": "2024-01-01",
+                    "journal": {"title": "Nature"},
+                },
+            ],
+        ),
+        query_agent=StubQueryAgent("MED13[Title/Abstract]"),
+        run_id_provider=None,
+        research_space_repository=StubResearchSpaceRepository(space),
+    )
+    default_model = "openai:gpt-4o-mini"
+    service = DataSourceAiTestService(
+        dependencies,
+        settings=DataSourceAiTestSettings(
+            sample_size=3,
+            ai_model_name=default_model,
+        ),
+    )
+
+    result = await service.test_ai_configuration(source_id)
+
+    # Result should show the default model
+    assert result.model == default_model
+    assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_ai_test_passes_none_model_id_when_not_configured() -> None:
+    """Should pass None model_id when not configured in agent_config."""
+    source_id = uuid4()
+    space_id = uuid4()
+    space = ResearchSpace(
+        id=space_id,
+        slug="test-space",
+        name="Test Space",
+        description="Study MED13",
+        owner_id=uuid4(),
+        status=SpaceStatus.ACTIVE,
+    )
+    # Build source without model_id (default None)
+    source = build_pubmed_source(
+        source_id=source_id,
+        research_space_id=space_id,
+        ai_enabled=True,
+    )
+
+    query_agent = StubQueryAgent("MED13[Title/Abstract]")
+
+    dependencies = DataSourceAiTestDependencies(
+        source_repository=StubUserDataSourceRepository(source),
+        pubmed_gateway=StubPubMedGateway(
+            [
+                {
+                    "pubmed_id": "1",
+                    "title": "MED13 findings",
+                    "doi": None,
+                    "pmc_id": None,
+                    "publication_date": "2024-01-01",
+                    "journal": {"title": "Nature"},
+                },
+            ],
+        ),
+        query_agent=query_agent,
+        run_id_provider=None,
+        research_space_repository=StubResearchSpaceRepository(space),
+    )
+    service = DataSourceAiTestService(
+        dependencies,
+        settings=DataSourceAiTestSettings(
+            sample_size=3,
+            ai_model_name="openai:gpt-test",
+        ),
+    )
+
+    result = await service.test_ai_configuration(source_id)
+
+    # Verify model_id was None (system default)
+    assert len(query_agent.calls) == 1
+    assert query_agent.calls[0]["model_id"] is None
+    assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_result_model_is_none_when_no_query_agent() -> None:
+    """Result.model should be None when query agent is not available."""
+    source_id = uuid4()
+    source = build_pubmed_source(
+        source_id=source_id,
+        research_space_id=None,
+        ai_enabled=True,
+        model_id="openai:gpt-5",
+    )
+
+    dependencies = DataSourceAiTestDependencies(
+        source_repository=StubUserDataSourceRepository(source),
+        pubmed_gateway=StubPubMedGateway([]),
+        query_agent=None,  # No query agent available
+        run_id_provider=None,
+        research_space_repository=StubResearchSpaceRepository(None),
+    )
+    service = DataSourceAiTestService(
+        dependencies,
+        settings=DataSourceAiTestSettings(
+            sample_size=3,
+            ai_model_name="openai:gpt-4o-mini",
+        ),
+    )
+
+    result = await service.test_ai_configuration(source_id)
+
+    # Model should be None when no query agent
+    assert result.model is None
+    assert result.success is False
+    assert "AI agent is not configured" in result.message

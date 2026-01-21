@@ -91,15 +91,21 @@ class DataSourceAiTestService:
         flujo_tables: list[data_source_types.FlujoTableSummary] = []
         ai_executed = False
 
+        # Track the actual model used (configured or default)
+        actual_model_id: str | None = None
+
         if error_message is None and config is not None:
             research_space_description = self._resolve_research_space_description(
                 source,
                 config,
             )
             ai_executed = True
+            # Use configured model_id or fall back to default
+            actual_model_id = config.agent_config.model_id or self._ai_model_name
             intelligent_query = await self._generate_intelligent_query(
                 research_space_description,
                 config.agent_config.agent_prompt,
+                config.agent_config.model_id,
             )
 
             if not intelligent_query:
@@ -138,6 +144,7 @@ class DataSourceAiTestService:
         search_terms = self._extract_search_terms(executed_query)
         model_name = self._resolve_model_name(
             has_query_agent=self._query_agent is not None,
+            configured_model_id=actual_model_id,
         )
 
         return data_source_types.DataSourceAiTestResult(
@@ -210,6 +217,7 @@ class DataSourceAiTestService:
         self,
         research_space_description: str,
         agent_prompt: str,
+        model_id: str | None = None,
     ) -> str:
         if self._query_agent is None:
             return ""
@@ -218,6 +226,7 @@ class DataSourceAiTestService:
                 research_space_description=research_space_description,
                 user_instructions=agent_prompt,
                 source_type="pubmed",
+                model_id=model_id,
             )
 
             # Log decision and confidence for observability
@@ -240,10 +249,16 @@ class DataSourceAiTestService:
             logger.exception("AI query generation failed")
             return ""
 
-    def _resolve_model_name(self, *, has_query_agent: bool) -> str | None:
+    def _resolve_model_name(
+        self,
+        *,
+        has_query_agent: bool,
+        configured_model_id: str | None = None,
+    ) -> str | None:
         if not has_query_agent:
             return None
-        model = self._ai_model_name
+        # Use configured model if provided, otherwise fall back to default
+        model = configured_model_id or self._ai_model_name
         return model.strip() if isinstance(model, str) and model.strip() else None
 
     @staticmethod

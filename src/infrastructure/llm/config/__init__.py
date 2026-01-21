@@ -11,13 +11,20 @@ from src.infrastructure.llm.config.governance import (
     ShadowEvalConfig,
     UsageLimits,
 )
-from src.infrastructure.llm.config.model_registry import ModelConfig, ModelRegistry
+from src.infrastructure.llm.config.model_registry import (
+    FlujoModelRegistry,
+    ModelRegistry,
+    get_default_model_id,
+    get_model_registry,
+)
 
 __all__ = [
+    "FlujoModelRegistry",
     "GovernanceConfig",
-    "ModelConfig",
     "ModelRegistry",
     "ShadowEvalConfig",
     "UsageLimits",
+    "get_default_model_id",
+    "get_model_registry",
     "resolve_flujo_state_uri",
 ]

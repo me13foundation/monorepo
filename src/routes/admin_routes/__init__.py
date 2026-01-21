@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from .ai_models import router as ai_models_router
 from .catalog import router as catalog_router
 from .data_sources import router as data_sources_router
 from .stats import stats_router
@@ -23,6 +24,7 @@ router = APIRouter(
     },
 )
 
+router.include_router(ai_models_router)
 router.include_router(templates_router)
 router.include_router(data_sources_router)
 router.include_router(catalog_router)

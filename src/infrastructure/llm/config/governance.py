@@ -56,6 +56,20 @@ class UsageLimits:
         )
 
 
+def _get_default_judge_model() -> str:
+    """Get the default judge model from registry."""
+    # Import here to avoid circular imports
+    from src.domain.agents.models import ModelCapability
+    from src.infrastructure.llm.config.model_registry import get_model_registry
+
+    try:
+        registry = get_model_registry()
+        return registry.get_default_model(ModelCapability.JUDGE).model_id
+    except (ValueError, KeyError):
+        # Fallback if registry not available or no judge model configured
+        return "openai:gpt-4o-mini"
+
+
 @dataclass(frozen=True)
 class ShadowEvalConfig:
     """
@@ -68,7 +82,13 @@ class ShadowEvalConfig:
     enabled: bool = False
     sink: str = "database"  # "database", "file", "both"
     sample_rate: float = 0.1  # 10% of requests
-    judge_model: str = "openai:gpt-4o-mini"
+    judge_model: str = ""  # Empty string means use registry default
+
+    def __post_init__(self) -> None:
+        """Set default judge model from registry if not specified."""
+        if not self.judge_model:
+            # Use object.__setattr__ because dataclass is frozen
+            object.__setattr__(self, "judge_model", _get_default_judge_model())
 
     @classmethod
     def from_environment(cls) -> ShadowEvalConfig:
@@ -76,7 +96,11 @@ class ShadowEvalConfig:
         enabled = os.getenv("FLUJO_SHADOW_EVAL_ENABLED", "0") == "1"
         sink = os.getenv("FLUJO_SHADOW_EVAL_SINK", "database")
         sample_rate_raw = os.getenv("FLUJO_SHADOW_EVAL_SAMPLE_RATE", "0.1")
-        judge_model = os.getenv("FLUJO_SHADOW_EVAL_JUDGE_MODEL", "openai:gpt-4o-mini")
+        judge_model = os.getenv("FLUJO_SHADOW_EVAL_JUDGE_MODEL", "")
+
+        # If no env var, use registry default
+        if not judge_model:
+            judge_model = _get_default_judge_model()
 
         return cls(
             enabled=enabled,

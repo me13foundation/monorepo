@@ -85,6 +85,7 @@ class PubMedIngestionService:
                 research_space_description=research_space_description,
                 user_instructions=config.agent_config.agent_prompt,
                 source_type="pubmed",
+                model_id=config.agent_config.model_id,
             )
 
             if contract.decision == "generated" and contract.query:

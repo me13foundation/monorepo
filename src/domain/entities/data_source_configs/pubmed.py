@@ -23,6 +23,10 @@ class AiAgentConfig(BaseModel):
         default=True,
         description="Whether to use the research space description as context",
     )
+    model_id: str | None = Field(
+        default=None,
+        description="Override model ID for this source (None = use system default)",
+    )
 
 
 class PubMedQueryConfig(BaseModel):
