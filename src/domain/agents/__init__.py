@@ -1,9 +1,9 @@
 """
 Domain layer for AI agents.
 
-This module defines the contracts, contexts, and port interfaces for AI agents.
-Contracts are the architecture - they define what agents can output, how decisions
-are justified, and when humans must intervene.
+This module defines the contracts, contexts, model specifications, and port
+interfaces for AI agents. Contracts are the architecture - they define what
+agents can output, how decisions are justified, and when humans must intervene.
 """
 
 from src.domain.agents.contexts.base import BaseAgentContext
@@ -14,6 +14,12 @@ from src.domain.agents.contracts.base import (
     EvidenceItem,
 )
 from src.domain.agents.contracts.query_generation import QueryGenerationContract
+from src.domain.agents.models import (
+    ModelCapability,
+    ModelCostTier,
+    ModelReasoningSettings,
+    ModelSpec,
+)
 
 __all__ = [
     # Contracts
@@ -24,4 +30,9 @@ __all__ = [
     # Contexts
     "BaseAgentContext",
     "QueryGenerationContext",
+    # Models
+    "ModelCapability",
+    "ModelCostTier",
+    "ModelReasoningSettings",
+    "ModelSpec",
 ]

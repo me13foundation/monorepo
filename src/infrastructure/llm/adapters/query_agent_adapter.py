@@ -27,11 +27,13 @@ from flujo.domain.models import PipelineResult, StepResult
 from flujo.exceptions import FlujoError, PausedException, PipelineAbortSignal
 
 from src.domain.agents.contracts.query_generation import QueryGenerationContract
+from src.domain.agents.models import ModelCapability
 from src.domain.agents.ports.query_agent_port import (
     QueryAgentPort,
     QueryAgentRunMetadataProvider,
 )
 from src.infrastructure.llm.config.governance import GovernanceConfig
+from src.infrastructure.llm.config.model_registry import get_model_registry
 from src.infrastructure.llm.pipelines.query_pipelines.pubmed_pipeline import (
     create_pubmed_query_pipeline,
 )
@@ -49,6 +51,9 @@ logger = logging.getLogger(__name__)
 
 _INVALID_OPENAI_KEYS = frozenset({"test", "changeme", "placeholder"})
 
+# Cache key format: (source_type, model_id or "default")
+PipelineCacheKey = tuple[str, str]
+
 
 class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
     """
@@ -57,6 +62,9 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
     Implements the QueryAgentPort interface using Flujo pipelines
     with evidence-first contracts, confidence-based governance,
     and proper lifecycle management.
+
+    Supports per-request model selection by caching pipelines for each
+    (source_type, model_id) combination.
     """
 
     def __init__(
@@ -70,41 +78,119 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
         Initialize the Flujo query agent adapter.
 
         Args:
-            model: Optional model ID override
+            model: Optional default model ID override
             use_governance: Enable confidence-based governance
             use_granular: Use granular steps for multi-turn durability (default False)
                           Query generation is single-turn, so granular is not needed.
         """
-        self._model = model
+        self._default_model = model
         self._use_governance = use_governance
         self._use_granular = use_granular
         self._state_backend = get_state_backend()
-        self._pipelines: dict[str, Flujo[Any, Any, Any]] = {}
+        # Pipeline cache: (source_type, model_id) -> pipeline
+        self._pipelines: dict[PipelineCacheKey, Flujo[Any, Any, Any]] = {}
         self._last_run_id: str | None = None
         self._governance = GovernanceConfig.from_environment()
         self._lifecycle_manager = get_lifecycle_manager()
+        self._registry = get_model_registry()
 
-        # Initialize supported source pipelines
-        self._setup_pipelines()
+        # Initialize default pipeline for supported sources
+        self._setup_default_pipelines()
 
-    def _setup_pipelines(self) -> None:
-        """Initialize pipelines for supported data sources."""
-        # PubMed pipeline
-        pubmed_pipeline = create_pubmed_query_pipeline(
-            state_backend=self._state_backend,
-            model=self._model,
-            use_governance=self._use_governance,
-            use_granular=self._use_granular,
+    def _setup_default_pipelines(self) -> None:
+        """Initialize default pipelines for supported data sources."""
+        # Get default model from registry if not specified
+        default_model = self._default_model
+        if default_model is None:
+            default_model = self._registry.get_default_model(
+                ModelCapability.QUERY_GENERATION,
+            ).model_id
+
+        # Create default PubMed pipeline
+        self._get_or_create_pipeline("pubmed", default_model)
+
+    def _get_or_create_pipeline(
+        self,
+        source_type: str,
+        model_id: str | None,
+    ) -> Flujo[Any, Any, Any]:
+        """
+        Get a cached pipeline or create a new one for the given source and model.
+
+        Args:
+            source_type: The data source type (e.g., "pubmed")
+            model_id: The model ID to use (None = use default)
+
+        Returns:
+            The cached or newly created pipeline
+        """
+        # Resolve model_id to actual value
+        if model_id is None:
+            model_id = self._default_model
+            if model_id is None:
+                model_id = self._registry.get_default_model(
+                    ModelCapability.QUERY_GENERATION,
+                ).model_id
+
+        cache_key: PipelineCacheKey = (source_type.lower(), model_id)
+
+        # Return cached pipeline if available
+        if cache_key in self._pipelines:
+            return self._pipelines[cache_key]
+
+        # Create new pipeline for this source/model combination
+        logger.info(
+            "Creating new pipeline for source=%s model=%s",
+            source_type,
+            model_id,
         )
-        self._pipelines["pubmed"] = pubmed_pipeline
-        self._lifecycle_manager.register_runner(pubmed_pipeline)
 
-    async def generate_query(
+        pipeline = self._create_pipeline_for_source(source_type.lower(), model_id)
+        self._pipelines[cache_key] = pipeline
+        self._lifecycle_manager.register_runner(pipeline)
+
+        return pipeline
+
+    def _create_pipeline_for_source(
+        self,
+        source_type: str,
+        model_id: str,
+    ) -> Flujo[Any, Any, Any]:
+        """
+        Create a pipeline for the given source type and model.
+
+        Args:
+            source_type: The data source type
+            model_id: The model ID to use
+
+        Returns:
+            A new pipeline configured for the source and model
+
+        Raises:
+            ValueError: If source type is not supported
+        """
+        if source_type == "pubmed":
+            return create_pubmed_query_pipeline(
+                state_backend=self._state_backend,
+                model=model_id,
+                use_governance=self._use_governance,
+                use_granular=self._use_granular,
+            )
+
+        msg = f"Unsupported source type: {source_type}"
+        raise ValueError(msg)
+
+    def _is_supported_source(self, source_type: str) -> bool:
+        """Check if a source type is supported."""
+        return source_type.lower() in {"pubmed"}
+
+    async def generate_query(  # noqa: PLR0913
         self,
         research_space_description: str,
         user_instructions: str,
         source_type: str,
         *,
+        model_id: str | None = None,
         user_id: str | None = None,
         correlation_id: str | None = None,
     ) -> QueryGenerationContract:
@@ -115,6 +201,7 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
             research_space_description: Description of the research space context
             user_instructions: User-provided prompting to steer the agent
             source_type: The type of data source (e.g., "pubmed", "clinvar")
+            model_id: Optional model ID override for this request (None = use default)
             user_id: Optional user ID for audit attribution
             correlation_id: Optional correlation ID for distributed tracing
 
@@ -125,22 +212,26 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
         source_key = source_type.lower()
 
         # Check for supported source
-        if source_key not in self._pipelines:
+        if not self._is_supported_source(source_key):
             logger.warning(
                 "Unsupported source type: %s. Returning escalation contract.",
                 source_type,
             )
             return self._create_unsupported_source_contract(source_type)
 
+        # Resolve model_id (validate if specified)
+        effective_model_id = self._resolve_model_id(model_id)
+
         # Check for OpenAI key if using OpenAI model
-        if self._is_openai_model() and not self._has_openai_key():
+        if self._is_openai_model(effective_model_id) and not self._has_openai_key():
             logger.info(
                 "OpenAI API key not configured; returning fallback contract for %s.",
                 source_type,
             )
             return self._create_no_api_key_contract(source_type)
 
-        pipeline = self._pipelines[source_key]
+        # Get or create pipeline for this source/model combination
+        pipeline = self._get_or_create_pipeline(source_key, effective_model_id)
 
         # Build input text
         input_text = self._build_input_text(
@@ -224,7 +315,7 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
 
         Should be called during application shutdown.
         """
-        for source_type, pipeline in self._pipelines.items():
+        for cache_key, pipeline in self._pipelines.items():
             try:
                 if hasattr(pipeline, "aclose"):
                     await pipeline.aclose()
@@ -232,7 +323,7 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
             except (RuntimeError, OSError, ConnectionError) as exc:
                 logger.warning(
                     "Error closing pipeline for %s: %s",
-                    source_type,
+                    cache_key,
                     exc,
                 )
 
@@ -244,10 +335,42 @@ class FlujoQueryAgentAdapter(QueryAgentPort, QueryAgentRunMetadataProvider):
 
     # --- Private helper methods ---
 
-    def _is_openai_model(self) -> bool:
-        """Check if the configured model is an OpenAI model."""
-        if self._model:
-            return self._model.startswith("openai:")
+    def _resolve_model_id(self, model_id: str | None) -> str:
+        """
+        Resolve the effective model ID.
+
+        Args:
+            model_id: The requested model ID (None = use default)
+
+        Returns:
+            The resolved model ID
+        """
+        if model_id is not None:
+            # Validate the model exists and supports query generation
+            if self._registry.validate_model_for_capability(
+                model_id,
+                ModelCapability.QUERY_GENERATION,
+            ):
+                return model_id
+            logger.warning(
+                "Model %s does not support query generation, using default",
+                model_id,
+            )
+
+        # Use default model
+        if self._default_model is not None:
+            return self._default_model
+
+        return self._registry.get_default_model(
+            ModelCapability.QUERY_GENERATION,
+        ).model_id
+
+    def _is_openai_model(self, model_id: str | None = None) -> bool:
+        """Check if the specified (or default) model is an OpenAI model."""
+        if model_id:
+            return model_id.startswith("openai:")
+        if self._default_model:
+            return self._default_model.startswith("openai:")
         return True  # Default model is OpenAI
 
     @staticmethod

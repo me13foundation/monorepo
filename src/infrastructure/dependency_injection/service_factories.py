@@ -4,7 +4,6 @@ Factory mixin for building application services used by the dependency container
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 from src.application import export as export_module
@@ -33,6 +32,7 @@ from src.application.services import (
     SystemStatusService,
     VariantApplicationService,
 )
+from src.domain.agents.models import ModelCapability
 from src.domain.services import (
     EvidenceDomainService,
     GeneDomainService,
@@ -43,6 +43,7 @@ from src.infrastructure.data_sources import (
     SimplePubMedPdfGateway,
 )
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
+from src.infrastructure.llm.config.model_registry import get_model_registry
 from src.infrastructure.queries.source_query_client import HTTPQueryClient
 from src.infrastructure.repositories import (
     SQLAlchemyDataDiscoverySessionRepository,
@@ -83,8 +84,9 @@ class ApplicationServiceFactoryMixin:
 
     def get_query_agent(self) -> QueryAgentPort:
         if self._query_agent is None:
-            model = os.getenv("MED13_AI_AGENT_MODEL", "openai:gpt-4o-mini")
-            self._query_agent = FlujoQueryAgentAdapter(model=model)
+            registry = get_model_registry()
+            model_spec = registry.get_default_model(ModelCapability.QUERY_GENERATION)
+            self._query_agent = FlujoQueryAgentAdapter(model=model_spec.model_id)
         return self._query_agent
 
     def create_gene_application_service(

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The MED13 Resource Library implements a **contract-first, evidence-based AI agent system** using the [Flujo](https://github.com/flujo-ai/flujo) framework. This architecture enables intelligent query generation, data processing, and research assistance while maintaining strict type safety and Clean Architecture principles.
+The MED13 Resource Library implements a **contract-first, evidence-based AI agent system** using the [Flujo](https://github.com/aandresalvarez/flujo) framework. This architecture enables intelligent query generation, data processing, and research assistance while maintaining strict type safety and Clean Architecture principles.
 
 ## Architectural Principles
 
@@ -374,13 +374,37 @@ Provide:
 # src/infrastructure/llm/factories/my_agent_factory.py
 from flujo.agents import make_agent_async
 from src.domain.agents.contracts.my_agent import MyAgentContract
+from src.domain.agents.models import ModelCapability
+from src.infrastructure.llm.config.model_registry import get_model_registry
 from src.infrastructure.llm.prompts.my_agent.prompt import MY_AGENT_SYSTEM_PROMPT
 
 def create_my_agent(model: str | None = None) -> FlujoAgent:
+    # Get model from registry (respects env var overrides)
+    registry = get_model_registry()
+
+    if model:
+        model_spec = registry.get_model(model)
+    else:
+        model_spec = registry.get_default_model(ModelCapability.QUERY_GENERATION)
+
+    # Handle reasoning models with special settings
+    reasoning_settings = model_spec.get_reasoning_settings()
+
+    if reasoning_settings:
+        return make_agent_async(
+            model=model_spec.model_id,
+            system_prompt=MY_AGENT_SYSTEM_PROMPT,
+            output_type=MyAgentContract,
+            max_retries=model_spec.max_retries,
+            timeout=int(model_spec.timeout_seconds),
+            model_settings=reasoning_settings,
+        )
+
     return make_agent_async(
-        model=model or "openai:gpt-4o-mini",
+        model=model_spec.model_id,
         system_prompt=MY_AGENT_SYSTEM_PROMPT,
         output_type=MyAgentContract,
+        max_retries=model_spec.max_retries,
     )
 ```
 
@@ -465,6 +489,108 @@ As we add more agents:
 3. **Factory Pattern**: Centralized agent creation with consistent configuration
 4. **Skill Composition**: Agents can invoke registered skills for bounded capabilities
 
+## Model Management
+
+### Centralized Model Registry
+
+All AI models are configured in `flujo.toml` and accessed through a centralized registry. This eliminates hardcoded model strings and enables:
+
+- **Per-capability defaults**: Different models for different tasks
+- **Environment overrides**: Override via `MED13_AI_{CAPABILITY}_MODEL`
+- **Reasoning model support**: Automatic handling of `model_settings` for reasoning models
+- **Future: User selection**: Users can choose from available models
+
+### Model Configuration (flujo.toml)
+
+```toml
+[models]
+# System-wide defaults by capability
+default_query_generation = "openai:gpt-4o-mini"
+default_evidence_extraction = "openai:gpt-5"
+default_curation = "openai:gpt-5"
+default_judge = "openai:gpt-4o-mini"
+
+# Model specifications
+[models.registry."openai:gpt-4o-mini"]
+display_name = "GPT-4o Mini"
+provider = "openai"
+capabilities = ["query_generation", "judge"]
+cost_tier = "low"
+is_reasoning_model = false
+max_retries = 3
+timeout_seconds = 30.0
+is_enabled = true
+
+[models.registry."openai:gpt-5"]
+display_name = "GPT-5"
+provider = "openai"
+capabilities = ["query_generation", "evidence_extraction", "curation", "judge"]
+cost_tier = "high"
+is_reasoning_model = true
+max_retries = 1
+timeout_seconds = 180.0
+is_enabled = true
+
+[models.registry."openai:gpt-5".default_reasoning_settings]
+effort = "high"
+summary = "detailed"
+```
+
+### Using the Registry
+
+```python
+from src.domain.agents.models import ModelCapability
+from src.infrastructure.llm.config.model_registry import get_model_registry
+
+# Get registry (singleton)
+registry = get_model_registry()
+
+# Get default model for a capability
+model = registry.get_default_model(ModelCapability.QUERY_GENERATION)
+print(model.model_id)        # "openai:gpt-4o-mini"
+print(model.display_name)    # "GPT-4o Mini"
+
+# Get models supporting a capability
+models = registry.get_models_for_capability(ModelCapability.EVIDENCE_EXTRACTION)
+
+# Check if model supports capability
+is_valid = registry.validate_model_for_capability(
+    "openai:gpt-5",
+    ModelCapability.CURATION
+)
+
+# Get all available models (for UI selection)
+available = registry.get_available_models()
+```
+
+### Reasoning Model Handling
+
+Reasoning models (like GPT-5) require special `model_settings` for Flujo:
+
+```python
+# The factory handles this automatically
+from src.infrastructure.llm.factories.base_factory import BaseAgentFactory
+
+class MyAgentFactory(BaseAgentFactory[MyContract]):
+    def create(self, model: str | None = None) -> FlujoAgent:
+        # If model is a reasoning model, factory adds model_settings automatically
+        return super().create(model)
+
+# Or manually get settings
+model_spec = registry.get_model("openai:gpt-5")
+if model_spec.is_reasoning_model:
+    settings = model_spec.get_reasoning_settings(effort="high")
+    # Returns: {"reasoning": {"effort": "high"}, "text": {"verbosity": "detailed"}}
+```
+
+### Model Resolution Priority
+
+The registry resolves models in this order:
+
+1. **Environment variable**: `MED13_AI_{CAPABILITY}_MODEL=openai:gpt-5`
+2. **flujo.toml defaults**: `[models] default_query_generation = "..."`
+3. **Fallback**: First enabled model with the capability
+
 ## Configuration Reference
 
 ### Environment Variables
@@ -474,14 +600,21 @@ As we add more agents:
 FLUJO_STATE_URI=postgresql://...     # Override state backend URI
 DATABASE_URL=postgresql://...         # Fallback for state backend
 
-# Model Configuration
-MED13_AI_AGENT_MODEL=openai:gpt-4o-mini  # Default model
+# Model Configuration (override flujo.toml defaults)
+MED13_AI_QUERY_GENERATION_MODEL=openai:gpt-5-nano
+MED13_AI_EVIDENCE_EXTRACTION_MODEL=openai:gpt-5
+MED13_AI_CURATION_MODEL=openai:gpt-5
+MED13_AI_JUDGE_MODEL=openai:gpt-4o-mini
 
 # Governance
 FLUJO_GOVERNANCE_ENABLED=true
 FLUJO_GOVERNANCE_HITL_THRESHOLD=0.85
 FLUJO_GOVERNANCE_REQUIRE_EVIDENCE=true
 FLUJO_GOVERNANCE_TOOL_ALLOWLIST=pubmed.search,query.validate
+
+# Shadow Evaluation
+FLUJO_SHADOW_EVAL_ENABLED=0
+FLUJO_SHADOW_EVAL_JUDGE_MODEL=openai:gpt-4o-mini
 ```
 
 ### flujo.toml Configuration
@@ -489,7 +622,12 @@ FLUJO_GOVERNANCE_TOOL_ALLOWLIST=pubmed.search,query.validate
 ```toml
 [flujo]
 state_uri = "postgresql://user:pass@host:5432/db?options=-c%20search_path%3Dflujo,public"
-default_model = "openai:gpt-4o-mini"
+
+[models]
+default_query_generation = "openai:gpt-4o-mini"
+default_evidence_extraction = "openai:gpt-5"
+default_curation = "openai:gpt-5"
+default_judge = "openai:gpt-4o-mini"
 
 [aros]
 session_ttl = "24h"
@@ -500,6 +638,10 @@ pooled_connections = 10
 enabled = true
 hitl_threshold = 0.85
 require_evidence = true
+
+[shadow_eval]
+enabled = false
+judge_model = "openai:gpt-4o-mini"
 
 [lockfile]
 enabled = true

@@ -17,7 +17,11 @@ Module Organization:
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
 from src.infrastructure.llm.config.flujo_config import resolve_flujo_state_uri
 from src.infrastructure.llm.config.governance import GovernanceConfig
-from src.infrastructure.llm.config.model_registry import ModelConfig, ModelRegistry
+from src.infrastructure.llm.config.model_registry import (
+    FlujoModelRegistry,
+    ModelRegistry,
+    get_model_registry,
+)
 from src.infrastructure.llm.factories.query_agent_factory import (
     QueryAgentFactory,
     create_pubmed_query_agent,
@@ -47,9 +51,10 @@ __all__ = [
     # Adapters
     "FlujoQueryAgentAdapter",
     # Config
+    "FlujoModelRegistry",
     "GovernanceConfig",
-    "ModelConfig",
     "ModelRegistry",
+    "get_model_registry",
     "resolve_flujo_state_uri",
     # Factories
     "create_pubmed_query_agent",

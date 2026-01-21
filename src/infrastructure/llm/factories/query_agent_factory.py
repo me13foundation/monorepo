@@ -10,7 +10,8 @@ from __future__ import annotations
 from flujo.agents import make_agent_async
 
 from src.domain.agents.contracts.query_generation import QueryGenerationContract
-from src.infrastructure.llm.config.model_registry import ModelRegistry
+from src.domain.agents.models import ModelCapability
+from src.infrastructure.llm.config.model_registry import get_model_registry
 from src.infrastructure.llm.factories.base_factory import BaseAgentFactory, FlujoAgent
 from src.infrastructure.llm.prompts.query.pubmed import PUBMED_QUERY_SYSTEM_PROMPT
 
@@ -32,13 +33,32 @@ def create_pubmed_query_agent(
     Returns:
         Configured agent for PubMed query generation
     """
-    config = ModelRegistry.get_model_or_default(
-        model,
-        ModelRegistry.DEFAULT_QUERY_MODEL,
-    )
+    registry = get_model_registry()
+
+    if model:
+        try:
+            model_spec = registry.get_model(model)
+        except KeyError:
+            # Model not in registry, use default
+            model_spec = registry.get_default_model(ModelCapability.QUERY_GENERATION)
+    else:
+        model_spec = registry.get_default_model(ModelCapability.QUERY_GENERATION)
+
+    # Handle reasoning models with special settings
+    reasoning_settings = model_spec.get_reasoning_settings()
+
+    if reasoning_settings:
+        return make_agent_async(
+            model=model_spec.model_id,
+            system_prompt=PUBMED_QUERY_SYSTEM_PROMPT,
+            output_type=QueryGenerationContract,
+            max_retries=model_spec.max_retries,
+            timeout=int(model_spec.timeout_seconds),
+            model_settings=reasoning_settings,
+        )
 
     return make_agent_async(
-        model=config.model_id,
+        model=model_spec.model_id,
         system_prompt=PUBMED_QUERY_SYSTEM_PROMPT,
         output_type=QueryGenerationContract,
         max_retries=max_retries,
@@ -64,11 +84,11 @@ class QueryAgentFactory(BaseAgentFactory[QueryGenerationContract]):
 
         Args:
             source_type: Data source type (pubmed, clinvar, etc.)
-            model: Default model ID to use
+            model: Default model ID to use (loads from registry if None)
             max_retries: Default retry count for agent calls
         """
         super().__init__(
-            default_model=model or ModelRegistry.DEFAULT_QUERY_MODEL,
+            default_model=model,  # Base class handles registry lookup
             max_retries=max_retries,
         )
         self._source_type = source_type

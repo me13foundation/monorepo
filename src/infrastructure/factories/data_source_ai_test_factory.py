@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -12,8 +11,10 @@ from src.application.services import (
     DataSourceAiTestSettings,
 )
 from src.database.session import SessionLocal
+from src.domain.agents.models import ModelCapability
 from src.infrastructure.data_sources import PubMedSourceGateway
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
+from src.infrastructure.llm.config.model_registry import get_model_registry
 from src.infrastructure.llm.state.flujo_state_repository import (
     SqlAlchemyFlujoStateRepository,
 )
@@ -38,7 +39,12 @@ def build_data_source_ai_test_service(
     source_repository = SqlAlchemyUserDataSourceRepository(session)
     research_space_repository = SqlAlchemyResearchSpaceRepository(session)
     flujo_state_repository = SqlAlchemyFlujoStateRepository(session)
-    model_name = os.getenv("MED13_AI_AGENT_MODEL", "openai:gpt-4o-mini")
+
+    # Get model from registry (respects env var overrides)
+    registry = get_model_registry()
+    model_spec = registry.get_default_model(ModelCapability.QUERY_GENERATION)
+    model_name = model_spec.model_id
+
     query_agent = FlujoQueryAgentAdapter(model=model_name)
 
     dependencies = DataSourceAiTestDependencies(

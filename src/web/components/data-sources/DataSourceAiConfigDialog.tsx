@@ -30,11 +30,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { AiModelSelector } from './AiModelSelector'
 
 const aiConfigSchema = z.object({
   is_ai_managed: z.boolean().default(false),
   use_research_space_context: z.boolean().default(true),
   agent_prompt: z.string().default(''),
+  model_id: z.string().nullable().default(null),
 })
 
 type AiConfigFormValues = z.infer<typeof aiConfigSchema>
@@ -67,14 +69,17 @@ export function DataSourceAiConfigDialog({
     typeof agentConfig.use_research_space_context === 'boolean'
       ? agentConfig.use_research_space_context
       : true
+  const defaultModelIdFromConfig =
+    typeof agentConfig.model_id === 'string' ? agentConfig.model_id : null
 
   const defaultValues = useMemo<AiConfigFormValues>(
     () => ({
       is_ai_managed: defaultIsAiManaged,
       use_research_space_context: defaultUseContext,
       agent_prompt: defaultAgentPrompt,
+      model_id: defaultModelIdFromConfig,
     }),
-    [defaultAgentPrompt, defaultIsAiManaged, defaultUseContext],
+    [defaultAgentPrompt, defaultIsAiManaged, defaultUseContext, defaultModelIdFromConfig],
   )
 
   const form = useForm<AiConfigFormValues>({
@@ -97,6 +102,7 @@ export function DataSourceAiConfigDialog({
         is_ai_managed: values.is_ai_managed,
         agent_prompt: values.agent_prompt,
         use_research_space_context: values.use_research_space_context,
+        model_id: values.model_id,
       },
     }
     const updatedConfig = { ...config, metadata: updatedMetadata }
@@ -156,6 +162,22 @@ export function DataSourceAiConfigDialog({
 
             {isAiManaged && (
               <>
+                <FormField
+                  control={form.control}
+                  name="model_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>AI Model</FormLabel>
+                      <FormControl>
+                        <AiModelSelector value={field.value} onChange={field.onChange} />
+                      </FormControl>
+                      <FormDescription>
+                        Choose which AI model powers query generation for this source.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="use_research_space_context"

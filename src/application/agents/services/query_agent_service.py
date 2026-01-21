@@ -60,12 +60,13 @@ class QueryAgentService:
         self._agent = dependencies.query_agent
         self._research_space_repo = dependencies.research_space_repository
 
-    async def generate_query_for_source(
+    async def generate_query_for_source(  # noqa: PLR0913
         self,
         research_space_description: str,
         user_instructions: str,
         source_type: str,
         *,
+        model_id: str | None = None,
         user_id: str | None = None,
         correlation_id: str | None = None,
     ) -> QueryGenerationContract:
@@ -80,6 +81,7 @@ class QueryAgentService:
             research_space_description: Description of the research space context
             user_instructions: User-provided prompting to steer the agent
             source_type: The type of data source (e.g., "pubmed", "clinvar")
+            model_id: Optional model ID override for this request
             user_id: Optional user ID for audit attribution
             correlation_id: Optional correlation ID for distributed tracing
 
@@ -87,8 +89,9 @@ class QueryAgentService:
             QueryGenerationContract with the generated query and metadata
         """
         logger.info(
-            "Generating query for source=%s user=%s correlation=%s",
+            "Generating query for source=%s model=%s user=%s correlation=%s",
             source_type,
+            model_id or "default",
             user_id,
             correlation_id,
         )
@@ -97,6 +100,7 @@ class QueryAgentService:
             research_space_description=research_space_description,
             user_instructions=user_instructions,
             source_type=source_type,
+            model_id=model_id,
             user_id=user_id,
             correlation_id=correlation_id,
         )
@@ -110,12 +114,13 @@ class QueryAgentService:
 
         return result
 
-    async def generate_query_for_research_space(
+    async def generate_query_for_research_space(  # noqa: PLR0913
         self,
         research_space_id: str,
         user_instructions: str,
         source_type: str,
         *,
+        model_id: str | None = None,
         user_id: str | None = None,
         correlation_id: str | None = None,
     ) -> QueryGenerationContract:
@@ -129,6 +134,7 @@ class QueryAgentService:
             research_space_id: ID of the research space
             user_instructions: User-provided prompting to steer the agent
             source_type: The type of data source
+            model_id: Optional model ID override for this request
             user_id: Optional user ID for audit attribution
             correlation_id: Optional correlation ID for distributed tracing
 
@@ -166,16 +172,18 @@ class QueryAgentService:
             research_space_description=description,
             user_instructions=user_instructions,
             source_type=source_type,
+            model_id=model_id,
             user_id=user_id,
             correlation_id=correlation_id,
         )
 
-    async def generate_queries_for_multiple_sources(
+    async def generate_queries_for_multiple_sources(  # noqa: PLR0913
         self,
         research_space_description: str,
         user_instructions: str,
         source_types: list[str],
         *,
+        model_id: str | None = None,
         user_id: str | None = None,
         correlation_id: str | None = None,
     ) -> dict[str, QueryGenerationContract]:
@@ -189,6 +197,7 @@ class QueryAgentService:
             research_space_description: Description of the research space context
             user_instructions: User-provided prompting to steer the agent
             source_types: List of data source types to generate queries for
+            model_id: Optional model ID override for all requests
             user_id: Optional user ID for audit attribution
             correlation_id: Optional correlation ID for distributed tracing
 
@@ -203,6 +212,7 @@ class QueryAgentService:
                     research_space_description=research_space_description,
                     user_instructions=user_instructions,
                     source_type=source_type,
+                    model_id=model_id,
                     user_id=user_id,
                     correlation_id=correlation_id,
                 )

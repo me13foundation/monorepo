@@ -16,12 +16,12 @@ Type Safety Note:
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
-if TYPE_CHECKING:
-    from src.infrastructure.llm.config.model_registry import ModelConfig
+from src.domain.agents.models import ModelCapability, ModelSpec
+from src.infrastructure.llm.config.model_registry import get_model_registry
 
 OutputT = TypeVar("OutputT", bound=BaseModel)
 
@@ -30,6 +30,12 @@ OutputT = TypeVar("OutputT", bound=BaseModel)
 # We use 'object' as the base type to avoid explicit 'Any' while acknowledging
 # we can't fully type Flujo's internal agent wrapper.
 FlujoAgent = object
+
+
+def _get_default_model_id() -> str:
+    """Get the default model ID from registry."""
+    registry = get_model_registry()
+    return registry.get_default_model(ModelCapability.QUERY_GENERATION).model_id
 
 
 class BaseAgentFactory(ABC, Generic[OutputT]):
@@ -42,17 +48,17 @@ class BaseAgentFactory(ABC, Generic[OutputT]):
 
     def __init__(
         self,
-        default_model: str = "openai:gpt-4o-mini",
+        default_model: str | None = None,
         max_retries: int = 3,
     ) -> None:
         """
         Initialize the factory.
 
         Args:
-            default_model: Default model ID to use
+            default_model: Default model ID to use (loads from registry if None)
             max_retries: Default retry count for agent calls
         """
-        self._default_model = default_model
+        self._default_model = default_model or _get_default_model_id()
         self._max_retries = max_retries
 
     @property
@@ -76,28 +82,61 @@ class BaseAgentFactory(ABC, Generic[OutputT]):
         """
         from flujo.agents import make_agent_async
 
+        model_id = model or self._default_model
+        registry = get_model_registry()
+
+        # Check if it's a reasoning model that needs special settings
+        try:
+            model_spec = registry.get_model(model_id)
+            reasoning_settings = model_spec.get_reasoning_settings()
+
+            if reasoning_settings:
+                return make_agent_async(
+                    model=model_id,
+                    system_prompt=self.get_system_prompt(),
+                    output_type=self.output_type,
+                    max_retries=model_spec.max_retries,
+                    timeout=int(model_spec.timeout_seconds),
+                    model_settings=reasoning_settings,
+                )
+        except KeyError:
+            # Model not in registry, use defaults
+            pass
+
         return make_agent_async(
-            model=model or self._default_model,
+            model=model_id,
             system_prompt=self.get_system_prompt(),
             output_type=self.output_type,
             max_retries=self._max_retries,
         )
 
-    def create_with_config(self, config: ModelConfig) -> FlujoAgent:
+    def create_with_spec(self, spec: ModelSpec) -> FlujoAgent:
         """
-        Create an agent using a ModelConfig.
+        Create an agent using a ModelSpec.
 
         Args:
-            config: Model configuration with all settings
+            spec: Model specification with all settings
 
         Returns:
             Configured Flujo agent (AsyncAgentWrapper with OutputT contract)
         """
         from flujo.agents import make_agent_async
 
+        reasoning_settings = spec.get_reasoning_settings()
+
+        if reasoning_settings:
+            return make_agent_async(
+                model=spec.model_id,
+                system_prompt=self.get_system_prompt(),
+                output_type=self.output_type,
+                max_retries=spec.max_retries,
+                timeout=int(spec.timeout_seconds),
+                model_settings=reasoning_settings,
+            )
+
         return make_agent_async(
-            model=config.model_id,
+            model=spec.model_id,
             system_prompt=self.get_system_prompt(),
             output_type=self.output_type,
-            max_retries=config.max_retries,
+            max_retries=spec.max_retries,
         )
