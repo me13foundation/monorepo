@@ -14,6 +14,7 @@ from .authorization import (
 from .common import (
     APIResponse,
     EvidenceUpdate,
+    ExtractionQueueUpdate,
     GeneUpdate,
     PaginatedResponse,
     PhenotypeUpdate,
@@ -108,6 +109,7 @@ __all__ = [
     "DOIMintResult",
     "FlujoTableSummary",
     "EvidenceUpdate",
+    "ExtractionQueueUpdate",
     "GeneUpdate",
     "GeneStatistics",
     "GoogleCloudStorageConfig",

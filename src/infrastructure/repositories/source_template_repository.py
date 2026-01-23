@@ -226,7 +226,7 @@ class SqlAlchemySourceTemplateRepository(SourceTemplateRepository):
         if model is None:
             return None
         model.is_approved = True
-        model.approved_at = datetime.now(UTC).isoformat()
+        model.approved_at = datetime.now(UTC).isoformat(timespec="seconds")
         model.updated_at = datetime.now(UTC)
         self.session.commit()
         self.session.refresh(model)

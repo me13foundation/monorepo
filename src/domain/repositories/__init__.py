@@ -8,6 +8,7 @@ enabling dependency inversion and testability.
 from .base import QuerySpecification, Repository
 from .data_source_activation_repository import DataSourceActivationRepository
 from .evidence_repository import EvidenceRepository
+from .extraction_queue_repository import ExtractionQueueRepository
 from .gene_repository import GeneRepository
 from .ingestion_job_repository import IngestionJobRepository
 from .phenotype_repository import PhenotypeRepository
@@ -26,6 +27,7 @@ from .variant_repository import VariantRepository
 
 __all__ = [
     "EvidenceRepository",
+    "ExtractionQueueRepository",
     "GeneRepository",
     "IngestionJobRepository",
     "PhenotypeRepository",

@@ -28,6 +28,9 @@ from src.models.value_objects.provenance import (
 from src.type_definitions.storage import StorageOperationRecord, StorageUseCase
 
 if TYPE_CHECKING:
+    from src.application.services.extraction_queue_service import (
+        ExtractionQueueService,
+    )
     from src.application.services.ports.scheduler_port import (
         ScheduledJob,
         SchedulerPort,
@@ -61,6 +64,7 @@ class IngestionSchedulingService:
             storage_repository.StorageOperationRepository | None
         ) = None,
         pubmed_discovery_service: PubMedDiscoveryService | None = None,
+        extraction_queue_service: ExtractionQueueService | None = None,
         retry_batch_size: int = 25,
     ) -> None:
         self._scheduler = scheduler
@@ -69,6 +73,7 @@ class IngestionSchedulingService:
         self._ingestion_services = dict(ingestion_services)
         self._storage_operation_repository = storage_operation_repository
         self._pubmed_discovery_service = pubmed_discovery_service
+        self._extraction_queue_service = extraction_queue_service
         self._retry_batch_size = max(retry_batch_size, 1)
 
     async def schedule_source(self, source_id: UUID) -> ScheduledJob:
@@ -152,6 +157,14 @@ class IngestionSchedulingService:
             if hasattr(summary, "executed_query") and summary.executed_query:
                 metadata["executed_query"] = summary.executed_query
 
+            extraction_metadata = self._enqueue_extraction(
+                source=source,
+                ingestion_job_id=running.id,
+                summary=summary,
+            )
+            if extraction_metadata:
+                metadata["extraction_queue"] = extraction_metadata
+
             completed = running.model_copy(
                 update={"metadata": metadata},
             ).complete_successfully(metrics)
@@ -171,6 +184,35 @@ class IngestionSchedulingService:
             )
             self._update_schedule_after_run(updated_source)
             return summary
+
+    def _enqueue_extraction(
+        self,
+        *,
+        source: user_data_source.UserDataSource,
+        ingestion_job_id: UUID,
+        summary: PubMedIngestionSummary,
+    ) -> dict[str, int] | None:
+        if self._extraction_queue_service is None:
+            return None
+
+        combined_ids = list(summary.created_publication_ids) + list(
+            summary.updated_publication_ids,
+        )
+        publication_ids = list(dict.fromkeys(combined_ids))
+        if not publication_ids:
+            return None
+
+        enqueue_summary = self._extraction_queue_service.enqueue_for_ingestion(
+            source_id=source.id,
+            ingestion_job_id=ingestion_job_id,
+            publication_ids=publication_ids,
+        )
+        return {
+            "requested": enqueue_summary.requested,
+            "queued": enqueue_summary.queued,
+            "skipped": enqueue_summary.skipped,
+            "version": enqueue_summary.extraction_version,
+        }
 
     def _create_ingestion_job(
         self,

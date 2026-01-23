@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
@@ -26,14 +26,26 @@ else:
     JSONObject = dict[str, object]  # Runtime type stub
 
 
-def _from_iso(value: str | None) -> datetime | None:
+def _from_iso_required(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+def _from_iso_optional(value: str | None) -> datetime | None:
     if not value:
         return None
-    return datetime.fromisoformat(value)
+    return _from_iso_required(value)
 
 
-def _to_iso(value: datetime | None) -> str | None:
-    return value.isoformat() if value else None
+def _to_iso_seconds(value: datetime | None) -> str | None:
+    if not value:
+        return None
+    normalized = value
+    if normalized.tzinfo is None:
+        normalized = normalized.replace(tzinfo=UTC)
+    return normalized.astimezone(UTC).isoformat(timespec="seconds")
 
 
 class IngestionJobMapper:
@@ -54,10 +66,10 @@ class IngestionJobMapper:
             source_id=UUID(model.source_id),
             trigger=IngestionTrigger(model.trigger.value),
             triggered_by=(UUID(model.triggered_by) if model.triggered_by else None),
-            triggered_at=datetime.fromisoformat(model.triggered_at),
+            triggered_at=_from_iso_required(model.triggered_at),
             status=IngestionStatus(model.status.value),
-            started_at=_from_iso(model.started_at),
-            completed_at=_from_iso(model.completed_at),
+            started_at=_from_iso_optional(model.started_at),
+            completed_at=_from_iso_optional(model.completed_at),
             metrics=JobMetrics.model_validate(metrics_payload),
             errors=[
                 IngestionError.model_validate(error_payload)
@@ -76,13 +88,22 @@ class IngestionJobMapper:
             "source_id": str(job.source_id),
             "trigger": IngestionTriggerEnum(job.trigger.value),
             "triggered_by": str(job.triggered_by) if job.triggered_by else None,
-            "triggered_at": job.triggered_at.isoformat(),
+            "triggered_at": _to_iso_seconds(job.triggered_at),
             "status": IngestionStatusEnum(job.status.value),
-            "started_at": _to_iso(job.started_at),
-            "completed_at": _to_iso(job.completed_at),
+            "started_at": _to_iso_seconds(job.started_at),
+            "completed_at": _to_iso_seconds(job.completed_at),
             "metrics": job.metrics.model_dump(mode="json"),
             "errors": [error.model_dump(mode="json") for error in job.errors],
             "provenance": job.provenance.model_dump(mode="json"),
             "job_metadata": dict(job.metadata),
             "source_config_snapshot": dict(job.source_config_snapshot),
         }
+
+    @staticmethod
+    def serialize_timestamp(value: datetime) -> str:
+        """Serialize timestamps to the same format stored in the database."""
+        serialized = _to_iso_seconds(value)
+        if serialized is None:
+            msg = "Timestamp serialization failed"
+            raise ValueError(msg)
+        return serialized

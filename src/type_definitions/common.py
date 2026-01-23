@@ -11,7 +11,7 @@ from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING, Literal, TypedDict
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from datetime import date
+    from datetime import date, datetime
 
 JSONPrimitive = str | int | float | bool | None
 type JSONValue = JSONPrimitive | Mapping[str, "JSONValue"] | Sequence["JSONValue"]
@@ -106,6 +106,20 @@ class PublicationUpdate(TypedDict, total=False):
     doi: str | None
     pmid: str | None
     abstract: str | None
+
+
+class ExtractionQueueUpdate(TypedDict, total=False):
+    """Type-safe extraction queue update parameters."""
+
+    status: str
+    attempts: int
+    last_error: str | None
+    extraction_version: int
+    metadata: JSONObject
+    queued_at: datetime | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    updated_at: datetime | None
 
 
 # API response types

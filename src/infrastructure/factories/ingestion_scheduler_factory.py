@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from src.application.services import (
+    ExtractionQueueService,
     IngestionSchedulingService,
     PubMedDiscoveryService,
     PubMedIngestionService,
@@ -23,6 +24,7 @@ from src.infrastructure.data_sources import (
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
 from src.infrastructure.repositories import (
     SQLAlchemyDiscoverySearchJobRepository,
+    SqlAlchemyExtractionQueueRepository,
     SqlAlchemyIngestionJobRepository,
     SqlAlchemyPublicationRepository,
     SqlAlchemyResearchSpaceRepository,
@@ -63,6 +65,10 @@ def build_ingestion_scheduling_service(
         operation_repository=storage_operation_repository,
         plugin_registry=initialize_storage_plugins(),
     )
+    extraction_queue_repository = SqlAlchemyExtractionQueueRepository(session)
+    extraction_queue_service = ExtractionQueueService(
+        queue_repository=extraction_queue_repository,
+    )
 
     # Initialize Query Agent
     query_agent = FlujoQueryAgentAdapter()
@@ -100,6 +106,7 @@ def build_ingestion_scheduling_service(
         ingestion_services=ingestion_services,
         storage_operation_repository=storage_operation_repository,
         pubmed_discovery_service=pubmed_discovery_service,
+        extraction_queue_service=extraction_queue_service,
     )
 
 

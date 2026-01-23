@@ -26,4 +26,6 @@ class PubMedIngestionSummary:
     parsed_publications: int
     created_publications: int
     updated_publications: int
+    created_publication_ids: tuple[int, ...] = ()
+    updated_publication_ids: tuple[int, ...] = ()
     executed_query: str | None = None

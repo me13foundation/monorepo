@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -334,9 +335,14 @@ class SqlAlchemyPublicationRepository(
         if model is None:
             message = f"Publication with id {publication_id} not found"
             raise ValueError(message)
+        field_map = {"pmid": "pubmed_id"}
         for field, value in updates.items():
-            if hasattr(model, field):
-                setattr(model, field, value)
+            target_field = field_map.get(field, field)
+            new_value = value
+            if target_field == "authors" and isinstance(new_value, list):
+                new_value = json.dumps(new_value)
+            if hasattr(model, target_field):
+                setattr(model, target_field, new_value)
         model.updated_at = datetime.now(UTC)
         self.session.commit()
         self.session.refresh(model)

@@ -28,6 +28,7 @@ from .discovery_search_job import (
 )
 from .drug import Drug, DrugApprovalStatus, TherapeuticModality
 from .evidence import Evidence
+from .extraction_queue_item import ExtractionQueueItem, ExtractionStatus
 from .gene import Gene
 
 # Data Sources module entities
@@ -70,6 +71,8 @@ __all__ = [
     "Drug",
     "DrugApprovalStatus",
     "Evidence",
+    "ExtractionQueueItem",
+    "ExtractionStatus",
     "Gene",
     "IngestionError",
     "IngestionJob",

@@ -18,6 +18,32 @@ This plan follows **Clean Architecture principles** and assumes a **Postgres-bac
 - Extraction to an independent service is optional and only justified by scale, latency, or external consumer needs.
 - Any future TypeDB migration must preserve the API contract.
 
+## Implementation status (as of January 23, 2026)
+
+**Legend:** DONE | PARTIAL | PLANNED
+
+### Phase 1: Ontology
+- **Drug entity** DONE (`src/domain/entities/drug.py`)
+- **Pathway entity** DONE (`src/domain/entities/pathway.py`)
+- **ProteinDomain value object** DONE (`src/domain/value_objects/protein_structure.py`)
+- **Mechanism entity** PLANNED (not yet implemented)
+- **Variant schema enhancements** DONE (structural annotation + in-silico scores in `src/domain/entities/variant.py`)
+- **Phenotype longitudinal observations** DONE (`src/domain/entities/phenotype.py`)
+
+### Phase 2: Atlas ingestion
+- **UniProt domain extraction** PLANNED (parser exists, but domains are not mapped into `ProteinDomain` or persisted)
+- **PubMed research corpus + extraction** PARTIAL (ingestion now queues publications for extraction; extraction logic is still pending)
+- **Drug/Pathway seeding** PLANNED (no seed files or seeding service yet)
+- **Repository/DB JSON fields** PLANNED (DB models/migrations do not yet store structural annotation or longitudinal observations)
+
+### Phase 3: Knowledge graph core
+- **GraphService + Postgres node/edge storage** PLANNED (not implemented)
+- **Graph API endpoints** PLANNED (no `/api/graph/*` routes yet)
+
+### Phase 4: AI engine + UI
+- **Hypothesis scoring / inference services** PLANNED (not implemented)
+- **Knowledge graph UI** PARTIAL (route exists but is a placeholder page)
+
 ---
 
 # MED13 Translational AI Platform: Engineering Implementation Plan
@@ -157,7 +183,7 @@ This is the core engine. It orchestrates the retrieval of data from Repositories
 
 ### **3.3 Public API (`src/routes/graph.py`)**
 *   **Endpoint:** `GET /api/graph/export`
-    *   Returns the full JSON graph. This enables "Open Science" – researchers can download our model and run their own algorithms.
+    *   Returns the full JSON graph. This enables "Open Science" - researchers can download our model and run their own algorithms.
 
 ---
 

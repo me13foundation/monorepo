@@ -111,7 +111,9 @@ class PubMedIngestionService:
             await self._persist_raw_records(raw_records, source)
 
         publications = self._transform_records(raw_records)
-        created, updated = self._persist_publications(publications)
+        created, updated, created_ids, updated_ids = self._persist_publications(
+            publications,
+        )
 
         return PubMedIngestionSummary(
             source_id=source.id,
@@ -119,6 +121,8 @@ class PubMedIngestionService:
             parsed_publications=len(publications),
             created_publications=created,
             updated_publications=updated,
+            created_publication_ids=created_ids,
+            updated_publication_ids=updated_ids,
             executed_query=config.query,
         )
 
@@ -179,21 +183,30 @@ class PubMedIngestionService:
     def _persist_publications(
         self,
         publications: Iterable[publication.Publication],
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int, tuple[int, ...], tuple[int, ...]]:
         created = 0
         updated = 0
+        created_ids: list[int] = []
+        updated_ids: list[int] = []
         for publication_record in publications:
             pmid = publication_record.identifier.pubmed_id
             if pmid and (existing := self._publication_repository.find_by_pmid(pmid)):
                 if existing.id is None:
                     continue
                 updates = self._build_update_payload(publication_record)
-                self._publication_repository.update_publication(existing.id, updates)
+                updated_entity = self._publication_repository.update_publication(
+                    existing.id,
+                    updates,
+                )
+                if updated_entity.id is not None:
+                    updated_ids.append(updated_entity.id)
                 updated += 1
             else:
-                self._publication_repository.create(publication_record)
+                created_entity = self._publication_repository.create(publication_record)
+                if created_entity.id is not None:
+                    created_ids.append(created_entity.id)
                 created += 1
-        return created, updated
+        return created, updated, tuple(created_ids), tuple(updated_ids)
 
     @staticmethod
     def _build_update_payload(

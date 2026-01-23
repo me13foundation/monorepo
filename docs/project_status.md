@@ -1,5 +1,7 @@
 # MED13 Resource Library - Project Overview, Current Status, and Recommendations
 
+**Status date:** January 23, 2026
+
 ## Purpose and scope
 
 The MED13 Resource Library is a biomedical data platform focused on MED13 genetic variants, phenotypes, and evidence. The platform targets researchers and administrators who need reliable, type-safe data management and discovery. The architecture follows Clean Architecture with a FastAPI backend and a Next.js admin interface.
@@ -37,8 +39,12 @@ This document summarizes the project based on repository documentation and highl
 - Clean Architecture foundation is documented as complete and stable.
 - Domain entities and services exist for core biomedical data and data sources.
 - Data Sources module is documented as implemented across domain, application, infrastructure, and UI layers.
+- ResoGraph ontology is **partially implemented**: `Drug` and `Pathway` entities exist; `ProteinDomain` exists as a value object; `Mechanism` is not yet implemented.
+- Variant/Phenotype **domain models** include structural + longitudinal fields, but **DB persistence/migrations** for these fields are not yet present.
 - Authentication, authorization, rate limiting, and baseline audit logging are implemented.
 - API endpoints cover genes, variants, phenotypes, evidence, research spaces, and data source management.
+- Graph service, graph storage, and `/api/graph/*` endpoints are not implemented yet.
+- Flujo-based PubMed **query generation** is implemented; publications are now queued for immediate extraction after ingestion, but extraction logic is not yet implemented.
 
 ### Frontend
 
@@ -46,6 +52,7 @@ This document summarizes the project based on repository documentation and highl
 - The frontend follows a server-orchestrated pattern with dumb client components and server actions.
 - Data discovery workflows are refactored to align with backend orchestration DTOs.
 - Design system and component library are in place (shadcn/ui with documented typography and theme choices).
+- Knowledge Graph UI exists as a placeholder route; no graph explorer/visualization yet.
 
 ### Infrastructure and operations
 
@@ -67,10 +74,10 @@ This document summarizes the project based on repository documentation and highl
 
 ### Translational AI Platform plan (docs/plan.md)
 
-- Sprint 1 (Ontology): Add new domain entities (Drug, Pathway, ProteinDomain, Mechanism) and enrich Variant and Phenotype schemas.
-- Sprint 2 (Atlas ingestion): Upgrade UniProt ingestion to capture protein domains and structural data.
-- Sprint 3 (Graph core): Implement GraphService (Postgres-backed + NetworkX), add /api/graph/export, and introduce hypothesis + review structures.
-- Sprint 4 (UI and public): Build a network explorer in the admin UI and publish dataset exports.
+- Sprint 1 (Ontology): **Partially complete.** Drug/Pathway/ProteinDomain exist; Mechanism is pending. Variant + Phenotype domain schemas are enriched, but DB persistence is pending.
+- Sprint 2 (Atlas ingestion): **Not started.** UniProt domain extraction and PubMed extraction pipeline are pending.
+- Sprint 3 (Graph core): **Not started.** GraphService, graph storage, and graph endpoints are pending.
+- Sprint 4 (UI and public): **Not started.** UI has a placeholder Knowledge Graph route only.
 
 ### Future optional TypeDB plan (docs/world_model/TypeDb_plan.md)
 
@@ -96,6 +103,7 @@ This document summarizes the project based on repository documentation and highl
 2. Graph strategy implementation
    - Define the Postgres graph schema (nodes, edges, evidence, review state) and indexing strategy.
    - Establish criteria for when a TypeDB migration would be justified.
+   - Close the gap between domain models and database persistence for new mechanism fields.
 
 3. Security readiness
    - HIPAA compliance gaps are critical if the system will handle PHI in production.
@@ -138,8 +146,8 @@ Short term (0-2 weeks)
 - Identify the minimum security tasks needed for pilot or production.
 
 Near term (2-6 weeks)
-- Implement Sprint 1 domain entities (Drug, Pathway, ProteinDomain, Mechanism) with tests and API exposure.
-- Update TypeScript types and admin UI to surface new entities.
+- Finish Sprint 1 by adding **Mechanism** (domain + DB) and add DB persistence for Drug/Pathway and Variant/Phenotype structural fields.
+- Update TypeScript types and admin UI to surface the new entities once persistence is in place.
 - Define the graph export contract and data schema for downstream tooling.
 
 Mid term (6-10 weeks)

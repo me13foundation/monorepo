@@ -5,7 +5,7 @@ Provides bidirectional mapping between domain entities and database models
 for the Data Sources module.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID
 
 from src.domain.entities.user_data_source import (
@@ -17,6 +17,24 @@ from src.domain.entities.user_data_source import (
     UserDataSource,
 )
 from src.models.database import UserDataSourceModel
+
+
+def _parse_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
+
+
+def _format_datetime(value: datetime | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value
+    if normalized.tzinfo is None:
+        normalized = normalized.replace(tzinfo=UTC)
+    return normalized.astimezone(UTC).isoformat(timespec="seconds")
 
 
 class UserDataSourceMapper:
@@ -41,9 +59,7 @@ class UserDataSourceMapper:
         # Timestamps are handled by SQLAlchemy as datetime objects
         created_at = model.created_at
         updated_at = model.updated_at
-        last_ingested_at = None
-        if model.last_ingested_at:
-            last_ingested_at = datetime.fromisoformat(model.last_ingested_at)
+        last_ingested_at = _parse_datetime(model.last_ingested_at)
 
         # Build configuration
         configuration = SourceConfiguration.model_validate(model.configuration)
@@ -100,9 +116,7 @@ class UserDataSourceMapper:
             status=entity.status.value,
             ingestion_schedule=entity.ingestion_schedule.model_dump(),
             quality_metrics=entity.quality_metrics.model_dump(),
-            last_ingested_at=(
-                entity.last_ingested_at.isoformat() if entity.last_ingested_at else None
-            ),
+            last_ingested_at=_format_datetime(entity.last_ingested_at),
             tags=entity.tags,
             version=entity.version,
         )

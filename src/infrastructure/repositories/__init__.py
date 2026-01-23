@@ -7,6 +7,7 @@ from .data_discovery_repository_impl import (
 )
 from .data_source_activation_repository import SqlAlchemyDataSourceActivationRepository
 from .evidence_repository import SqlAlchemyEvidenceRepository
+from .extraction_queue_repository import SqlAlchemyExtractionQueueRepository
 from .gene_repository import SqlAlchemyGeneRepository
 from .ingestion_job_repository import SqlAlchemyIngestionJobRepository
 from .phenotype_repository import SqlAlchemyPhenotypeRepository
@@ -31,6 +32,7 @@ __all__ = [
     "SQLAlchemySourceCatalogRepository",
     "SqlAlchemyDataSourceActivationRepository",
     "SqlAlchemyEvidenceRepository",
+    "SqlAlchemyExtractionQueueRepository",
     "SqlAlchemyGeneRepository",
     "SqlAlchemyIngestionJobRepository",
     "SqlAlchemyPhenotypeRepository",

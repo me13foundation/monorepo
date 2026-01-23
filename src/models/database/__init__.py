@@ -7,6 +7,7 @@ from . import (
     data_discovery,
     data_source_activation,
     evidence,
+    extraction_queue,
     gene,
     ingestion_job,
     phenotype,
@@ -34,6 +35,9 @@ DataSourceActivationModel = data_source_activation.DataSourceActivationModel
 EvidenceLevel = evidence.EvidenceLevel
 EvidenceModel = evidence.EvidenceModel
 EvidenceType = evidence.EvidenceType
+
+ExtractionQueueItemModel = extraction_queue.ExtractionQueueItemModel
+ExtractionStatusEnum = extraction_queue.ExtractionStatusEnum
 
 GeneModel = gene.GeneModel
 GeneType = gene.GeneType
@@ -87,6 +91,8 @@ __all__ = [
     "EvidenceLevel",
     "EvidenceModel",
     "EvidenceType",
+    "ExtractionQueueItemModel",
+    "ExtractionStatusEnum",
     "GeneModel",
     "GeneType",
     "IngestionJobModel",

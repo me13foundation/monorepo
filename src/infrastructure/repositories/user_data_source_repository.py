@@ -265,7 +265,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         stmt = (
             update(UserDataSourceModel)
             .where(UserDataSourceModel.id == str(source_id))
-            .values(ingestion_schedule=schedule.model_dump())
+            .values(ingestion_schedule=schedule.model_dump(mode="json"))
             .returning(UserDataSourceModel)
         )
         result = self.session.execute(stmt).scalar_one_or_none()
@@ -280,7 +280,7 @@ class SqlAlchemyUserDataSourceRepository(UserDataSourceRepositoryInterface):
         stmt = (
             update(UserDataSourceModel)
             .where(UserDataSourceModel.id == str(source_id))
-            .values(last_ingested_at=now.isoformat())
+            .values(last_ingested_at=now.isoformat(timespec="seconds"))
             .returning(UserDataSourceModel)
         )
         result = self.session.execute(stmt).scalar_one_or_none()

@@ -32,9 +32,12 @@ def _parse_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
     try:
-        return datetime.fromisoformat(value)
+        parsed = datetime.fromisoformat(value)
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
 
 
 def _format_datetime(value: datetime | None) -> str | None:
@@ -42,7 +45,7 @@ def _format_datetime(value: datetime | None) -> str | None:
         return None
     if value.tzinfo is None:
         value = value.replace(tzinfo=UTC)
-    return value.isoformat()
+    return value.astimezone(UTC).isoformat(timespec="seconds")
 
 
 class SourceTemplateMapper:

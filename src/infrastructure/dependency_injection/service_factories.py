@@ -21,6 +21,7 @@ from src.application.services import (
     DataSourceActivationService,
     DiscoveryConfigurationService,
     EvidenceApplicationService,
+    ExtractionQueueService,
     GeneApplicationService,
     PhenotypeApplicationService,
     PublicationApplicationService,
@@ -51,6 +52,7 @@ from src.infrastructure.repositories import (
     SQLAlchemyDiscoveryPresetRepository,
     SQLAlchemyDiscoverySearchJobRepository,
     SqlAlchemyEvidenceRepository,
+    SqlAlchemyExtractionQueueRepository,
     SqlAlchemyGeneRepository,
     SqlAlchemyPhenotypeRepository,
     SqlAlchemyPublicationRepository,
@@ -145,6 +147,13 @@ class ApplicationServiceFactoryMixin:
             publication_repository=publication_repository,
             evidence_repository=evidence_repository,
         )
+
+    def create_extraction_queue_service(
+        self,
+        session: Session,
+    ) -> ExtractionQueueService:
+        queue_repository = SqlAlchemyExtractionQueueRepository(session)
+        return ExtractionQueueService(queue_repository=queue_repository)
 
     def create_discovery_configuration_service(
         self,

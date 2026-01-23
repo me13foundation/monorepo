@@ -131,7 +131,8 @@ class SqlAlchemyIngestionJobRepository(IngestionJobRepository):
         )
         if since:
             stmt = stmt.where(
-                IngestionJobModel.triggered_at >= since.isoformat(),
+                IngestionJobModel.triggered_at
+                >= IngestionJobMapper.serialize_timestamp(since),
             )
         stmt = (
             stmt.order_by(desc(IngestionJobModel.triggered_at))
@@ -149,7 +150,10 @@ class SqlAlchemyIngestionJobRepository(IngestionJobRepository):
         threshold = datetime.now(UTC) - timedelta(hours=hours)
         stmt = (
             select(IngestionJobModel)
-            .where(IngestionJobModel.triggered_at >= threshold.isoformat())
+            .where(
+                IngestionJobModel.triggered_at
+                >= IngestionJobMapper.serialize_timestamp(threshold),
+            )
             .order_by(desc(IngestionJobModel.triggered_at))
             .offset(skip)
             .limit(limit)
@@ -249,7 +253,8 @@ class SqlAlchemyIngestionJobRepository(IngestionJobRepository):
     def delete_old_jobs(self, days: int = 90) -> int:
         threshold = datetime.now(UTC) - timedelta(days=days)
         stmt = delete(IngestionJobModel).where(
-            IngestionJobModel.triggered_at < threshold.isoformat(),
+            IngestionJobModel.triggered_at
+            < IngestionJobMapper.serialize_timestamp(threshold),
         )
         result = self.session.execute(stmt)
         self.session.commit()

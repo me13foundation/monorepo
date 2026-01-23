@@ -18,6 +18,7 @@ from . import (
     data_source_authorization_service,
     discovery_configuration_service,
     evidence_service,
+    extraction_queue_service,
     gene_service,
     ingestion_scheduling_service,
     phenotype_service,
@@ -60,6 +61,8 @@ DiscoveryConfigurationService = (
     discovery_configuration_service.DiscoveryConfigurationService
 )
 EvidenceApplicationService = evidence_service.EvidenceApplicationService
+ExtractionEnqueueSummary = extraction_queue_service.ExtractionEnqueueSummary
+ExtractionQueueService = extraction_queue_service.ExtractionQueueService
 GeneApplicationService = gene_service.GeneApplicationService
 IngestionSchedulingService = ingestion_scheduling_service.IngestionSchedulingService
 PhenotypeApplicationService = phenotype_service.PhenotypeApplicationService
@@ -113,6 +116,8 @@ __all__ = [
     "DataSourcePermission",
     "DiscoveryConfigurationService",
     "EvidenceApplicationService",
+    "ExtractionEnqueueSummary",
+    "ExtractionQueueService",
     "GeneApplicationService",
     "IngestionSchedulingService",
     "PhenotypeApplicationService",
