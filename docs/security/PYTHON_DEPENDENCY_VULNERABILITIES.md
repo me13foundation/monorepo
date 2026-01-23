@@ -1,0 +1,26 @@
+# Python Dependency Vulnerabilities
+
+**Last Updated:** January 23, 2026
+
+This register tracks Python dependency advisories detected by pip-audit and
+records how we mitigate or resolve them.
+
+## Resolved
+
+### jaraco.context (CVE-2026-23949)
+- **Status:** Resolved
+- **Action:** Require `jaraco.context>=6.1.0` in development dependencies.
+- **Notes:** This upgrade removes the vulnerable version flagged by pip-audit.
+
+## Open (Upstream Fix Pending)
+
+### protobuf (CVE-2026-0994)
+- **Status:** Open (no fixed version listed in pip-audit output)
+- **Impact:** Denial-of-service risk when parsing deeply nested
+  `google.protobuf.Any` via `google.protobuf.json_format.ParseDict()`.
+- **Current Usage:** No direct usage of `google.protobuf` APIs in the codebase
+  (checked via repository search).
+- **Mitigation:** Avoid parsing untrusted protobuf `Any` payloads via
+  `ParseDict()`; monitor upstream release notes for a patched protobuf version.
+- **Next Step:** Bump protobuf once a fixed version is published and re-run
+  `make security-audit`.
