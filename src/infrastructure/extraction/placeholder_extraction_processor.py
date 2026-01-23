@@ -27,7 +27,10 @@ class PlaceholderExtractionProcessor(ExtractionProcessorPort):
         if publication is None:
             return ExtractionProcessorResult(
                 status="failed",
+                facts=[],
                 metadata={},
+                processor_name="placeholder",
+                text_source="title_abstract",
                 error_message="publication_not_found",
             )
 
@@ -42,7 +45,10 @@ class PlaceholderExtractionProcessor(ExtractionProcessorPort):
         }
         return ExtractionProcessorResult(
             status="skipped",
+            facts=[],
             metadata=metadata,
+            processor_name="placeholder",
+            text_source="title_abstract",
         )
 
 

@@ -23,6 +23,7 @@ from . import (
     gene_service,
     ingestion_scheduling_service,
     phenotype_service,
+    publication_extraction_service,
     publication_service,
     pubmed_discovery_service,
     pubmed_ingestion_service,
@@ -70,6 +71,12 @@ GeneApplicationService = gene_service.GeneApplicationService
 IngestionSchedulingService = ingestion_scheduling_service.IngestionSchedulingService
 PhenotypeApplicationService = phenotype_service.PhenotypeApplicationService
 PublicationApplicationService = publication_service.PublicationApplicationService
+PublicationExtractionListResult = (
+    publication_extraction_service.PublicationExtractionListResult
+)
+PublicationExtractionService = (
+    publication_extraction_service.PublicationExtractionService
+)
 PubMedDiscoveryService = pubmed_discovery_service.PubMedDiscoveryService
 PubMedIngestionService = pubmed_ingestion_service.PubMedIngestionService
 PubMedQueryBuilder = pubmed_query_builder.PubMedQueryBuilder
@@ -131,6 +138,8 @@ __all__ = [
     "PubMedQueryBuilder",
     "PubmedDownloadRequest",
     "PublicationApplicationService",
+    "PublicationExtractionListResult",
+    "PublicationExtractionService",
     "RunPubmedSearchRequest",
     "SessionRevocationContext",
     "SourceManagementService",

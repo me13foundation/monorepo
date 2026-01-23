@@ -122,8 +122,42 @@ class ExtractionProcessorPort(Protocol):
 
 **Current behavior:**
 - Queueing is implemented.
-- A runner processes queued items using a placeholder processor that marks
-  items as `skipped` until real extraction logic is implemented.
+- A runner processes queued items using a rule-based processor and stores
+  extraction outputs in `publication_extractions`.
+
+---
+
+## 5) Extraction Outputs (publication_extractions)
+
+**Table:** `publication_extractions`
+
+**Columns (proposed):**
+- `id` (UUID, PK)
+- `publication_id` (INT, FK -> publications.id, indexed)
+- `pubmed_id` (STRING, nullable, indexed)
+- `source_id` (UUID, FK -> user_data_sources.id, indexed)
+- `ingestion_job_id` (UUID, FK -> ingestion_jobs.id, indexed)
+- `queue_item_id` (UUID, FK -> extraction_queue.id, unique)
+- `status` (ENUM: completed | failed | skipped, indexed)
+- `extraction_version` (INT, default 1, indexed)
+- `processor_name` (STRING)
+- `processor_version` (STRING, nullable)
+- `text_source` (STRING)
+- `document_reference` (STRING, nullable)
+- `facts` (JSON array, default [])
+- `metadata_payload` (JSON, default {})
+- `extracted_at` (DATETIME, default now)
+- `created_at` (DATETIME, default now)
+- `updated_at` (DATETIME, default now)
+
+**Indexes:**
+- `status`
+- `publication_id`
+- `pubmed_id`
+- `source_id`
+- `ingestion_job_id`
+- `queue_item_id`
+- `extraction_version`
 
 ---
 
@@ -135,4 +169,12 @@ Behavior:
 - After a PubMed ingestion run completes, queue all created/updated
   publication IDs for extraction using `ExtractionQueueService`.
 - Immediately run extraction for newly queued items via
-  `ExtractionRunnerService` (placeholder processor for now).
+  `ExtractionRunnerService` (rule-based processor for now).
+
+---
+
+## 6) API Endpoints
+
+**Routes:**
+- `GET /extractions` (filterable list)
+- `GET /extractions/{extraction_id}` (single record)

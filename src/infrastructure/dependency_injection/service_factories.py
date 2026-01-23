@@ -26,6 +26,7 @@ from src.application.services import (
     GeneApplicationService,
     PhenotypeApplicationService,
     PublicationApplicationService,
+    PublicationExtractionService,
     PubMedDiscoveryService,
     PubMedQueryBuilder,
     SourceManagementService,
@@ -44,7 +45,7 @@ from src.infrastructure.data_sources import (
     DeterministicPubMedSearchGateway,
     SimplePubMedPdfGateway,
 )
-from src.infrastructure.extraction import PlaceholderExtractionProcessor
+from src.infrastructure.extraction import RuleBasedPubMedExtractionProcessor
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
 from src.infrastructure.llm.config.model_registry import get_model_registry
 from src.infrastructure.queries.source_query_client import HTTPQueryClient
@@ -57,6 +58,7 @@ from src.infrastructure.repositories import (
     SqlAlchemyExtractionQueueRepository,
     SqlAlchemyGeneRepository,
     SqlAlchemyPhenotypeRepository,
+    SqlAlchemyPublicationExtractionRepository,
     SqlAlchemyPublicationRepository,
     SQLAlchemyQueryTestResultRepository,
     SQLAlchemySourceCatalogRepository,
@@ -150,6 +152,13 @@ class ApplicationServiceFactoryMixin:
             evidence_repository=evidence_repository,
         )
 
+    def create_publication_extraction_service(
+        self,
+        session: Session,
+    ) -> PublicationExtractionService:
+        extraction_repository = SqlAlchemyPublicationExtractionRepository(session)
+        return PublicationExtractionService(extraction_repository)
+
     def create_extraction_queue_service(
         self,
         session: Session,
@@ -163,10 +172,12 @@ class ApplicationServiceFactoryMixin:
     ) -> ExtractionRunnerService:
         queue_repository = SqlAlchemyExtractionQueueRepository(session)
         publication_repository = SqlAlchemyPublicationRepository(session)
-        processor = PlaceholderExtractionProcessor()
+        extraction_repository = SqlAlchemyPublicationExtractionRepository(session)
+        processor = RuleBasedPubMedExtractionProcessor()
         return ExtractionRunnerService(
             queue_repository=queue_repository,
             publication_repository=publication_repository,
+            extraction_repository=extraction_repository,
             processor=processor,
         )
 

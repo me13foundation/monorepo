@@ -122,6 +122,47 @@ class ExtractionQueueUpdate(TypedDict, total=False):
     updated_at: datetime | None
 
 
+ExtractionTextSource = Literal[
+    "title_abstract",
+    "title",
+    "abstract",
+    "full_text",
+]
+
+ExtractionFactType = Literal[
+    "variant",
+    "phenotype",
+    "gene",
+    "drug",
+    "mechanism",
+    "pathway",
+    "other",
+]
+
+
+class ExtractionFact(TypedDict, total=False):
+    """Structured fact extracted from a publication."""
+
+    fact_type: ExtractionFactType
+    value: str
+    normalized_id: str | None
+    source: str | None
+    attributes: JSONObject
+
+
+class PublicationExtractionUpdate(TypedDict, total=False):
+    """Type-safe publication extraction update parameters."""
+
+    status: str
+    facts: list[ExtractionFact]
+    metadata: JSONObject
+    extracted_at: datetime | None
+    processor_name: str | None
+    processor_version: str | None
+    text_source: str | None
+    document_reference: str | None
+
+
 # API response types
 class APIResponse(TypedDict, total=False):
     """Standard API response structure."""

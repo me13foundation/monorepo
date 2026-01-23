@@ -12,6 +12,7 @@ from . import (
     ingestion_job,
     phenotype,
     publication,
+    publication_extraction,
     research_space,
     review,
     source_template,
@@ -51,6 +52,8 @@ PhenotypeModel = phenotype.PhenotypeModel
 
 PublicationModel = publication.PublicationModel
 PublicationType = publication.PublicationType
+PublicationExtractionModel = publication_extraction.PublicationExtractionModel
+ExtractionOutcomeEnum = publication_extraction.ExtractionOutcomeEnum
 
 MembershipRoleEnum = research_space.MembershipRoleEnum
 ResearchSpaceMembershipModel = research_space.ResearchSpaceMembershipModel
@@ -103,6 +106,8 @@ __all__ = [
     "PhenotypeModel",
     "PublicationModel",
     "PublicationType",
+    "PublicationExtractionModel",
+    "ExtractionOutcomeEnum",
     "QueryTestResultModel",
     "ResearchSpaceMembershipModel",
     "ResearchSpaceModel",

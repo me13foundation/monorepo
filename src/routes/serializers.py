@@ -12,6 +12,7 @@ from src.models.api import evidence as evidence_api
 from src.models.api import gene as gene_api
 from src.models.api import phenotype as phenotype_api
 from src.models.api import publication as publication_api
+from src.models.api import publication_extraction as publication_extraction_api
 from src.models.api import variant as variant_api
 
 if TYPE_CHECKING:
@@ -21,7 +22,9 @@ if TYPE_CHECKING:
     from src.domain.entities.gene import Gene
     from src.domain.entities.phenotype import Phenotype
     from src.domain.entities.publication import Publication
+    from src.domain.entities.publication_extraction import PublicationExtraction
     from src.domain.entities.variant import EvidenceSummary, Variant, VariantSummary
+    from src.type_definitions.common import ExtractionFact, ExtractionFactType
 
 ActivityFeedItem = api_common.ActivityFeedItem
 DashboardSummary = api_common.DashboardSummary
@@ -45,6 +48,10 @@ PhenotypeResponse = phenotype_api.PhenotypeResponse
 AuthorInfo = publication_api.AuthorInfo
 PublicationResponse = publication_api.PublicationResponse
 ApiPublicationType = publication_api.PublicationType
+
+ApiExtractionOutcome = publication_extraction_api.ExtractionOutcome
+ExtractionFactResponse = publication_extraction_api.ExtractionFactResponse
+PublicationExtractionResponse = publication_extraction_api.PublicationExtractionResponse
 
 ApiClinicalSignificance = variant_api.ClinicalSignificance
 VariantResponse = variant_api.VariantResponse
@@ -231,6 +238,48 @@ def serialize_publication(publication: Publication) -> PublicationResponse:
     )
 
 
+def serialize_extraction_fact(
+    fact: ExtractionFact,
+) -> ExtractionFactResponse:
+    """Serialize an extraction fact mapping into a response DTO."""
+    fact_type: ExtractionFactType = fact.get("fact_type", "other")
+    return ExtractionFactResponse(
+        fact_type=fact_type,
+        value=fact.get("value", ""),
+        normalized_id=(
+            str(fact["normalized_id"]) if fact.get("normalized_id") else None
+        ),
+        source=str(fact["source"]) if fact.get("source") else None,
+        attributes=fact.get("attributes"),
+    )
+
+
+def serialize_publication_extraction(
+    extraction: PublicationExtraction,
+) -> PublicationExtractionResponse:
+    """Serialize a publication extraction domain entity."""
+    facts = [serialize_extraction_fact(fact) for fact in (extraction.facts or [])]
+    return PublicationExtractionResponse(
+        id=str(extraction.id),
+        publication_id=extraction.publication_id,
+        pubmed_id=extraction.pubmed_id,
+        source_id=str(extraction.source_id),
+        ingestion_job_id=str(extraction.ingestion_job_id),
+        queue_item_id=str(extraction.queue_item_id),
+        status=ApiExtractionOutcome(extraction.status.value),
+        extraction_version=extraction.extraction_version,
+        processor_name=extraction.processor_name,
+        processor_version=extraction.processor_version,
+        text_source=extraction.text_source.value,
+        document_reference=extraction.document_reference,
+        facts=facts,
+        metadata=extraction.metadata,
+        extracted_at=extraction.extracted_at,
+        created_at=extraction.created_at,
+        updated_at=extraction.updated_at,
+    )
+
+
 def serialize_evidence_brief(evidence: EvidenceSummary) -> EvidenceSummaryResponse:
     """Serialize the lightweight EvidenceSummary helper."""
     return EvidenceSummaryResponse(
@@ -401,6 +450,7 @@ __all__ = [
     "serialize_evidence_brief",
     "serialize_gene",
     "serialize_phenotype",
+    "serialize_publication_extraction",
     "serialize_publication",
     "serialize_variant",
     "serialize_variant_summary",

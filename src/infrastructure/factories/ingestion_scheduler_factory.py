@@ -22,12 +22,13 @@ from src.infrastructure.data_sources import (
     PubMedSourceGateway,
     SimplePubMedPdfGateway,
 )
-from src.infrastructure.extraction import PlaceholderExtractionProcessor
+from src.infrastructure.extraction import RuleBasedPubMedExtractionProcessor
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
 from src.infrastructure.repositories import (
     SQLAlchemyDiscoverySearchJobRepository,
     SqlAlchemyExtractionQueueRepository,
     SqlAlchemyIngestionJobRepository,
+    SqlAlchemyPublicationExtractionRepository,
     SqlAlchemyPublicationRepository,
     SqlAlchemyResearchSpaceRepository,
     SqlAlchemyStorageConfigurationRepository,
@@ -71,10 +72,12 @@ def build_ingestion_scheduling_service(
     extraction_queue_service = ExtractionQueueService(
         queue_repository=extraction_queue_repository,
     )
+    extraction_repository = SqlAlchemyPublicationExtractionRepository(session)
     extraction_runner_service = ExtractionRunnerService(
         queue_repository=extraction_queue_repository,
         publication_repository=publication_repository,
-        processor=PlaceholderExtractionProcessor(),
+        extraction_repository=extraction_repository,
+        processor=RuleBasedPubMedExtractionProcessor(),
     )
 
     # Initialize Query Agent

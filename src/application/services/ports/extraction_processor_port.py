@@ -5,7 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal, Protocol
 
-from src.type_definitions.common import JSONObject  # noqa: TC001
+from src.type_definitions.common import (  # noqa: TC001
+    ExtractionFact,
+    ExtractionTextSource,
+    JSONObject,
+)
 
 if TYPE_CHECKING:
     from src.domain.entities.extraction_queue_item import ExtractionQueueItem
@@ -18,7 +22,12 @@ ExtractionOutcome = Literal["completed", "failed", "skipped"]
 @dataclass(frozen=True)
 class ExtractionProcessorResult:
     status: ExtractionOutcome
+    facts: list[ExtractionFact]
     metadata: JSONObject
+    processor_name: str
+    text_source: ExtractionTextSource
+    processor_version: str | None = None
+    document_reference: str | None = None
     error_message: str | None = None
 
 

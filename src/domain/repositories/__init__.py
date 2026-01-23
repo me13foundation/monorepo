@@ -12,6 +12,7 @@ from .extraction_queue_repository import ExtractionQueueRepository
 from .gene_repository import GeneRepository
 from .ingestion_job_repository import IngestionJobRepository
 from .phenotype_repository import PhenotypeRepository
+from .publication_extraction_repository import PublicationExtractionRepository
 from .publication_repository import PublicationRepository
 from .research_space_repository import ResearchSpaceRepository
 from .source_template_repository import SourceTemplateRepository
@@ -31,6 +32,7 @@ __all__ = [
     "GeneRepository",
     "IngestionJobRepository",
     "PhenotypeRepository",
+    "PublicationExtractionRepository",
     "PublicationRepository",
     "ResearchSpaceRepository",
     "QuerySpecification",

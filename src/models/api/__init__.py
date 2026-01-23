@@ -54,6 +54,11 @@ from .publication import (
     PublicationType,
     PublicationUpdate,
 )
+from .publication_extraction import (
+    ExtractionFactResponse,
+    ExtractionOutcome,
+    PublicationExtractionResponse,
+)
 from .variant import (
     ClinicalSignificance,
     VariantCreate,
@@ -99,10 +104,13 @@ __all__ = [
     "PhenotypeStatisticsResponse",
     "PhenotypeUpdate",
     "PublicationCreate",
+    "PublicationExtractionResponse",
     "PublicationList",
     "PublicationResponse",
     "PublicationType",
     "PublicationUpdate",
+    "ExtractionFactResponse",
+    "ExtractionOutcome",
     "PublicationSummary",
     "VariantCreate",
     "VariantList",

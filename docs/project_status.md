@@ -44,7 +44,7 @@ This document summarizes the project based on repository documentation and highl
 - Authentication, authorization, rate limiting, and baseline audit logging are implemented.
 - API endpoints cover genes, variants, phenotypes, evidence, research spaces, and data source management.
 - Graph service, graph storage, and `/api/graph/*` endpoints are not implemented yet.
-- Flujo-based PubMed **query generation** is implemented; publications are queued and a placeholder extraction runner processes them immediately after ingestion (real extraction logic still pending).
+- Flujo-based PubMed **query generation** is implemented; publications are queued and a rule-based extraction runner processes them immediately after ingestion, persisting extraction outputs (full-text/LLM extraction still pending).
 
 ### Frontend
 

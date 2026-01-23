@@ -2,7 +2,7 @@
 
 **Status date:** January 23, 2026
 **Owner:** Platform Engineering (overall)
-**Scope:** Queue + immediate post-ingestion wiring, no extraction logic yet.
+**Scope:** Queue + immediate post-ingestion wiring + MVP extraction outputs.
 
 ---
 
@@ -10,7 +10,8 @@
 
 Deliver an immediate post-ingestion extraction pipeline that safely queues
 publications for extraction, supports concurrent ingestion runs, and prevents
-duplicate processing. Extraction logic itself will be added in a later phase.
+duplicate processing. MVP extraction logic is rule-based and designed to be
+extended to full-text extraction later.
 
 ---
 
@@ -27,17 +28,18 @@ duplicate processing. Extraction logic itself will be added in a later phase.
 | T5 | Application service for queueing | Backend Eng | DONE | `ExtractionQueueService` |
 | T6 | Wire immediate post-ingestion hook | Backend Eng | DONE | Ingestion scheduling now enqueues |
 | T7 | Extraction runner and processor port | Data/AI Eng | DONE | Placeholder processor + runner |
-| T8 | MVP extraction rules (variants, phenotypes) | Data/AI Eng | NOT STARTED | Future phase |
-| T9 | Admin visibility / metrics endpoints | Backend Eng | NOT STARTED | Future phase |
-| T10 | Integration tests (queue + ingestion hook) | QA | NOT STARTED | Future phase |
+| T8 | MVP extraction rules (variants, phenotypes) | Data/AI Eng | DONE | Rule-based PubMed processor |
+| T9 | Extraction outputs persistence + API | Backend Eng | DONE | `publication_extractions` table + API |
+| T10 | Admin visibility / metrics endpoints | Backend Eng | NOT STARTED | Future phase |
+| T11 | Integration tests (queue + extraction) | QA | NOT STARTED | Future phase |
 
 ---
 
 ## Milestones
 
 - **M1 (Complete):** Queue schema and immediate ingestion hook in place (Postgres verified).
-- **M2 (Next):** Extraction runner processes queued items.
-- **M3 (Next):** MVP extraction outputs persisted and traceable.
+- **M2 (Complete):** Extraction runner processes queued items.
+- **M3 (Complete):** MVP extraction outputs persisted and traceable.
 
 ---
 
@@ -46,5 +48,5 @@ duplicate processing. Extraction logic itself will be added in a later phase.
 - Queue records are created immediately after ingestion completes and include
   ingestion job metadata for traceability.
 - Postgres smoke test completed (Jan 23, 2026) with queued extraction rows.
-- Runner now processes queued items using a placeholder processor (marked as
-  skipped) until real extraction logic lands (T8).
+- Runner now processes queued items using a rule-based processor and stores
+  extraction outputs for reuse and extension to full-text extraction.

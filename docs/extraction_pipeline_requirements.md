@@ -13,7 +13,8 @@ We already ingest PubMed data (often via AI-generated queries) and store
 publications. The next step is to **extract structured facts** from those
 papers (variants, phenotypes, mechanisms, drugs, pathways). Extraction should
 **run immediately after ingestion** and **must not reprocess the same paper**
-unless extraction logic changes.
+unless extraction logic changes. The MVP must be scalable to full-text
+extraction by recording the text source and document reference.
 
 ---
 
@@ -32,7 +33,7 @@ unless extraction logic changes.
 
 - Building the full knowledge graph and graph APIs.
 - Automated agent-based reasoning or hypothesis scoring.
-- Full NLP extraction or LLM-based paper parsing (can be staged later).
+- Full NLP extraction or LLM-why a re we based paper parsing (can be staged later).
 
 ---
 
@@ -54,8 +55,8 @@ unless extraction logic changes.
 
 ### Extraction Run (per publication)
 - Load raw record and/or publication metadata.
-- Extract structured facts (MVP: variants, phenotypes, drugs, mechanisms).
-- Persist extraction outputs into domain entities or staging tables.
+- Extract structured facts (MVP: variants, phenotypes, gene mentions).
+- Persist extraction outputs into a dedicated table for re-use.
 - Mark the publication as **extracted** (or **failed** with error).
 
 ---
@@ -72,7 +73,20 @@ unless extraction logic changes.
   - `attempts`
   - `last_error`
   - `extraction_version`
-  - timestamps: `queued_at`, `started_at`, `completed_at`
+- timestamps: `queued_at`, `started_at`, `completed_at`
+
+### Extraction Outputs (required)
+- A dedicated table to store extracted facts and metadata.
+- Keys should include:
+  - `publication_id`
+  - `source_id`
+  - `ingestion_job_id`
+  - `queue_item_id`
+  - `status` (completed | failed | skipped)
+  - `facts` (JSON array)
+  - `text_source` (title_abstract | full_text | etc.)
+  - `document_reference` (pointer to stored full text if used)
+  - timestamps: `extracted_at`, `created_at`, `updated_at`
 
 ### Status Transitions
 - `pending` -> `processing` -> `completed`
@@ -130,6 +144,7 @@ Multiple ingestion pipelines may run at the same time. Extraction must:
   - publications processed
   - successes/failures
   - processing duration
+ - Provide read-only API access to extraction outputs for UI consumption.
 
 ---
 

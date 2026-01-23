@@ -8,6 +8,7 @@ from . import (
     data_discovery,
     evidence,
     export,
+    extractions,
     genes,
     health,
     phenotypes,
@@ -26,6 +27,7 @@ curation_router = curation.router
 dashboard_router = dashboard.router
 data_discovery_router = data_discovery.router
 evidence_router = evidence.router
+extractions_router = extractions.router
 export_router = export.router
 genes_router = genes.router
 health_router = health.router
@@ -45,6 +47,7 @@ __all__ = [
     "dashboard_router",
     "data_discovery_router",
     "evidence_router",
+    "extractions_router",
     "export_router",
     "genes_router",
     "health_router",

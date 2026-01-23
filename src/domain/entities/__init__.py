@@ -42,6 +42,11 @@ from .ingestion_job import (
 from .pathway import Pathway
 from .phenotype import LongitudinalObservation, Phenotype
 from .publication import Publication
+from .publication_extraction import (
+    ExtractionOutcome,
+    ExtractionTextSource,
+    PublicationExtraction,
+)
 from .source_template import (
     SourceTemplate,
     TemplateCategory,
@@ -72,7 +77,9 @@ __all__ = [
     "DrugApprovalStatus",
     "Evidence",
     "ExtractionQueueItem",
+    "ExtractionOutcome",
     "ExtractionStatus",
+    "ExtractionTextSource",
     "Gene",
     "IngestionError",
     "IngestionJob",
@@ -86,6 +93,7 @@ __all__ = [
     "Phenotype",
     "ProteinStructuralAnnotation",
     "Publication",
+    "PublicationExtraction",
     "PubMedSortOption",
     "QualityMetrics",
     "QueryParameterCapabilities",
