@@ -22,6 +22,7 @@ from src.application.services import (
     DiscoveryConfigurationService,
     EvidenceApplicationService,
     ExtractionQueueService,
+    ExtractionRunnerService,
     GeneApplicationService,
     PhenotypeApplicationService,
     PublicationApplicationService,
@@ -43,6 +44,7 @@ from src.infrastructure.data_sources import (
     DeterministicPubMedSearchGateway,
     SimplePubMedPdfGateway,
 )
+from src.infrastructure.extraction import PlaceholderExtractionProcessor
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
 from src.infrastructure.llm.config.model_registry import get_model_registry
 from src.infrastructure.queries.source_query_client import HTTPQueryClient
@@ -154,6 +156,19 @@ class ApplicationServiceFactoryMixin:
     ) -> ExtractionQueueService:
         queue_repository = SqlAlchemyExtractionQueueRepository(session)
         return ExtractionQueueService(queue_repository=queue_repository)
+
+    def create_extraction_runner_service(
+        self,
+        session: Session,
+    ) -> ExtractionRunnerService:
+        queue_repository = SqlAlchemyExtractionQueueRepository(session)
+        publication_repository = SqlAlchemyPublicationRepository(session)
+        processor = PlaceholderExtractionProcessor()
+        return ExtractionRunnerService(
+            queue_repository=queue_repository,
+            publication_repository=publication_repository,
+            processor=processor,
+        )
 
     def create_discovery_configuration_service(
         self,

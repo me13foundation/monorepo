@@ -26,7 +26,7 @@ duplicate processing. Extraction logic itself will be added in a later phase.
 | T4 | SQLAlchemy model + repository implementation | Backend Eng | DONE | Mapper + repository |
 | T5 | Application service for queueing | Backend Eng | DONE | `ExtractionQueueService` |
 | T6 | Wire immediate post-ingestion hook | Backend Eng | DONE | Ingestion scheduling now enqueues |
-| T7 | Extraction runner and processor port | Data/AI Eng | NOT STARTED | Future phase |
+| T7 | Extraction runner and processor port | Data/AI Eng | DONE | Placeholder processor + runner |
 | T8 | MVP extraction rules (variants, phenotypes) | Data/AI Eng | NOT STARTED | Future phase |
 | T9 | Admin visibility / metrics endpoints | Backend Eng | NOT STARTED | Future phase |
 | T10 | Integration tests (queue + ingestion hook) | QA | NOT STARTED | Future phase |
@@ -46,4 +46,5 @@ duplicate processing. Extraction logic itself will be added in a later phase.
 - Queue records are created immediately after ingestion completes and include
   ingestion job metadata for traceability.
 - Postgres smoke test completed (Jan 23, 2026) with queued extraction rows.
-- No extraction logic runs yet; queue items remain pending until T7 is implemented.
+- Runner now processes queued items using a placeholder processor (marked as
+  skipped) until real extraction logic lands (T8).

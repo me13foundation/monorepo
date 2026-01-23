@@ -32,7 +32,7 @@ This plan follows **Clean Architecture principles** and assumes a **Postgres-bac
 
 ### Phase 2: Atlas ingestion
 - **UniProt domain extraction** PLANNED (parser exists, but domains are not mapped into `ProteinDomain` or persisted)
-- **PubMed research corpus + extraction** PARTIAL (ingestion now queues publications for extraction; extraction logic is still pending)
+- **PubMed research corpus + extraction** PARTIAL (ingestion queues publications and a placeholder runner marks items skipped; real extraction logic is pending)
 - **Drug/Pathway seeding** PLANNED (no seed files or seeding service yet)
 - **Repository/DB JSON fields** PLANNED (DB models/migrations do not yet store structural annotation or longitudinal observations)
 

@@ -31,6 +31,9 @@ if TYPE_CHECKING:
     from src.application.services.extraction_queue_service import (
         ExtractionQueueService,
     )
+    from src.application.services.extraction_runner_service import (
+        ExtractionRunnerService,
+    )
     from src.application.services.ports.scheduler_port import (
         ScheduledJob,
         SchedulerPort,
@@ -41,6 +44,7 @@ if TYPE_CHECKING:
         user_data_source_repository,
     )
     from src.domain.services.pubmed_ingestion import PubMedIngestionSummary
+    from src.type_definitions.common import JSONObject
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +69,7 @@ class IngestionSchedulingService:
         ) = None,
         pubmed_discovery_service: PubMedDiscoveryService | None = None,
         extraction_queue_service: ExtractionQueueService | None = None,
+        extraction_runner_service: ExtractionRunnerService | None = None,
         retry_batch_size: int = 25,
     ) -> None:
         self._scheduler = scheduler
@@ -74,6 +79,7 @@ class IngestionSchedulingService:
         self._storage_operation_repository = storage_operation_repository
         self._pubmed_discovery_service = pubmed_discovery_service
         self._extraction_queue_service = extraction_queue_service
+        self._extraction_runner_service = extraction_runner_service
         self._retry_batch_size = max(retry_batch_size, 1)
 
     async def schedule_source(self, source_id: UUID) -> ScheduledJob:
@@ -164,6 +170,13 @@ class IngestionSchedulingService:
             )
             if extraction_metadata:
                 metadata["extraction_queue"] = extraction_metadata
+                extraction_run = self._run_extraction(
+                    source=source,
+                    ingestion_job_id=running.id,
+                    queued_count=extraction_metadata["queued"],
+                )
+                if extraction_run:
+                    metadata["extraction_run"] = extraction_run
 
             completed = running.model_copy(
                 update={"metadata": metadata},
@@ -213,6 +226,24 @@ class IngestionSchedulingService:
             "skipped": enqueue_summary.skipped,
             "version": enqueue_summary.extraction_version,
         }
+
+    def _run_extraction(
+        self,
+        *,
+        source: user_data_source.UserDataSource,
+        ingestion_job_id: UUID,
+        queued_count: int,
+    ) -> JSONObject | None:
+        if self._extraction_runner_service is None:
+            return None
+        if queued_count <= 0:
+            return None
+        summary = self._extraction_runner_service.run_for_ingestion_job(
+            source_id=source.id,
+            ingestion_job_id=ingestion_job_id,
+            expected_items=queued_count,
+        )
+        return summary.to_metadata()
 
     def _create_ingestion_job(
         self,

@@ -75,7 +75,7 @@ class ExtractionQueueRepository(Repository[ExtractionQueueItem, UUID, Extraction
 
 ---
 
-## 4) Application Service Interface
+## 4) Application Service Interfaces
 
 **File:** `src/application/services/extraction_queue_service.py`
 
@@ -92,9 +92,38 @@ class ExtractionQueueService:
     ) -> ExtractionEnqueueSummary: ...
 ```
 
+**File:** `src/application/services/extraction_runner_service.py`
+
+Core methods:
+```python
+class ExtractionRunnerService:
+    def run_for_ingestion_job(
+        self,
+        *,
+        source_id: UUID,
+        ingestion_job_id: UUID,
+        expected_items: int,
+        batch_size: int | None = None,
+    ) -> ExtractionRunSummary: ...
+```
+
+**File:** `src/application/services/ports/extraction_processor_port.py`
+
+Core interfaces:
+```python
+class ExtractionProcessorPort(Protocol):
+    def extract_publication(
+        self,
+        *,
+        queue_item: ExtractionQueueItem,
+        publication: Publication | None,
+    ) -> ExtractionProcessorResult: ...
+```
+
 **Current behavior:**
-- Only queues items.
-- No extraction processing yet (future T7).
+- Queueing is implemented.
+- A runner processes queued items using a placeholder processor that marks
+  items as `skipped` until real extraction logic is implemented.
 
 ---
 
@@ -105,3 +134,5 @@ class ExtractionQueueService:
 Behavior:
 - After a PubMed ingestion run completes, queue all created/updated
   publication IDs for extraction using `ExtractionQueueService`.
+- Immediately run extraction for newly queued items via
+  `ExtractionRunnerService` (placeholder processor for now).

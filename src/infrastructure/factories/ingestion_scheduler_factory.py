@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from src.application.services import (
     ExtractionQueueService,
+    ExtractionRunnerService,
     IngestionSchedulingService,
     PubMedDiscoveryService,
     PubMedIngestionService,
@@ -21,6 +22,7 @@ from src.infrastructure.data_sources import (
     PubMedSourceGateway,
     SimplePubMedPdfGateway,
 )
+from src.infrastructure.extraction import PlaceholderExtractionProcessor
 from src.infrastructure.llm.adapters.query_agent_adapter import FlujoQueryAgentAdapter
 from src.infrastructure.repositories import (
     SQLAlchemyDiscoverySearchJobRepository,
@@ -69,6 +71,11 @@ def build_ingestion_scheduling_service(
     extraction_queue_service = ExtractionQueueService(
         queue_repository=extraction_queue_repository,
     )
+    extraction_runner_service = ExtractionRunnerService(
+        queue_repository=extraction_queue_repository,
+        publication_repository=publication_repository,
+        processor=PlaceholderExtractionProcessor(),
+    )
 
     # Initialize Query Agent
     query_agent = FlujoQueryAgentAdapter()
@@ -107,6 +114,7 @@ def build_ingestion_scheduling_service(
         storage_operation_repository=storage_operation_repository,
         pubmed_discovery_service=pubmed_discovery_service,
         extraction_queue_service=extraction_queue_service,
+        extraction_runner_service=extraction_runner_service,
     )
 
 
