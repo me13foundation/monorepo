@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
@@ -45,42 +46,117 @@ def _reset_database() -> None:
     Base.metadata.create_all(bind=session_module.engine)
 
 
+def _fetch_enum_values(
+    session: session_module.SessionLocal,
+    enum_name: str,
+) -> set[str]:
+    if session.bind.dialect.name != "postgresql":
+        return set()
+    rows = session.execute(
+        text(f"SELECT unnest(enum_range(NULL::{enum_name}))"),
+    ).fetchall()
+    return {row[0] for row in rows}
+
+
+def _choose_enum_value(
+    values: set[str],
+    preferred: tuple[str, ...],
+    fallback: str,
+) -> str:
+    for candidate in preferred:
+        if candidate in values:
+            return candidate
+    if values:
+        return sorted(values)[0]
+    return fallback
+
+
 def _seed_source_and_job(
     session: session_module.SessionLocal,
 ) -> tuple[UUID, UUID]:
     source_id = uuid4()
-    session.add(
-        UserDataSourceModel(
-            id=str(source_id),
-            owner_id=str(uuid4()),
-            research_space_id=None,
-            name="PubMed Source",
-            description="",
-            source_type="pubmed",
-            template_id=None,
-            configuration={"metadata": {"query": "MED13"}},
-            status="active",
-            ingestion_schedule={
-                "enabled": True,
-                "frequency": "hourly",
-                "start_time": datetime.now(UTC).isoformat(),
-                "timezone": "UTC",
-                "backend_job_id": None,
+    owner_id = uuid4()
+    schedule_payload = {
+        "enabled": True,
+        "frequency": "hourly",
+        "start_time": datetime.now(UTC).isoformat(),
+        "timezone": "UTC",
+        "backend_job_id": None,
+    }
+    metrics_payload = {
+        "completeness_score": None,
+        "consistency_score": None,
+        "timeliness_score": None,
+        "overall_score": None,
+        "last_assessed": None,
+        "issues_count": 0,
+    }
+    configuration_payload = {"metadata": {"query": "MED13"}}
+
+    if session.bind.dialect.name == "postgresql":
+        source_values = _fetch_enum_values(session, "sourcetypeenum")
+        status_values = _fetch_enum_values(session, "sourcestatusenum")
+        source_type = _choose_enum_value(
+            source_values,
+            ("PUBMED", "pubmed", "API", "api"),
+            "API",
+        )
+        status = _choose_enum_value(
+            status_values,
+            ("ACTIVE", "active"),
+            "ACTIVE",
+        )
+
+        session.execute(
+            text(
+                "INSERT INTO user_data_sources "
+                "(id, owner_id, research_space_id, name, description, source_type, "
+                "template_id, configuration, status, ingestion_schedule, "
+                "quality_metrics, last_ingested_at, tags, version) "
+                "VALUES "
+                "(:id, :owner_id, :research_space_id, :name, :description, "
+                ":source_type, :template_id, CAST(:configuration AS JSON), :status, "
+                "CAST(:ingestion_schedule AS JSON), CAST(:quality_metrics AS JSON), "
+                ":last_ingested_at, CAST(:tags AS JSON), :version)",
+            ),
+            {
+                "id": str(source_id),
+                "owner_id": str(owner_id),
+                "research_space_id": None,
+                "name": "PubMed Source",
+                "description": "",
+                "source_type": source_type,
+                "template_id": None,
+                "configuration": json.dumps(configuration_payload),
+                "status": status,
+                "ingestion_schedule": json.dumps(schedule_payload),
+                "quality_metrics": json.dumps(metrics_payload),
+                "last_ingested_at": None,
+                "tags": json.dumps([]),
+                "version": "1.0",
             },
-            quality_metrics={
-                "completeness_score": None,
-                "consistency_score": None,
-                "timeliness_score": None,
-                "overall_score": None,
-                "last_assessed": None,
-                "issues_count": 0,
-            },
-            last_ingested_at=None,
-            tags=[],
-            version="1.0",
-        ),
-    )
-    session.commit()
+        )
+        session.commit()
+    else:
+        session.add(
+            UserDataSourceModel(
+                id=str(source_id),
+                owner_id=str(owner_id),
+                research_space_id=None,
+                name="PubMed Source",
+                description="",
+                source_type="pubmed",
+                template_id=None,
+                configuration=configuration_payload,
+                status="active",
+                ingestion_schedule=schedule_payload,
+                quality_metrics=metrics_payload,
+                last_ingested_at=None,
+                tags=[],
+                version="1.0",
+            ),
+        )
+        session.commit()
 
     job_id = uuid4()
     session.add(
@@ -89,7 +165,7 @@ def _seed_source_and_job(
             source_id=str(source_id),
             trigger=IngestionTriggerEnum.SCHEDULED,
             triggered_by=None,
-            triggered_at=datetime.now(UTC).isoformat(),
+            triggered_at=datetime.now(UTC).isoformat(timespec="seconds"),
             status=IngestionStatusEnum.COMPLETED,
             started_at=None,
             completed_at=None,
