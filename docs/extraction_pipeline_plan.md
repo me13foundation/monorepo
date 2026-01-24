@@ -1,6 +1,6 @@
 # Extraction Pipeline Plan (PubMed Immediate Post-Ingestion)
 
-**Status date:** January 23, 2026
+**Status date:** January 24, 2026
 **Owner:** Platform Engineering (overall)
 **Scope:** Queue + immediate post-ingestion wiring + MVP extraction outputs.
 
@@ -10,8 +10,9 @@
 
 Deliver an immediate post-ingestion extraction pipeline that safely queues
 publications for extraction, supports concurrent ingestion runs, and prevents
-duplicate processing. MVP extraction logic is rule-based and designed to be
-extended to full-text extraction later.
+duplicate processing. MVP extraction logic is rule-based, stores the processed
+text payload for future reuse, and is designed to be extended to full-text
+extraction later.
 
 ---
 
@@ -31,7 +32,10 @@ extended to full-text extraction later.
 | T8 | MVP extraction rules (variants, phenotypes) | Data/AI Eng | DONE | Rule-based PubMed processor |
 | T9 | Extraction outputs persistence + API | Backend Eng | DONE | `publication_extractions` table + API |
 | T10 | Admin visibility / metrics endpoints | Backend Eng | NOT STARTED | Future phase |
-| T11 | Integration tests (queue + extraction) | QA | NOT STARTED | Future phase |
+| T11 | Integration tests (queue + extraction) | QA | IN PROGRESS | API integration + runner unit tests added |
+| T12 | Store extraction text payloads + document URL endpoint | Backend Eng | DONE | Document stored in RAW_SOURCE + `/extractions/{id}/document-url` |
+| T13 | Admin UI preview for extraction documents | Frontend Eng | DONE | Data source ingestion details now show recent extractions + Open link |
+| T14 | E2E coverage for extraction preview | QA | DONE | Playwright test for extraction preview page |
 
 ---
 
@@ -50,3 +54,6 @@ extended to full-text extraction later.
 - Postgres smoke test completed (Jan 23, 2026) with queued extraction rows.
 - Runner now processes queued items using a rule-based processor and stores
   extraction outputs for reuse and extension to full-text extraction.
+- Text payloads are persisted to RAW_SOURCE storage and retrievable via the
+  document URL endpoint to avoid recomputation.
+- Admin UI surfaces recent extractions and provides a document open/copy flow.

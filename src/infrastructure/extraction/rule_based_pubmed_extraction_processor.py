@@ -59,6 +59,15 @@ class RuleBasedPubMedExtractionProcessor(ExtractionProcessorPort):
             text_source = text_payload.text_source
             document_reference = text_payload.document_reference
         else:
+            if publication is None:
+                return ExtractionProcessorResult(
+                    status="failed",
+                    facts=[],
+                    metadata={},
+                    processor_name="rule_based_pubmed_v1",
+                    text_source="title_abstract",
+                    error_message="publication_not_found",
+                )
             text = _build_text(publication)
             text_source = "title_abstract"
             document_reference = None

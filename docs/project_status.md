@@ -1,6 +1,6 @@
 # MED13 Resource Library - Project Overview, Current Status, and Recommendations
 
-**Status date:** January 23, 2026
+**Status date:** January 24, 2026
 
 ## Purpose and scope
 
@@ -44,7 +44,7 @@ This document summarizes the project based on repository documentation and highl
 - Authentication, authorization, rate limiting, and baseline audit logging are implemented.
 - API endpoints cover genes, variants, phenotypes, evidence, research spaces, and data source management.
 - Graph service, graph storage, and `/api/graph/*` endpoints are not implemented yet.
-- Flujo-based PubMed **query generation** is implemented; publications are queued and a rule-based extraction runner processes them immediately after ingestion, persisting extraction outputs (full-text/LLM extraction still pending).
+- Flujo-based PubMed **query generation** is implemented; publications are queued and a rule-based extraction runner processes them immediately after ingestion, persisting extraction outputs. Text payloads are stored in RAW_SOURCE storage with a document URL endpoint for retrieval (full-text/LLM extraction still pending).
 
 ### Frontend
 
@@ -53,6 +53,7 @@ This document summarizes the project based on repository documentation and highl
 - Data discovery workflows are refactored to align with backend orchestration DTOs.
 - Design system and component library are in place (shadcn/ui with documented typography and theme choices).
 - Knowledge Graph UI exists as a placeholder route; no graph explorer/visualization yet.
+- Data Sources UI now surfaces recent extraction activity and provides a document open/copy flow for stored extraction payloads.
 
 ### Infrastructure and operations
 
@@ -144,6 +145,7 @@ Short term (0-2 weeks)
 - Document the Postgres-first decision in the PRD and align all stakeholder messaging.
 - Draft a concise PRD with scope, goals, and success metrics.
 - Identify the minimum security tasks needed for pilot or production.
+- Add admin-facing extraction metrics/overview endpoints once product requirements are clarified.
 
 Near term (2-6 weeks)
 - Finish Sprint 1 by adding **Mechanism** (domain + DB) and add DB persistence for Drug/Pathway and Variant/Phenotype structural fields.

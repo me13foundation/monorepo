@@ -18,7 +18,7 @@ This plan follows **Clean Architecture principles** and assumes a **Postgres-bac
 - Extraction to an independent service is optional and only justified by scale, latency, or external consumer needs.
 - Any future TypeDB migration must preserve the API contract.
 
-## Implementation status (as of January 23, 2026)
+## Implementation status (as of January 24, 2026)
 
 **Legend:** DONE | PARTIAL | PLANNED
 
@@ -32,7 +32,7 @@ This plan follows **Clean Architecture principles** and assumes a **Postgres-bac
 
 ### Phase 2: Atlas ingestion
 - **UniProt domain extraction** PLANNED (parser exists, but domains are not mapped into `ProteinDomain` or persisted)
-- **PubMed research corpus + extraction** PARTIAL (rule-based extraction runs after ingestion and persists outputs; full-text/LLM extraction is pending)
+- **PubMed research corpus + extraction** PARTIAL (rule-based extraction runs after ingestion, persists outputs, stores text payloads in RAW_SOURCE with a document URL endpoint; full-text/LLM extraction is pending)
 - **Drug/Pathway seeding** PLANNED (no seed files or seeding service yet)
 - **Repository/DB JSON fields** PLANNED (DB models/migrations do not yet store structural annotation or longitudinal observations)
 
