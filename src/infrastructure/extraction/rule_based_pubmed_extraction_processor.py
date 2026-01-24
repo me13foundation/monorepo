@@ -9,6 +9,7 @@ from src.application.services.ports.extraction_processor_port import (
     ExtractionOutcome,
     ExtractionProcessorPort,
     ExtractionProcessorResult,
+    ExtractionTextPayload,
 )
 
 if TYPE_CHECKING:
@@ -41,8 +42,9 @@ class RuleBasedPubMedExtractionProcessor(ExtractionProcessorPort):
         *,
         queue_item: ExtractionQueueItem,
         publication: Publication | None,
+        text_payload: ExtractionTextPayload | None = None,
     ) -> ExtractionProcessorResult:
-        if publication is None:
+        if publication is None and text_payload is None:
             return ExtractionProcessorResult(
                 status="failed",
                 facts=[],
@@ -52,7 +54,14 @@ class RuleBasedPubMedExtractionProcessor(ExtractionProcessorPort):
                 error_message="publication_not_found",
             )
 
-        text = _build_text(publication)
+        if text_payload is not None:
+            text = text_payload.text
+            text_source = text_payload.text_source
+            document_reference = text_payload.document_reference
+        else:
+            text = _build_text(publication)
+            text_source = "title_abstract"
+            document_reference = None
         if not text:
             return ExtractionProcessorResult(
                 status="skipped",
@@ -62,7 +71,8 @@ class RuleBasedPubMedExtractionProcessor(ExtractionProcessorPort):
                     "queue_item_id": str(queue_item.id),
                 },
                 processor_name="rule_based_pubmed_v1",
-                text_source="title_abstract",
+                text_source=text_source,
+                document_reference=document_reference,
             )
 
         facts: list[ExtractionFact] = []
@@ -92,9 +102,9 @@ class RuleBasedPubMedExtractionProcessor(ExtractionProcessorPort):
                 fact["attributes"] = attributes
             facts.append(fact)
 
-        _extract_gene_mentions(text, self._gene_symbols, add_fact)
-        _extract_variants(text, add_fact)
-        _extract_hpo_ids(text, add_fact)
+        _extract_gene_mentions(text, self._gene_symbols, add_fact, source=text_source)
+        _extract_variants(text, add_fact, source=text_source)
+        _extract_hpo_ids(text, add_fact, source=text_source)
 
         status: ExtractionOutcome = "completed" if facts else "skipped"
         metadata: JSONObject = {
@@ -107,7 +117,8 @@ class RuleBasedPubMedExtractionProcessor(ExtractionProcessorPort):
             metadata=metadata,
             processor_name="rule_based_pubmed_v1",
             processor_version="1.0",
-            text_source="title_abstract",
+            text_source=text_source,
+            document_reference=document_reference,
         )
 
 
@@ -132,6 +143,8 @@ def _extract_gene_mentions(
     text: str,
     symbols: set[str],
     add_fact: _AddFact,
+    *,
+    source: str,
 ) -> None:
     if not symbols:
         return
@@ -142,41 +155,41 @@ def _extract_gene_mentions(
                 "gene",
                 symbol,
                 normalized_id=symbol,
-                source="title_abstract",
+                source=source,
             )
 
 
-def _extract_variants(text: str, add_fact: _AddFact) -> None:
+def _extract_variants(text: str, add_fact: _AddFact, *, source: str) -> None:
     for match in _CDNA_VARIANT_PATTERN.findall(text):
         add_fact(
             "variant",
             match,
-            source="title_abstract",
+            source=source,
             attributes={"pattern": "hgvs_c"},
         )
     for match in _PROTEIN_VARIANT_3_PATTERN.findall(text):
         add_fact(
             "variant",
             match,
-            source="title_abstract",
+            source=source,
             attributes={"pattern": "hgvs_p3"},
         )
     for match in _PROTEIN_VARIANT_1_PATTERN.findall(text):
         add_fact(
             "variant",
             match,
-            source="title_abstract",
+            source=source,
             attributes={"pattern": "hgvs_p1"},
         )
 
 
-def _extract_hpo_ids(text: str, add_fact: _AddFact) -> None:
+def _extract_hpo_ids(text: str, add_fact: _AddFact, *, source: str) -> None:
     for match in _HPO_ID_PATTERN.findall(text):
         add_fact(
             "phenotype",
             match,
             normalized_id=match,
-            source="title_abstract",
+            source=source,
         )
 
 

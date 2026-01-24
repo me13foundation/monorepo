@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
+import pytest
+
 from src.application.services.extraction_runner_service import ExtractionRunnerService
 from src.application.services.ports.extraction_processor_port import (
     ExtractionProcessorResult,
+    ExtractionTextPayload,
 )
 from src.domain.entities.extraction_queue_item import (
     ExtractionQueueItem,
@@ -22,13 +25,54 @@ from src.domain.entities.publication_extraction import (
     PublicationExtraction,
 )
 from src.domain.value_objects.identifiers import PublicationIdentifier
+from src.type_definitions.storage import (
+    StorageOperationRecord,
+    StorageOperationStatus,
+    StorageOperationType,
+    StorageUseCase,
+)
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from src.type_definitions.common import (
         ExtractionFact,
         JSONObject,
         PublicationExtractionUpdate,
     )
+
+
+class StubStorageCoordinator:
+    def __init__(self) -> None:
+        self.stored: list[dict[str, str]] = []
+
+    async def store_for_use_case(
+        self,
+        use_case: StorageUseCase,
+        *,
+        key: str,
+        file_path: Path,
+        content_type: str | None = None,
+        user_id: UUID | None = None,
+        metadata: JSONObject | None = None,
+    ) -> StorageOperationRecord:
+        text = file_path.read_text(encoding="utf-8")
+        self.stored.append(
+            {
+                "key": key,
+                "text": text,
+                "use_case": use_case.value,
+                "content_type": content_type or "",
+            },
+        )
+        return StorageOperationRecord(
+            id=uuid4(),
+            configuration_id=uuid4(),
+            operation_type=StorageOperationType.STORE,
+            key=key,
+            status=StorageOperationStatus.SUCCESS,
+            created_at=datetime.now(UTC),
+        )
 
 
 class StubQueueRepository:
@@ -107,8 +151,15 @@ class StubProcessor:
         *,
         queue_item: ExtractionQueueItem,
         publication: Publication | None,
+        text_payload: ExtractionTextPayload | None = None,
     ) -> ExtractionProcessorResult:
-        return self.result
+        if text_payload is None:
+            return self.result
+        return replace(
+            self.result,
+            text_source=text_payload.text_source,
+            document_reference=text_payload.document_reference,
+        )
 
 
 def _build_queue_item() -> ExtractionQueueItem:
@@ -158,7 +209,8 @@ def _build_result(status: ExtractionOutcome) -> ExtractionProcessorResult:
     )
 
 
-def test_run_pending_persists_new_extraction() -> None:
+@pytest.mark.asyncio
+async def test_run_pending_persists_new_extraction() -> None:
     item = _build_queue_item()
     publication = _build_publication(item.publication_id)
     queue_repo = StubQueueRepository([item])
@@ -173,7 +225,7 @@ def test_run_pending_persists_new_extraction() -> None:
         batch_size=1,
     )
 
-    summary = runner.run_pending()
+    summary = await runner.run_pending()
 
     assert summary.completed == 1
     assert len(extraction_repo.created) == 1
@@ -182,7 +234,8 @@ def test_run_pending_persists_new_extraction() -> None:
     assert metadata.get("extraction_id") == str(extraction_repo.created[0].id)
 
 
-def test_run_pending_updates_existing_extraction() -> None:
+@pytest.mark.asyncio
+async def test_run_pending_updates_existing_extraction() -> None:
     item = _build_queue_item()
     publication = _build_publication(item.publication_id)
     existing = PublicationExtraction(
@@ -217,9 +270,39 @@ def test_run_pending_updates_existing_extraction() -> None:
         batch_size=1,
     )
 
-    summary = runner.run_pending()
+    summary = await runner.run_pending()
 
     assert summary.completed == 1
     assert extraction_repo.updated
     metadata = queue_repo.completed_metadata[0]
     assert metadata.get("extraction_id") == str(existing.id)
+
+
+@pytest.mark.asyncio
+async def test_run_pending_stores_text_payload() -> None:
+    item = _build_queue_item()
+    publication = _build_publication(item.publication_id)
+    queue_repo = StubQueueRepository([item])
+    extraction_repo = StubExtractionRepository()
+    processor = StubProcessor(_build_result(ExtractionOutcome.COMPLETED))
+    storage_coordinator = StubStorageCoordinator()
+
+    runner = ExtractionRunnerService(
+        queue_repository=queue_repo,
+        publication_repository=StubPublicationRepository(publication),
+        extraction_repository=extraction_repo,
+        processor=processor,
+        storage_coordinator=storage_coordinator,
+        batch_size=1,
+    )
+
+    summary = await runner.run_pending()
+
+    assert summary.completed == 1
+    assert storage_coordinator.stored
+    stored = storage_coordinator.stored[0]
+    assert stored["use_case"] == StorageUseCase.RAW_SOURCE.value
+    assert stored["text"] == f"{publication.title} {publication.abstract}"
+    assert extraction_repo.created
+    assert extraction_repo.created[0].document_reference == stored["key"]
+    assert extraction_repo.created[0].text_source == ExtractionTextSource.TITLE_ABSTRACT

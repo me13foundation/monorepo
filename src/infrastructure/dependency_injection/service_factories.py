@@ -174,11 +174,13 @@ class ApplicationServiceFactoryMixin:
         publication_repository = SqlAlchemyPublicationRepository(session)
         extraction_repository = SqlAlchemyPublicationExtractionRepository(session)
         processor = RuleBasedPubMedExtractionProcessor()
+        storage_coordinator = self.create_storage_operation_coordinator(session)
         return ExtractionRunnerService(
             queue_repository=queue_repository,
             publication_repository=publication_repository,
             extraction_repository=extraction_repository,
             processor=processor,
+            storage_coordinator=storage_coordinator,
         )
 
     def create_discovery_configuration_service(

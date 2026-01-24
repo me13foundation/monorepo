@@ -249,6 +249,48 @@ class StorageConfigurationService:
             metadata=metadata,
         )
 
+    async def get_file_url(
+        self,
+        configuration: StorageConfiguration,
+        *,
+        key: str,
+        user_id: UUID | None,
+        metadata: JSONObject | None = None,
+    ) -> str:
+        """Retrieve a provider URL for an existing stored file."""
+
+        plugin = self._require_plugin(configuration.provider)
+        return await storage_operation_recorder.record_retrieve_operation(
+            configuration=configuration,
+            plugin=plugin,
+            operation_repository=self._operation_repository,
+            metrics_recorder=self._metrics_recorder,
+            key=key,
+            user_id=user_id,
+            metadata=metadata,
+        )
+
+    async def get_file_url_for_use_case(
+        self,
+        use_case: StorageUseCase,
+        *,
+        key: str,
+        user_id: UUID | None = None,
+        metadata: JSONObject | None = None,
+    ) -> str:
+        """Retrieve a provider URL for a file tied to a storage use case."""
+
+        configuration = self.get_default_for_use_case(use_case)
+        if configuration is None:
+            msg = f"No storage configuration defined for use case {use_case.value}"
+            raise RuntimeError(msg)
+        return await self.get_file_url(
+            configuration,
+            key=key,
+            user_id=user_id,
+            metadata=metadata,
+        )
+
     def get_usage_metrics(self, configuration_id: UUID) -> StorageUsageMetrics | None:
         """Return aggregated usage metrics for a configuration."""
 

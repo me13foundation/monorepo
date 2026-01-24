@@ -15,16 +15,25 @@ from sqlalchemy.orm import Session
 
 from src.database.session import get_session
 from src.domain.repositories.base import QuerySpecification
+from src.domain.services.storage_providers.errors import StorageOperationError
 from src.infrastructure.dependency_injection.dependencies import (
     get_legacy_dependency_container,
 )
-from src.models.api import PaginatedResponse, PublicationExtractionResponse
+from src.models.api import (
+    PaginatedResponse,
+    PublicationExtractionDocumentResponse,
+    PublicationExtractionResponse,
+)
 from src.routes.serializers import serialize_publication_extraction
 from src.type_definitions.common import QueryFilters
+from src.type_definitions.storage import StorageUseCase
 
 if TYPE_CHECKING:
     from src.application.services.publication_extraction_service import (
         PublicationExtractionService,
+    )
+    from src.application.services.storage_configuration_service import (
+        StorageConfigurationService,
     )
 
 
@@ -52,6 +61,13 @@ def get_extraction_service(
 ) -> PublicationExtractionService:
     container = get_legacy_dependency_container()
     return container.create_publication_extraction_service(db)
+
+
+def get_storage_configuration_service(
+    db: Session = Depends(get_session),
+) -> StorageConfigurationService:
+    container = get_legacy_dependency_container()
+    return container.create_storage_configuration_service(db)
 
 
 @router.get(
@@ -115,3 +131,49 @@ async def get_extraction(
             detail=f"Extraction {extraction_id} not found",
         )
     return serialize_publication_extraction(extraction)
+
+
+@router.get(
+    "/{extraction_id}/document-url",
+    summary="Get extraction document URL",
+    response_model=PublicationExtractionDocumentResponse,
+)
+async def get_extraction_document_url(
+    extraction_id: UUID,
+    service: PublicationExtractionService = Depends(get_extraction_service),
+    storage_service: StorageConfigurationService = Depends(
+        get_storage_configuration_service,
+    ),
+) -> PublicationExtractionDocumentResponse:
+    extraction = service.get_by_id(extraction_id)
+    if extraction is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Extraction {extraction_id} not found",
+        )
+    if not extraction.document_reference:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Extraction {extraction_id} has no stored document reference",
+        )
+    try:
+        url = await storage_service.get_file_url_for_use_case(
+            StorageUseCase.RAW_SOURCE,
+            key=extraction.document_reference,
+            user_id=None,
+            metadata={"extraction_id": str(extraction.id)},
+        )
+    except StorageOperationError as exc:
+        reason = None
+        if exc.details is not None and isinstance(exc.details.get("reason"), str):
+            reason = exc.details["reason"]
+        status_code = 404 if reason == "missing" else 502
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    return PublicationExtractionDocumentResponse(
+        extraction_id=str(extraction.id),
+        document_reference=extraction.document_reference,
+        url=url,
+    )

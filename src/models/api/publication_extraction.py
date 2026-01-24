@@ -74,8 +74,22 @@ class PublicationExtractionResponse(BaseModel):
     updated_at: datetime = Field(..., description="Record update timestamp")
 
 
+class PublicationExtractionDocumentResponse(BaseModel):
+    """Response schema for extraction document URLs."""
+
+    model_config = ConfigDict(strict=True)
+
+    extraction_id: str = Field(..., description="Extraction record identifier")
+    document_reference: str = Field(
+        ...,
+        description="Storage key for the processed document",
+    )
+    url: str = Field(..., description="Resolved URL or path to the document")
+
+
 __all__ = [
     "ExtractionFactResponse",
     "ExtractionOutcome",
+    "PublicationExtractionDocumentResponse",
     "PublicationExtractionResponse",
 ]

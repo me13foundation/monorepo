@@ -68,6 +68,7 @@ def build_ingestion_scheduling_service(
         operation_repository=storage_operation_repository,
         plugin_registry=initialize_storage_plugins(),
     )
+    storage_coordinator = StorageOperationCoordinator(storage_service)
     extraction_queue_repository = SqlAlchemyExtractionQueueRepository(session)
     extraction_queue_service = ExtractionQueueService(
         queue_repository=extraction_queue_repository,
@@ -78,6 +79,7 @@ def build_ingestion_scheduling_service(
         publication_repository=publication_repository,
         extraction_repository=extraction_repository,
         processor=RuleBasedPubMedExtractionProcessor(),
+        storage_coordinator=storage_coordinator,
     )
 
     # Initialize Query Agent
@@ -90,8 +92,6 @@ def build_ingestion_scheduling_service(
         query_agent=query_agent,
         research_space_repository=research_space_repository,
     )
-
-    storage_coordinator = StorageOperationCoordinator(storage_service)
 
     discovery_job_repository = SQLAlchemyDiscoverySearchJobRepository(session)
     query_builder = PubMedQueryBuilder()

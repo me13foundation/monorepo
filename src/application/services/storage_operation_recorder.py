@@ -109,6 +109,76 @@ async def record_store_operation(  # noqa: PLR0913 - explicit workflow inputs ke
         return recorded
 
 
+async def record_retrieve_operation(  # noqa: PLR0913 - explicit workflow inputs keep Clean Architecture boundaries
+    *,
+    configuration: StorageConfiguration,
+    plugin: StorageProviderPlugin,
+    operation_repository: StorageOperationRepository,
+    metrics_recorder: StorageMetricsRecorder,
+    key: str,
+    user_id: UUID | None,
+    metadata: JSONObject | None,
+) -> str:
+    """Retrieve a file URL and persist audit + metric events."""
+
+    validated_config = await plugin.validate_config(configuration.config)
+    operation_metadata: JSONObject = metadata or {}
+    operation = StorageOperation(
+        id=uuid4(),
+        configuration_id=configuration.id,
+        user_id=user_id,
+        operation_type=StorageOperationType.RETRIEVE,
+        key=key,
+        metadata=operation_metadata,
+        status=StorageOperationStatus.PENDING,
+        created_at=datetime.now(UTC),
+    )
+    started_at = datetime.now(UTC)
+    try:
+        url = await plugin.get_file_url(validated_config, key)
+        success_operation = operation.model_copy(
+            update={
+                "status": StorageOperationStatus.SUCCESS,
+            },
+        )
+    except StorageOperationError as exc:
+        failure_operation = operation.model_copy(
+            update={
+                "status": StorageOperationStatus.FAILED,
+                "error_message": str(exc),
+            },
+        )
+        operation_repository.record_operation(failure_operation)
+        failure_metadata: JSONObject = {
+            **operation_metadata,
+            "error": str(exc),
+        }
+        _record_metric(
+            recorder=metrics_recorder,
+            configuration=configuration,
+            status=StorageOperationStatus.FAILED,
+            started_at=started_at,
+            metadata=failure_metadata,
+            event_type=StorageMetricEventType.RETRIEVE,
+        )
+        raise
+    else:
+        operation_repository.record_operation(success_operation)
+        success_metadata: JSONObject = {
+            **operation_metadata,
+            "url_generated": True,
+        }
+        _record_metric(
+            recorder=metrics_recorder,
+            configuration=configuration,
+            status=StorageOperationStatus.SUCCESS,
+            started_at=started_at,
+            metadata=success_metadata,
+            event_type=StorageMetricEventType.RETRIEVE,
+        )
+        return url
+
+
 def record_test_metric(
     *,
     configuration: StorageConfiguration,
@@ -157,4 +227,8 @@ def _record_metric(  # noqa: PLR0913 - helper requires explicit telemetry inputs
     )
 
 
-__all__ = ["record_store_operation", "record_test_metric"]
+__all__ = [
+    "record_retrieve_operation",
+    "record_store_operation",
+    "record_test_metric",
+]

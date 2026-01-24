@@ -20,6 +20,15 @@ ExtractionOutcome = Literal["completed", "failed", "skipped"]
 
 
 @dataclass(frozen=True)
+class ExtractionTextPayload:
+    """Payload describing the text provided to an extraction processor."""
+
+    text: str
+    text_source: ExtractionTextSource
+    document_reference: str | None = None
+
+
+@dataclass(frozen=True)
 class ExtractionProcessorResult:
     status: ExtractionOutcome
     facts: list[ExtractionFact]
@@ -39,6 +48,7 @@ class ExtractionProcessorPort(Protocol):
         *,
         queue_item: ExtractionQueueItem,
         publication: Publication | None,
+        text_payload: ExtractionTextPayload | None = None,
     ) -> ExtractionProcessorResult:
         """Extract facts for a single publication."""
 
@@ -47,4 +57,5 @@ __all__ = [
     "ExtractionOutcome",
     "ExtractionProcessorPort",
     "ExtractionProcessorResult",
+    "ExtractionTextPayload",
 ]

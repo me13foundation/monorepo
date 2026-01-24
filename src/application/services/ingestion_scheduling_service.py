@@ -170,7 +170,7 @@ class IngestionSchedulingService:
             )
             if extraction_metadata:
                 metadata["extraction_queue"] = extraction_metadata
-                extraction_run = self._run_extraction(
+                extraction_run = await self._run_extraction(
                     source=source,
                     ingestion_job_id=running.id,
                     queued_count=extraction_metadata["queued"],
@@ -227,7 +227,7 @@ class IngestionSchedulingService:
             "version": enqueue_summary.extraction_version,
         }
 
-    def _run_extraction(
+    async def _run_extraction(
         self,
         *,
         source: user_data_source.UserDataSource,
@@ -238,7 +238,7 @@ class IngestionSchedulingService:
             return None
         if queued_count <= 0:
             return None
-        summary = self._extraction_runner_service.run_for_ingestion_job(
+        summary = await self._extraction_runner_service.run_for_ingestion_job(
             source_id=source.id,
             ingestion_job_id=ingestion_job_id,
             expected_items=queued_count,

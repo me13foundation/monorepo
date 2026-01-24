@@ -63,6 +63,7 @@ class StorageMetricEventType(StrEnum):
     """Metric classification for observability exports."""
 
     STORE = "store"
+    RETRIEVE = "retrieve"
     TEST = "test"
 
 

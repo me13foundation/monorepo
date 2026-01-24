@@ -33,7 +33,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - auth/* (login, register, forgot-password pages)
+     * - e2e/* (Playwright-only routes)
      */
-    "/((?!api/auth|auth/|_next/static|_next/image|favicon.ico).*)",
+    "/((?!api/auth|auth/|_next/static|_next/image|favicon.ico|e2e/).*)",
   ],
 }

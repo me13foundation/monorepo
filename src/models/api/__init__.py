@@ -57,6 +57,7 @@ from .publication import (
 from .publication_extraction import (
     ExtractionFactResponse,
     ExtractionOutcome,
+    PublicationExtractionDocumentResponse,
     PublicationExtractionResponse,
 )
 from .variant import (
@@ -104,6 +105,7 @@ __all__ = [
     "PhenotypeStatisticsResponse",
     "PhenotypeUpdate",
     "PublicationCreate",
+    "PublicationExtractionDocumentResponse",
     "PublicationExtractionResponse",
     "PublicationList",
     "PublicationResponse",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
@@ -23,6 +24,10 @@ from src.models.database.publication_extraction import (
     ExtractionOutcomeEnum,
     PublicationExtractionModel,
 )
+from src.models.database.storage import (
+    StorageConfigurationModel,
+    StorageProviderEnum,
+)
 from src.models.database.user_data_source import UserDataSourceModel
 
 _READ_API_HEADERS = {
@@ -31,6 +36,9 @@ _READ_API_HEADERS = {
     "X-TEST-USER-EMAIL": "test@example.com",
     "X-TEST-USER-ROLE": "read",
 }
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _reset_database() -> None:
@@ -241,6 +249,7 @@ def _seed_extraction(
     ingestion_job_id: UUID,
     queue_item_id: UUID,
     status: ExtractionOutcomeEnum,
+    document_reference: str | None = None,
 ) -> str:
     extraction_id = uuid4()
     now = datetime.now(UTC)
@@ -257,7 +266,7 @@ def _seed_extraction(
             processor_name="rule_based",
             processor_version="1.0",
             text_source="title_abstract",
-            document_reference=None,
+            document_reference=document_reference,
             facts=[{"fact_type": "gene", "value": "MED13"}],
             metadata_payload={"note": "api-test"},
             extracted_at=now,
@@ -267,6 +276,35 @@ def _seed_extraction(
     )
     session.commit()
     return str(extraction_id)
+
+
+def _seed_storage_configuration(
+    session: session_module.SessionLocal,
+    base_path: Path,
+) -> UUID:
+    config_id = uuid4()
+    now = datetime.now(UTC)
+    session.add(
+        StorageConfigurationModel(
+            id=str(config_id),
+            name="Test Raw Source Storage",
+            provider=StorageProviderEnum.LOCAL_FILESYSTEM,
+            config_data={
+                "provider": "local_filesystem",
+                "base_path": str(base_path),
+                "create_directories": True,
+                "expose_file_urls": True,
+            },
+            enabled=True,
+            supported_capabilities=["raw_source"],
+            default_use_cases=["raw_source"],
+            metadata_payload={},
+            created_at=now,
+            updated_at=now,
+        ),
+    )
+    session.commit()
+    return config_id
 
 
 def _build_client() -> TestClient:
@@ -358,3 +396,44 @@ def test_get_extraction_by_id() -> None:
 
     missing = client.get(f"/extractions/{uuid4()}")
     assert missing.status_code == 404
+
+
+def test_get_extraction_document_url(tmp_path: Path) -> None:
+    _reset_database()
+    session = session_module.SessionLocal()
+    try:
+        base_path = tmp_path / "raw-storage"
+        base_path.mkdir(parents=True, exist_ok=True)
+        _seed_storage_configuration(session, base_path)
+
+        source_id, job_id = _seed_source_and_job(session)
+        pub_id = _seed_publication(session, "888")
+        queue_id = _seed_queue_item(
+            session,
+            publication_id=pub_id,
+            source_id=source_id,
+            ingestion_job_id=job_id,
+        )
+        key = "extractions/test/doc.txt"
+        file_path = base_path / key
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        file_path.write_text("stored document")
+        extraction_id = _seed_extraction(
+            session,
+            publication_id=pub_id,
+            source_id=source_id,
+            ingestion_job_id=job_id,
+            queue_item_id=queue_id,
+            status=ExtractionOutcomeEnum.COMPLETED,
+            document_reference=key,
+        )
+    finally:
+        session.close()
+
+    client = _build_client()
+    response = client.get(f"/extractions/{extraction_id}/document-url")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["extraction_id"] == extraction_id
+    assert payload["document_reference"] == key
+    assert key in payload["url"]

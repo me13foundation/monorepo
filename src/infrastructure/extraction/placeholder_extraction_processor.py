@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from src.application.services.ports.extraction_processor_port import (
     ExtractionProcessorPort,
     ExtractionProcessorResult,
+    ExtractionTextPayload,
 )
 from src.type_definitions.common import JSONObject  # noqa: TC001
 
@@ -23,6 +24,7 @@ class PlaceholderExtractionProcessor(ExtractionProcessorPort):
         *,
         queue_item: ExtractionQueueItem,
         publication: Publication | None,
+        text_payload: ExtractionTextPayload | None = None,
     ) -> ExtractionProcessorResult:
         if publication is None:
             return ExtractionProcessorResult(
@@ -30,7 +32,12 @@ class PlaceholderExtractionProcessor(ExtractionProcessorPort):
                 facts=[],
                 metadata={},
                 processor_name="placeholder",
-                text_source="title_abstract",
+                text_source=(
+                    text_payload.text_source if text_payload else "title_abstract"
+                ),
+                document_reference=(
+                    text_payload.document_reference if text_payload else None
+                ),
                 error_message="publication_not_found",
             )
 
@@ -48,7 +55,10 @@ class PlaceholderExtractionProcessor(ExtractionProcessorPort):
             facts=[],
             metadata=metadata,
             processor_name="placeholder",
-            text_source="title_abstract",
+            text_source=text_payload.text_source if text_payload else "title_abstract",
+            document_reference=(
+                text_payload.document_reference if text_payload else None
+            ),
         )
 
 
