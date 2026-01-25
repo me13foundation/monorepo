@@ -108,7 +108,7 @@ const buildFormState = (mechanism?: Mechanism): MechanismFormState => ({
   name: mechanism?.name ?? '',
   description: mechanism?.description ?? '',
   evidence_tier: mechanism?.evidence_tier ?? 'supporting',
-  confidence_score: mechanism?.confidence_score ? String(mechanism.confidence_score) : '0.5',
+  confidence_score: String(mechanism?.confidence_score ?? 0.5),
   source: mechanism?.source ?? 'manual_curation',
   phenotype_ids: mechanism?.phenotype_ids?.length
     ? mechanism.phenotype_ids.join(', ')
