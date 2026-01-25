@@ -1,5 +1,3 @@
-"use client"
-
 import { apiGet, apiPost } from '@/lib/api/client'
 import type {
   EnableMaintenanceRequest,

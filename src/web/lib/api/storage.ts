@@ -1,5 +1,3 @@
-"use client"
-
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api/client'
 import type {
   CreateStorageConfigurationRequest,
