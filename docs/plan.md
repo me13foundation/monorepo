@@ -18,7 +18,34 @@ This plan follows **Clean Architecture principles** and assumes a **Postgres-bac
 - Extraction to an independent service is optional and only justified by scale, latency, or external consumer needs.
 - Any future TypeDB migration must preserve the API contract.
 
-## Implementation status (as of January 24, 2026)
+## Proposal alignment (ResoGraph JTC 2026)
+
+**Program frame**
+- **Project title:** ResoGraph: A Hybrid AI & Knowledge Graph Platform for Resolving Unsolved Rare Genetic and Non-Genetic Diseases
+- **Duration:** 36 months
+- **Primary objective:** 15-25% relative increase in diagnostic yield on >1,000 unsolved cases.
+- **Scope:** Rare disease diagnosis only; design is domain-agnostic but no out-of-scope expansion.
+
+**Core safety constraints**
+- AI agents are **hypothesis generators only** (no autonomous diagnosis, no write access to validated knowledge).
+- Human experts must review and approve hypotheses before graph promotion.
+- All mechanistic links are evidence-backed with provenance and confidence scores.
+
+**Hybrid Intelligence layers**
+1. **Mechanism-centered knowledge graph (Map)**:
+   - Variant <-> Protein Domain <-> Mechanism <-> Phenotype (HPO)
+2. **AI agents (Scouts)**:
+   - Traverse existing graph paths and propose mechanistic hypotheses
+   - Produce human-readable evidence reports
+3. **Human review (Judges)**:
+   - Mandatory expert validation + optional functional assays
+
+**Cohort strategy**
+- **Phase 1 (Gold Standard):** MED13 pilot for calibration and ground-truth mechanistic reasoning.
+- **Phase 2 (Expansion):** Neurodevelopmental, Ciliopathy/Mito, and Immune-mediated cohorts.
+- **Evaluation:** Diagnostic yield uplift and VUS reclassification with evidence tracking.
+
+## Implementation status (as of January 25, 2026)
 
 **Legend:** DONE | PARTIAL | PLANNED
 
@@ -32,9 +59,10 @@ This plan follows **Clean Architecture principles** and assumes a **Postgres-bac
 
 ### Phase 2: Atlas ingestion
 - **UniProt domain extraction** PLANNED (parser exists, but domains are not mapped into `ProteinDomain` or persisted)
-- **PubMed research corpus + extraction** PARTIAL (rule-based extraction runs after ingestion, persists outputs, stores text payloads in RAW_SOURCE with a document URL endpoint; full-text/LLM extraction is pending)
+- **PubMed research corpus + extraction** PARTIAL (rule-based title/abstract extraction runs after ingestion, persists outputs, stores text payloads in RAW_SOURCE with a document URL endpoint; full-text ingestion + LLM extraction are pending)
 - **Drug/Pathway seeding** PLANNED (no seed files or seeding service yet)
 - **Repository/DB JSON fields** PLANNED (DB models/migrations do not yet store structural annotation or longitudinal observations)
+ - **Non-genetic inputs** PLANNED (immune/biochemical evidence ingestion and mapping to mechanism/pathway nodes)
 
 ### Phase 3: Knowledge graph core
 - **GraphService + Postgres node/edge storage** PLANNED (not implemented)
@@ -125,13 +153,23 @@ To enable human-verifiable hypotheses, we will add explicit structures for revie
 ### **2.2 AI-Driven Literature Extraction (PubMed "Scout")**
 *   **Task:** Transform PubMed ingestion into a "Research Corpus" builder.
 *   **Implementation:**
-    *   **Raw Storage:** Upgrade `PubMedIngestor` to save full JSON/XML content to `storage/raw/pubmed/`.
-    *   **Analysis Queue:** Create a mechanism (e.g., `analysis_status` flag or DB table) to mark papers as "Ready for Extraction."
+    *   **Raw Storage (MVP):** Save title/abstract text payloads to RAW_SOURCE storage with a document URL for retrieval.
+    *   **Full-Text Storage (Next):** Persist full JSON/XML or full-text content to RAW_SOURCE for downstream LLM extraction.
+    *   **Analysis Queue:** Queue publications for extraction and run immediately after ingestion (scheduler-driven ingestion remains the trigger).
     *   **Entity Extraction (MVP):** Implement basic regex/rule-based extraction for:
         *   **Variants:** `c.\d+[A-Z]>[A-Z]`, `p.[A-Z][a-z]{2}\d+[A-Z][a-z]{2}`
-        *   **Phenotypes:** Match against HPO term list.
-        *   **Drugs:** Match against a seed list of known compounds.
-*   **Success Criteria:** System can identify "Paper X contains Variant Y and Drug Z."
+        *   **Phenotypes:** HPO IDs in text (`HP:#######`).
+        *   **Genes:** Known gene symbols (MED13 MVP).
+    *   **Entity Extraction (Next):** Add HPO term list matching and drug/compound matching.
+*   **Success Criteria:** MVP can identify "Paper X contains Variant Y and Phenotype Z" from title/abstract; full-text + LLM extraction extends coverage.
+
+### **2.3 Non-Genetic Evidence Ingestion (Immune-Mediated)**
+*   **Task:** Add ingestion for non-genetic inputs relevant to immune-mediated rare disease cases.
+*   **Implementation:**
+    *   Define a minimal schema for immune/biochemical evidence (e.g., cytokines, auto-antibodies, pathway activity).
+    *   Map non-genetic evidence into Mechanism/Pathway nodes with provenance.
+    *   Support ingestion of cohort-provided structured datasets.
+*   **Success Criteria:** Immune-mediated cases can be represented without a starting variant, and hypotheses can traverse from phenotype -> mechanism -> pathway.
 
 ### **2.3 Therapeutic Atlas Seeding**
 *   **Task:** Populate the `Drug` and `Pathway` tables.
@@ -185,6 +223,24 @@ This is the core engine. It orchestrates the retrieval of data from Repositories
 *   **Endpoint:** `GET /api/graph/export`
     *   Returns the full JSON graph. This enables "Open Science" - researchers can download our model and run their own algorithms.
 
+## **Phase 4: Human Validation & Evaluation (Clinical Impact)**
+**Goal:** Prove clinical utility and enforce strict human governance.
+
+### **4.1 Hypothesis Review Workflow**
+*   **Task:** Add `Hypothesis` + `ReviewDecision` domain entities and a review queue in the admin UI.
+*   **Implementation:**
+    *   Persist hypotheses with evidence references and confidence scores.
+    *   Create reviewer actions: approve, reject, request more evidence.
+    *   Log every review decision with provenance and timestamps.
+
+### **4.2 Cohort Evaluation**
+*   **Task:** Evaluate ResoGraph on >1,000 unsolved cases across genetic and non-genetic cohorts.
+*   **Success Criteria:** 15-25% relative increase in diagnostic yield; 100-200 VUS reclassifications backed by evidence.
+
+### **4.3 Functional Validation (Optional in MVP)**
+*   **Task:** Capture wet-lab validation outcomes for a subset of hypotheses.
+*   **Implementation:** Store assay results as evidence records linked to hypotheses and mechanisms.
+
 ---
 
 ## **Phase 4: The AI Engine (Inference Layer)**
@@ -234,16 +290,16 @@ This is the core engine. It orchestrates the retrieval of data from Repositories
 
 ---
 
-## **Execution Roadmap (Sprints)**
+## **Execution Roadmap (36-Month, Proposal-Aligned)**
 
-| Sprint | Focus | Key Deliverables |
-| :--- | :--- | :--- |
-| **Sprint 1** | **Ontology** | `Drug`, `Pathway`, `ProteinDomain`, `Mechanism` entities created. `Variant` schema updated. |
-| **Sprint 2** | **Atlas Data** | `UniProtIngestor` upgraded to fetch Domains. `Variant` repository updated to store new fields. |
-| **Sprint 3** | **Graph Core** | `GraphService` implemented with `networkx`. `GET /graph/export` endpoint live. Hypothesis and review scaffolding added. |
-| **Sprint 4** | **UI & Public** | "Network Explorer" in Next.js UI (using `react-force-graph`). Public release of the dataset. |
+| Phase | Timeframe | Focus | Key Deliverables |
+| :--- | :--- | :--- | :--- |
+| **Phase 1** | Months 1-9 | **MED13 Gold Standard** | Mechanism entity + persistence, MED13 mechanistic subgraph, curated evidence ingestion, baseline extraction MVP. |
+| **Phase 2** | Months 10-18 | **Atlas Expansion** | UniProt domain ingestion, full-text PubMed ingestion + LLM extraction, non-genetic evidence ingestion. |
+| **Phase 3** | Months 19-27 | **Graph Core + Agents** | GraphService + APIs, agentic hypothesis generation, review queue UX, provenance-based scoring. |
+| **Phase 4** | Months 28-36 | **Cohort Evaluation** | Multi-cohort validation (>1,000 cases), diagnostic yield tracking, VUS reclassification reports. |
 
-## **Recommendation for "Right Now"**
-Start with **Sprint 1 (Ontology)**. Without the rigorous Pydantic models for `Drug`, `Pathway`, and `Structure`, the AI has no data structure to operate on.
-
-Shall I generate the code for **Sprint 1 (The New Entities)** now?
+## **Immediate priorities (proposal-aligned)**
+- Finish **Mechanism** domain + DB persistence and wire to variants/domains/phenotypes.
+- Upgrade PubMed ingestion to full-text storage + LLM extraction.
+- Introduce **Hypothesis** + **ReviewDecision** with a minimal review workflow in the admin UI.

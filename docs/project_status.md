@@ -1,6 +1,6 @@
 # MED13 Resource Library - Project Overview, Current Status, and Recommendations
 
-**Status date:** January 24, 2026
+**Status date:** January 25, 2026
 
 ## Purpose and scope
 
@@ -32,6 +32,24 @@ This document summarizes the project based on repository documentation and highl
 - Treat Postgres as the system of record; use NetworkX for traversal.
 - Only extract to a standalone service if scale, latency, or external consumer needs demand it.
 
+## Proposal alignment (ResoGraph JTC 2026)
+
+**Program frame**
+- **Project title:** ResoGraph: A Hybrid AI & Knowledge Graph Platform for Resolving Unsolved Rare Genetic and Non-Genetic Diseases
+- **Duration:** 36 months
+- **Primary objective:** 15-25% relative increase in diagnostic yield on >1,000 unsolved cases.
+- **Scope:** Rare disease diagnosis only; architecture is domain-agnostic but no out-of-scope expansion.
+
+**Hybrid intelligence model**
+1. **Mechanism-centered knowledge graph**: Variant <-> Protein Domain <-> Mechanism <-> Phenotype (HPO)
+2. **AI agents (hypothesis generators)**: Traverse existing graph paths and propose mechanistic explanations.
+3. **Human validation**: Mandatory expert review before graph promotion; optional functional assays.
+
+**Cohort strategy**
+- **Phase 1 (Gold Standard):** MED13 pilot for calibration and mechanistic ground truth.
+- **Phase 2 (Expansion):** Neurodevelopmental, Ciliopathy/Mito, Immune-mediated cohorts.
+- **Evaluation:** Diagnostic yield uplift and VUS reclassification with evidence tracking.
+
 ## Current status summary
 
 ### Backend and domain
@@ -44,7 +62,7 @@ This document summarizes the project based on repository documentation and highl
 - Authentication, authorization, rate limiting, and baseline audit logging are implemented.
 - API endpoints cover genes, variants, phenotypes, evidence, research spaces, and data source management.
 - Graph service, graph storage, and `/api/graph/*` endpoints are not implemented yet.
-- Flujo-based PubMed **query generation** is implemented; publications are queued and a rule-based extraction runner processes them immediately after ingestion, persisting extraction outputs. Text payloads are stored in RAW_SOURCE storage with a document URL endpoint for retrieval (full-text/LLM extraction still pending).
+- Flujo-based PubMed **query generation** is implemented; publications are queued and a rule-based extraction runner processes title/abstract text immediately after ingestion, persisting extraction outputs. Text payloads are stored in RAW_SOURCE storage with a document URL endpoint for retrieval (full-text ingestion + LLM extraction still pending).
 
 ### Frontend
 
@@ -53,7 +71,7 @@ This document summarizes the project based on repository documentation and highl
 - Data discovery workflows are refactored to align with backend orchestration DTOs.
 - Design system and component library are in place (shadcn/ui with documented typography and theme choices).
 - Knowledge Graph UI exists as a placeholder route; no graph explorer/visualization yet.
-- Data Sources UI now surfaces recent extraction activity and provides a document open/copy flow for stored extraction payloads.
+- Data Sources UI surfaces recent extraction activity and provides a document open/copy flow for stored extraction payloads.
 
 ### Infrastructure and operations
 
@@ -76,7 +94,7 @@ This document summarizes the project based on repository documentation and highl
 ### Translational AI Platform plan (docs/plan.md)
 
 - Sprint 1 (Ontology): **Partially complete.** Drug/Pathway/ProteinDomain exist; Mechanism is pending. Variant + Phenotype domain schemas are enriched, but DB persistence is pending.
-- Sprint 2 (Atlas ingestion): **Not started.** UniProt domain extraction and PubMed extraction pipeline are pending.
+- Sprint 2 (Atlas ingestion): **Partially complete.** PubMed ingestion + rule-based title/abstract extraction pipeline is in place with stored payloads and document URLs. UniProt domain extraction, full-text ingestion, and LLM extraction are pending.
 - Sprint 3 (Graph core): **Not started.** GraphService, graph storage, and graph endpoints are pending.
 - Sprint 4 (UI and public): **Not started.** UI has a placeholder Knowledge Graph route only.
 
@@ -145,12 +163,14 @@ Short term (0-2 weeks)
 - Document the Postgres-first decision in the PRD and align all stakeholder messaging.
 - Draft a concise PRD with scope, goals, and success metrics.
 - Identify the minimum security tasks needed for pilot or production.
+- Expand PubMed ingestion to capture full-text/JSON payloads and store them in RAW_SOURCE with stable document URLs.
 - Add admin-facing extraction metrics/overview endpoints once product requirements are clarified.
 
 Near term (2-6 weeks)
 - Finish Sprint 1 by adding **Mechanism** (domain + DB) and add DB persistence for Drug/Pathway and Variant/Phenotype structural fields.
 - Update TypeScript types and admin UI to surface the new entities once persistence is in place.
 - Define the graph export contract and data schema for downstream tooling.
+ - Implement LLM-based extraction on stored full-text content and persist structured facts.
 
 Mid term (6-10 weeks)
 - Upgrade UniProt ingestion and enrich structural annotations.
