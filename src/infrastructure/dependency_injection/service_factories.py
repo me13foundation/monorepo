@@ -24,6 +24,7 @@ from src.application.services import (
     ExtractionQueueService,
     ExtractionRunnerService,
     GeneApplicationService,
+    MechanismApplicationService,
     PhenotypeApplicationService,
     PublicationApplicationService,
     PublicationExtractionService,
@@ -57,6 +58,7 @@ from src.infrastructure.repositories import (
     SqlAlchemyEvidenceRepository,
     SqlAlchemyExtractionQueueRepository,
     SqlAlchemyGeneRepository,
+    SqlAlchemyMechanismRepository,
     SqlAlchemyPhenotypeRepository,
     SqlAlchemyPublicationExtractionRepository,
     SqlAlchemyPublicationRepository,
@@ -128,6 +130,15 @@ class ApplicationServiceFactoryMixin:
         phenotype_repository = SqlAlchemyPhenotypeRepository(session)
         return PhenotypeApplicationService(
             phenotype_repository=phenotype_repository,
+        )
+
+    def create_mechanism_application_service(
+        self,
+        session: Session,
+    ) -> MechanismApplicationService:
+        mechanism_repository = SqlAlchemyMechanismRepository(session)
+        return MechanismApplicationService(
+            mechanism_repository=mechanism_repository,
         )
 
     def create_evidence_application_service(

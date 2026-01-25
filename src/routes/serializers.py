@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from src.models.api import common as api_common
 from src.models.api import evidence as evidence_api
 from src.models.api import gene as gene_api
+from src.models.api import mechanism as mechanism_api
 from src.models.api import phenotype as phenotype_api
 from src.models.api import publication as publication_api
 from src.models.api import publication_extraction as publication_extraction_api
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 
     from src.domain.entities.evidence import Evidence
     from src.domain.entities.gene import Gene
+    from src.domain.entities.mechanism import Mechanism
     from src.domain.entities.phenotype import Phenotype
     from src.domain.entities.publication import Publication
     from src.domain.entities.publication_extraction import PublicationExtraction
@@ -44,6 +46,10 @@ ApiGeneType = gene_api.GeneType
 
 ApiPhenotypeCategory = phenotype_api.PhenotypeCategory
 PhenotypeResponse = phenotype_api.PhenotypeResponse
+
+MechanismResponse = mechanism_api.MechanismResponse
+ProteinDomainPayload = mechanism_api.ProteinDomainPayload
+ProteinDomainCoordinate = mechanism_api.ProteinDomainCoordinate
 
 AuthorInfo = publication_api.AuthorInfo
 PublicationResponse = publication_api.PublicationResponse
@@ -235,6 +241,51 @@ def serialize_publication(publication: Publication) -> PublicationResponse:
         updated_at=publication.updated_at,
         evidence_count=len(evidence),
         evidence=evidence,
+    )
+
+
+def serialize_mechanism(mechanism: Mechanism) -> MechanismResponse:
+    """Serialize a Mechanism entity."""
+    mechanism_id = _require_entity_id("Mechanism", mechanism.id)
+    protein_domains = [
+        ProteinDomainPayload(
+            name=domain.name,
+            source_id=domain.source_id,
+            start_residue=domain.start_residue,
+            end_residue=domain.end_residue,
+            domain_type=domain.domain_type,
+            description=domain.description,
+            coordinates=(
+                [
+                    ProteinDomainCoordinate(
+                        x=coord.x,
+                        y=coord.y,
+                        z=coord.z,
+                        confidence=coord.confidence,
+                    )
+                    for coord in domain.coordinates
+                ]
+                if domain.coordinates
+                else None
+            ),
+        )
+        for domain in mechanism.protein_domains
+    ]
+
+    phenotype_ids = list(mechanism.phenotype_ids or [])
+
+    return MechanismResponse(
+        id=mechanism_id,
+        name=mechanism.name,
+        description=mechanism.description,
+        evidence_tier=ApiEvidenceLevel(mechanism.evidence_tier.value),
+        confidence_score=mechanism.confidence_score,
+        source=mechanism.source,
+        protein_domains=protein_domains,
+        phenotype_ids=phenotype_ids,
+        phenotype_count=len(phenotype_ids),
+        created_at=mechanism.created_at,
+        updated_at=mechanism.updated_at,
     )
 
 

@@ -39,6 +39,7 @@ from .ingestion_job import (
     IngestionTrigger,
     JobMetrics,
 )
+from .mechanism import Mechanism
 from .pathway import Pathway
 from .phenotype import LongitudinalObservation, Phenotype
 from .publication import Publication
@@ -89,6 +90,7 @@ __all__ = [
     "InSilicoScores",
     "JobMetrics",
     "LongitudinalObservation",
+    "Mechanism",
     "Pathway",
     "Phenotype",
     "ProteinStructuralAnnotation",

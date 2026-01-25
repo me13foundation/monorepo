@@ -11,6 +11,7 @@ from .evidence_repository import EvidenceRepository
 from .extraction_queue_repository import ExtractionQueueRepository
 from .gene_repository import GeneRepository
 from .ingestion_job_repository import IngestionJobRepository
+from .mechanism_repository import MechanismRepository
 from .phenotype_repository import PhenotypeRepository
 from .publication_extraction_repository import PublicationExtractionRepository
 from .publication_repository import PublicationRepository
@@ -31,6 +32,7 @@ __all__ = [
     "ExtractionQueueRepository",
     "GeneRepository",
     "IngestionJobRepository",
+    "MechanismRepository",
     "PhenotypeRepository",
     "PublicationExtractionRepository",
     "PublicationRepository",

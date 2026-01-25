@@ -10,9 +10,11 @@ from sqlalchemy import Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+from .mechanism import mechanism_phenotypes
 
 if TYPE_CHECKING:
     from .evidence import EvidenceModel
+    from .mechanism import MechanismModel
 
 
 class PhenotypeCategory(SQLEnum):
@@ -82,5 +84,9 @@ class PhenotypeModel(Base):
 
     # Relationships
     evidence: Mapped[list["EvidenceModel"]] = relationship(back_populates="phenotype")
+    mechanisms: Mapped[list["MechanismModel"]] = relationship(
+        secondary=mechanism_phenotypes,
+        back_populates="phenotypes",
+    )
 
     __table_args__ = {"sqlite_autoincrement": True}  # noqa: RUF012

@@ -1,5 +1,6 @@
 from .evidence_mapper import EvidenceMapper
 from .gene_mapper import GeneMapper
+from .mechanism_mapper import MechanismMapper
 from .phenotype_mapper import PhenotypeMapper
 from .publication_mapper import PublicationMapper
 
@@ -13,6 +14,7 @@ __all__ = [
     "GeneMapper",
     "PhenotypeMapper",
     "PublicationMapper",
+    "MechanismMapper",
     "SourceTemplateMapper",
     "UserDataSourceMapper",
     "VariantMapper",

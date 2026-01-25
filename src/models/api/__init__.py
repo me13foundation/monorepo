@@ -35,6 +35,14 @@ from .gene import (
     GeneResponse,
     GeneUpdate,
 )
+from .mechanism import (
+    MechanismCreate,
+    MechanismList,
+    MechanismResponse,
+    MechanismUpdate,
+    ProteinDomainCoordinate,
+    ProteinDomainPayload,
+)
 from .phenotype import (
     PhenotypeCategory,
     PhenotypeCategoryResult,
@@ -111,6 +119,12 @@ __all__ = [
     "PublicationResponse",
     "PublicationType",
     "PublicationUpdate",
+    "MechanismCreate",
+    "MechanismList",
+    "MechanismResponse",
+    "MechanismUpdate",
+    "ProteinDomainCoordinate",
+    "ProteinDomainPayload",
     "ExtractionFactResponse",
     "ExtractionOutcome",
     "PublicationSummary",

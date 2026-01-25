@@ -22,6 +22,7 @@ from . import (
     extraction_runner_service,
     gene_service,
     ingestion_scheduling_service,
+    mechanism_service,
     phenotype_service,
     publication_extraction_service,
     publication_service,
@@ -70,6 +71,7 @@ ExtractionRunnerService = extraction_runner_service.ExtractionRunnerService
 GeneApplicationService = gene_service.GeneApplicationService
 IngestionSchedulingService = ingestion_scheduling_service.IngestionSchedulingService
 PhenotypeApplicationService = phenotype_service.PhenotypeApplicationService
+MechanismApplicationService = mechanism_service.MechanismApplicationService
 PublicationApplicationService = publication_service.PublicationApplicationService
 PublicationExtractionListResult = (
     publication_extraction_service.PublicationExtractionListResult
@@ -132,6 +134,7 @@ __all__ = [
     "ExtractionRunnerService",
     "GeneApplicationService",
     "IngestionSchedulingService",
+    "MechanismApplicationService",
     "PhenotypeApplicationService",
     "PubMedDiscoveryService",
     "PubMedIngestionService",

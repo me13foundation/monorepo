@@ -10,6 +10,7 @@ from .evidence_repository import SqlAlchemyEvidenceRepository
 from .extraction_queue_repository import SqlAlchemyExtractionQueueRepository
 from .gene_repository import SqlAlchemyGeneRepository
 from .ingestion_job_repository import SqlAlchemyIngestionJobRepository
+from .mechanism_repository import SqlAlchemyMechanismRepository
 from .phenotype_repository import SqlAlchemyPhenotypeRepository
 from .publication_extraction_repository import SqlAlchemyPublicationExtractionRepository
 from .publication_repository import SqlAlchemyPublicationRepository
@@ -36,6 +37,7 @@ __all__ = [
     "SqlAlchemyExtractionQueueRepository",
     "SqlAlchemyGeneRepository",
     "SqlAlchemyIngestionJobRepository",
+    "SqlAlchemyMechanismRepository",
     "SqlAlchemyPhenotypeRepository",
     "SqlAlchemyPublicationExtractionRepository",
     "SqlAlchemyPublicationRepository",

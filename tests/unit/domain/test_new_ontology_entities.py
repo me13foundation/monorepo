@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.domain.entities.drug import Drug, DrugApprovalStatus, TherapeuticModality
+from src.domain.entities.mechanism import Mechanism
 from src.domain.entities.pathway import Pathway
 from src.domain.entities.phenotype import LongitudinalObservation, Phenotype
 from src.domain.entities.variant import (
@@ -15,6 +16,7 @@ from src.domain.entities.variant import (
     ProteinStructuralAnnotation,
     Variant,
 )
+from src.domain.value_objects.confidence import EvidenceLevel
 from src.domain.value_objects.identifiers import PhenotypeIdentifier, VariantIdentifier
 from src.domain.value_objects.protein_structure import Coordinates3D, ProteinDomain
 
@@ -119,3 +121,37 @@ class TestEnhancedPhenotype:
         phenotype.add_observation(obs)
         assert len(phenotype.observations) == 1
         assert phenotype.observations[0].severity_score == 3
+
+
+class TestMechanismEntity:
+    def test_create_valid_mechanism(self) -> None:
+        domain = ProteinDomain(
+            name="Mediator binding",
+            start_residue=10,
+            end_residue=50,
+        )
+        mechanism = Mechanism(
+            name="Mediator complex disruption",
+            evidence_tier=EvidenceLevel.STRONG,
+            confidence_score=0.8,
+            protein_domains=[domain],
+            phenotype_ids=[1, 2],
+        )
+        assert mechanism.name == "Mediator complex disruption"
+        assert mechanism.evidence_tier == EvidenceLevel.STRONG
+        assert mechanism.confidence_score == 0.8
+        assert mechanism.protein_domains[0].name == "Mediator binding"
+        assert mechanism.phenotype_ids == [1, 2]
+
+    def test_invalid_confidence_score(self) -> None:
+        with pytest.raises(ValidationError):
+            Mechanism(
+                name="Invalid confidence",
+                confidence_score=1.5,
+            )
+
+    def test_empty_name_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            Mechanism(
+                name="  ",
+            )

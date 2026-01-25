@@ -38,6 +38,7 @@ from src.routes import (
     extractions_router,
     genes_router,
     health_router,
+    mechanisms_router,
     phenotypes_router,
     research_space_discovery_router,
     research_spaces_router,
@@ -159,6 +160,7 @@ def create_app() -> FastAPI:
     app.include_router(resources_router)
     app.include_router(genes_router)
     app.include_router(variants_router)
+    app.include_router(mechanisms_router)
     app.include_router(phenotypes_router)
     app.include_router(evidence_router)
     app.include_router(extractions_router)

@@ -10,6 +10,7 @@ from . import (
     extraction_queue,
     gene,
     ingestion_job,
+    mechanism,
     phenotype,
     publication,
     publication_extraction,
@@ -49,6 +50,8 @@ IngestionTrigger = ingestion_job.IngestionTriggerEnum
 
 PhenotypeCategory = phenotype.PhenotypeCategory
 PhenotypeModel = phenotype.PhenotypeModel
+
+MechanismModel = mechanism.MechanismModel
 
 PublicationModel = publication.PublicationModel
 PublicationType = publication.PublicationType
@@ -102,6 +105,7 @@ __all__ = [
     "IngestionStatus",
     "IngestionTrigger",
     "MembershipRoleEnum",
+    "MechanismModel",
     "PhenotypeCategory",
     "PhenotypeModel",
     "PublicationModel",

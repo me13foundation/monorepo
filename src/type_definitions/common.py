@@ -76,6 +76,18 @@ class PhenotypeUpdate(TypedDict, total=False):
     severity_score: int | None
 
 
+class MechanismUpdate(TypedDict, total=False):
+    """Type-safe mechanism update parameters."""
+
+    name: str
+    description: str | None
+    evidence_tier: str
+    confidence_score: float
+    source: str
+    protein_domains: list[JSONObject]
+    phenotype_ids: list[int]
+
+
 class EvidenceUpdate(TypedDict, total=False):
     """Type-safe evidence update parameters."""
 
