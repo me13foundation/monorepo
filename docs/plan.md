@@ -53,7 +53,7 @@ This plan follows **Clean Architecture principles** and assumes a **Postgres-bac
 - **Drug entity** DONE (`src/domain/entities/drug.py`)
 - **Pathway entity** DONE (`src/domain/entities/pathway.py`)
 - **ProteinDomain value object** DONE (`src/domain/value_objects/protein_structure.py`)
-- **Mechanism entity** PLANNED (not yet implemented)
+- **Mechanism entity** DONE (domain + DB + API; `/mechanisms` endpoints)
 - **Variant schema enhancements** DONE (structural annotation + in-silico scores in `src/domain/entities/variant.py`)
 - **Phenotype longitudinal observations** DONE (`src/domain/entities/phenotype.py`)
 
@@ -300,6 +300,6 @@ This is the core engine. It orchestrates the retrieval of data from Repositories
 | **Phase 4** | Months 28-36 | **Cohort Evaluation** | Multi-cohort validation (>1,000 cases), diagnostic yield tracking, VUS reclassification reports. |
 
 ## **Immediate priorities (proposal-aligned)**
-- Finish **Mechanism** domain + DB persistence and wire to variants/domains/phenotypes.
+- Wire mechanisms into graph traversal/export and curation workflows.
 - Upgrade PubMed ingestion to full-text storage + LLM extraction.
 - Introduce **Hypothesis** + **ReviewDecision** with a minimal review workflow in the admin UI.

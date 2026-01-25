@@ -57,7 +57,7 @@ This document summarizes the project based on repository documentation and highl
 - Clean Architecture foundation is documented as complete and stable.
 - Domain entities and services exist for core biomedical data and data sources.
 - Data Sources module is documented as implemented across domain, application, infrastructure, and UI layers.
-- ResoGraph ontology is **partially implemented**: `Drug` and `Pathway` entities exist; `ProteinDomain` exists as a value object; `Mechanism` is not yet implemented.
+- ResoGraph ontology is **partially implemented**: `Drug` and `Pathway` entities exist; `ProteinDomain` exists as a value object; **`Mechanism` is implemented with DB persistence and `/mechanisms` API endpoints**.
 - Variant/Phenotype **domain models** include structural + longitudinal fields, but **DB persistence/migrations** for these fields are not yet present.
 - Authentication, authorization, rate limiting, and baseline audit logging are implemented.
 - API endpoints cover genes, variants, phenotypes, evidence, research spaces, and data source management.
@@ -93,7 +93,7 @@ This document summarizes the project based on repository documentation and highl
 
 ### Translational AI Platform plan (docs/plan.md)
 
-- Sprint 1 (Ontology): **Partially complete.** Drug/Pathway/ProteinDomain exist; Mechanism is pending. Variant + Phenotype domain schemas are enriched, but DB persistence is pending.
+- Sprint 1 (Ontology): **Partially complete.** Drug/Pathway/ProteinDomain + Mechanism are implemented; Variant + Phenotype domain schemas are enriched, but DB persistence is pending.
 - Sprint 2 (Atlas ingestion): **Partially complete.** PubMed ingestion + rule-based title/abstract extraction pipeline is in place with stored payloads and document URLs. UniProt domain extraction, full-text ingestion, and LLM extraction are pending.
 - Sprint 3 (Graph core): **Not started.** GraphService, graph storage, and graph endpoints are pending.
 - Sprint 4 (UI and public): **Not started.** UI has a placeholder Knowledge Graph route only.
@@ -167,10 +167,10 @@ Short term (0-2 weeks)
 - Add admin-facing extraction metrics/overview endpoints once product requirements are clarified.
 
 Near term (2-6 weeks)
-- Finish Sprint 1 by adding **Mechanism** (domain + DB) and add DB persistence for Drug/Pathway and Variant/Phenotype structural fields.
+- Add DB persistence for Drug/Pathway and Variant/Phenotype structural fields.
 - Update TypeScript types and admin UI to surface the new entities once persistence is in place.
 - Define the graph export contract and data schema for downstream tooling.
- - Implement LLM-based extraction on stored full-text content and persist structured facts.
+- Implement LLM-based extraction on stored full-text content and persist structured facts.
 
 Mid term (6-10 weeks)
 - Upgrade UniProt ingestion and enrich structural annotations.

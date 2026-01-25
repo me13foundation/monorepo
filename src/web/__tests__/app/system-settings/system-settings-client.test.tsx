@@ -12,6 +12,8 @@ import type { MaintenanceModeResponse } from '@/types/system-status'
 import type { SourceCatalogEntry } from '@/lib/types/data-discovery'
 import type { DataSourceAvailability } from '@/lib/api/data-source-activation'
 import type { ResearchSpace } from '@/types/research-space'
+import type { PaginatedResponse } from '@/types/generated'
+import type { Mechanism } from '@/types/mechanisms'
 
 const mockCreateUserAction = jest.fn()
 const mockLockUserAction = jest.fn()
@@ -39,6 +41,9 @@ jest.mock('@/components/system-settings/MaintenanceModePanel', () => ({
 
 jest.mock('@/components/system-settings/SpaceSourcePermissionsManager', () => ({
   SpaceSourcePermissionsManager: () => <div data-testid="space-source-permissions-manager" />,
+}))
+jest.mock('@/components/system-settings/MechanismManagementSection', () => ({
+  MechanismManagementSection: () => <div data-testid="mechanism-management-section" />,
 }))
 
 jest.mock('sonner', () => ({
@@ -76,6 +81,7 @@ const baseMaintenanceState: MaintenanceModeResponse | null = null
 const baseCatalogEntries: SourceCatalogEntry[] = []
 const baseAvailabilitySummaries: DataSourceAvailability[] = []
 const baseSpaces: ResearchSpace[] = []
+const baseMechanisms: PaginatedResponse<Mechanism> | null = null
 
 const baseProps: SystemSettingsProps = {
   initialParams,
@@ -87,6 +93,7 @@ const baseProps: SystemSettingsProps = {
   catalogEntries: baseCatalogEntries,
   availabilitySummaries: baseAvailabilitySummaries,
   spaces: baseSpaces,
+  mechanisms: baseMechanisms,
   currentUserId: 'admin-1',
   isAdmin: true,
 }
